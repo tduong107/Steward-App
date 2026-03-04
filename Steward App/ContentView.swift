@@ -1,66 +1,61 @@
-//
-//  ContentView.swift
-//  Steward App
-//
-//  Created by Tienhung Duong on 3/3/26.
-//
-
 import SwiftUI
-import SwiftData
 
 struct ContentView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query private var items: [Item]
+    @State private var viewModel = WatchViewModel()
 
     var body: some View {
-        NavigationSplitView {
-            List {
-                ForEach(items) { item in
-                    NavigationLink {
-                        Text("Item at \(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))")
-                    } label: {
-                        Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
+        ZStack {
+            VStack(spacing: 0) {
+                // Main content area
+                NavigationStack {
+                    Group {
+                        switch viewModel.selectedTab {
+                        case .home:
+                            HomeScreen()
+                        case .activity:
+                            ActivityScreen()
+                        case .settings:
+                            SettingsScreen()
+                        }
+                    }
+                    .navigationDestination(isPresented: $viewModel.showDetail) {
+                        if let watch = viewModel.selectedWatch {
+                            DetailScreen(watch: watch)
+                        }
                     }
                 }
-                .onDelete(perform: deleteItems)
-            }
-#if os(macOS)
-            .navigationSplitViewColumnWidth(min: 180, ideal: 200)
-#endif
-            .toolbar {
-#if os(iOS)
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    EditButton()
-                }
-#endif
-                ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
+
+                // Custom tab bar
+                CustomTabBar(
+                    selectedTab: $viewModel.selectedTab,
+                    onChatTap: {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                            viewModel.isChatOpen = true
+                        }
                     }
-                }
+                )
             }
-        } detail: {
-            Text("Select an item")
-        }
-    }
 
-    private func addItem() {
-        withAnimation {
-            let newItem = Item(timestamp: Date())
-            modelContext.insert(newItem)
-        }
-    }
+            // Chat drawer overlay
+            if viewModel.isChatOpen {
+                ChatDrawer(isPresented: $viewModel.isChatOpen)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .zIndex(100)
+            }
 
-    private func deleteItems(offsets: IndexSet) {
-        withAnimation {
-            for index in offsets {
-                modelContext.delete(items[index])
+            // Action modal overlay
+            if let watch = viewModel.actionModalWatch {
+                ActionModal(watch: watch)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .zIndex(200)
             }
         }
+        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: viewModel.isChatOpen)
+        .animation(.spring(response: 0.3, dampingFraction: 0.85), value: viewModel.actionModalWatch != nil)
+        .environment(viewModel)
     }
 }
 
 #Preview {
     ContentView()
-        .modelContainer(for: Item.self, inMemory: true)
 }
