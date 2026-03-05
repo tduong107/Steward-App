@@ -3,7 +3,23 @@ import SwiftUI
 struct DetailScreen: View {
     let watch: Watch
     @Environment(WatchViewModel.self) private var viewModel
+    @Environment(SupabaseService.self) private var supabase
     @Environment(\.dismiss) private var dismiss
+
+    // Price history (generated once per view)
+    @State private var priceHistory: [PricePoint] = []
+    @State private var showShareSheet = false
+
+    // Real check results from Supabase
+    @State private var checkResults: [CheckResultDTO] = []
+    @State private var isLoadingChecks = true
+
+    /// Show price chart for price-related watches
+    private var showsPriceChart: Bool {
+        watch.actionType == .price ||
+        watch.condition.lowercased().contains("price") ||
+        watch.actionLabel.lowercased().contains("price")
+    }
 
     var body: some View {
         ScrollView {
@@ -28,7 +44,40 @@ struct DetailScreen: View {
                     .foregroundStyle(Theme.inkMid)
                 }
             }
+
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showShareSheet = true
+                } label: {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(Theme.ink)
+                }
+                .accessibilityLabel("Share this watch")
+            }
         }
+        .sheet(isPresented: $showShareSheet) {
+            ShareWatchSheet(watch: watch)
+        }
+        .onAppear {
+            if priceHistory.isEmpty && showsPriceChart {
+                priceHistory = PricePoint.mockHistory(for: watch.name)
+            }
+        }
+        .task {
+            await loadCheckResults()
+        }
+    }
+
+    // MARK: - Load Check Results
+
+    private func loadCheckResults() async {
+        do {
+            checkResults = try await supabase.fetchCheckResults(forWatchId: watch.id)
+        } catch {
+            // Silently fail — empty state will show "No checks yet"
+        }
+        isLoadingChecks = false
     }
 
     // MARK: - Header Card
@@ -91,12 +140,22 @@ struct DetailScreen: View {
                 changeBanner
             }
 
+            // Price History Chart (only for price-related watches)
+            if showsPriceChart && !priceHistory.isEmpty {
+                PriceHistoryChart(points: priceHistory, accentColor: Theme.accent)
+                    .padding(.bottom, 4)
+            }
+
             DetailRow(icon: "🎯", label: "Watching for", value: watch.condition)
             DetailRow(icon: "⚡", label: "AI will", value: watch.actionLabel, highlight: watch.triggered)
             DetailRow(icon: "⏱", label: "Check frequency", value: watch.checkFrequency)
             DetailRow(icon: "🔔", label: "Notify via", value: "Push notification · Email")
 
             actionButton
+
+            // Share card
+            shareCard
+
             recentChecks
         }
         .padding(.horizontal, 24)
@@ -165,45 +224,102 @@ struct DetailScreen: View {
         .accessibilityLabel(watch.triggered ? "Let Steward act now" : "Waiting for trigger")
     }
 
-    // MARK: - Recent Checks
+    // MARK: - Share Card (Feature 3)
+
+    private var shareCard: some View {
+        Button {
+            showShareSheet = true
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "person.2")
+                    .font(.system(size: 16))
+                    .foregroundStyle(Theme.accent)
+                    .frame(width: 36, height: 36)
+                    .background(Theme.accentLight)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Share this watch")
+                        .font(Theme.body(13, weight: .semibold))
+                        .foregroundStyle(Theme.ink)
+
+                    Text("Invite a friend to watch this too")
+                        .font(Theme.body(11))
+                        .foregroundStyle(Theme.inkLight)
+                }
+
+                Spacer()
+
+                Image(systemName: "arrow.up.forward")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Theme.accentMid)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(Theme.bgCard)
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(Theme.accentMid, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .padding(.top, 4)
+    }
+
+    // MARK: - Recent Checks (Real Data from Supabase)
 
     private var recentChecks: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Recent Checks")
-                .font(Theme.serif(15, weight: .semibold))
-                .foregroundStyle(Theme.ink)
-                .padding(.top, 8)
+            HStack {
+                Text("Recent Checks")
+                    .font(Theme.serif(15, weight: .semibold))
+                    .foregroundStyle(Theme.ink)
 
-            VStack(spacing: 0) {
-                ForEach(checkHistory.indices, id: \.self) { i in
-                    let check = checkHistory[i]
-                    HStack {
-                        Text(check.time)
-                            .font(Theme.body(12))
-                            .foregroundStyle(Theme.inkMid)
+                Spacer()
 
-                        Spacer()
+                if isLoadingChecks {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+            }
+            .padding(.top, 8)
 
-                        Text(check.note)
-                            .font(Theme.body(12, weight: check.changed ? .semibold : .regular))
-                            .foregroundStyle(check.changed ? Theme.accent : Theme.inkLight)
-                    }
-                    .padding(.vertical, 11)
+            if checkResults.isEmpty && !isLoadingChecks {
+                // Empty state
+                HStack {
+                    Image(systemName: "clock")
+                        .font(.system(size: 14))
+                        .foregroundStyle(Theme.inkLight)
 
-                    if i < checkHistory.count - 1 {
-                        Divider().foregroundStyle(Theme.border)
+                    Text("No checks yet — Steward will start monitoring soon")
+                        .font(Theme.body(12))
+                        .foregroundStyle(Theme.inkLight)
+                }
+                .padding(.vertical, 16)
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(Array(checkResults.enumerated()), id: \.element.id) { index, result in
+                        HStack {
+                            Text(result.checkedAt.formatted(.relative(presentation: .named)))
+                                .font(Theme.body(12))
+                                .foregroundStyle(Theme.inkMid)
+
+                            Spacer()
+
+                            Text(result.resultText)
+                                .font(Theme.body(12, weight: result.changed ? .semibold : .regular))
+                                .foregroundStyle(result.changed ? Theme.accent : Theme.inkLight)
+                                .lineLimit(1)
+                        }
+                        .padding(.vertical, 11)
+
+                        if index < checkResults.count - 1 {
+                            Divider().foregroundStyle(Theme.border)
+                        }
                     }
                 }
             }
         }
-    }
-
-    private var checkHistory: [(time: String, note: String, changed: Bool)] {
-        [
-            (time: "Just now", note: watch.triggered ? (watch.changeNote ?? "Change detected") : "No change", changed: watch.triggered),
-            (time: "5 min ago", note: "No change", changed: false),
-            (time: "10 min ago", note: "No change", changed: false),
-            (time: "15 min ago", note: "No change", changed: false),
-        ]
     }
 }

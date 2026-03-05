@@ -9,6 +9,9 @@ struct CustomTabBar: View {
             // Home tab
             tabButton(for: .home)
 
+            // Activity tab
+            tabButton(for: .activity)
+
             // AI Chat center button
             Button(action: onChatTap) {
                 Image(systemName: "sparkle")
@@ -22,8 +25,8 @@ struct CustomTabBar: View {
             .offset(y: -12)
             .accessibilityLabel("Open Steward AI chat")
 
-            // Activity tab (skip settings, put it after chat)
-            tabButton(for: .activity)
+            // Settings tab
+            tabButton(for: .settings)
         }
         .padding(.horizontal, 24)
         .padding(.top, 10)

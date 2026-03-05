@@ -9,7 +9,13 @@ struct HomeScreen: View {
                 headerSection
                 chatPromptBar
                 triggeredAlerts
-                watchList
+
+                if viewModel.watches.isEmpty {
+                    emptyState
+                } else {
+                    watchList
+                }
+
                 addWatchCard
             }
             .padding(.bottom, 24)
@@ -23,15 +29,7 @@ struct HomeScreen: View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 8) {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Theme.accent)
-                        .frame(width: 26, height: 26)
-                        .overlay(
-                            Text("S")
-                                .font(.system(size: 14, weight: .bold, design: .serif))
-                                .italic()
-                                .foregroundStyle(.white)
-                        )
+                    StewardLogo(size: 30)
 
                     Text("Steward")
                         .font(Theme.serif(22, weight: .bold))
@@ -45,18 +43,31 @@ struct HomeScreen: View {
 
             Spacer()
 
-            Button(action: {}) {
-                Image(systemName: "bell")
-                    .font(.system(size: 16))
-                    .foregroundStyle(Theme.ink)
-                    .frame(width: 38, height: 38)
-                    .background(Theme.bgCard)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Theme.border, lineWidth: 1)
-                    )
-                    .shadow(color: .black.opacity(0.04), radius: 8, y: 4)
+            Button(action: { viewModel.selectedTab = .activity }) {
+                ZStack(alignment: .topTrailing) {
+                    Image(systemName: "bell")
+                        .font(.system(size: 16))
+                        .foregroundStyle(Theme.ink)
+                        .frame(width: 38, height: 38)
+                        .background(Theme.bgCard)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Theme.border, lineWidth: 1)
+                        )
+                        .shadow(color: .black.opacity(0.04), radius: 8, y: 4)
+
+                    // Badge for triggered watches
+                    if !viewModel.triggeredWatches.isEmpty {
+                        Text("\(viewModel.triggeredWatches.count)")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 18, height: 18)
+                            .background(Theme.red)
+                            .clipShape(Circle())
+                            .offset(x: 4, y: -4)
+                    }
+                }
             }
             .accessibilityLabel("Notifications")
         }
@@ -71,16 +82,7 @@ struct HomeScreen: View {
             viewModel.isChatOpen = true
         } label: {
             HStack(spacing: 10) {
-                Image(systemName: "sparkle")
-                    .font(.system(size: 14))
-                    .foregroundStyle(Theme.accent)
-                    .frame(width: 30, height: 30)
-                    .background(Theme.accentLight)
-                    .clipShape(RoundedRectangle(cornerRadius: 9))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 9)
-                            .stroke(Theme.accentMid, lineWidth: 1)
-                    )
+                StewardLogo(size: 30)
 
                 Text("Ask Steward to watch something…")
                     .font(Theme.body(13))
@@ -125,6 +127,30 @@ struct HomeScreen: View {
         }
     }
 
+    // MARK: - Empty State
+
+    private var emptyState: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "eye.slash")
+                .font(.system(size: 36))
+                .foregroundStyle(Theme.inkLight)
+
+            VStack(spacing: 6) {
+                Text("No watches yet")
+                    .font(Theme.serif(17, weight: .semibold))
+                    .foregroundStyle(Theme.ink)
+
+                Text("Tell Steward what to monitor and it'll\nwatch the web for you around the clock.")
+                    .font(Theme.body(13))
+                    .foregroundStyle(Theme.inkLight)
+                    .multilineTextAlignment(.center)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 40)
+        .padding(.horizontal, 24)
+    }
+
     // MARK: - Watch List
 
     private var watchList: some View {
@@ -145,6 +171,13 @@ struct HomeScreen: View {
                 ForEach(viewModel.watches) { watch in
                     WatchCard(watch: watch) {
                         viewModel.openDetail(for: watch)
+                    }
+                    .contextMenu {
+                        Button(role: .destructive) {
+                            viewModel.removeWatch(watch)
+                        } label: {
+                            Label("Delete Watch", systemImage: "trash")
+                        }
                     }
                     .transition(.asymmetric(
                         insertion: .move(edge: .bottom).combined(with: .opacity),

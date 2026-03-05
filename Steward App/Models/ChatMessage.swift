@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 
 enum ChatRole {
     case steward
@@ -18,26 +19,29 @@ struct ChatMessage: Identifiable {
     let text: String
     var suggestions: [String]?
     var actionCards: [ActionCard]?
+    var image: UIImage? // Optional attached screenshot/photo
 
     init(
         id: UUID = UUID(),
         role: ChatRole,
         text: String,
         suggestions: [String]? = nil,
-        actionCards: [ActionCard]? = nil
+        actionCards: [ActionCard]? = nil,
+        image: UIImage? = nil
     ) {
         self.id = id
         self.role = role
         self.text = text
         self.suggestions = suggestions
         self.actionCards = actionCards
+        self.image = image
     }
 }
 
 extension ChatMessage {
     static let initial = ChatMessage(
         role: .steward,
-        text: "Good morning. I'm Steward — I watch websites and act on your behalf so you don't have to. What would you like me to keep an eye on?",
-        suggestions: ["Monitor a product price", "Watch for a restock", "Track an appointment slot", "Something else"]
+        text: "Hello! 👋 I'm Steward, your personal web watcher. I keep an eye on websites and take action on your behalf. What can I help you with?",
+        suggestions: ["Monitor a product price", "Watch for a restock", "Track an appointment slot", "Import a wishlist"]
     )
 }

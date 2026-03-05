@@ -8,134 +8,205 @@ final class ChatViewModel {
     var messages: [ChatMessage] = [ChatMessage.initial]
     var inputText = ""
     var isTyping = false
+    var pendingWatch: Watch?
+    var pendingWishlistWatches: [Watch] = []
+    var pendingImage: UIImage? // Staged image before sending
 
-    // Multi-turn conversation state
-    private enum ConversationStage {
-        case initial
-        case awaitingURL(intent: String)
-        case awaitingConfirmation(url: String, actionType: ActionType)
-        case complete
-    }
+    /// Full conversation history for the AI (role + content pairs)
+    private var conversationHistory: [AIService.Message] = []
 
-    private var stage: ConversationStage = .initial
+    // MARK: - Public API
 
     func send(_ text: String? = nil) {
         let messageText = text ?? inputText
-        guard !messageText.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        let image = pendingImage
 
-        let userMsg = ChatMessage(role: .user, text: messageText)
+        // Allow sending if there's text OR an image
+        guard !messageText.trimmingCharacters(in: .whitespaces).isEmpty || image != nil else { return }
+
+        let displayText = messageText.trimmingCharacters(in: .whitespaces).isEmpty
+            ? "📸 [Screenshot]"
+            : messageText
+
+        let userMsg = ChatMessage(role: .user, text: displayText, image: image)
         withAnimation(.spring(response: 0.3)) {
             messages.append(userMsg)
         }
         inputText = ""
-
+        pendingImage = nil
         isTyping = true
 
+        // Compress image to JPEG for API
+        var imageData: Data?
+        if let image = image {
+            imageData = compressImage(image)
+        }
+
+        // Build the text for conversation history
+        let historyText = messageText.trimmingCharacters(in: .whitespaces).isEmpty
+            ? "I'm sending you a screenshot. What product/item is this? Help me set up a watch for it."
+            : messageText
+
+        // Add to conversation history
+        conversationHistory.append(AIService.Message(role: "user", content: historyText, imageData: imageData))
+
         Task {
-            try? await Task.sleep(for: .seconds(1.0))
-            let replies = buildReply(for: messageText)
-            withAnimation(.spring(response: 0.3)) {
-                isTyping = false
-                messages.append(contentsOf: replies)
+            do {
+                let response = try await AIService.shared.chat(messages: conversationHistory)
+
+                // Parse AI response for display text, watch JSON, suggestions, and proposal flag
+                let parsed = parseResponse(response)
+
+                // Add full response (with markers) to history so AI has context
+                conversationHistory.append(AIService.Message(role: "assistant", content: response))
+
+                withAnimation(.spring(response: 0.3)) {
+                    isTyping = false
+                    messages.append(ChatMessage(
+                        role: .steward,
+                        text: parsed.displayText,
+                        suggestions: parsed.suggestions
+                    ))
+                }
+
+                // Create watch if AI included the marker
+                if let json = parsed.watchJSON {
+                    createWatchFromJSON(json)
+                }
+
+            } catch {
+                let errorDetail = error.localizedDescription
+                withAnimation(.spring(response: 0.3)) {
+                    isTyping = false
+                    messages.append(ChatMessage(
+                        role: .steward,
+                        text: "Sorry, I had trouble connecting. Error: \(errorDetail)"
+                    ))
+                }
+                print("[ChatViewModel] AI error: \(error)")
             }
         }
+    }
+
+    func clearPendingImage() {
+        pendingImage = nil
     }
 
     func reset() {
         messages = [ChatMessage.initial]
         inputText = ""
         isTyping = false
-        stage = .initial
+        pendingWatch = nil
+        pendingWishlistWatches = []
+        pendingImage = nil
+        conversationHistory = []
     }
 
-    // MARK: - Conversation Logic
+    // MARK: - Image Compression
 
-    private func buildReply(for text: String) -> [ChatMessage] {
-        let lower = text.lowercased()
+    /// Compresses and resizes image for API (max ~1MB, max 1568px on longest side)
+    private func compressImage(_ image: UIImage) -> Data? {
+        let maxDimension: CGFloat = 1024
+        let size = image.size
 
-        switch stage {
-        case .initial:
-            return handleInitialMessage(lower, original: text)
-        case .awaitingURL(let intent):
-            return handleURLInput(lower, intent: intent)
-        case .awaitingConfirmation(let url, let actionType):
-            return handleConfirmation(lower, url: url, actionType: actionType)
-        case .complete:
-            stage = .initial
-            return [ChatMessage(
-                role: .steward,
-                text: "Anything else you'd like me to watch?",
-                suggestions: ["Monitor a product price", "Watch for a restock", "Track an appointment slot"]
-            )]
+        var newSize = size
+        if size.width > maxDimension || size.height > maxDimension {
+            let ratio = min(maxDimension / size.width, maxDimension / size.height)
+            newSize = CGSize(width: size.width * ratio, height: size.height * ratio)
         }
+
+        let renderer = UIGraphicsImageRenderer(size: newSize)
+        let resized = renderer.image { _ in
+            image.draw(in: CGRect(origin: .zero, size: newSize))
+        }
+
+        return resized.jpegData(compressionQuality: 0.7)
     }
 
-    private func handleInitialMessage(_ lower: String, original: String) -> [ChatMessage] {
-        if lower.contains("price") || lower.contains("tesla") || lower.contains("drop") {
-            stage = .awaitingURL(intent: "price")
-            return [ChatMessage(
-                role: .steward,
-                text: "I can watch that page for a price change. What's the URL?"
-            )]
-        }
+    // MARK: - Parse AI Response
 
-        if lower.contains("restock") || lower.contains("stock") || lower.contains("nike") || lower.contains("shoe") {
-            stage = .awaitingURL(intent: "restock")
-            return [ChatMessage(
-                role: .steward,
-                text: "Got it — I'll monitor that page for a restock. Paste the product URL and I'll get started."
-            )]
-        }
-
-        if lower.contains("appointment") || lower.contains("book") || lower.contains("slot") {
-            stage = .awaitingURL(intent: "appointment")
-            return [ChatMessage(
-                role: .steward,
-                text: "I can watch for an open slot and book it the moment it appears. What site should I monitor?"
-            )]
-        }
-
-        if lower.contains("http") || lower.contains(".com") || lower.contains("www") {
-            return handleURLDetected(lower)
-        }
-
-        stage = .awaitingURL(intent: "general")
-        return [ChatMessage(
-            role: .steward,
-            text: "Sure — to get started, share the URL of the page you'd like me to watch. I'll scan it and suggest the best actions."
-        )]
+    struct ParsedResponse {
+        let displayText: String
+        let watchJSON: String?
+        let suggestions: [String]?
+        let isProposal: Bool
     }
 
-    private func handleURLInput(_ lower: String, intent: String) -> [ChatMessage] {
-        if lower.contains("http") || lower.contains(".com") || lower.contains("www") || lower.contains(".") {
-            return handleURLDetected(lower)
+    /// Extracts display text, optional watch JSON, suggestions, and proposal flag from AI response
+    private func parseResponse(_ response: String) -> ParsedResponse {
+        var text = response
+
+        // 1. Extract [CREATE_WATCH] JSON if present
+        var watchJSON: String?
+        if let regex = try? NSRegularExpression(pattern: "\\[CREATE_WATCH\\](.*?)\\[/CREATE_WATCH\\]", options: .dotMatchesLineSeparators),
+           let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+           let jsonRange = Range(match.range(at: 1), in: text) {
+            watchJSON = String(text[jsonRange])
+            text = text.replacingOccurrences(of: "\\[CREATE_WATCH\\].*?\\[/CREATE_WATCH\\]", with: "", options: .regularExpression)
         }
-        return [ChatMessage(
-            role: .steward,
-            text: "That doesn't look like a URL. Please paste a link like nike.com/product or https://example.com"
-        )]
+
+        // 2. Check for [PROPOSE_WATCH] marker
+        let isProposal = text.contains("[PROPOSE_WATCH]")
+        text = text.replacingOccurrences(of: "[PROPOSE_WATCH]", with: "")
+
+        // 3. Extract [SUGGESTIONS] if present
+        var suggestions: [String]?
+        if let regex = try? NSRegularExpression(pattern: "\\[SUGGESTIONS\\](.*?)\\[/SUGGESTIONS\\]", options: .dotMatchesLineSeparators),
+           let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+           let sugRange = Range(match.range(at: 1), in: text) {
+            let raw = String(text[sugRange])
+            suggestions = raw.components(separatedBy: "|").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+            text = text.replacingOccurrences(of: "\\[SUGGESTIONS\\].*?\\[/SUGGESTIONS\\]", with: "", options: .regularExpression)
+        }
+
+        // 4. If it's a proposal, override suggestions with confirm/deny buttons
+        if isProposal {
+            suggestions = ["Yes, set it up! ✅", "No, let me change something"]
+        }
+
+        return ParsedResponse(
+            displayText: text.trimmingCharacters(in: .whitespacesAndNewlines),
+            watchJSON: watchJSON,
+            suggestions: suggestions,
+            isProposal: isProposal
+        )
     }
 
-    private func handleURLDetected(_ lower: String) -> [ChatMessage] {
-        let url = lower.trimmingCharacters(in: .whitespaces)
-        stage = .awaitingConfirmation(url: url, actionType: .notify)
-        return [ChatMessage(
-            role: .steward,
-            text: "I've scanned that page. Here's what I can do for you automatically:",
-            actionCards: [
-                ActionCard(icon: "bell", label: "Notify me when anything changes", type: .notify),
-                ActionCard(icon: "cart", label: "Add to cart when back in stock", type: .cart),
-                ActionCard(icon: "chart.line.downtrend.xyaxis", label: "Alert me if price drops", type: .price),
-                ActionCard(icon: "doc.text", label: "Submit a form on my behalf", type: .form),
-            ]
-        )]
-    }
+    // MARK: - Create Watch from AI JSON
 
-    private func handleConfirmation(_ lower: String, url: String, actionType: ActionType) -> [ChatMessage] {
-        stage = .complete
-        return [ChatMessage(
-            role: .steward,
-            text: "All set! I'll start monitoring right away and let you know the moment something changes. You can check the status on your home screen."
-        )]
+    private func createWatchFromJSON(_ json: String) {
+        guard let data = json.data(using: .utf8) else { return }
+
+        struct WatchPayload: Codable {
+            let emoji: String
+            let name: String
+            let url: String
+            let condition: String
+            let actionLabel: String
+            let actionType: String
+        }
+
+        do {
+            let payload = try JSONDecoder().decode(WatchPayload.self, from: data)
+            let actionType = ActionType(rawValue: payload.actionType) ?? .notify
+
+            // Ensure URL has a protocol
+            var url = payload.url
+            if !url.lowercased().hasPrefix("http") {
+                url = "https://\(url)"
+            }
+
+            let watch = Watch(
+                emoji: payload.emoji,
+                name: payload.name,
+                url: url,
+                condition: payload.condition,
+                actionLabel: payload.actionLabel,
+                actionType: actionType
+            )
+            pendingWatch = watch
+        } catch {
+            print("[ChatViewModel] Failed to parse watch JSON: \(error)")
+        }
     }
 }

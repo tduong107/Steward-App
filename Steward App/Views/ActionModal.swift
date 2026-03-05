@@ -146,50 +146,203 @@ struct ActionModal: View {
         }
     }
 
-    // MARK: - Done State
+    // MARK: - Done State (with Smart Rewatch Suggestions)
 
     private var doneContent: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "checkmark")
-                .font(.system(size: 26, weight: .semibold))
-                .foregroundStyle(Theme.accent)
-                .frame(width: 64, height: 64)
-                .background(Theme.accentLight)
-                .clipShape(Circle())
-                .overlay(
-                    Circle()
-                        .stroke(Theme.accentMid, lineWidth: 1.5)
-                )
-                .padding(.top, 20)
-
-            Text("Done — consider it handled.")
-                .font(Theme.serif(18, weight: .bold))
-                .foregroundStyle(Theme.ink)
-
-            Text("Steward successfully completed \"\(watch.actionLabel)\"")
-                .font(Theme.body(13))
-                .foregroundStyle(Theme.inkMid)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 24)
-
-            Button {
-                viewModel.dismissAction()
-            } label: {
-                Text("Back to home")
-                    .font(Theme.body(14, weight: .bold))
+        ScrollView {
+            VStack(spacing: 16) {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 26, weight: .semibold))
                     .foregroundStyle(Theme.accent)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
+                    .frame(width: 64, height: 64)
                     .background(Theme.accentLight)
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .clipShape(Circle())
                     .overlay(
-                        RoundedRectangle(cornerRadius: 14)
-                            .stroke(Theme.accentMid, lineWidth: 1)
+                        Circle()
+                            .stroke(Theme.accentMid, lineWidth: 1.5)
                     )
+                    .padding(.top, 20)
+
+                Text("Done, consider it handled!")
+                    .font(Theme.serif(18, weight: .bold))
+                    .foregroundStyle(Theme.ink)
+
+                Text("Steward successfully completed \"\(watch.actionLabel)\"")
+                    .font(Theme.body(13))
+                    .foregroundStyle(Theme.inkMid)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 24)
+
+                // Smart Rewatch Suggestions
+                rewatchSuggestions
+
+                Button {
+                    viewModel.dismissAction()
+                } label: {
+                    Text("Back to home")
+                        .font(Theme.body(14, weight: .bold))
+                        .foregroundStyle(Theme.accent)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(Theme.accentLight)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14)
+                                .stroke(Theme.accentMid, lineWidth: 1)
+                        )
+                }
+                .padding(.horizontal, 24)
+                .padding(.bottom, 40)
             }
-            .padding(.horizontal, 24)
-            .padding(.bottom, 40)
         }
+    }
+
+    // MARK: - Smart Rewatch Suggestions
+
+    private var rewatchSuggestions: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.gold)
+
+                Text("Steward suggests")
+                    .font(Theme.body(12, weight: .semibold))
+                    .foregroundStyle(Theme.ink)
+            }
+            .padding(.top, 4)
+
+            ForEach(suggestions, id: \.label) { suggestion in
+                Button {
+                    viewModel.addQuickWatch(
+                        emoji: suggestion.emoji,
+                        name: suggestion.name,
+                        url: suggestion.url,
+                        condition: suggestion.condition,
+                        actionLabel: suggestion.label,
+                        actionType: suggestion.actionType
+                    )
+                } label: {
+                    HStack(spacing: 10) {
+                        Text(suggestion.emoji)
+                            .font(.system(size: 16))
+                            .frame(width: 36, height: 36)
+                            .background(Theme.bgDeep)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(suggestion.label)
+                                .font(Theme.body(12, weight: .semibold))
+                                .foregroundStyle(Theme.ink)
+                                .lineLimit(1)
+
+                            Text(suggestion.subtitle)
+                                .font(Theme.body(11))
+                                .foregroundStyle(Theme.inkLight)
+                                .lineLimit(1)
+                        }
+
+                        Spacer()
+
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 20))
+                            .foregroundStyle(Theme.accent)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background(Theme.bg)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Theme.border, lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 24)
+        .padding(.top, 4)
+    }
+
+    /// Context-aware suggestions based on the watch that was just acted upon
+    private var suggestions: [RewatchSuggestion] {
+        let urlLower = watch.url.lowercased()
+
+        // Shopping: suggest restock watch + related items
+        if watch.actionType == .cart || urlLower.contains("nike") || urlLower.contains("amazon") || urlLower.contains("shopify") {
+            return [
+                RewatchSuggestion(
+                    emoji: "🔄",
+                    name: "\(watch.name) Restocks",
+                    url: watch.url,
+                    condition: "Back in stock in your size",
+                    label: "Watch for future restocks",
+                    subtitle: "Get notified when \(watch.name) restocks",
+                    actionType: .cart
+                ),
+                RewatchSuggestion(
+                    emoji: "📉",
+                    name: "\(watch.name) Price",
+                    url: watch.url,
+                    condition: "Price drops",
+                    label: "Track price drops",
+                    subtitle: "Know when the price goes down",
+                    actionType: .price
+                ),
+            ]
+        }
+
+        // Price: suggest restock or deeper discount
+        if watch.actionType == .price {
+            return [
+                RewatchSuggestion(
+                    emoji: "🎯",
+                    name: "\(watch.name)",
+                    url: watch.url,
+                    condition: "Price drops further",
+                    label: "Keep watching for a bigger drop",
+                    subtitle: "Alert me if it goes even lower",
+                    actionType: .price
+                ),
+                RewatchSuggestion(
+                    emoji: "🛒",
+                    name: "\(watch.name)",
+                    url: watch.url,
+                    condition: "Back in stock",
+                    label: "Watch for restocks too",
+                    subtitle: "Auto-add to cart when available",
+                    actionType: .cart
+                ),
+            ]
+        }
+
+        // Booking: suggest rebooking or similar
+        if watch.actionType == .book {
+            return [
+                RewatchSuggestion(
+                    emoji: "📅",
+                    name: "\(watch.name)",
+                    url: watch.url,
+                    condition: "Earlier slot opens",
+                    label: "Watch for an earlier slot",
+                    subtitle: "I'll rebook if something better opens",
+                    actionType: .book
+                ),
+            ]
+        }
+
+        // Default
+        return [
+            RewatchSuggestion(
+                emoji: "🔔",
+                name: "\(watch.name)",
+                url: watch.url,
+                condition: "Any future changes",
+                label: "Keep watching for changes",
+                subtitle: "Stay in the loop on updates",
+                actionType: .notify
+            ),
+        ]
     }
 
     // MARK: - Info Row
@@ -215,4 +368,16 @@ struct ActionModal: View {
             }
         }
     }
+}
+
+// MARK: - Rewatch Suggestion Model
+
+private struct RewatchSuggestion {
+    let emoji: String
+    let name: String
+    let url: String
+    let condition: String
+    let label: String
+    let subtitle: String
+    let actionType: ActionType
 }

@@ -1,8 +1,14 @@
 import SwiftUI
+import PhotosUI
 
 struct ChatDrawer: View {
     @State private var chatVM = ChatViewModel()
     @Binding var isPresented: Bool
+    @Environment(WatchViewModel.self) private var watchVM
+
+    @FocusState private var isInputFocused: Bool
+    @State private var selectedPhotoItem: PhotosPickerItem?
+    @State private var showImageSourcePicker = false
 
     var body: some View {
         GeometryReader { geo in
@@ -10,13 +16,17 @@ struct ChatDrawer: View {
                 // Backdrop
                 Color.black.opacity(0.4)
                     .ignoresSafeArea()
-                    .onTapGesture { isPresented = false }
+                    .onTapGesture {
+                        isInputFocused = false
+                        isPresented = false
+                    }
 
-                // Sheet
+                // Sheet — respects keyboard safe area
                 VStack(spacing: 0) {
                     dragHandle
                     chatHeader
                     messageList
+                    imagePreview
                     inputBar
                 }
                 .frame(maxHeight: geo.size.height * 0.82)
@@ -25,7 +35,31 @@ struct ChatDrawer: View {
                 .shadow(color: .black.opacity(0.15), radius: 24, y: -4)
                 .transition(.move(edge: .bottom))
             }
-            .ignoresSafeArea(edges: .bottom)
+        }
+        .onChange(of: chatVM.messages.count) {
+            // Bridge single watch creation
+            if let watch = chatVM.pendingWatch {
+                watchVM.addWatch(watch)
+                chatVM.pendingWatch = nil
+            }
+
+            // Bridge wishlist bulk import
+            if !chatVM.pendingWishlistWatches.isEmpty {
+                for watch in chatVM.pendingWishlistWatches {
+                    watchVM.addWatch(watch)
+                }
+                chatVM.pendingWishlistWatches = []
+            }
+        }
+        .onChange(of: selectedPhotoItem) {
+            Task {
+                if let item = selectedPhotoItem,
+                   let data = try? await item.loadTransferable(type: Data.self),
+                   let uiImage = UIImage(data: data) {
+                    chatVM.pendingImage = uiImage
+                }
+                selectedPhotoItem = nil
+            }
         }
     }
 
@@ -40,12 +74,7 @@ struct ChatDrawer: View {
 
             HStack {
                 HStack(spacing: 10) {
-                    Image(systemName: "sparkle")
-                        .font(.system(size: 16))
-                        .foregroundStyle(.white)
-                        .frame(width: 34, height: 34)
-                        .background(Theme.accent)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                    StewardLogo(size: 34)
 
                     VStack(alignment: .leading, spacing: 1) {
                         Text("Steward AI")
@@ -125,10 +154,65 @@ struct ChatDrawer: View {
         }
     }
 
+    // MARK: - Image Preview (staged image before sending)
+
+    private var imagePreview: some View {
+        Group {
+            if let image = chatVM.pendingImage {
+                HStack(spacing: 10) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 60, height: 60)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(Theme.border, lineWidth: 1)
+                        )
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Screenshot attached")
+                            .font(Theme.body(12, weight: .medium))
+                            .foregroundStyle(Theme.ink)
+
+                        Text("Send to analyze")
+                            .font(Theme.body(11))
+                            .foregroundStyle(Theme.inkLight)
+                    }
+
+                    Spacer()
+
+                    Button {
+                        withAnimation(.spring(response: 0.3)) {
+                            chatVM.clearPendingImage()
+                        }
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 20))
+                            .foregroundStyle(Theme.inkLight)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(Theme.bgDeep)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+    }
+
     // MARK: - Input Bar
 
     private var inputBar: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
+            // Photo picker button
+            PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+                Image(systemName: "photo.on.rectangle.angled")
+                    .font(.system(size: 18))
+                    .foregroundStyle(Theme.inkLight)
+                    .frame(width: 36, height: 42)
+            }
+            .accessibilityLabel("Attach screenshot")
+
             TextField("Tell Steward what to watch…", text: $chatVM.inputText)
                 .font(Theme.body(13))
                 .padding(.horizontal, 14)
@@ -139,6 +223,7 @@ struct ChatDrawer: View {
                     RoundedRectangle(cornerRadius: 14)
                         .stroke(Theme.border, lineWidth: 1)
                 )
+                .focused($isInputFocused)
                 .submitLabel(.send)
                 .onSubmit {
                     chatVM.send()
@@ -149,12 +234,12 @@ struct ChatDrawer: View {
             } label: {
                 Image(systemName: "arrow.up")
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(chatVM.inputText.trimmingCharacters(in: .whitespaces).isEmpty ? Theme.inkLight : .white)
+                    .foregroundStyle(canSend ? .white : Theme.inkLight)
                     .frame(width: 42, height: 42)
-                    .background(chatVM.inputText.trimmingCharacters(in: .whitespaces).isEmpty ? Theme.bgDeep : Theme.accent)
+                    .background(canSend ? Theme.accent : Theme.bgDeep)
                     .clipShape(RoundedRectangle(cornerRadius: 13))
             }
-            .disabled(chatVM.inputText.trimmingCharacters(in: .whitespaces).isEmpty)
+            .disabled(!canSend)
             .accessibilityLabel("Send message")
         }
         .padding(.horizontal, 16)
@@ -163,6 +248,11 @@ struct ChatDrawer: View {
         .overlay(alignment: .top) {
             Divider().foregroundStyle(Theme.border)
         }
+    }
+
+    /// Send button is enabled when there's text OR a pending image
+    private var canSend: Bool {
+        !chatVM.inputText.trimmingCharacters(in: .whitespaces).isEmpty || chatVM.pendingImage != nil
     }
 }
 
@@ -180,12 +270,7 @@ struct ChatMessageView: View {
                 // Steward avatar
                 if message.role == .steward {
                     HStack(spacing: 6) {
-                        Image(systemName: "sparkle")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.white)
-                            .frame(width: 22, height: 22)
-                            .background(Theme.accent)
-                            .clipShape(RoundedRectangle(cornerRadius: 7))
+                        StewardLogo(size: 22)
 
                         Text("Steward")
                             .font(Theme.body(11))
@@ -193,15 +278,30 @@ struct ChatMessageView: View {
                     }
                 }
 
-                // Bubble
-                Text(message.text)
-                    .font(Theme.body(13))
-                    .foregroundStyle(message.role == .user ? .white : Theme.ink)
-                    .lineSpacing(4)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 11)
-                    .background(message.role == .user ? Theme.accent : Theme.bgDeep)
-                    .clipShape(ChatBubbleShape(isUser: message.role == .user))
+                // Image attachment (if present)
+                if let image = message.image {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(maxWidth: 200, maxHeight: 200)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14)
+                                .stroke(message.role == .user ? Color.white.opacity(0.2) : Theme.border, lineWidth: 1)
+                        )
+                }
+
+                // Bubble (hide if text is just the screenshot placeholder and image exists)
+                if message.image == nil || message.text != "📸 [Screenshot]" {
+                    Text(message.text)
+                        .font(Theme.body(13))
+                        .foregroundStyle(message.role == .user ? .white : Theme.ink)
+                        .lineSpacing(4)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 11)
+                        .background(message.role == .user ? Theme.accent : Theme.bgDeep)
+                        .clipShape(ChatBubbleShape(isUser: message.role == .user))
+                }
 
                 // Suggestions
                 if let suggestions = message.suggestions {
@@ -317,12 +417,7 @@ struct TypingIndicator: View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 6) {
-                    Image(systemName: "sparkle")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.white)
-                        .frame(width: 22, height: 22)
-                        .background(Theme.accent)
-                        .clipShape(RoundedRectangle(cornerRadius: 7))
+                    StewardLogo(size: 22)
 
                     Text("Steward")
                         .font(Theme.body(11))

@@ -1,12 +1,18 @@
 import SwiftUI
+import SwiftData
 
 struct ContentView: View {
     @State private var viewModel = WatchViewModel()
+    @State private var realtimeManager = RealtimeManager()
+    @Environment(\.modelContext) private var modelContext
+    @Environment(AuthManager.self) private var authManager
+    @Environment(SupabaseService.self) private var supabaseService
+    @AppStorage("isDarkMode") private var isDarkMode = true
 
     var body: some View {
         ZStack {
+            // Main app content
             VStack(spacing: 0) {
-                // Main content area
                 NavigationStack {
                     Group {
                         switch viewModel.selectedTab {
@@ -25,7 +31,6 @@ struct ContentView: View {
                     }
                 }
 
-                // Custom tab bar
                 CustomTabBar(
                     selectedTab: $viewModel.selectedTab,
                     onChatTap: {
@@ -52,10 +57,30 @@ struct ContentView: View {
         }
         .animation(.spring(response: 0.35, dampingFraction: 0.85), value: viewModel.isChatOpen)
         .animation(.spring(response: 0.3, dampingFraction: 0.85), value: viewModel.actionModalWatch != nil)
+        .preferredColorScheme(isDarkMode ? .dark : .light)
         .environment(viewModel)
+        .onAppear {
+            viewModel.configure(
+                with: modelContext,
+                auth: authManager,
+                supabase: supabaseService
+            )
+
+            // Start realtime subscriptions
+            if let userId = authManager.currentUserId {
+                realtimeManager.start(for: userId, viewModel: viewModel)
+            }
+        }
+        .onDisappear {
+            realtimeManager.stop()
+        }
     }
 }
 
 #Preview {
     ContentView()
+        .modelContainer(for: [Watch.self, ActivityItem.self], inMemory: true)
+        .environment(AuthManager())
+        .environment(SupabaseService())
+        .environment(NotificationManager())
 }
