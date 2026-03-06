@@ -15,5 +15,7 @@
 			</array>
 		</dict>
 	</array>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Steward needs access to your photos so you can share screenshots of products you'd like to watch.</string>
 </dict>
 </plist>

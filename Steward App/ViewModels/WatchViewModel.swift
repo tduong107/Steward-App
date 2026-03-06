@@ -376,32 +376,36 @@ final class WatchViewModel {
     func runAction() {
         actionState = .running
         Task {
-            try? await Task.sleep(for: .seconds(2.4))
+            guard let watch = actionModalWatch else {
+                actionState = .idle
+                return
+            }
+
+            // Mark the watch as acted upon locally
+            watch.triggered = false
+            watch.status = .watching
+            try? modelContext?.save()
+
+            // Sync the change to Supabase
+            if let userId = auth?.currentUserId {
+                let dto = watch.toDTO(userId: userId)
+                try? await supabase?.updateWatch(dto)
+            }
+
             withAnimation(.spring(response: 0.4)) {
                 actionState = .done
             }
-            if let watch = actionModalWatch {
-                watch.triggered = false
-                watch.status = .watching
-                try? modelContext?.save()
 
-                let activity = ActivityItem(
-                    icon: "checkmark",
-                    iconColorName: "accent",
-                    label: watch.actionLabel,
-                    subtitle: "\(watch.name) \u{00B7} AI acted",
-                    time: "Just now"
-                )
-                logActivity(activity, watchId: watch.id)
+            let activity = ActivityItem(
+                icon: "checkmark",
+                iconColorName: "accent",
+                label: watch.actionLabel,
+                subtitle: "\(watch.name) \u{00B7} Action completed",
+                time: "Just now"
+            )
+            logActivity(activity, watchId: watch.id)
 
-                // Update cloud
-                if let userId = auth?.currentUserId {
-                    let dto = watch.toDTO(userId: userId)
-                    try? await supabase?.updateWatch(dto)
-                }
-
-                fetchLocalWatches()
-            }
+            fetchLocalWatches()
         }
     }
 

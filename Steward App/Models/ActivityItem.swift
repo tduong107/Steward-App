@@ -38,7 +38,8 @@ final class ActivityItem {
     }
 }
 
-// MARK: - Sample Data (for first launch only)
+#if DEBUG
+// MARK: - Sample Data (for previews only)
 extension ActivityItem {
     static func createSamples() -> [ActivityItem] {
         [
@@ -50,3 +51,4 @@ extension ActivityItem {
         ]
     }
 }
+#endif

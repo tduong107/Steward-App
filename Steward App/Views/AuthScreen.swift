@@ -77,9 +77,10 @@ struct AuthScreen: View {
                             .multilineTextAlignment(.center)
                     }
 
-                    Text("By signing in, you agree to our Terms of Service and Privacy Policy.")
+                    Text("By signing in, you agree to our [\(Text("Terms of Service").underline())](https://steward.app/terms) and [\(Text("Privacy Policy").underline())](https://steward.app/privacy).")
                         .font(.system(size: 11, weight: .regular))
                         .foregroundStyle(mint.opacity(0.35))
+                        .tint(mint.opacity(0.6))
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 20)
                 }

@@ -1,10 +1,6 @@
 import SwiftUI
 
 struct SettingsScreen: View {
-    @AppStorage("confirmBeforeActing") private var confirmBeforeActing = true
-    @AppStorage("learningEnabled") private var learningEnabled = true
-    @AppStorage("emailDigest") private var emailDigest = "Daily"
-    @AppStorage("quietHoursEnabled") private var quietHoursEnabled = true
     @AppStorage("isDarkMode") private var isDarkMode = true
     @AppStorage("defaultCheckFrequency") private var defaultCheckFrequency = "Daily"
     @Environment(AuthManager.self) private var authManager
@@ -33,14 +29,6 @@ struct SettingsScreen: View {
                 .padding(.top, 20)
                 .padding(.bottom, 24)
 
-                // AI Behaviour
-                sectionHeader("AI Behaviour")
-                settingsCard {
-                    toggleRow(icon: "sparkle", label: "Confirm before acting", isOn: $confirmBeforeActing)
-                    Divider().foregroundStyle(Theme.border).padding(.leading, 52)
-                    toggleRow(icon: "brain", label: "Learn from my preferences", isOn: $learningEnabled)
-                }
-
                 // Appearance
                 sectionHeader("Appearance")
                 settingsCard {
@@ -51,10 +39,6 @@ struct SettingsScreen: View {
                 sectionHeader("Notifications")
                 settingsCard {
                     notificationToggle
-                    Divider().foregroundStyle(Theme.border).padding(.leading, 52)
-                    valueRow(icon: "envelope", label: "Email digests", value: emailDigest)
-                    Divider().foregroundStyle(Theme.border).padding(.leading, 52)
-                    toggleRow(icon: "moon", label: "Quiet hours", isOn: $quietHoursEnabled)
                 }
 
                 // Watch Preferences
@@ -72,7 +56,9 @@ struct SettingsScreen: View {
                     Divider().foregroundStyle(Theme.border).padding(.leading, 52)
                     restorePurchasesRow
                     Divider().foregroundStyle(Theme.border).padding(.leading, 52)
-                    valueRow(icon: "lock", label: "Privacy & data", value: "")
+                    privacyPolicyRow
+                    Divider().foregroundStyle(Theme.border).padding(.leading, 52)
+                    termsOfServiceRow
                 }
 
                 // Sign Out
@@ -236,6 +222,56 @@ struct SettingsScreen: View {
         }
         .buttonStyle(.plain)
         .disabled(subscriptionManager.isPurchasing)
+    }
+
+    // MARK: - Privacy Policy Row
+
+    private var privacyPolicyRow: some View {
+        Link(destination: URL(string: "https://steward.app/privacy")!) {
+            HStack(spacing: 12) {
+                Image(systemName: "lock")
+                    .font(.system(size: 16))
+                    .foregroundStyle(Theme.ink)
+                    .frame(width: 24)
+
+                Text("Privacy Policy")
+                    .font(Theme.body(13))
+                    .foregroundStyle(Theme.ink)
+
+                Spacer()
+
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Theme.borderMid)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+        }
+    }
+
+    // MARK: - Terms of Service Row
+
+    private var termsOfServiceRow: some View {
+        Link(destination: URL(string: "https://steward.app/terms")!) {
+            HStack(spacing: 12) {
+                Image(systemName: "doc.text")
+                    .font(.system(size: 16))
+                    .foregroundStyle(Theme.ink)
+                    .frame(width: 24)
+
+                Text("Terms of Service")
+                    .font(Theme.body(13))
+                    .foregroundStyle(Theme.ink)
+
+                Spacer()
+
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Theme.borderMid)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+        }
     }
 
     // MARK: - Account Row

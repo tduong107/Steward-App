@@ -302,7 +302,7 @@ struct PaywallScreen: View {
                         Text("Current Plan")
                             .font(Theme.body(14, weight: .bold))
                     } else {
-                        Text(product != nil ? "Subscribe for \(product!.displayPrice)" : "Loading…")
+                        Text(product.map { "Subscribe for \($0.displayPrice)" } ?? "Loading…")
                             .font(Theme.body(14, weight: .bold))
                     }
                 }

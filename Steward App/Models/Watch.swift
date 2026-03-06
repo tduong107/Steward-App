@@ -122,7 +122,8 @@ extension Watch {
     }
 }
 
-// MARK: - Sample Data (for first launch only)
+#if DEBUG
+// MARK: - Sample Data (for previews only)
 extension Watch {
     static func createSamples() -> [Watch] {
         [
@@ -159,3 +160,4 @@ extension Watch {
         ]
     }
 }
+#endif

@@ -6,6 +6,7 @@ struct PricePoint: Identifiable {
     let price: Double
 }
 
+#if DEBUG
 // MARK: - Mock Data Generator
 extension PricePoint {
     /// Generate realistic-looking price history for demo purposes
@@ -30,7 +31,10 @@ extension PricePoint {
 
         return points
     }
+}
+#endif
 
+extension PricePoint {
     /// The lowest price in a set of points
     static func lowestPrice(in points: [PricePoint]) -> PricePoint? {
         points.min(by: { $0.price < $1.price })
