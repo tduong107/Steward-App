@@ -12,6 +12,7 @@ final class ChatViewModel {
     var pendingWishlistWatches: [Watch] = []
     var pendingImage: UIImage? // Staged image before sending
     var shouldDismiss = false // Signal to close the chat drawer
+    var subscriptionTier: SubscriptionTier = .free // Set by caller to enable frequency prompts
 
     /// Full conversation history for the AI (role + content pairs)
     private var conversationHistory: [AIService.Message] = []
@@ -55,6 +56,11 @@ final class ChatViewModel {
                 if enriched != historyText {
                     historyText = enriched
                 }
+            }
+
+            // Inject subscription tier context on first message so AI knows which frequencies to offer
+            if conversationHistory.isEmpty && subscriptionTier != .free {
+                historyText = "[USER_TIER]\(subscriptionTier.rawValue)[/USER_TIER]\n" + historyText
             }
 
             // Add to conversation history (with enriched URL context)
@@ -446,6 +452,7 @@ final class ChatViewModel {
             let condition: String
             let actionLabel: String
             let actionType: String
+            let checkFrequency: String?
             let imageURL: String?
         }
 
@@ -459,6 +466,11 @@ final class ChatViewModel {
                 url = "https://\(url)"
             }
 
+            // Use AI-specified frequency, fall back to user's default, then "Daily"
+            let frequency = payload.checkFrequency
+                ?? UserDefaults.standard.string(forKey: "defaultCheckFrequency")
+                ?? "Daily"
+
             let watch = Watch(
                 emoji: payload.emoji,
                 name: payload.name,
@@ -466,6 +478,7 @@ final class ChatViewModel {
                 condition: payload.condition,
                 actionLabel: payload.actionLabel,
                 actionType: actionType,
+                checkFrequency: frequency,
                 imageURL: payload.imageURL
             )
             pendingWatch = watch

@@ -79,10 +79,21 @@ struct WatchCard: View {
                             .frame(width: 5, height: 5)
                             .modifier(watch.triggered ? PulseModifier() : PulseModifier(enabled: false))
 
-                        Text(watch.triggered ? (watch.changeNote ?? "") : watch.condition)
-                            .font(Theme.body(11, weight: watch.triggered ? .semibold : .regular))
-                            .foregroundStyle(watch.triggered ? Theme.accent : Theme.inkLight)
-                            .lineLimit(1)
+                        if watch.triggered {
+                            Image(systemName: "sparkle")
+                                .font(.system(size: 9))
+                                .foregroundStyle(Theme.accent)
+
+                            Text(watch.changeNote ?? "Change detected!")
+                                .font(Theme.body(11, weight: .semibold))
+                                .foregroundStyle(Theme.accent)
+                                .lineLimit(1)
+                        } else {
+                            Text(watch.condition)
+                                .font(Theme.body(11))
+                                .foregroundStyle(Theme.inkLight)
+                                .lineLimit(1)
+                        }
                     }
                     .padding(.top, 4)
                 }

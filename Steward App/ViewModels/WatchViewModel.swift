@@ -150,6 +150,16 @@ final class WatchViewModel {
             return
         }
 
+        // Apply user's default frequency if watch still has the default "Daily"
+        // (AI-specified frequencies are already non-"Daily" and won't be overridden)
+        if watch.checkFrequency == "Daily" {
+            let defaultFreq = UserDefaults.standard.string(forKey: "defaultCheckFrequency") ?? "Daily"
+            if let freq = CheckFrequency.from(string: defaultFreq),
+               subscriptionManager?.currentTier.includes(freq.requiredTier) == true {
+                watch.checkFrequency = defaultFreq
+            }
+        }
+
         // Insert locally first for instant UI
         context.insert(watch)
         try? context.save()

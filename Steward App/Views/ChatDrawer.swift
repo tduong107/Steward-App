@@ -5,6 +5,7 @@ struct ChatDrawer: View {
     @State private var chatVM = ChatViewModel()
     @Binding var isPresented: Bool
     @Environment(WatchViewModel.self) private var watchVM
+    @Environment(SubscriptionManager.self) private var subscriptionManager
 
     @FocusState private var isInputFocused: Bool
     @State private var selectedPhotoItem: PhotosPickerItem?
@@ -103,6 +104,9 @@ struct ChatDrawer: View {
                 // Send the captured URL back into chat
                 chatVM.send("I found it! Here's the URL: \(capturedURL)")
             }
+        }
+        .onAppear {
+            chatVM.subscriptionTier = subscriptionManager.currentTier
         }
     }
 

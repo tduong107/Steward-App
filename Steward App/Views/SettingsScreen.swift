@@ -6,9 +6,11 @@ struct SettingsScreen: View {
     @AppStorage("emailDigest") private var emailDigest = "Daily"
     @AppStorage("quietHoursEnabled") private var quietHoursEnabled = true
     @AppStorage("isDarkMode") private var isDarkMode = true
+    @AppStorage("defaultCheckFrequency") private var defaultCheckFrequency = "Daily"
     @Environment(AuthManager.self) private var authManager
     @Environment(NotificationManager.self) private var notificationManager
     @Environment(SubscriptionManager.self) private var subscriptionManager
+    @State private var showFrequencyPicker = false
 
     private var currentTier: SubscriptionTier {
         subscriptionManager.currentTier
@@ -53,6 +55,12 @@ struct SettingsScreen: View {
                     valueRow(icon: "envelope", label: "Email digests", value: emailDigest)
                     Divider().foregroundStyle(Theme.border).padding(.leading, 52)
                     toggleRow(icon: "moon", label: "Quiet hours", isOn: $quietHoursEnabled)
+                }
+
+                // Watch Preferences
+                sectionHeader("Watch Preferences")
+                settingsCard {
+                    defaultFrequencyRow
                 }
 
                 // Account
@@ -112,6 +120,53 @@ struct SettingsScreen: View {
     private func openAppSettings() {
         if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
             UIApplication.shared.open(settingsURL)
+        }
+    }
+
+    // MARK: - Default Frequency Row
+
+    private var defaultFrequencyRow: some View {
+        Button {
+            showFrequencyPicker = true
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "clock.arrow.circlepath")
+                    .font(.system(size: 16))
+                    .foregroundStyle(Theme.ink)
+                    .frame(width: 24)
+
+                Text("Default check frequency")
+                    .font(Theme.body(13))
+                    .foregroundStyle(Theme.ink)
+
+                Spacer()
+
+                // Show tier badge if non-free frequency is selected
+                if let freq = CheckFrequency.from(string: defaultCheckFrequency),
+                   freq.requiredTier != .free {
+                    Text(freq.requiredTier.displayName)
+                        .font(Theme.body(9, weight: .bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(freq.requiredTier == .premium ? Theme.gold : Theme.accent)
+                        .clipShape(Capsule())
+                }
+
+                Text(defaultCheckFrequency)
+                    .font(Theme.body(12, weight: .semibold))
+                    .foregroundStyle(Theme.accent)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Theme.borderMid)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+        }
+        .buttonStyle(.plain)
+        .sheet(isPresented: $showFrequencyPicker) {
+            FrequencyPickerSheet(selectedFrequency: $defaultCheckFrequency)
         }
     }
 
