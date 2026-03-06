@@ -41,14 +41,25 @@ struct PriceHistoryChart: View {
 
                 Spacer()
 
-                // Period label
-                Text("30 days")
-                    .font(Theme.body(11, weight: .medium))
-                    .foregroundStyle(Theme.inkLight)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .background(Theme.bgDeep)
-                    .clipShape(Capsule())
+                // Period label based on actual data range
+                if let firstDate = points.first?.date, let lastDate = points.last?.date {
+                    let days = max(1, Calendar.current.dateComponents([.day], from: firstDate, to: lastDate).day ?? 1)
+                    Text("\(days) day\(days == 1 ? "" : "s")")
+                        .font(Theme.body(11, weight: .medium))
+                        .foregroundStyle(Theme.inkLight)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(Theme.bgDeep)
+                        .clipShape(Capsule())
+                } else {
+                    Text("1 check")
+                        .font(Theme.body(11, weight: .medium))
+                        .foregroundStyle(Theme.inkLight)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(Theme.bgDeep)
+                        .clipShape(Capsule())
+                }
             }
 
             // Current price + change
@@ -58,45 +69,61 @@ struct PriceHistoryChart: View {
                     .foregroundStyle(Theme.ink)
                     .contentTransition(.numericText())
 
-                if selectedPoint == nil {
-                    HStack(spacing: 3) {
-                        Image(systemName: priceChange >= 0 ? "arrow.up.right" : "arrow.down.right")
-                            .font(.system(size: 10, weight: .bold))
+                if points.count >= 2 {
+                    if selectedPoint == nil {
+                        HStack(spacing: 3) {
+                            Image(systemName: priceChange >= 0 ? "arrow.up.right" : "arrow.down.right")
+                                .font(.system(size: 10, weight: .bold))
 
-                        Text("\(priceChange >= 0 ? "+" : "")\(String(format: "%.1f", priceChangePercent))%")
-                            .font(Theme.body(12, weight: .semibold))
+                            Text("\(priceChange >= 0 ? "+" : "")\(String(format: "%.1f", priceChangePercent))%")
+                                .font(Theme.body(12, weight: .semibold))
+                        }
+                        .foregroundStyle(priceChange >= 0 ? Theme.red : Theme.accent)
+                    } else if let sel = selectedPoint {
+                        Text(formatDate(sel.date))
+                            .font(Theme.body(12))
+                            .foregroundStyle(Theme.inkMid)
                     }
-                    .foregroundStyle(priceChange >= 0 ? Theme.red : Theme.accent)
-                } else if let sel = selectedPoint {
-                    Text(formatDate(sel.date))
+                } else {
+                    Text("First data point")
                         .font(Theme.body(12))
-                        .foregroundStyle(Theme.inkMid)
+                        .foregroundStyle(Theme.inkLight)
                 }
             }
 
             // Chart
             Chart(points) { point in
-                AreaMark(
-                    x: .value("Date", point.date),
-                    yStart: .value("Min", minPrice),
-                    yEnd: .value("Price", point.price)
-                )
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [accentColor.opacity(0.15), accentColor.opacity(0.02)],
-                        startPoint: .top,
-                        endPoint: .bottom
+                if points.count >= 2 {
+                    AreaMark(
+                        x: .value("Date", point.date),
+                        yStart: .value("Min", minPrice),
+                        yEnd: .value("Price", point.price)
                     )
-                )
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [accentColor.opacity(0.15), accentColor.opacity(0.02)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
 
-                LineMark(
-                    x: .value("Date", point.date),
-                    y: .value("Price", point.price)
-                )
-                .foregroundStyle(accentColor)
-                .lineStyle(StrokeStyle(lineWidth: 2))
+                    LineMark(
+                        x: .value("Date", point.date),
+                        y: .value("Price", point.price)
+                    )
+                    .foregroundStyle(accentColor)
+                    .lineStyle(StrokeStyle(lineWidth: 2))
+                }
 
-                if let sel = selectedPoint, sel.id == point.id {
+                // Show point mark for single data point or selected point
+                if points.count == 1 {
+                    PointMark(
+                        x: .value("Date", point.date),
+                        y: .value("Price", point.price)
+                    )
+                    .foregroundStyle(accentColor)
+                    .symbolSize(80)
+                } else if let sel = selectedPoint, sel.id == point.id {
                     PointMark(
                         x: .value("Date", point.date),
                         y: .value("Price", point.price)
@@ -107,7 +134,7 @@ struct PriceHistoryChart: View {
             }
             .chartYScale(domain: minPrice...maxPrice)
             .chartXAxis {
-                AxisMarks(values: .stride(by: .day, count: 7)) { value in
+                AxisMarks(values: .stride(by: .day, count: max(1, points.count > 7 ? 7 : points.count))) { value in
                     AxisValueLabel(format: .dateTime.month(.abbreviated).day())
                         .font(Theme.body(10))
                         .foregroundStyle(Theme.inkLight)
@@ -149,24 +176,26 @@ struct PriceHistoryChart: View {
             }
             .frame(height: 180)
 
-            // Low / High badges
-            HStack(spacing: 12) {
-                if let low = lowestPoint {
-                    priceBadge(
-                        label: "30d Low",
-                        price: low.price,
-                        color: Theme.accent,
-                        icon: "arrow.down"
-                    )
-                }
+            // Low / High badges (only meaningful with 2+ data points)
+            if points.count >= 2 {
+                HStack(spacing: 12) {
+                    if let low = lowestPoint {
+                        priceBadge(
+                            label: "Low",
+                            price: low.price,
+                            color: Theme.accent,
+                            icon: "arrow.down"
+                        )
+                    }
 
-                if let high = highestPoint {
-                    priceBadge(
-                        label: "30d High",
-                        price: high.price,
-                        color: Theme.red,
-                        icon: "arrow.up"
-                    )
+                    if let high = highestPoint {
+                        priceBadge(
+                            label: "High",
+                            price: high.price,
+                            color: Theme.red,
+                            icon: "arrow.up"
+                        )
+                    }
                 }
             }
         }

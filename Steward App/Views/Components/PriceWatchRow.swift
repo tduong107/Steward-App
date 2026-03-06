@@ -45,7 +45,7 @@ struct PriceWatchRow: View {
                 .background(Theme.bgDeep)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
 
-                // Name + URL
+                // Name + price or waiting state
                 VStack(alignment: .leading, spacing: 2) {
                     Text(watch.name)
                         .font(Theme.body(13, weight: .semibold))
@@ -64,6 +64,10 @@ struct PriceWatchRow: View {
                                     .foregroundStyle(change >= 0 ? Theme.red : Theme.accent)
                             }
                         }
+                    } else {
+                        Text("Waiting for price data…")
+                            .font(Theme.body(11))
+                            .foregroundStyle(Theme.inkLight)
                     }
                 }
 

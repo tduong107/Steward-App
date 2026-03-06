@@ -7,9 +7,10 @@ struct DetailScreen: View {
     @Environment(SubscriptionManager.self) private var subscriptionManager
     @Environment(\.dismiss) private var dismiss
 
-    // Price history (real data from Supabase, mock fallback)
+    // Price history (real data from Supabase only)
     @State private var priceHistory: [PricePoint] = []
     @State private var dealInsight: DealInsight?
+    @State private var isLoadingPrices = true
     @State private var showShareSheet = false
     @State private var showDeleteConfirm = false
     @State private var showBrowser = false
@@ -124,23 +125,21 @@ struct DetailScreen: View {
         isLoadingChecks = false
     }
 
-    /// Load real price history from Supabase; fall back to mock if < 2 real data points
+    /// Load real price history from Supabase (no mock data)
     private func loadPriceHistory() async {
         do {
             let results = try await supabase.fetchPriceHistory(forWatchId: watch.id)
             let realPoints = PricePoint.fromCheckResults(results)
+            priceHistory = realPoints
 
             if realPoints.count >= 2 {
-                priceHistory = realPoints
                 dealInsight = DealAnalyzer.analyze(history: realPoints)
-            } else {
-                // Not enough real data yet — show mock so the chart isn't empty
-                priceHistory = PricePoint.mockHistory(for: watch.name)
             }
         } catch {
-            // Fallback to mock data on error
-            priceHistory = PricePoint.mockHistory(for: watch.name)
+            // On error, leave empty — chart will show empty state
+            priceHistory = []
         }
+        isLoadingPrices = false
     }
 
     // MARK: - Header Card
@@ -236,9 +235,17 @@ struct DetailScreen: View {
             }
 
             // Price History Chart (only for price-related watches)
-            if showsPriceChart && !priceHistory.isEmpty {
-                PriceHistoryChart(points: priceHistory, accentColor: Theme.accent)
-                    .padding(.bottom, 4)
+            if showsPriceChart {
+                if isLoadingPrices {
+                    priceChartLoadingState
+                        .padding(.bottom, 4)
+                } else if priceHistory.isEmpty {
+                    priceChartEmptyState
+                        .padding(.bottom, 4)
+                } else {
+                    PriceHistoryChart(points: priceHistory, accentColor: Theme.accent)
+                        .padding(.bottom, 4)
+                }
             }
 
             // Deal Quality Badge (only when we have real price analysis + paid tier)
@@ -272,6 +279,73 @@ struct DetailScreen: View {
         .padding(.horizontal, 24)
         .padding(.top, 16)
         .padding(.bottom, 24)
+    }
+
+    // MARK: - Price Chart States
+
+    private var priceChartLoadingState: some View {
+        VStack(spacing: 12) {
+            HStack {
+                Text("Price History")
+                    .font(Theme.serif(15, weight: .semibold))
+                    .foregroundStyle(Theme.ink)
+
+                Spacer()
+            }
+
+            ProgressView()
+                .controlSize(.small)
+
+            Text("Loading price data...")
+                .font(Theme.body(12))
+                .foregroundStyle(Theme.inkLight)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(16)
+        .background(Theme.bgCard)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Theme.border, lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.04), radius: 8, y: 4)
+    }
+
+    private var priceChartEmptyState: some View {
+        VStack(spacing: 12) {
+            HStack {
+                Text("Price History")
+                    .font(Theme.serif(15, weight: .semibold))
+                    .foregroundStyle(Theme.ink)
+
+                Spacer()
+            }
+
+            VStack(spacing: 8) {
+                Image(systemName: "chart.line.downtrend.xyaxis")
+                    .font(.system(size: 28))
+                    .foregroundStyle(Theme.inkLight.opacity(0.5))
+
+                Text("Waiting for price data")
+                    .font(Theme.body(14, weight: .medium))
+                    .foregroundStyle(Theme.inkMid)
+
+                Text("Steward will start tracking prices on the next check. Price history will appear here as data is collected.")
+                    .font(Theme.body(12))
+                    .foregroundStyle(Theme.inkLight)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(.vertical, 20)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(16)
+        .background(Theme.bgCard)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Theme.border, lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.04), radius: 8, y: 4)
     }
 
     // MARK: - Change Banner

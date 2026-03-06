@@ -201,17 +201,15 @@ struct PriceInsightsScreen: View {
                 let results = try await supabase.fetchPriceHistory(forWatchId: watch.id)
                 let points = PricePoint.fromCheckResults(results)
 
-                if points.count >= 2 {
-                    priceData[watch.id] = points
-                    if let insight = DealAnalyzer.analyze(history: points) {
-                        dealInsights[watch.id] = insight
-                    }
-                } else {
-                    // Use mock data for display if not enough real data
-                    priceData[watch.id] = PricePoint.mockHistory(for: watch.name)
+                // Always use real data only — no mock fallback
+                priceData[watch.id] = points
+
+                if points.count >= 2, let insight = DealAnalyzer.analyze(history: points) {
+                    dealInsights[watch.id] = insight
                 }
             } catch {
-                priceData[watch.id] = PricePoint.mockHistory(for: watch.name)
+                // On error, leave empty — no mock data
+                priceData[watch.id] = []
             }
         }
 
