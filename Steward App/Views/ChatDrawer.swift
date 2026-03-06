@@ -465,13 +465,27 @@ struct ProductLinkCard: View {
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 10) {
-                // Source icon
-                Image(systemName: sourceIcon)
-                    .font(.system(size: 14))
-                    .foregroundStyle(Theme.accent)
-                    .frame(width: 32, height: 32)
-                    .background(Theme.accentLight)
+                // Product image or source icon fallback
+                if let imageURLString = link.imageURL, let imgURL = URL(string: imageURLString) {
+                    AsyncImage(url: imgURL) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .scaledToFill()
+                        case .failure:
+                            sourceIconView
+                        default:
+                            ProgressView()
+                                .controlSize(.small)
+                                .frame(width: 40, height: 40)
+                        }
+                    }
+                    .frame(width: 40, height: 40)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
+                } else {
+                    sourceIconView
+                }
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(link.title)
@@ -510,6 +524,15 @@ struct ProductLinkCard: View {
             )
         }
         .buttonStyle(.plain)
+    }
+
+    private var sourceIconView: some View {
+        Image(systemName: sourceIcon)
+            .font(.system(size: 14))
+            .foregroundStyle(Theme.accent)
+            .frame(width: 40, height: 40)
+            .background(Theme.accentLight)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }
 

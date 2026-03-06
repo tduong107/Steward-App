@@ -19,6 +19,7 @@ struct ProductLink: Identifiable {
     let url: String
     let source: String // e.g. "Amazon", "Google Shopping", "eBay"
     let price: String? // Optional price snippet
+    let imageURL: String? // Product image from search results
 
     var displayURL: String {
         URL(string: url)?.host ?? url

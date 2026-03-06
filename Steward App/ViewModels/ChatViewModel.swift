@@ -187,6 +187,9 @@ final class ChatViewModel {
             productLinks = parseProductLinks(raw)
             text = text.replacingOccurrences(of: "\\[PRODUCT_LINKS\\].*?\\[/PRODUCT_LINKS\\]", with: "", options: .regularExpression)
         }
+        // Strip any remaining standalone PRODUCT_LINKS markers (empty tags, partial tags, etc.)
+        text = text.replacingOccurrences(of: "[PRODUCT_LINKS]", with: "")
+        text = text.replacingOccurrences(of: "[/PRODUCT_LINKS]", with: "")
 
         // 4. Extract [SUGGESTIONS] if present
         var suggestions: [String]?
@@ -276,6 +279,7 @@ final class ChatViewModel {
             let url: String
             let source: String
             let price: String?
+            let imageURL: String?
         }
 
         var links: [ProductLink] = []
@@ -289,7 +293,8 @@ final class ChatViewModel {
                     title: payload.title,
                     url: payload.url,
                     source: payload.source,
-                    price: payload.price
+                    price: payload.price,
+                    imageURL: payload.imageURL
                 ))
             } catch {
                 #if DEBUG
@@ -441,6 +446,7 @@ final class ChatViewModel {
             let condition: String
             let actionLabel: String
             let actionType: String
+            let imageURL: String?
         }
 
         do {
@@ -459,13 +465,68 @@ final class ChatViewModel {
                 url: url,
                 condition: payload.condition,
                 actionLabel: payload.actionLabel,
-                actionType: actionType
+                actionType: actionType,
+                imageURL: payload.imageURL
             )
             pendingWatch = watch
+
+            // If no image was provided by the AI, try to fetch og:image from the URL
+            if payload.imageURL == nil || payload.imageURL?.isEmpty == true {
+                Task { @MainActor in
+                    if let ogImage = await self.fetchOGImage(from: url) {
+                        watch.imageURL = ogImage
+                    }
+                }
+            }
         } catch {
             #if DEBUG
             print("[ChatViewModel] Failed to parse watch JSON: \(error)")
             #endif
+        }
+    }
+
+    // MARK: - Fetch Product Image
+
+    /// Fetches the og:image from a URL to use as the watch hero photo
+    private func fetchOGImage(from urlString: String) async -> String? {
+        guard let url = URL(string: urlString) else { return nil }
+
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 8
+        let session = URLSession(configuration: config)
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1", forHTTPHeaderField: "User-Agent")
+
+        do {
+            let (data, _) = try await session.data(for: request)
+            let html = String(data: data, encoding: .utf8) ?? ""
+
+            // Try og:image patterns
+            let patterns = [
+                "property=\"og:image\"\\s+content=\"([^\"]+)\"",
+                "content=\"([^\"]+)\"\\s+property=\"og:image\"",
+                "property='og:image'\\s+content='([^']+)'",
+                "content='([^']+)'\\s+property='og:image'"
+            ]
+
+            for pattern in patterns {
+                if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
+                   let match = regex.firstMatch(in: html, range: NSRange(html.startIndex..., in: html)),
+                   let range = Range(match.range(at: 1), in: html) {
+                    let imageURL = String(html[range]).trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !imageURL.isEmpty, imageURL.hasPrefix("http") {
+                        return imageURL
+                    }
+                }
+            }
+            return nil
+        } catch {
+            #if DEBUG
+            print("[ChatViewModel] Failed to fetch og:image: \(error.localizedDescription)")
+            #endif
+            return nil
         }
     }
 }
