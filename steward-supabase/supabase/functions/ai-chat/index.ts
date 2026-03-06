@@ -133,6 +133,22 @@ RULES:
 - ALWAYS include either [SUGGESTIONS] or [PROPOSE_WATCH] at the end of every response (never both), unless you're ending the conversation with [DISMISS]
 - When you include [PRODUCT_LINKS], also include [SUGGESTIONS] after it (product links + suggestions is OK)`;
 
+// Simple in-memory rate limiter: max 20 requests per minute per IP
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT = 20;
+const RATE_WINDOW_MS = 60_000;
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_WINDOW_MS });
+    return true;
+  }
+  entry.count++;
+  return entry.count <= RATE_LIMIT;
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -140,6 +156,33 @@ serve(async (req) => {
   }
 
   try {
+    // Verify apikey header is present (basic guard against unauthenticated abuse)
+    const apikey = req.headers.get("apikey") ?? "";
+    if (!apikey) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized — missing apikey" }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Rate limit by IP to prevent quota abuse
+    const clientIP =
+      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      req.headers.get("cf-connecting-ip") ||
+      "unknown";
+    if (!checkRateLimit(clientIP)) {
+      return new Response(
+        JSON.stringify({ error: "Too many requests. Please try again later." }),
+        {
+          status: 429,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
     const { messages } = await req.json();
 
     if (!messages || !Array.isArray(messages)) {
