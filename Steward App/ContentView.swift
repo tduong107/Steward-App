@@ -92,6 +92,25 @@ struct ContentView: View {
         .onDisappear {
             realtimeManager.stop()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .didTapWatchNotification)) { notification in
+            if let watchId = notification.userInfo?["watch_id"] as? UUID {
+                // Switch to home tab first
+                viewModel.selectedTab = .home
+
+                // Find the watch by ID and navigate to its detail
+                if let watch = viewModel.watches.first(where: { $0.id == watchId }) {
+                    viewModel.openDetail(for: watch)
+                } else {
+                    // Watch not in local cache yet — sync from cloud, then navigate
+                    Task {
+                        await viewModel.syncFromCloud()
+                        if let watch = viewModel.watches.first(where: { $0.id == watchId }) {
+                            viewModel.openDetail(for: watch)
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

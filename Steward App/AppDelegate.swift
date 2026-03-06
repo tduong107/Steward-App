@@ -6,11 +6,23 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
-        // Firebase will be configured here in Phase 5 full implementation
-        // FirebaseApp.configure()
-
-        // Set notification delegate
+        // Set notification delegate for foreground display
         UNUserNotificationCenter.current().delegate = self
+
+        // Handle notification that launched the app (cold start / killed state)
+        if let remoteNotification = launchOptions?[.remoteNotification] as? [String: Any],
+           let watchIdString = remoteNotification["watch_id"] as? String,
+           let watchId = UUID(uuidString: watchIdString) {
+            // Delay slightly to let the UI initialize before posting deep link
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                NotificationCenter.default.post(
+                    name: .didTapWatchNotification,
+                    object: nil,
+                    userInfo: ["watch_id": watchId]
+                )
+            }
+        }
+
         return true
     }
 
@@ -52,17 +64,27 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
         completionHandler([.banner, .badge, .sound])
     }
 
-    // Handle notification tap
+    // Handle notification tap — extract watch_id and deep link to detail screen
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
         let userInfo = response.notification.request.content.userInfo
-        // Can extract watch_id from userInfo to navigate to the right screen
+
+        if let watchIdString = userInfo["watch_id"] as? String,
+           let watchId = UUID(uuidString: watchIdString) {
+            NotificationCenter.default.post(
+                name: .didTapWatchNotification,
+                object: nil,
+                userInfo: ["watch_id": watchId]
+            )
+        }
+
         #if DEBUG
         print("[AppDelegate] Notification tapped: \(userInfo)")
         #endif
+
         completionHandler()
     }
 }
@@ -72,4 +94,5 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
 extension Notification.Name {
     static let didRegisterForRemoteNotifications = Notification.Name("didRegisterForRemoteNotifications")
     static let didFailToRegisterForRemoteNotifications = Notification.Name("didFailToRegisterForRemoteNotifications")
+    static let didTapWatchNotification = Notification.Name("didTapWatchNotification")
 }
