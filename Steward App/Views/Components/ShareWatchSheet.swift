@@ -3,11 +3,18 @@ import SwiftUI
 struct ShareWatchSheet: View {
     let watch: Watch
     @Environment(\.dismiss) private var dismiss
+    @Environment(SupabaseService.self) private var supabase
     @State private var copied = false
+    @State private var shareCode: String?
+    @State private var isGenerating = false
+    @State private var errorMessage: String?
 
-    /// A mock shareable link
+    /// The real shareable link using the URL scheme
     private var shareURL: String {
-        "https://steward.app/watch/\(watch.id.uuidString.prefix(8).lowercased())"
+        if let code = shareCode {
+            return "steward://watch/\(code)"
+        }
+        return "Generating link..."
     }
 
     /// Shareable text message
@@ -80,35 +87,51 @@ struct ShareWatchSheet: View {
                 // Copy link
                 VStack(spacing: 10) {
                     HStack {
-                        Text(shareURL)
-                            .font(Theme.body(12))
-                            .foregroundStyle(Theme.inkMid)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
+                        if isGenerating {
+                            HStack(spacing: 6) {
+                                ProgressView()
+                                    .controlSize(.small)
+                                Text("Generating link...")
+                                    .font(Theme.body(12))
+                                    .foregroundStyle(Theme.inkLight)
+                            }
+                        } else if let error = errorMessage {
+                            Text(error)
+                                .font(Theme.body(12))
+                                .foregroundStyle(Theme.red)
+                        } else {
+                            Text(shareURL)
+                                .font(Theme.body(12))
+                                .foregroundStyle(Theme.inkMid)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
 
                         Spacer()
 
-                        Button {
-                            UIPasteboard.general.string = shareURL
-                            withAnimation(.spring(response: 0.3)) {
-                                copied = true
+                        if shareCode != nil {
+                            Button {
+                                UIPasteboard.general.string = shareURL
+                                withAnimation(.spring(response: 0.3)) {
+                                    copied = true
+                                }
+                                Task {
+                                    try? await Task.sleep(for: .seconds(2))
+                                    withAnimation { copied = false }
+                                }
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                                        .font(.system(size: 12, weight: .semibold))
+                                    Text(copied ? "Copied!" : "Copy")
+                                        .font(Theme.body(12, weight: .semibold))
+                                }
+                                .foregroundStyle(copied ? Theme.accent : Theme.ink)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(copied ? Theme.accentLight : Theme.bgDeep)
+                                .clipShape(Capsule())
                             }
-                            Task {
-                                try? await Task.sleep(for: .seconds(2))
-                                withAnimation { copied = false }
-                            }
-                        } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: copied ? "checkmark" : "doc.on.doc")
-                                    .font(.system(size: 12, weight: .semibold))
-                                Text(copied ? "Copied!" : "Copy")
-                                    .font(Theme.body(12, weight: .semibold))
-                            }
-                            .foregroundStyle(copied ? Theme.accent : Theme.ink)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(copied ? Theme.accentLight : Theme.bgDeep)
-                            .clipShape(Capsule())
                         }
                     }
                     .padding(.horizontal, 14)
@@ -127,19 +150,34 @@ struct ShareWatchSheet: View {
 
                 // Share buttons
                 VStack(spacing: 10) {
-                    ShareLink(item: shareText) {
+                    if shareCode != nil {
+                        ShareLink(item: shareText) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "square.and.arrow.up")
+                                    .font(.system(size: 14))
+                                Text("Share via...")
+                                    .font(Theme.body(14, weight: .bold))
+                            }
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(Theme.accent)
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                            .shadow(color: Theme.accent.opacity(0.25), radius: 12, y: 4)
+                        }
+                    } else {
+                        // Disabled share button while loading
                         HStack(spacing: 6) {
                             Image(systemName: "square.and.arrow.up")
                                 .font(.system(size: 14))
                             Text("Share via...")
                                 .font(Theme.body(14, weight: .bold))
                         }
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.white.opacity(0.5))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
-                        .background(Theme.accent)
+                        .background(Theme.accent.opacity(0.5))
                         .clipShape(RoundedRectangle(cornerRadius: 14))
-                        .shadow(color: Theme.accent.opacity(0.25), radius: 12, y: 4)
                     }
 
                     Button {
@@ -160,5 +198,27 @@ struct ShareWatchSheet: View {
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
+        .task {
+            await generateShareLink()
+        }
+    }
+
+    private func generateShareLink() async {
+        isGenerating = true
+        errorMessage = nil
+
+        do {
+            let code = try await supabase.createShareLink(watchId: watch.id)
+            withAnimation(.spring(response: 0.3)) {
+                shareCode = code
+            }
+        } catch {
+            errorMessage = "Could not generate link"
+            #if DEBUG
+            print("[ShareWatchSheet] Error: \(error)")
+            #endif
+        }
+
+        isGenerating = false
     }
 }

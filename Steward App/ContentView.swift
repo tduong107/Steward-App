@@ -10,6 +10,11 @@ struct ContentView: View {
     @Environment(SubscriptionManager.self) private var subscriptionManager
     @AppStorage("isDarkMode") private var isDarkMode = true
 
+    // Shared watch deep link
+    @State private var sharedWatchData: SharedWatchData?
+    @State private var showJoinSheet = false
+    @State private var shareCodeError: String?
+
     var body: some View {
         @Bindable var subscription = subscriptionManager
         ZStack {
@@ -108,6 +113,32 @@ struct ContentView: View {
                             viewModel.openDetail(for: watch)
                         }
                     }
+                }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .didOpenSharedWatch)) { notification in
+            if let code = notification.userInfo?["share_code"] as? String {
+                Task {
+                    do {
+                        let data = try await supabaseService.resolveShareCode(code)
+                        sharedWatchData = data
+                        showJoinSheet = true
+                    } catch {
+                        shareCodeError = error.localizedDescription
+                        #if DEBUG
+                        print("[ContentView] Failed to resolve share code: \(error)")
+                        #endif
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $showJoinSheet) {
+            if let data = sharedWatchData {
+                JoinWatchSheet(sharedWatch: data) {
+                    // Create a Watch from the shared data and add it
+                    let watch = data.toWatch()
+                    viewModel.addWatch(watch)
+                    viewModel.selectedTab = .home
                 }
             }
         }

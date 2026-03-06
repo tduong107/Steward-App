@@ -4,25 +4,65 @@ struct HomeScreen: View {
     @Environment(WatchViewModel.self) private var viewModel
     @Environment(SubscriptionManager.self) private var subscriptionManager
 
+    // Savings milestone celebration
+    @AppStorage("achievedMilestoneAmount") private var achievedMilestoneAmount: Double = 0
+    @State private var showCelebration = false
+    @State private var celebrationMilestone: SavingsMilestone?
+
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                headerSection
-                chatPromptBar
-                triggeredAlerts
-                priceInsightsCard
+        ZStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    headerSection
+                    chatPromptBar
+                    triggeredAlerts
+                    priceInsightsCard
+                    savingsMilestoneSection
 
-                if viewModel.watches.isEmpty {
-                    emptyState
-                } else {
-                    watchList
+                    if viewModel.watches.isEmpty {
+                        emptyState
+                    } else {
+                        watchList
+                    }
+
+                    addWatchCard
                 }
-
-                addWatchCard
+                .padding(.bottom, 24)
             }
-            .padding(.bottom, 24)
+            .background(Theme.bg)
+
+            // Celebration overlay
+            if showCelebration, let milestone = celebrationMilestone {
+                CelebrationOverlay(
+                    milestone: milestone,
+                    totalSavings: viewModel.savingsCalculation.totalSavings,
+                    onDismiss: {
+                        withAnimation {
+                            showCelebration = false
+                            celebrationMilestone = nil
+                        }
+                    }
+                )
+                .transition(.opacity)
+                .zIndex(999)
+            }
         }
-        .background(Theme.bg)
+        .onChange(of: viewModel.savingsCalculation.totalSavings) { _, _ in
+            checkForNewMilestone()
+        }
+    }
+
+    // MARK: - Milestone Detection
+
+    private func checkForNewMilestone() {
+        guard let current = viewModel.savingsCalculation.currentMilestone else { return }
+        if current.amount > achievedMilestoneAmount {
+            achievedMilestoneAmount = current.amount
+            celebrationMilestone = current
+            withAnimation(.spring(response: 0.4)) {
+                showCelebration = true
+            }
+        }
     }
 
     // MARK: - Header
@@ -238,6 +278,18 @@ struct HomeScreen: View {
                 .padding(.horizontal, 24)
                 .padding(.bottom, 16)
             }
+        }
+    }
+
+    // MARK: - Savings Milestone Section
+
+    @ViewBuilder
+    private var savingsMilestoneSection: some View {
+        if viewModel.savingsCalculation.totalSavings > 0 {
+            SavingsMilestoneCard(calculation: viewModel.savingsCalculation)
+                .padding(.horizontal, 24)
+                .padding(.bottom, 16)
+                .transition(.move(edge: .top).combined(with: .opacity))
         }
     }
 

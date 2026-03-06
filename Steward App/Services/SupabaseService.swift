@@ -103,4 +103,49 @@ final class SupabaseService {
             .eq("id", value: userId.uuidString)
             .execute()
     }
+
+    // MARK: - Share Watch
+
+    /// Creates a share link for a watch, returns the share code
+    func createShareLink(watchId: UUID) async throws -> String {
+        let url = SupabaseConfig.url.appendingPathComponent("functions/v1/share-watch")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(SupabaseConfig.anonKey, forHTTPHeaderField: "apikey")
+        request.httpBody = try JSONEncoder().encode(["watch_id": watchId.uuidString])
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            let body = String(data: data, encoding: .utf8) ?? "Unknown error"
+            throw NSError(domain: "ShareWatch", code: -1, userInfo: [NSLocalizedDescriptionKey: body])
+        }
+
+        struct ShareResponse: Codable {
+            let share_code: String
+        }
+
+        let result = try JSONDecoder().decode(ShareResponse.self, from: data)
+        return result.share_code
+    }
+
+    /// Resolves a share code into shared watch data
+    func resolveShareCode(_ code: String) async throws -> SharedWatchData {
+        let url = SupabaseConfig.url.appendingPathComponent("functions/v1/get-shared-watch")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(SupabaseConfig.anonKey, forHTTPHeaderField: "apikey")
+        request.httpBody = try JSONEncoder().encode(["share_code": code])
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            let body = String(data: data, encoding: .utf8) ?? "Unknown error"
+            throw NSError(domain: "ShareWatch", code: -1, userInfo: [NSLocalizedDescriptionKey: body])
+        }
+
+        return try JSONDecoder().decode(SharedWatchData.self, from: data)
+    }
 }

@@ -32,6 +32,10 @@ final class WatchViewModel {
     var isSyncing = false
     var syncError: String?
 
+    // Savings milestones
+    var savingsCalculation: SavingsCalculation = .empty
+    var isLoadingSavings = false
+
     private var modelContext: ModelContext?
     private var auth: AuthManager?
     private var supabase: SupabaseService?
@@ -123,6 +127,43 @@ final class WatchViewModel {
         }
 
         isSyncing = false
+
+        // Load savings data after sync completes
+        await loadSavings()
+    }
+
+    // MARK: - Savings
+
+    func loadSavings() async {
+        guard let supabase else { return }
+        isLoadingSavings = true
+
+        // Filter price-related watches
+        let priceWatches = watches.filter { watch in
+            watch.actionType == .price ||
+            watch.condition.lowercased().contains("price") ||
+            watch.actionLabel.lowercased().contains("price")
+        }
+
+        var priceHistories: [UUID: [PricePoint]] = [:]
+
+        for watch in priceWatches {
+            do {
+                let results = try await supabase.fetchPriceHistory(forWatchId: watch.id)
+                let points = PricePoint.fromCheckResults(results)
+                priceHistories[watch.id] = points
+            } catch {
+                // Skip watches we can't load
+            }
+        }
+
+        let watchTuples = priceWatches.map { (id: $0.id, name: $0.name, emoji: $0.emoji) }
+        savingsCalculation = SavingsCalculator.calculate(
+            watches: watchTuples,
+            priceHistories: priceHistories
+        )
+
+        isLoadingSavings = false
     }
 
     // MARK: - Watch Management

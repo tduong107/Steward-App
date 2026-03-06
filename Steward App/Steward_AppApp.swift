@@ -26,6 +26,17 @@ struct Steward_AppApp: App {
                         notificationManager.didFailToRegisterForRemoteNotifications(error: error)
                     }
                 }
+                .onOpenURL { url in
+                    // Handle steward://watch/XXXXXX deep links
+                    guard url.scheme == "steward",
+                          url.host == "watch",
+                          let code = url.pathComponents.dropFirst().first else { return }
+                    NotificationCenter.default.post(
+                        name: .didOpenSharedWatch,
+                        object: nil,
+                        userInfo: ["share_code": String(code)]
+                    )
+                }
                 .task {
                     notificationManager.configure(supabase: supabaseService)
                     await notificationManager.checkCurrentStatus()
