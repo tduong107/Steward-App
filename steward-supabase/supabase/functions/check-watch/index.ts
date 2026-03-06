@@ -84,8 +84,8 @@ serve(async (req) => {
       pageText = `Fetch error: ${fetchErr.message}`;
     }
 
-    // Evaluate the condition against the page content
-    const { changed, resultText } = evaluateCondition(
+    // Evaluate the condition against the page content (async for AI-powered evaluation)
+    const { changed, resultText } = await evaluateConditionAsync(
       watch.condition,
       pageText,
       fetchSuccess
@@ -177,11 +177,13 @@ serve(async (req) => {
 
 // ─── Condition Evaluation Engine ───────────────────────────────────
 
-function evaluateCondition(
+const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
+
+async function evaluateConditionAsync(
   condition: string,
   pageText: string,
   fetchSuccess: boolean
-): { changed: boolean; resultText: string } {
+): Promise<{ changed: boolean; resultText: string }> {
   if (!fetchSuccess) {
     return { changed: false, resultText: "Could not reach page" };
   }
@@ -284,7 +286,21 @@ function evaluateCondition(
     return { changed: false, resultText: `"${searchText}" not found` };
   }
 
-  // 6) Generic keyword check — look for the condition keywords in the page
+  // 6) AI-powered evaluation for generic/ambiguous conditions
+  // Use Claude Haiku to intelligently evaluate whether the condition is met
+  if (ANTHROPIC_API_KEY) {
+    try {
+      const aiResult = await evaluateWithAI(condition, pageText);
+      if (aiResult) {
+        return aiResult;
+      }
+    } catch (err) {
+      console.error(`[check-watch] AI evaluation failed: ${err.message}`);
+      // Fall through to basic keyword check
+    }
+  }
+
+  // 7) Fallback: Basic keyword check (if AI is unavailable)
   const keywords = condLower
     .replace(/[^a-z0-9\s]/g, "")
     .split(/\s+/)
@@ -296,16 +312,104 @@ function evaluateCondition(
     if (ratio >= 0.6) {
       return {
         changed: true,
-        resultText: `Change detected — matched: ${matched.join(", ")}`,
+        resultText: `Condition "${condition}" appears to be met`,
       };
     }
     return {
       changed: false,
-      resultText: `No match (${matched.length}/${keywords.length} keywords)`,
+      resultText: `Checked — condition not yet met`,
     };
   }
 
   return { changed: false, resultText: "Checked — no change" };
+}
+
+// ─── AI-Powered Condition Evaluation ──────────────────────────────
+
+async function evaluateWithAI(
+  condition: string,
+  pageText: string
+): Promise<{ changed: boolean; resultText: string } | null> {
+  // Truncate page text to avoid token limits (keep first ~4000 chars which usually has the key info)
+  const truncatedPage = pageText.length > 4000
+    ? pageText.substring(0, 4000) + "\n...[page truncated]"
+    : pageText;
+
+  const prompt = `You are evaluating whether a specific condition has been met on a web page.
+
+CONDITION THE USER IS WATCHING FOR:
+"${condition}"
+
+PAGE CONTENT (may be truncated):
+${truncatedPage}
+
+INSTRUCTIONS:
+1. Analyze the page content and determine if the user's condition has been met.
+2. Respond with EXACTLY this JSON format, nothing else:
+{"changed": true/false, "resultText": "A short, specific description of what you found"}
+
+RULES FOR resultText:
+- Be specific and reference actual content from the page (e.g., "Price is now $299.99" not "Price changed")
+- Keep it under 60 characters
+- If the condition IS met, describe what was found (e.g., "New size M available at $45", "Sale: 30% off now live")
+- If the condition is NOT met, briefly state the current status (e.g., "Still showing $349.99", "No restock yet")
+- Never say "condition matched" or "keywords matched" — be descriptive about WHAT specifically was found
+- Write in a friendly, natural tone
+
+Respond ONLY with the JSON object:`;
+
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 150,
+      messages: [{ role: "user", content: prompt }],
+    }),
+  });
+
+  if (!response.ok) {
+    console.error(`[check-watch] Anthropic API error: ${response.status}`);
+    return null;
+  }
+
+  const data = await response.json();
+  const text = data?.content?.[0]?.text?.trim();
+
+  if (!text) return null;
+
+  try {
+    // Parse the JSON response from the AI
+    const parsed = JSON.parse(text);
+    if (typeof parsed.changed === "boolean" && typeof parsed.resultText === "string") {
+      return {
+        changed: parsed.changed,
+        resultText: parsed.resultText.substring(0, 80), // Safety limit
+      };
+    }
+  } catch {
+    // Try to extract JSON from the response if it has extra text
+    const jsonMatch = text.match(/\{[^}]+\}/);
+    if (jsonMatch) {
+      try {
+        const parsed = JSON.parse(jsonMatch[0]);
+        if (typeof parsed.changed === "boolean" && typeof parsed.resultText === "string") {
+          return {
+            changed: parsed.changed,
+            resultText: parsed.resultText.substring(0, 80),
+          };
+        }
+      } catch {
+        // Give up
+      }
+    }
+  }
+
+  return null;
 }
 
 function extractPrice(text: string): number | null {
