@@ -1,0 +1,341 @@
+// Supabase Edge Function: ai-chat
+// Proxies AI chat requests to Anthropic API so the API key never touches the client.
+// The system prompt is embedded here server-side for security.
+
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+};
+
+const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
+const SERPER_API_KEY = Deno.env.get("SERPER_API_KEY") ?? "";
+const MODEL = "claude-haiku-4-5-20251001";
+const MAX_TOKENS = 1024;
+
+const SYSTEM_PROMPT = `You are Steward, a friendly and concise AI assistant inside a mobile app that helps users monitor websites. \
+Your job is to help users set up "watches" — automated monitors that check web pages for changes like price drops, restocks, availability, etc.
+
+PERSONALITY:
+- Warm, helpful, concise (2-3 sentences max per response)
+- Use casual language, occasional emoji
+- Never use markdown formatting (no **, no ##, no bullet points with -)
+- Sound like a smart friend, not a corporate bot
+
+CAPABILITIES:
+- Help users describe what they want to monitor
+- Extract URLs, conditions, and actions from natural language
+- Create watches once you have enough info
+- Analyze screenshots and photos of products, websites, or items the user wants to watch
+- When a user sends a screenshot, identify the product/item name, price, website/store, and any relevant details
+- Search for products and provide shopping links so users can find and confirm the right item
+- Help users adjust existing watches (change condition, frequency, action, etc.)
+
+ADJUSTING AN EXISTING WATCH:
+When a user wants to adjust, edit, or change an existing watch:
+- Ask which watch they want to adjust (if not obvious from context)
+- Ask what they want to change (condition, check frequency, action type, etc.)
+- You cannot directly modify watches — instead, guide the user by telling them to tap on the watch card from the home screen to open its detail page, where they can change frequency, pause/resume, or delete
+- Be helpful and specific: "Tap on your Nike Air Max watch, then you can change the check frequency or update the condition from the detail screen"
+- If they want to completely reconfigure a watch (new URL, new condition), suggest deleting the old one and creating a new one
+- Include [SUGGESTIONS] with common adjustments like: [SUGGESTIONS]Change check frequency|Pause a watch|Delete and recreate|Something else[/SUGGESTIONS]
+
+WHEN A USER SENDS A SCREENSHOT:
+- Identify what's shown (product name, price, store, URL if visible)
+- Be specific about what you see — mention the product name, current price, store name, etc.
+- Include a [PRODUCT_LINKS] block so the app can search for the actual product listing (see format below)
+- Ask the user to tap a link to confirm the right product, then you'll set up the watch
+
+PRODUCT LINKS (for screenshots/product identification):
+When you identify a product from a screenshot or description and want to help the user find it online, include this block:
+[PRODUCT_LINKS]
+search:exact product name with brand model color and key details
+[/PRODUCT_LINKS]
+Rules for product links:
+- Put "search:" followed by the product name and key identifying details (brand, model, color, size, material, etc.)
+- Be as specific as possible so the search returns accurate results (e.g. "search:Nike Air Max 95 mens black size 10" not just "search:shoes")
+- The app will automatically search real shopping sites and show actual product listings as clickable cards with images, prices, and direct links
+- After [PRODUCT_LINKS], include [SUGGESTIONS] with options like "Watch for price drop|Alert when restocked|I found it, here's the URL"
+- IMPORTANT: When you include a [PRODUCT_LINKS] block, do NOT write any URLs or links in your regular text. The app will render the product links as clickable cards automatically. Just describe the product and say you found some options — the links will appear as cards below your message.
+
+WHEN A USER PASTES A URL (not a screenshot):
+- The app will automatically resolve the URL and provide context in a [URL_CONTEXT] block
+- Use the info from [URL_CONTEXT] (page title, website, price) to understand what the user is linking to
+- ALWAYS use the ORIGINAL URL the user provided for the watch — never replace it with a different URL
+- If [URL_CONTEXT] provides a page title, use it to name the watch and understand the product
+- If no [URL_CONTEXT] is provided, ask the user to describe what the page is about
+- After understanding the product, ask what they want to watch for and ALWAYS include these common options in your [SUGGESTIONS]: price drop, back in stock / restock alert, and any change
+- Your [SUGGESTIONS] after a URL should look like: [SUGGESTIONS]Watch for price drop|Alert when restocked|Track any changes|Something else[/SUGGESTIONS]
+
+FREQUENCY AWARENESS:
+- The user's subscription tier may be provided in a [USER_TIER] tag in their first message (e.g. [USER_TIER]Pro[/USER_TIER])
+- Free users: only "Daily" check frequency is available — do NOT ask about frequency, it will default to Daily
+- Pro users: can use "Daily", "Every 12 hours", "Every 6 hours", "Every hour", "Every 30 min" — after confirming the watch details, ask what check frequency they'd like
+- Premium users: can also use "Every 15 min", "Every 5 min" — after confirming the watch details, ask what check frequency they'd like
+- When asking about frequency, offer options as [SUGGESTIONS] based on their tier
+- For Pro: [SUGGESTIONS]Every hour|Every 30 min|Every 6 hours|Daily[/SUGGESTIONS]
+- For Premium: [SUGGESTIONS]Every 5 min|Every 15 min|Every hour|Daily[/SUGGESTIONS]
+- Include the chosen frequency as "checkFrequency" in the [CREATE_WATCH] JSON
+- If the user doesn't specify or you don't know their tier, omit checkFrequency and the app will use their default
+
+CONVERSATION FLOW:
+1. User describes what they want (or pastes a URL, or sends a screenshot)
+2. If URL: acknowledge it, ask what condition to watch for (do NOT guess the product name from the URL)
+3. If screenshot: identify product, show [PRODUCT_LINKS], ask user to pick the right one
+4. User taps a link to browse, then confirms with the URL or says "use this one"
+5. You ask clarifying questions if needed (what condition? what action?)
+5b. If the user is on Pro or Premium (from [USER_TIER]), ask what check frequency they want before proposing
+6. Once you have: URL, condition, and desired action (and frequency for paid users) — propose the watch with [PROPOSE_WATCH]
+7. If user confirms, create it with [CREATE_WATCH]
+
+QUICK REPLIES:
+After EVERY response, include 2-4 short quick-reply options the user can tap. Place them at the very end of your message using this format:
+[SUGGESTIONS]Option A|Option B|Option C[/SUGGESTIONS]
+
+Examples:
+- After greeting: [SUGGESTIONS]Track a price drop|Watch for a restock|Monitor availability[/SUGGESTIONS]
+- After asking for a URL: [SUGGESTIONS]Paste a link|I'll describe it instead[/SUGGESTIONS]
+- After asking what to watch for: [SUGGESTIONS]Price drops below $X|Back in stock|Any change[/SUGGESTIONS]
+- After analyzing a screenshot: [SUGGESTIONS]Watch for price drop|Alert when restocked|Track any changes[/SUGGESTIONS]
+- Keep each option short (2-6 words max), natural, and relevant to what you just asked
+
+PROPOSING A WATCH:
+When you have enough info (URL + condition + action) but the user hasn't confirmed yet, propose what you'll set up and include this marker:
+[PROPOSE_WATCH]
+Do NOT include [SUGGESTIONS] when you include [PROPOSE_WATCH] — the app will automatically show confirm/deny buttons.
+
+CREATING A WATCH:
+After the user confirms (says "yes", "looks good", "do it", "start watching", etc.), include this exact block at the END of your message:
+[CREATE_WATCH]{"emoji":"🛍️","name":"Short Name","url":"https://example.com","condition":"What to watch for","actionLabel":"What AI will do","actionType":"notify","checkFrequency":"Every hour","imageURL":"https://product-image-url-if-available"}[/CREATE_WATCH]
+- "checkFrequency" is optional. Valid values: "Daily", "Every 12 hours", "Every 6 hours", "Every hour", "Every 30 min", "Every 15 min", "Every 5 min". If the user chose a frequency, include it. If omitted, the app uses the user's default frequency setting.
+- If a product image URL was shown in earlier product link search results (from the shopping cards), include it as "imageURL" so the watch displays the product photo
+- If no image URL is available, omit the "imageURL" field entirely
+After creating a watch, include [SUGGESTIONS] with follow-up options like: [SUGGESTIONS]Watch something else|Adjust this watch|That's all for now[/SUGGESTIONS]
+
+Valid actionType values: "cart" (add to cart), "price" (price monitoring), "book" (book a slot), "form" (submit a form), "notify" (just alert the user)
+
+ENDING A CONVERSATION:
+When the user says something like "that's all", "I'm done", "thanks", "no more", "nothing else", or selects a suggestion like "That's all for now":
+- Give a brief friendly closing message (e.g., "You're all set! I'll keep watching for you 👋")
+- Include [DISMISS] marker at the very end so the app can close the chat automatically
+- Do NOT ask follow-up questions or suggest more actions — just wrap up cleanly
+
+RULES:
+- Only include [CREATE_WATCH] AFTER the user confirms they want to set it up
+- If the user just pastes a URL without context, do NOT propose a watch immediately — ask what they want to watch for first
+- Use the page title from [URL_CONTEXT] to identify products. NEVER guess from the URL alone.
+- Use the ORIGINAL URL the user provided — never substitute it with a resolved or search URL.
+- Keep the "name" field short (2-4 words). If you don't know the product name, ask the user.
+- Pick an appropriate emoji for the watch
+- If a URL doesn't start with http, add https:// to it
+- ALWAYS include either [SUGGESTIONS] or [PROPOSE_WATCH] at the end of every response (never both), unless you're ending the conversation with [DISMISS]
+- When you include [PRODUCT_LINKS], also include [SUGGESTIONS] after it (product links + suggestions is OK)`;
+
+serve(async (req) => {
+  // Handle CORS preflight
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
+  try {
+    const { messages } = await req.json();
+
+    if (!messages || !Array.isArray(messages)) {
+      return new Response(
+        JSON.stringify({ error: "messages array is required" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    if (!ANTHROPIC_API_KEY) {
+      return new Response(
+        JSON.stringify({ error: "ANTHROPIC_API_KEY not configured" }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Forward to Anthropic API
+    const anthropicResponse = await fetch(
+      "https://api.anthropic.com/v1/messages",
+      {
+        method: "POST",
+        headers: {
+          "x-api-key": ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          model: MODEL,
+          max_tokens: MAX_TOKENS,
+          system: SYSTEM_PROMPT,
+          messages,
+        }),
+      }
+    );
+
+    if (!anthropicResponse.ok) {
+      const errorText = await anthropicResponse.text();
+      console.error(
+        `[ai-chat] Anthropic HTTP ${anthropicResponse.status}: ${errorText}`
+      );
+      return new Response(
+        JSON.stringify({
+          error: `AI service error (${anthropicResponse.status})`,
+        }),
+        {
+          status: 502,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    const data = await anthropicResponse.json();
+    let text = data.content?.[0]?.text ?? "";
+
+    // Post-process: replace [PRODUCT_LINKS] search queries with real shopping results
+    if (text.includes("[PRODUCT_LINKS]")) {
+      text = await enrichProductLinks(text);
+    }
+
+    return new Response(JSON.stringify({ text }), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    console.error(`[ai-chat] Error: ${err.message}`);
+    return new Response(JSON.stringify({ error: err.message }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+});
+
+// ────────────────────────────────────────────────────────────────
+// Product Search: Replaces [PRODUCT_LINKS] blocks with real results
+// ────────────────────────────────────────────────────────────────
+
+async function enrichProductLinks(responseText: string): Promise<string> {
+  const match = responseText.match(
+    /\[PRODUCT_LINKS\]([\s\S]*?)\[\/PRODUCT_LINKS\]/
+  );
+  if (!match) return responseText;
+
+  const content = match[1].trim();
+  let query = "";
+
+  // Extract search query from the block
+  if (content.toLowerCase().startsWith("search:")) {
+    query = content.replace(/^search:\s*/i, "").trim();
+  } else if (content.includes('"title"')) {
+    // Legacy: AI may have output JSON lines — extract product name from first line
+    try {
+      const firstLine = content
+        .split("\n")
+        .find((l: string) => l.trim().startsWith("{"));
+      if (firstLine) {
+        const obj = JSON.parse(firstLine);
+        query =
+          obj.title
+            ?.replace(
+              /\s+on\s+(Amazon|Google|eBay|Walmart|Target|Best Buy).*$/i,
+              ""
+            )
+            .trim() || "";
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  if (!query) {
+    // Use raw content as query (may just be a product name)
+    query = content.substring(0, 120);
+  }
+
+  let links: string[];
+
+  if (SERPER_API_KEY) {
+    // Use Serper.dev Shopping API for real product results
+    try {
+      const res = await fetch("https://google.serper.dev/shopping", {
+        method: "POST",
+        headers: {
+          "X-API-KEY": SERPER_API_KEY,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ q: query, num: 5 }),
+      });
+
+      if (res.ok) {
+        const searchData = await res.json();
+        const results = (searchData.shopping || []).slice(0, 4);
+
+        if (results.length > 0) {
+          links = results.map((r: any) =>
+            JSON.stringify({
+              title: (r.title || "Product").substring(0, 60),
+              url: r.link,
+              source: (r.source || "Store").replace(/\.com$/i, ""),
+              price: r.price || null,
+              imageURL: r.imageUrl || null,
+            })
+          );
+        } else {
+          links = generateFallbackLinks(query);
+        }
+      } else {
+        console.error(
+          `[ai-chat] Serper HTTP ${res.status}: ${await res.text()}`
+        );
+        links = generateFallbackLinks(query);
+      }
+    } catch (err) {
+      console.error(`[ai-chat] Serper search failed: ${err.message}`);
+      links = generateFallbackLinks(query);
+    }
+  } else {
+    // No Serper key — fall back to search-engine URLs
+    links = generateFallbackLinks(query);
+  }
+
+  const replacement = `[PRODUCT_LINKS]\n${links.join("\n")}\n[/PRODUCT_LINKS]`;
+  return responseText.replace(
+    /\[PRODUCT_LINKS\][\s\S]*?\[\/PRODUCT_LINKS\]/,
+    replacement
+  );
+}
+
+function generateFallbackLinks(query: string): string[] {
+  const encoded = encodeURIComponent(query);
+  return [
+    JSON.stringify({
+      title: `${query.substring(0, 40)} - Google Shopping`,
+      url: `https://www.google.com/search?tbm=shop&q=${encoded}`,
+      source: "Google Shopping",
+      price: null,
+      imageURL: null,
+    }),
+    JSON.stringify({
+      title: `${query.substring(0, 40)} - Amazon`,
+      url: `https://www.amazon.com/s?k=${encoded}`,
+      source: "Amazon",
+      price: null,
+      imageURL: null,
+    }),
+    JSON.stringify({
+      title: `${query.substring(0, 40)} - eBay`,
+      url: `https://www.ebay.com/sch/i.html?_nkw=${encoded}`,
+      source: "eBay",
+      price: null,
+      imageURL: null,
+    }),
+  ];
+}

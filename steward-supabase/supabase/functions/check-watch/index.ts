@@ -296,7 +296,7 @@ function evaluateCondition(
     if (ratio >= 0.6) {
       return {
         changed: true,
-        resultText: `Condition keywords matched (${matched.length}/${keywords.length})`,
+        resultText: `Change detected — matched: ${matched.join(", ")}`,
       };
     }
     return {
