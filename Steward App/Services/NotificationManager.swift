@@ -30,7 +30,9 @@ final class NotificationManager: NSObject {
                 }
             }
         } catch {
+            #if DEBUG
             print("[NotificationManager] Permission error: \(error)")
+            #endif
         }
     }
 
@@ -46,20 +48,28 @@ final class NotificationManager: NSObject {
     func didRegisterForRemoteNotifications(deviceToken data: Data) {
         let token = data.map { String(format: "%02.2hhx", $0) }.joined()
         self.deviceToken = token
+        #if DEBUG
         print("[NotificationManager] APNs token: \(token)")
+        #endif
 
         // Store token in Supabase
         Task {
             do {
                 try await supabase?.updateDeviceToken(token)
+                #if DEBUG
                 print("[NotificationManager] Token saved to Supabase")
+                #endif
             } catch {
+                #if DEBUG
                 print("[NotificationManager] Failed to save token: \(error)")
+                #endif
             }
         }
     }
 
     func didFailToRegisterForRemoteNotifications(error: Error) {
+        #if DEBUG
         print("[NotificationManager] Failed to register: \(error)")
+        #endif
     }
 }

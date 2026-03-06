@@ -7,6 +7,7 @@ struct Steward_AppApp: App {
     @State private var authManager = AuthManager()
     @State private var supabaseService = SupabaseService()
     @State private var notificationManager = NotificationManager()
+    @State private var subscriptionManager = SubscriptionManager()
 
     var body: some Scene {
         WindowGroup {
@@ -14,6 +15,7 @@ struct Steward_AppApp: App {
                 .environment(authManager)
                 .environment(supabaseService)
                 .environment(notificationManager)
+                .environment(subscriptionManager)
                 .onReceive(NotificationCenter.default.publisher(for: .didRegisterForRemoteNotifications)) { notification in
                     if let token = notification.userInfo?["token"] as? Data {
                         notificationManager.didRegisterForRemoteNotifications(deviceToken: token)
@@ -27,6 +29,8 @@ struct Steward_AppApp: App {
                 .task {
                     notificationManager.configure(supabase: supabaseService)
                     await notificationManager.checkCurrentStatus()
+                    await subscriptionManager.loadProducts()
+                    await subscriptionManager.checkEntitlements()
                 }
         }
         .modelContainer(for: [Watch.self, ActivityItem.self])

@@ -40,4 +40,18 @@ extension PricePoint {
     static func highestPrice(in points: [PricePoint]) -> PricePoint? {
         points.max(by: { $0.price < $1.price })
     }
+
+    /// Convert real check results (with price data) into PricePoints
+    static func fromCheckResults(_ results: [CheckResultDTO]) -> [PricePoint] {
+        results
+            .filter { $0.price != nil }
+            .map { PricePoint(date: $0.checkedAt, price: $0.price!) }
+            .sorted { $0.date < $1.date }
+    }
+
+    /// The average price across a set of points
+    static func averagePrice(in points: [PricePoint]) -> Double? {
+        guard !points.isEmpty else { return nil }
+        return points.map(\.price).reduce(0, +) / Double(points.count)
+    }
 }

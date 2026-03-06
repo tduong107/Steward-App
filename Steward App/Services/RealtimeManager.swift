@@ -35,7 +35,9 @@ final class RealtimeManager {
         Task { [weak self] in
             for await _ in changes {
                 guard let self else { return }
+                #if DEBUG
                 print("[Realtime] Watch table changed — syncing from cloud")
+                #endif
                 await self.viewModel?.syncFromCloud()
             }
         }

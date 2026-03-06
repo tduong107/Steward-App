@@ -8,6 +8,11 @@ struct SettingsScreen: View {
     @AppStorage("isDarkMode") private var isDarkMode = true
     @Environment(AuthManager.self) private var authManager
     @Environment(NotificationManager.self) private var notificationManager
+    @Environment(SubscriptionManager.self) private var subscriptionManager
+
+    private var currentTier: SubscriptionTier {
+        subscriptionManager.currentTier
+    }
 
     var body: some View {
         ScrollView {
@@ -55,7 +60,9 @@ struct SettingsScreen: View {
                 settingsCard {
                     accountRow
                     Divider().foregroundStyle(Theme.border).padding(.leading, 52)
-                    valueRow(icon: "sparkle", label: "Plan", value: "Steward Pro", highlight: true)
+                    planRow
+                    Divider().foregroundStyle(Theme.border).padding(.leading, 52)
+                    restorePurchasesRow
                     Divider().foregroundStyle(Theme.border).padding(.leading, 52)
                     valueRow(icon: "lock", label: "Privacy & data", value: "")
                 }
@@ -106,6 +113,74 @@ struct SettingsScreen: View {
         if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
             UIApplication.shared.open(settingsURL)
         }
+    }
+
+    // MARK: - Plan Row
+
+    private var planRow: some View {
+        Button {
+            subscriptionManager.presentPaywall()
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "sparkle")
+                    .font(.system(size: 16))
+                    .foregroundStyle(Theme.ink)
+                    .frame(width: 24)
+
+                Text("Plan")
+                    .font(Theme.body(13))
+                    .foregroundStyle(Theme.ink)
+
+                Spacer()
+
+                Text("Steward \(currentTier.displayName) · \(currentTier.price)")
+                    .font(Theme.body(12, weight: .semibold))
+                    .foregroundStyle(Theme.accent)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Theme.borderMid)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Restore Purchases Row
+
+    private var restorePurchasesRow: some View {
+        Button {
+            Task {
+                await subscriptionManager.restorePurchases()
+            }
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 16))
+                    .foregroundStyle(Theme.ink)
+                    .frame(width: 24)
+
+                Text("Restore purchases")
+                    .font(Theme.body(13))
+                    .foregroundStyle(Theme.ink)
+
+                Spacer()
+
+                if subscriptionManager.isPurchasing {
+                    ProgressView()
+                        .controlSize(.small)
+                } else {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Theme.borderMid)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+        }
+        .buttonStyle(.plain)
+        .disabled(subscriptionManager.isPurchasing)
     }
 
     // MARK: - Account Row

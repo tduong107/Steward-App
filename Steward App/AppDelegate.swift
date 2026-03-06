@@ -60,7 +60,9 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
     ) {
         let userInfo = response.notification.request.content.userInfo
         // Can extract watch_id from userInfo to navigate to the right screen
+        #if DEBUG
         print("[AppDelegate] Notification tapped: \(userInfo)")
+        #endif
         completionHandler()
     }
 }

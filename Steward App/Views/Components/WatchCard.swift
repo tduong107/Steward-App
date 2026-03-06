@@ -7,13 +7,33 @@ struct WatchCard: View {
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 12) {
-                // Emoji icon
+                // Product image or emoji fallback
                 ZStack(alignment: .topTrailing) {
-                    Text(watch.emoji)
-                        .font(.system(size: 20))
+                    if let imageURL = watch.imageURL, let url = URL(string: imageURL) {
+                        AsyncImage(url: url) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .scaledToFill()
+                            case .failure:
+                                Text(watch.emoji)
+                                    .font(.system(size: 20))
+                            default:
+                                ProgressView()
+                                    .controlSize(.small)
+                            }
+                        }
                         .frame(width: 44, height: 44)
                         .background(Theme.bgDeep)
                         .clipShape(RoundedRectangle(cornerRadius: Theme.radiusMd))
+                    } else {
+                        Text(watch.emoji)
+                            .font(.system(size: 20))
+                            .frame(width: 44, height: 44)
+                            .background(Theme.bgDeep)
+                            .clipShape(RoundedRectangle(cornerRadius: Theme.radiusMd))
+                    }
 
                     if watch.triggered {
                         Circle()
@@ -37,9 +57,14 @@ struct WatchCard: View {
 
                         Spacer()
 
-                        Text(watch.lastSeen)
-                            .font(Theme.body(11))
-                            .foregroundStyle(Theme.inkLight)
+                        // Next check countdown
+                        HStack(spacing: 3) {
+                            Image(systemName: "clock")
+                                .font(.system(size: 9))
+                            Text(watch.nextCheckCountdown)
+                                .font(Theme.body(10))
+                        }
+                        .foregroundStyle(Theme.inkLight)
                     }
 
                     Text(watch.url)

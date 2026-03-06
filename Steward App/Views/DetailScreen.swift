@@ -4,15 +4,20 @@ struct DetailScreen: View {
     let watch: Watch
     @Environment(WatchViewModel.self) private var viewModel
     @Environment(SupabaseService.self) private var supabase
+    @Environment(SubscriptionManager.self) private var subscriptionManager
     @Environment(\.dismiss) private var dismiss
 
-    // Price history (generated once per view)
+    // Price history (real data from Supabase, mock fallback)
     @State private var priceHistory: [PricePoint] = []
+    @State private var dealInsight: DealInsight?
     @State private var showShareSheet = false
+    @State private var showDeleteConfirm = false
+    @State private var showBrowser = false
 
     // Real check results from Supabase
     @State private var checkResults: [CheckResultDTO] = []
     @State private var isLoadingChecks = true
+    @State private var showFrequencyPicker = false
 
     /// Show price chart for price-related watches
     private var showsPriceChart: Bool {
@@ -46,26 +51,65 @@ struct DetailScreen: View {
             }
 
             ToolbarItem(placement: .primaryAction) {
-                Button {
-                    showShareSheet = true
-                } label: {
-                    Image(systemName: "square.and.arrow.up")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(Theme.ink)
+                HStack(spacing: 16) {
+                    Button {
+                        showShareSheet = true
+                    } label: {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(Theme.ink)
+                    }
+                    .accessibilityLabel("Share this watch")
+
+                    Menu {
+                        Button(role: .destructive) {
+                            showDeleteConfirm = true
+                        } label: {
+                            Label("Delete Watch", systemImage: "trash")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(Theme.ink)
+                    }
+                    .accessibilityLabel("More options")
                 }
-                .accessibilityLabel("Share this watch")
             }
+        }
+        .alert("Delete Watch", isPresented: $showDeleteConfirm) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) {
+                viewModel.removeWatch(watch)
+                dismiss()
+            }
+        } message: {
+            Text("Are you sure you want to delete \"\(watch.name)\"? This action cannot be undone.")
         }
         .sheet(isPresented: $showShareSheet) {
             ShareWatchSheet(watch: watch)
         }
-        .onAppear {
-            if priceHistory.isEmpty && showsPriceChart {
-                priceHistory = PricePoint.mockHistory(for: watch.name)
+        .sheet(isPresented: $showBrowser) {
+            if let url = watch.fullURL {
+                InAppBrowser(initialURL: url) { _ in }
             }
+        }
+        .sheet(isPresented: $showFrequencyPicker) {
+            FrequencyPickerSheet(
+                selectedFrequency: Binding(
+                    get: { watch.checkFrequency },
+                    set: { newValue in
+                        watch.checkFrequency = newValue
+                        try? viewModel.saveAndSync(watch)
+                    }
+                )
+            )
+            .presentationDetents([.medium, .large])
         }
         .task {
             await loadCheckResults()
+            if showsPriceChart {
+                await loadPriceHistory()
+            }
         }
     }
 
@@ -80,25 +124,76 @@ struct DetailScreen: View {
         isLoadingChecks = false
     }
 
+    /// Load real price history from Supabase; fall back to mock if < 2 real data points
+    private func loadPriceHistory() async {
+        do {
+            let results = try await supabase.fetchPriceHistory(forWatchId: watch.id)
+            let realPoints = PricePoint.fromCheckResults(results)
+
+            if realPoints.count >= 2 {
+                priceHistory = realPoints
+                dealInsight = DealAnalyzer.analyze(history: realPoints)
+            } else {
+                // Not enough real data yet — show mock so the chart isn't empty
+                priceHistory = PricePoint.mockHistory(for: watch.name)
+            }
+        } catch {
+            // Fallback to mock data on error
+            priceHistory = PricePoint.mockHistory(for: watch.name)
+        }
+    }
+
     // MARK: - Header Card
 
     private var headerCard: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 14) {
-                Text(watch.emoji)
-                    .font(.system(size: 26))
-                    .frame(width: 56, height: 56)
-                    .background(Theme.bgDeep)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                Group {
+                    if let imageURL = watch.imageURL, let url = URL(string: imageURL) {
+                        AsyncImage(url: url) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .scaledToFill()
+                            case .failure:
+                                Text(watch.emoji)
+                                    .font(.system(size: 26))
+                            default:
+                                ProgressView()
+                                    .controlSize(.small)
+                            }
+                        }
+                    } else {
+                        Text(watch.emoji)
+                            .font(.system(size: 26))
+                    }
+                }
+                .frame(width: 56, height: 56)
+                .background(Theme.bgDeep)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(watch.name)
                         .font(Theme.serif(18, weight: .bold))
                         .foregroundStyle(Theme.ink)
 
-                    Text(watch.url)
-                        .font(Theme.body(12))
-                        .foregroundStyle(Theme.inkLight)
+                    Button {
+                        showBrowser = true
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(watch.url)
+                                .font(Theme.body(12))
+                                .foregroundStyle(Theme.accent)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+
+                            Image(systemName: "arrow.up.right")
+                                .font(.system(size: 9, weight: .semibold))
+                                .foregroundStyle(Theme.accentMid)
+                        }
+                    }
+                    .buttonStyle(.plain)
                 }
             }
 
@@ -146,10 +241,23 @@ struct DetailScreen: View {
                     .padding(.bottom, 4)
             }
 
+            // Deal Quality Badge (only when we have real price analysis + paid tier)
+            if let dealInsight = dealInsight, subscriptionManager.currentTier.hasPriceInsights {
+                DealQualityBadge(insight: dealInsight)
+                    .padding(.bottom, 4)
+            }
+
             DetailRow(icon: "🎯", label: "Watching for", value: watch.condition)
             DetailRow(icon: "⚡", label: "AI will", value: watch.actionLabel, highlight: watch.triggered)
-            DetailRow(icon: "⏱", label: "Check frequency", value: watch.checkFrequency)
+            Button { showFrequencyPicker = true } label: {
+                DetailRow(icon: "⏱", label: "Check frequency", value: watch.checkFrequency, showChevron: true)
+            }
+            .buttonStyle(.plain)
+            nextCheckRow
             DetailRow(icon: "🔔", label: "Notify via", value: "Push notification · Email")
+
+            // Visit website button
+            visitWebsiteCard
 
             actionButton
 
@@ -157,6 +265,9 @@ struct DetailScreen: View {
             shareCard
 
             recentChecks
+
+            // Delete watch
+            deleteWatchButton
         }
         .padding(.horizontal, 24)
         .padding(.top, 16)
@@ -222,6 +333,106 @@ struct DetailScreen: View {
         .disabled(!watch.triggered)
         .padding(.top, 8)
         .accessibilityLabel(watch.triggered ? "Let Steward act now" : "Waiting for trigger")
+    }
+
+    // MARK: - Next Check Countdown
+
+    private var nextCheckRow: some View {
+        HStack(spacing: 12) {
+            Text("⏳")
+                .font(.system(size: 16))
+                .frame(width: 28, alignment: .center)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Next check")
+                    .font(Theme.body(12))
+                    .foregroundStyle(Theme.inkLight)
+                Text(watch.nextCheckCountdown)
+                    .font(Theme.body(14, weight: .medium))
+                    .foregroundStyle(Theme.ink)
+            }
+
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(Theme.bgCard)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(Theme.border, lineWidth: 1)
+        )
+    }
+
+    // MARK: - Visit Website
+
+    private var visitWebsiteCard: some View {
+        Button {
+            showBrowser = true
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "globe")
+                    .font(.system(size: 16))
+                    .foregroundStyle(Theme.accent)
+                    .frame(width: 36, height: 36)
+                    .background(Theme.accentLight)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Visit Website")
+                        .font(Theme.body(13, weight: .semibold))
+                        .foregroundStyle(Theme.ink)
+
+                    Text(watch.url)
+                        .font(Theme.body(11))
+                        .foregroundStyle(Theme.inkLight)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+
+                Spacer()
+
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Theme.accentMid)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(Theme.bgCard)
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(Theme.accentMid, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .padding(.top, 4)
+    }
+
+    // MARK: - Delete Watch Button
+
+    private var deleteWatchButton: some View {
+        Button {
+            showDeleteConfirm = true
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "trash")
+                    .font(.system(size: 14))
+                Text("Delete Watch")
+                    .font(Theme.body(14, weight: .medium))
+            }
+            .foregroundStyle(Theme.red)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .background(Theme.redLight)
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(Theme.red.opacity(0.3), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .padding(.top, 16)
     }
 
     // MARK: - Share Card (Feature 3)

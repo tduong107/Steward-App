@@ -7,9 +7,11 @@ struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(AuthManager.self) private var authManager
     @Environment(SupabaseService.self) private var supabaseService
+    @Environment(SubscriptionManager.self) private var subscriptionManager
     @AppStorage("isDarkMode") private var isDarkMode = true
 
     var body: some View {
+        @Bindable var subscription = subscriptionManager
         ZStack {
             // Main app content
             VStack(spacing: 0) {
@@ -28,6 +30,9 @@ struct ContentView: View {
                         if let watch = viewModel.selectedWatch {
                             DetailScreen(watch: watch)
                         }
+                    }
+                    .navigationDestination(isPresented: $viewModel.showPriceInsights) {
+                        PriceInsightsScreen()
                     }
                 }
 
@@ -57,13 +62,26 @@ struct ContentView: View {
         }
         .animation(.spring(response: 0.35, dampingFraction: 0.85), value: viewModel.isChatOpen)
         .animation(.spring(response: 0.3, dampingFraction: 0.85), value: viewModel.actionModalWatch != nil)
+        .onChange(of: viewModel.selectedTab) { _, _ in
+            if viewModel.showDetail {
+                viewModel.showDetail = false
+                viewModel.selectedWatch = nil
+            }
+            if viewModel.showPriceInsights {
+                viewModel.showPriceInsights = false
+            }
+        }
         .preferredColorScheme(isDarkMode ? .dark : .light)
         .environment(viewModel)
+        .sheet(isPresented: $subscription.showPaywall) {
+            PaywallScreen()
+        }
         .onAppear {
             viewModel.configure(
                 with: modelContext,
                 auth: authManager,
-                supabase: supabaseService
+                supabase: supabaseService,
+                subscription: subscriptionManager
             )
 
             // Start realtime subscriptions
@@ -83,4 +101,5 @@ struct ContentView: View {
         .environment(AuthManager())
         .environment(SupabaseService())
         .environment(NotificationManager())
+        .environment(SubscriptionManager())
 }

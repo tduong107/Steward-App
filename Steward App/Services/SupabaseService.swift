@@ -53,6 +53,28 @@ final class SupabaseService {
             .value
     }
 
+    // MARK: - Price History
+
+    /// Fetches check results that have a price value, for building price history charts.
+    /// Returns results ordered by checked_at ascending (oldest first) for charting.
+    func fetchPriceHistory(forWatchId watchId: UUID, days: Int = 90) async throws -> [CheckResultDTO] {
+        let calendar = Calendar.current
+        let startDate = calendar.date(byAdding: .day, value: -days, to: Date()) ?? Date()
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        let startDateStr = formatter.string(from: startDate)
+
+        return try await SupabaseConfig.client
+            .from("check_results")
+            .select()
+            .eq("watch_id", value: watchId.uuidString)
+            .not("price", operator: .is, value: "null")
+            .gte("checked_at", value: startDateStr)
+            .order("checked_at", ascending: true)
+            .execute()
+            .value
+    }
+
     // MARK: - Activities
 
     func fetchActivities() async throws -> [ActivityDTO] {

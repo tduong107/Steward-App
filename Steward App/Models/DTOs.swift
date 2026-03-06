@@ -17,6 +17,7 @@ struct WatchDTO: Codable, Identifiable, Sendable {
     var lastChecked: Date?
     var triggered: Bool
     var changeNote: String?
+    var imageURL: String?
     var createdAt: Date
 
     enum CodingKeys: String, CodingKey {
@@ -30,6 +31,7 @@ struct WatchDTO: Codable, Identifiable, Sendable {
         case lastChecked = "last_checked"
         case triggered
         case changeNote = "change_note"
+        case imageURL = "image_url"
         case createdAt = "created_at"
     }
 }
@@ -60,6 +62,7 @@ struct CheckResultDTO: Codable, Identifiable, Sendable {
     let watchId: UUID
     var resultText: String
     var changed: Bool
+    var price: Double?
     var checkedAt: Date
 
     enum CodingKeys: String, CodingKey {
@@ -67,6 +70,7 @@ struct CheckResultDTO: Codable, Identifiable, Sendable {
         case watchId = "watch_id"
         case resultText = "result_text"
         case changed
+        case price
         case checkedAt = "checked_at"
     }
 }

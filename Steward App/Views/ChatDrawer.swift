@@ -9,6 +9,8 @@ struct ChatDrawer: View {
     @FocusState private var isInputFocused: Bool
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var showImageSourcePicker = false
+    @State private var browserItem: BrowserItem?
+    @State private var dragOffset: CGFloat = 0
 
     var body: some View {
         GeometryReader { geo in
@@ -33,6 +35,33 @@ struct ChatDrawer: View {
                 .background(Theme.bgCard)
                 .clipShape(RoundedRectangle(cornerRadius: Theme.radiusXL))
                 .shadow(color: .black.opacity(0.15), radius: 24, y: -4)
+                .offset(y: dragOffset)
+                .gesture(
+                    DragGesture()
+                        .onChanged { value in
+                            // Only allow dragging down (positive translation)
+                            if value.translation.height > 0 {
+                                dragOffset = value.translation.height
+                            }
+                        }
+                        .onEnded { value in
+                            // Dismiss if dragged down past threshold or with enough velocity
+                            if value.translation.height > 80 || value.predictedEndTranslation.height > 200 {
+                                withAnimation(.easeOut(duration: 0.25)) {
+                                    dragOffset = 600
+                                }
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                                    isPresented = false
+                                    dragOffset = 0
+                                }
+                            } else {
+                                // Snap back
+                                withAnimation(.spring(response: 0.3)) {
+                                    dragOffset = 0
+                                }
+                            }
+                        }
+                )
                 .transition(.move(edge: .bottom))
             }
         }
@@ -59,6 +88,20 @@ struct ChatDrawer: View {
                     chatVM.pendingImage = uiImage
                 }
                 selectedPhotoItem = nil
+            }
+        }
+        .onChange(of: chatVM.shouldDismiss) {
+            if chatVM.shouldDismiss {
+                withAnimation(.easeOut(duration: 0.3)) {
+                    isPresented = false
+                }
+                chatVM.shouldDismiss = false
+            }
+        }
+        .sheet(item: $browserItem) { item in
+            InAppBrowser(initialURL: item.url) { capturedURL in
+                // Send the captured URL back into chat
+                chatVM.send("I found it! Here's the URL: \(capturedURL)")
             }
         }
     }
@@ -121,11 +164,19 @@ struct ChatDrawer: View {
     private var messageList: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(spacing: 14) {
+                VStack(spacing: 14) {
                     ForEach(chatVM.messages) { msg in
-                        ChatMessageView(message: msg, onSuggestion: { text in
-                            chatVM.send(text)
-                        })
+                        ChatMessageView(
+                            message: msg,
+                            onSuggestion: { text in
+                                chatVM.send(text)
+                            },
+                            onProductLinkTap: { link in
+                                if let url = URL(string: link.url) {
+                                    browserItem = BrowserItem(url: url)
+                                }
+                            }
+                        )
                         .id(msg.id)
                     }
 
@@ -133,23 +184,31 @@ struct ChatDrawer: View {
                         TypingIndicator()
                             .id("typing")
                     }
+
+                    // Invisible anchor at the very bottom for reliable scrolling
+                    Color.clear
+                        .frame(height: 1)
+                        .id("bottomAnchor")
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 16)
             }
             .onChange(of: chatVM.messages.count) {
-                withAnimation {
-                    if let last = chatVM.messages.last {
-                        proxy.scrollTo(last.id, anchor: .bottom)
-                    }
-                }
+                scrollToBottom(proxy: proxy)
             }
             .onChange(of: chatVM.isTyping) {
                 if chatVM.isTyping {
-                    withAnimation {
-                        proxy.scrollTo("typing", anchor: .bottom)
-                    }
+                    scrollToBottom(proxy: proxy)
                 }
+            }
+        }
+    }
+
+    /// Scrolls to the bottom anchor with a small delay to let layout settle
+    private func scrollToBottom(proxy: ScrollViewProxy) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            withAnimation(.easeOut(duration: 0.3)) {
+                proxy.scrollTo("bottomAnchor", anchor: .bottom)
             }
         }
     }
@@ -261,6 +320,7 @@ struct ChatDrawer: View {
 struct ChatMessageView: View {
     let message: ChatMessage
     let onSuggestion: (String) -> Void
+    var onProductLinkTap: ((ProductLink) -> Void)?
 
     var body: some View {
         HStack(alignment: .top) {
@@ -301,6 +361,18 @@ struct ChatMessageView: View {
                         .padding(.vertical, 11)
                         .background(message.role == .user ? Theme.accent : Theme.bgDeep)
                         .clipShape(ChatBubbleShape(isUser: message.role == .user))
+                }
+
+                // Product link cards
+                if let links = message.productLinks, !links.isEmpty {
+                    VStack(spacing: 6) {
+                        ForEach(links) { link in
+                            ProductLinkCard(link: link) {
+                                onProductLinkTap?(link)
+                            }
+                        }
+                    }
+                    .padding(.top, 4)
                 }
 
                 // Suggestions
@@ -369,6 +441,75 @@ struct ChatMessageView: View {
 
             if message.role == .steward { Spacer(minLength: 40) }
         }
+    }
+}
+
+// MARK: - Product Link Card
+
+struct ProductLinkCard: View {
+    let link: ProductLink
+    let onTap: () -> Void
+
+    private var sourceIcon: String {
+        switch link.source.lowercased() {
+        case let s where s.contains("amazon"): return "cart"
+        case let s where s.contains("google"): return "magnifyingglass"
+        case let s where s.contains("ebay"): return "tag"
+        case let s where s.contains("walmart"): return "storefront"
+        case let s where s.contains("target"): return "target"
+        case let s where s.contains("best buy"): return "desktopcomputer"
+        default: return "globe"
+        }
+    }
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 10) {
+                // Source icon
+                Image(systemName: sourceIcon)
+                    .font(.system(size: 14))
+                    .foregroundStyle(Theme.accent)
+                    .frame(width: 32, height: 32)
+                    .background(Theme.accentLight)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(link.title)
+                        .font(Theme.body(12, weight: .semibold))
+                        .foregroundStyle(Theme.ink)
+                        .lineLimit(1)
+
+                    HStack(spacing: 4) {
+                        Text(link.source)
+                            .font(Theme.body(10, weight: .medium))
+                            .foregroundStyle(Theme.accent)
+
+                        if let price = link.price {
+                            Text("·")
+                                .foregroundStyle(Theme.inkLight)
+                            Text(price)
+                                .font(Theme.body(10))
+                                .foregroundStyle(Theme.inkMid)
+                        }
+                    }
+                }
+
+                Spacer()
+
+                Image(systemName: "arrow.up.right.square")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Theme.accent)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(Theme.bgCard)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Theme.accentMid, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -452,6 +593,13 @@ struct TypingIndicator: View {
         let adjusted = (phase + delay).truncatingRemainder(dividingBy: 1.0)
         return 0.3 + 0.7 * abs(sin(adjusted * .pi))
     }
+}
+
+// MARK: - Browser Item (for .sheet(item:))
+
+struct BrowserItem: Identifiable {
+    let id = UUID()
+    let url: URL
 }
 
 // MARK: - Flow Layout

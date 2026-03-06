@@ -19,6 +19,7 @@ final class WatchViewModel {
     var selectedTab: Tab = .home
     var selectedWatch: Watch?
     var showDetail = false
+    var showPriceInsights = false
 
     // Chat
     var isChatOpen = false
@@ -34,6 +35,7 @@ final class WatchViewModel {
     private var modelContext: ModelContext?
     private var auth: AuthManager?
     private var supabase: SupabaseService?
+    private var subscriptionManager: SubscriptionManager?
 
     enum Tab: String, CaseIterable {
         case home = "Watches"
@@ -51,10 +53,11 @@ final class WatchViewModel {
 
     // MARK: - Setup
 
-    func configure(with context: ModelContext, auth: AuthManager, supabase: SupabaseService) {
+    func configure(with context: ModelContext, auth: AuthManager, supabase: SupabaseService, subscription: SubscriptionManager? = nil) {
         self.modelContext = context
         self.auth = auth
         self.supabase = supabase
+        self.subscriptionManager = subscription
 
         // Load local data immediately for fast UI
         fetchLocalWatches()
@@ -128,8 +131,24 @@ final class WatchViewModel {
         watches.filter { $0.triggered }
     }
 
+    /// Whether the user can add another watch under their current tier
+    var canAddWatch: Bool {
+        let maxWatches = subscriptionManager?.currentTier.maxWatches ?? 3
+        return watches.count < maxWatches
+    }
+
     func addWatch(_ watch: Watch) {
         guard let context = modelContext, let userId = auth?.currentUserId else { return }
+
+        // Check watch limit — show paywall if over the tier's max
+        let maxWatches = subscriptionManager?.currentTier.maxWatches ?? 3
+        if !canAddWatch {
+            subscriptionManager?.presentPaywall(
+                highlighting: .pro,
+                reason: "You've reached the \(maxWatches)-watch limit on your Free plan. Upgrade to add more watches."
+            )
+            return
+        }
 
         // Insert locally first for instant UI
         context.insert(watch)
@@ -138,14 +157,77 @@ final class WatchViewModel {
             fetchLocalWatches()
         }
 
-        // Then push to Supabase
+        // Fetch product image in background, then push to Supabase
         Task {
+            // Try to fetch og:image if no imageURL yet
+            if watch.imageURL == nil {
+                if let ogImage = await fetchOGImageURL(for: watch.url) {
+                    watch.imageURL = ogImage
+                    try? context.save()
+                    withAnimation(.spring(response: 0.3)) {
+                        fetchLocalWatches()
+                    }
+                }
+            }
+
             do {
                 let dto = watch.toDTO(userId: userId)
                 try await supabase?.createWatch(dto)
             } catch {
                 syncError = "Failed to sync watch: \(error.localizedDescription)"
             }
+        }
+    }
+
+    // MARK: - OG Image Extraction
+
+    /// Fetches a URL's HTML and extracts the og:image meta tag
+    private func fetchOGImageURL(for urlString: String) async -> String? {
+        var fullURL = urlString
+        if !fullURL.lowercased().hasPrefix("http") {
+            fullURL = "https://\(fullURL)"
+        }
+        guard let url = URL(string: fullURL) else { return nil }
+
+        do {
+            var request = URLRequest(url: url)
+            request.timeoutInterval = 10
+            // Use a browser-like User-Agent so servers return full HTML
+            request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1", forHTTPHeaderField: "User-Agent")
+
+            let (data, _) = try await URLSession.shared.data(for: request)
+            guard let html = String(data: data, encoding: .utf8) else { return nil }
+
+            // Parse og:image from HTML using regex
+            // Match: <meta property="og:image" content="...">
+            let patterns = [
+                "property=\"og:image\"\\s+content=\"([^\"]+)\"",
+                "content=\"([^\"]+)\"\\s+property=\"og:image\"",
+                "property='og:image'\\s+content='([^']+)'",
+                "content='([^']+)'\\s+property='og:image'"
+            ]
+
+            for pattern in patterns {
+                if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
+                   let match = regex.firstMatch(in: html, range: NSRange(html.startIndex..., in: html)),
+                   let range = Range(match.range(at: 1), in: html) {
+                    let imageURL = String(html[range])
+                    // Make relative URLs absolute
+                    if imageURL.hasPrefix("//") {
+                        return "https:\(imageURL)"
+                    } else if imageURL.hasPrefix("/") {
+                        return "\(url.scheme ?? "https")://\(url.host ?? "")\(imageURL)"
+                    }
+                    return imageURL
+                }
+            }
+
+            return nil
+        } catch {
+            #if DEBUG
+            print("[WatchViewModel] Failed to fetch og:image: \(error)")
+            #endif
+            return nil
         }
     }
 
@@ -200,6 +282,20 @@ final class WatchViewModel {
     func openDetail(for watch: Watch) {
         selectedWatch = watch
         showDetail = true
+    }
+
+    /// Save a watch locally and sync to cloud (used for inline edits like frequency change)
+    func saveAndSync(_ watch: Watch) throws {
+        try modelContext?.save()
+        fetchLocalWatches()
+
+        // Push update to Supabase
+        if let userId = auth?.currentUserId {
+            Task {
+                let dto = watch.toDTO(userId: userId)
+                try? await supabase?.updateWatch(dto)
+            }
+        }
     }
 
     // MARK: - Activity Logging

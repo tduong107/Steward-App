@@ -16,7 +16,9 @@ extension Watch {
             lastSeen: dto.lastChecked?.formatted(.relative(presentation: .named)) ?? "Not yet",
             triggered: dto.triggered,
             changeNote: dto.changeNote,
-            checkFrequency: dto.checkFrequency
+            checkFrequency: dto.checkFrequency,
+            imageURL: dto.imageURL,
+            lastCheckedAt: dto.lastChecked
         )
         // Preserve the UUID and timestamp from Supabase
         self.id = dto.id
@@ -39,6 +41,7 @@ extension Watch {
             lastChecked: nil,
             triggered: self.triggered,
             changeNote: self.changeNote,
+            imageURL: self.imageURL,
             createdAt: self.createdAt
         )
     }

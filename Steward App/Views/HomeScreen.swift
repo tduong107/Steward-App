@@ -2,6 +2,7 @@ import SwiftUI
 
 struct HomeScreen: View {
     @Environment(WatchViewModel.self) private var viewModel
+    @Environment(SubscriptionManager.self) private var subscriptionManager
 
     var body: some View {
         ScrollView {
@@ -9,6 +10,7 @@ struct HomeScreen: View {
                 headerSection
                 chatPromptBar
                 triggeredAlerts
+                priceInsightsCard
 
                 if viewModel.watches.isEmpty {
                     emptyState
@@ -127,6 +129,118 @@ struct HomeScreen: View {
         }
     }
 
+    // MARK: - Price Insights Card
+
+    /// Price-related watches for the insights card
+    private var priceWatches: [Watch] {
+        viewModel.watches.filter { watch in
+            watch.actionType == .price ||
+            watch.condition.lowercased().contains("price") ||
+            watch.actionLabel.lowercased().contains("price")
+        }
+    }
+
+    @ViewBuilder
+    private var priceInsightsCard: some View {
+        if !priceWatches.isEmpty {
+            if subscriptionManager.currentTier.hasPriceInsights {
+                // Unlocked — full access
+                Button {
+                    viewModel.showPriceInsights = true
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "chart.line.downtrend.xyaxis")
+                            .font(.system(size: 16))
+                            .foregroundStyle(Theme.accent)
+                            .frame(width: 36, height: 36)
+                            .background(Theme.accentLight)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Price Insights")
+                                .font(Theme.body(13, weight: .semibold))
+                                .foregroundStyle(Theme.ink)
+
+                            Text("Tracking \(priceWatches.count) price\(priceWatches.count == 1 ? "" : "s") · Tap to see deals")
+                                .font(Theme.body(11))
+                                .foregroundStyle(Theme.inkLight)
+                        }
+
+                        Spacer()
+
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(Theme.accentMid)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(Theme.bgCard)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14)
+                            .stroke(Theme.accentMid, lineWidth: 1)
+                    )
+                    .shadow(color: .black.opacity(0.04), radius: 8, y: 4)
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 24)
+                .padding(.bottom, 16)
+            } else {
+                // Locked — teaser card
+                Button {
+                    subscriptionManager.presentPaywall(highlighting: .pro)
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "chart.line.downtrend.xyaxis")
+                            .font(.system(size: 16))
+                            .foregroundStyle(Theme.inkLight)
+                            .frame(width: 36, height: 36)
+                            .background(Theme.bgDeep)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack(spacing: 6) {
+                                Text("Price Insights")
+                                    .font(Theme.body(13, weight: .semibold))
+                                    .foregroundStyle(Theme.inkMid)
+
+                                Image(systemName: "lock.fill")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(Theme.inkLight)
+                            }
+
+                            Text("Upgrade to Pro to see deals & price trends")
+                                .font(Theme.body(11))
+                                .foregroundStyle(Theme.inkLight)
+                        }
+
+                        Spacer()
+
+                        Text("PRO")
+                            .font(Theme.body(10, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Theme.accent)
+                            .clipShape(Capsule())
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(Theme.bgCard)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14)
+                            .stroke(Theme.border, lineWidth: 1)
+                    )
+                    .shadow(color: .black.opacity(0.04), radius: 8, y: 4)
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 24)
+                .padding(.bottom, 16)
+            }
+        }
+    }
+
     // MARK: - Empty State
 
     private var emptyState: some View {
@@ -162,21 +276,33 @@ struct HomeScreen: View {
 
                 Spacer()
 
-                Text("\(viewModel.watches.count) watching")
-                    .font(Theme.body(12))
-                    .foregroundStyle(Theme.inkLight)
+                if subscriptionManager.currentTier.maxWatches < Int.max {
+                    Text("\(viewModel.watches.count)/\(subscriptionManager.currentTier.maxWatches) watches")
+                        .font(Theme.body(12))
+                        .foregroundStyle(Theme.inkLight)
+                } else {
+                    Text("\(viewModel.watches.count) watching")
+                        .font(Theme.body(12))
+                        .foregroundStyle(Theme.inkLight)
+                }
             }
 
             VStack(spacing: 10) {
                 ForEach(viewModel.watches) { watch in
-                    WatchCard(watch: watch) {
-                        viewModel.openDetail(for: watch)
-                    }
-                    .contextMenu {
-                        Button(role: .destructive) {
+                    SwipeToDelete {
+                        withAnimation(.spring(response: 0.3)) {
                             viewModel.removeWatch(watch)
-                        } label: {
-                            Label("Delete Watch", systemImage: "trash")
+                        }
+                    } content: {
+                        WatchCard(watch: watch) {
+                            viewModel.openDetail(for: watch)
+                        }
+                        .contextMenu {
+                            Button(role: .destructive) {
+                                viewModel.removeWatch(watch)
+                            } label: {
+                                Label("Delete Watch", systemImage: "trash")
+                            }
                         }
                     }
                     .transition(.asymmetric(

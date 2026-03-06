@@ -29,6 +29,8 @@ final class Watch {
     var triggered: Bool
     var changeNote: String?
     var checkFrequency: String
+    var imageURL: String?
+    var lastCheckedAt: Date?
     var createdAt: Date
 
     var actionType: ActionType {
@@ -52,7 +54,9 @@ final class Watch {
         lastSeen: String = "Just now",
         triggered: Bool = false,
         changeNote: String? = nil,
-        checkFrequency: String = "Every 5 minutes"
+        checkFrequency: String = "Daily",
+        imageURL: String? = nil,
+        lastCheckedAt: Date? = nil
     ) {
         self.id = UUID()
         self.emoji = emoji
@@ -66,7 +70,55 @@ final class Watch {
         self.triggered = triggered
         self.changeNote = changeNote
         self.checkFrequency = checkFrequency
+        self.imageURL = imageURL
+        self.lastCheckedAt = lastCheckedAt
         self.createdAt = Date()
+    }
+}
+
+// MARK: - Computed Helpers
+
+extension Watch {
+    /// The full URL with https:// prepended if missing
+    var fullURL: URL? {
+        var urlString = url
+        if !urlString.lowercased().hasPrefix("http") {
+            urlString = "https://\(urlString)"
+        }
+        return URL(string: urlString)
+    }
+
+    /// The next check date based on last check + frequency interval
+    var nextCheckDate: Date? {
+        guard let freq = CheckFrequency.from(string: checkFrequency) else { return nil }
+        let baseDate = lastCheckedAt ?? createdAt
+        return baseDate.addingTimeInterval(freq.intervalSeconds)
+    }
+
+    /// Formatted countdown string to next check (e.g. "in 4h 23m", "in 12m")
+    var nextCheckCountdown: String {
+        guard let nextDate = nextCheckDate else { return checkFrequency }
+
+        let now = Date()
+        if nextDate <= now {
+            return "Checking soon…"
+        }
+
+        let remaining = nextDate.timeIntervalSince(now)
+
+        if remaining < 60 {
+            return "in <1m"
+        } else if remaining < 3600 {
+            let mins = Int(remaining / 60)
+            return "in \(mins)m"
+        } else if remaining < 86400 {
+            let hours = Int(remaining / 3600)
+            let mins = Int((remaining.truncatingRemainder(dividingBy: 3600)) / 60)
+            return mins > 0 ? "in \(hours)h \(mins)m" : "in \(hours)h"
+        } else {
+            let hours = Int(remaining / 3600)
+            return "in \(hours)h"
+        }
     }
 }
 

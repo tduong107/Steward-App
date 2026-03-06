@@ -13,12 +13,25 @@ struct ActionCard: Identifiable {
     let type: ActionType
 }
 
+struct ProductLink: Identifiable {
+    let id = UUID()
+    let title: String
+    let url: String
+    let source: String // e.g. "Amazon", "Google Shopping", "eBay"
+    let price: String? // Optional price snippet
+
+    var displayURL: String {
+        URL(string: url)?.host ?? url
+    }
+}
+
 struct ChatMessage: Identifiable {
     let id: UUID
     let role: ChatRole
     let text: String
     var suggestions: [String]?
     var actionCards: [ActionCard]?
+    var productLinks: [ProductLink]?
     var image: UIImage? // Optional attached screenshot/photo
 
     init(
@@ -27,6 +40,7 @@ struct ChatMessage: Identifiable {
         text: String,
         suggestions: [String]? = nil,
         actionCards: [ActionCard]? = nil,
+        productLinks: [ProductLink]? = nil,
         image: UIImage? = nil
     ) {
         self.id = id
@@ -34,6 +48,7 @@ struct ChatMessage: Identifiable {
         self.text = text
         self.suggestions = suggestions
         self.actionCards = actionCards
+        self.productLinks = productLinks
         self.image = image
     }
 }
@@ -42,6 +57,6 @@ extension ChatMessage {
     static let initial = ChatMessage(
         role: .steward,
         text: "Hello! 👋 I'm Steward, your personal web watcher. I keep an eye on websites and take action on your behalf. What can I help you with?",
-        suggestions: ["Monitor a product price", "Watch for a restock", "Track an appointment slot", "Import a wishlist"]
+        suggestions: ["Monitor a product price", "Watch for a restock", "Adjust an existing watch", "Track an appointment slot"]
     )
 }
