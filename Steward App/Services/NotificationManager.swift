@@ -41,6 +41,13 @@ final class NotificationManager: NSObject {
     func checkCurrentStatus() async {
         let settings = await UNUserNotificationCenter.current().notificationSettings()
         isPermissionGranted = settings.authorizationStatus == .authorized
+
+        // Re-register for remote notifications to ensure device token is fresh
+        if isPermissionGranted {
+            await MainActor.run {
+                UIApplication.shared.registerForRemoteNotifications()
+            }
+        }
     }
 
     // MARK: - Handle Device Token
