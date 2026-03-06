@@ -38,7 +38,7 @@ extension Watch {
             actionType: self.actionTypeRaw,
             status: self.statusRaw,
             checkFrequency: self.checkFrequency,
-            lastChecked: nil,
+            lastChecked: self.lastCheckedAt,
             triggered: self.triggered,
             changeNote: self.changeNote,
             imageURL: self.imageURL,
