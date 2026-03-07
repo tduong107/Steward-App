@@ -2,22 +2,16 @@ import SwiftUI
 
 /// A reusable swipe-to-delete wrapper for use inside ScrollView / VStack layouts.
 /// Swipe left to reveal a red "Delete" button, then tap to confirm.
-///
-/// Key design choices:
-/// - Uses `.simultaneousGesture` so it doesn't fight the parent ScrollView
-/// - Only activates for primarily horizontal swipes (abs(x) > abs(y))
-/// - Blocks the inner Button tap during and briefly after a swipe via `allowsHitTesting`
 struct SwipeToDelete<Content: View>: View {
     let content: Content
     let onDelete: () -> Void
 
     @State private var offset: CGFloat = 0
     @State private var isSwiping = false
-    @State private var didSwipe = false       // stays true briefly after swipe to block tap
     @State private var showConfirm = false
 
     private let deleteWidth: CGFloat = 80
-    private let activationThreshold: CGFloat = 20
+    private let activationThreshold: CGFloat = 15
 
     init(onDelete: @escaping () -> Void, @ViewBuilder content: () -> Content) {
         self.onDelete = onDelete
@@ -34,8 +28,8 @@ struct SwipeToDelete<Content: View>: View {
             // Main content on top, offset by drag
             content
                 .offset(x: offset)
-                // Block taps on the WatchCard button during/after swipe
-                .allowsHitTesting(!didSwipe && offset == 0)
+                // Block taps whenever swiping or the card is offset
+                .allowsHitTesting(!isSwiping && offset == 0)
                 .overlay {
                     // When swiped open, tapping the card area closes the swipe
                     if offset < 0 && !isSwiping {
@@ -50,7 +44,7 @@ struct SwipeToDelete<Content: View>: View {
                 }
         }
         .contentShape(Rectangle())
-        .simultaneousGesture(swipeGesture)
+        .highPriorityGesture(swipeGesture)
         .clipped()
         .alert("Delete Watch", isPresented: $showConfirm) {
             Button("Cancel", role: .cancel) {
@@ -107,7 +101,6 @@ struct SwipeToDelete<Content: View>: View {
                 if !isSwiping {
                     guard horizontal > vertical, horizontal > activationThreshold else { return }
                     isSwiping = true
-                    didSwipe = true
                 }
 
                 let translation = value.translation.width
@@ -121,8 +114,6 @@ struct SwipeToDelete<Content: View>: View {
                 }
             }
             .onEnded { _ in
-                isSwiping = false
-
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
                     if -offset > deleteWidth / 2 {
                         // Snap open
@@ -133,10 +124,9 @@ struct SwipeToDelete<Content: View>: View {
                     }
                 }
 
-                // Clear the didSwipe flag after a short delay so the
-                // Button tap that fires simultaneously gets blocked.
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                    didSwipe = false
+                // Reset isSwiping after the animation settles
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                    isSwiping = false
                 }
             }
     }

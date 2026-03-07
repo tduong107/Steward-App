@@ -60,15 +60,22 @@ struct ActivityDTO: Codable, Identifiable, Sendable {
 struct CheckResultDTO: Codable, Identifiable, Sendable {
     let id: UUID
     let watchId: UUID
-    var resultText: String
+    var resultData: ResultData?
     var changed: Bool
     var price: Double?
     var checkedAt: Date
 
+    /// Convenience accessor for the text inside result_data
+    var resultText: String { resultData?.text ?? "" }
+
+    struct ResultData: Codable, Sendable {
+        var text: String?
+    }
+
     enum CodingKeys: String, CodingKey {
         case id
         case watchId = "watch_id"
-        case resultText = "result_text"
+        case resultData = "result_data"
         case changed
         case price
         case checkedAt = "checked_at"
