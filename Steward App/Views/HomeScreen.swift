@@ -440,20 +440,16 @@ struct HomeScreen: View {
 
             VStack(spacing: 10) {
                 ForEach(viewModel.watches) { watch in
-                    SwipeToDelete {
-                        withAnimation(.spring(response: 0.3)) {
-                            viewModel.removeWatch(watch)
-                        }
-                    } content: {
-                        WatchCard(watch: watch) {
-                            viewModel.openDetail(for: watch)
-                        }
-                        .contextMenu {
-                            Button(role: .destructive) {
+                    WatchCard(watch: watch) {
+                        viewModel.openDetail(for: watch)
+                    }
+                    .contextMenu {
+                        Button(role: .destructive) {
+                            withAnimation(.spring(response: 0.3)) {
                                 viewModel.removeWatch(watch)
-                            } label: {
-                                Label("Delete Watch", systemImage: "trash")
                             }
+                        } label: {
+                            Label("Delete Watch", systemImage: "trash")
                         }
                     }
                     .transition(.asymmetric(
