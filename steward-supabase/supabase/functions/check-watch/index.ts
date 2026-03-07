@@ -84,15 +84,18 @@ serve(async (req) => {
       pageText = `Fetch error: ${fetchErr.message}`;
     }
 
+    // Extract current price from raw HTML (structured selectors work best on raw HTML)
+    const currentPrice = fetchSuccess ? extractPrice(pageText) : null;
+
+    // Strip HTML for condition evaluation (AI and regex work better on plain text)
+    const plainText = fetchSuccess ? stripHtml(pageText) : pageText;
+
     // Evaluate the condition against the page content (async for AI-powered evaluation)
     const { changed, resultText } = await evaluateConditionAsync(
       watch.condition,
-      pageText,
+      plainText,
       fetchSuccess
     );
-
-    // Extract current price from page (for price history tracking)
-    const currentPrice = fetchSuccess ? extractPrice(pageText) : null;
 
     // Store the check result
     const now = new Date().toISOString();
@@ -340,20 +343,26 @@ async function evaluateWithAI(
 CONDITION THE USER IS WATCHING FOR:
 "${condition}"
 
-PAGE CONTENT (may be truncated):
+PAGE CONTENT (plain text, may be truncated):
 ${truncatedPage}
 
 INSTRUCTIONS:
-1. Analyze the page content and determine if the user's condition has been met.
+1. Analyze the page content carefully and determine if the user's condition has CLEARLY been met.
 2. Respond with EXACTLY this JSON format, nothing else:
 {"changed": true/false, "resultText": "A short, specific description of what you found"}
+
+CRITICAL RULES:
+- Default to changed: false unless you have STRONG evidence the condition is met.
+- For price conditions: only use prices that clearly belong to the MAIN product on the page. Ignore prices from related products, accessories, "other sellers", shipping costs, or promotional offers for different items.
+- For "price drops to new low" or similar: you CANNOT determine a historical low from a single page visit. Return changed: false with the current price.
+- If the page content is garbled, mostly HTML/CSS, or hard to parse, return changed: false.
+- Be skeptical — a false positive is worse than a missed detection.
 
 RULES FOR resultText:
 - Be specific and reference actual content from the page (e.g., "Price is now $299.99" not "Price changed")
 - Keep it under 60 characters
 - If the condition IS met, describe what was found (e.g., "New size M available at $45", "Sale: 30% off now live")
 - If the condition is NOT met, briefly state the current status (e.g., "Still showing $349.99", "No restock yet")
-- Never say "condition matched" or "keywords matched" — be descriptive about WHAT specifically was found
 - Write in a friendly, natural tone
 
 Respond ONLY with the JSON object:`;
@@ -412,19 +421,81 @@ Respond ONLY with the JSON object:`;
   return null;
 }
 
-function extractPrice(text: string): number | null {
-  // Match common price patterns: $1,234.56 or $123 or $12.99
-  const pricePattern = /\$\s?([\d,]+\.?\d{0,2})/g;
-  const matches = [...text.matchAll(pricePattern)];
+function stripHtml(html: string): string {
+  return html
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&#\d+;/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
+function extractPrice(text: string): number | null {
+  // Strategy: look for prices near known product-price HTML patterns first,
+  // then fall back to the most common price on the page.
+
+  // 1) Try structured price selectors common on e-commerce sites
+  //    Amazon: "priceAmount", "a-price-whole", "priceToPay"
+  //    Generic: "product-price", "sale-price", "current-price"
+  const structuredPatterns = [
+    /priceAmount[^>]*>\s*\$?\s*([\d,]+\.?\d{0,2})/i,
+    /priceToPay[^>]*>.*?\$?\s*([\d,]+\.?\d{0,2})/is,
+    /a-price-whole[^>]*>\s*([\d,]+)/i,
+    /product[_-]?price[^>]*>\s*\$?\s*([\d,]+\.?\d{0,2})/i,
+    /sale[_-]?price[^>]*>\s*\$?\s*([\d,]+\.?\d{0,2})/i,
+    /current[_-]?price[^>]*>\s*\$?\s*([\d,]+\.?\d{0,2})/i,
+    /price__current[^>]*>\s*\$?\s*([\d,]+\.?\d{0,2})/i,
+  ];
+
+  for (const pattern of structuredPatterns) {
+    const match = text.match(pattern);
+    if (match) {
+      const price = parseFloat(match[1].replace(/,/g, ""));
+      if (price > 0.50 && price < 100_000) return price;
+    }
+  }
+
+  // 2) Look for prices with dollar sign that have surrounding product context
+  //    e.g. near "price", "cost", "now", "sale", "buy"
+  const contextPattern = /(?:price|cost|now|sale|buy|pay)[^$]{0,40}\$([\d,]+\.\d{2})/gi;
+  const contextMatches = [...text.matchAll(contextPattern)];
+  if (contextMatches.length > 0) {
+    const price = parseFloat(contextMatches[0][1].replace(/,/g, ""));
+    if (price > 0.50 && price < 100_000) return price;
+  }
+
+  // 3) Fallback: collect all $X.XX prices (require cents for precision)
+  //    and return the most frequently occurring one (likely the main product price)
+  const pricePattern = /\$([\d,]+\.\d{2})/g;
+  const matches = [...text.matchAll(pricePattern)];
   if (matches.length === 0) return null;
 
-  // Return the first (most prominent) price found
-  const prices = matches.map((m) =>
-    parseFloat(m[1].replace(/,/g, ""))
-  );
+  const prices = matches
+    .map((m) => parseFloat(m[1].replace(/,/g, "")))
+    .filter((p) => p > 0.50 && p < 100_000);
 
-  // Filter out unreasonable prices (e.g., year numbers like 2024)
-  const reasonable = prices.filter((p) => p > 0.01 && p < 1_000_000);
-  return reasonable.length > 0 ? reasonable[0] : prices[0];
+  if (prices.length === 0) return null;
+
+  // Count frequency of each price — the main product price usually appears multiple times
+  const freq = new Map<number, number>();
+  for (const p of prices) {
+    freq.set(p, (freq.get(p) ?? 0) + 1);
+  }
+
+  // Return the most frequent price
+  let bestPrice = prices[0];
+  let bestCount = 0;
+  for (const [price, count] of freq) {
+    if (count > bestCount) {
+      bestCount = count;
+      bestPrice = price;
+    }
+  }
+
+  return bestPrice;
 }
