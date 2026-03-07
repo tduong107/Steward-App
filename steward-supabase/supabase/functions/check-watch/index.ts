@@ -99,7 +99,7 @@ serve(async (req) => {
     const { error: insertError } = await supabase.from("check_results").insert({
       id: crypto.randomUUID(),
       watch_id: watch.id,
-      result_text: resultText,
+      result_data: { text: resultText },
       changed: changed,
       price: currentPrice,
       checked_at: now,
