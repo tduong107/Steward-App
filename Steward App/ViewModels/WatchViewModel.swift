@@ -474,6 +474,7 @@ final class WatchViewModel {
             // Mark the watch as acted upon locally
             watch.triggered = false
             watch.status = .watching
+            watch.actionURL = nil  // Clear the action URL after acting
             try? modelContext?.save()
 
             // Sync the change to Supabase

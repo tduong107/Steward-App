@@ -280,6 +280,11 @@ struct DetailScreen: View {
                     .padding(.bottom, 4)
             }
 
+            // Action URL row (when triggered and actionable)
+            if watch.triggered, let actionURL = watch.actionURL {
+                DetailRow(icon: "🔗", label: "Action link", value: URL(string: actionURL)?.host ?? actionURL, highlight: true)
+            }
+
             DetailRow(icon: "🎯", label: "Watching for", value: watch.condition)
             DetailRow(icon: "⚡", label: "AI will", value: watch.actionLabel, highlight: watch.triggered)
             Button { showFrequencyPicker = true } label: {
@@ -394,7 +399,9 @@ struct DetailScreen: View {
                 .font(Theme.body(15, weight: .semibold))
                 .foregroundStyle(Theme.ink)
 
-            Text("Your condition was met · Steward can act now")
+            Text(watch.actionType.isActionable
+                ? "Your condition was met · Tap to \(watch.actionType.actionButtonLabel.lowercased())"
+                : "Your condition was met · Steward can act now")
                 .font(Theme.body(12))
                 .foregroundStyle(Theme.inkMid)
         }
@@ -420,10 +427,12 @@ struct DetailScreen: View {
         } label: {
             HStack {
                 if watch.triggered {
-                    Image(systemName: "sparkle")
+                    Image(systemName: watch.actionType.isActionable ? watch.actionType.actionButtonIcon : "sparkle")
                         .font(.system(size: 14))
                 }
-                Text(watch.triggered ? "Let Steward Act Now" : "⏳ Waiting for trigger…")
+                Text(watch.triggered
+                    ? (watch.actionType.isActionable ? watch.actionType.actionButtonLabel : "Acknowledge")
+                    : "⏳ Waiting for trigger…")
                     .font(Theme.body(15, weight: .bold))
             }
             .frame(maxWidth: .infinity)

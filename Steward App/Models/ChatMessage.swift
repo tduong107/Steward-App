@@ -58,6 +58,6 @@ extension ChatMessage {
     static let initial = ChatMessage(
         role: .steward,
         text: "Hello! 👋 I'm Steward, your personal web watcher. I keep an eye on websites and take action on your behalf. What can I help you with?",
-        suggestions: ["Monitor a product price", "Watch for a restock", "Adjust an existing watch", "Track an appointment slot"]
+        suggestions: ["Track a price drop", "Watch for a restock", "Find tickets or appointments", "Monitor a booking"]
     )
 }

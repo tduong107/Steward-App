@@ -20,6 +20,7 @@ extension Watch {
             preferredCheckTime: dto.preferredCheckTime,
             notifyChannels: dto.notifyChannels ?? "push",
             imageURL: dto.imageURL,
+            actionURL: dto.actionURL,
             lastCheckedAt: dto.lastChecked
         )
         // Preserve the UUID and timestamp from Supabase
@@ -46,6 +47,7 @@ extension Watch {
             triggered: self.triggered,
             changeNote: self.changeNote,
             imageURL: self.imageURL,
+            actionURL: self.actionURL,
             createdAt: self.createdAt
         )
     }

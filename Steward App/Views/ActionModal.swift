@@ -3,6 +3,29 @@ import SwiftUI
 struct ActionModal: View {
     let watch: Watch
     @Environment(WatchViewModel.self) private var viewModel
+    @State private var showActionBrowser = false
+
+    // MARK: - Type-Aware Text
+
+    private var idleTitle: String {
+        switch watch.actionType {
+        case .price: return "Price target hit!"
+        case .cart:  return "Item is available!"
+        case .book:  return "Slot found!"
+        case .form:  return "Ready to submit!"
+        case .notify: return "Change detected!"
+        }
+    }
+
+    private var doneMessage: String {
+        switch watch.actionType {
+        case .price: return "Deal page opened!"
+        case .cart:  return "Product page opened!"
+        case .book:  return "Booking page opened!"
+        case .form:  return "Form page opened!"
+        case .notify: return "Change acknowledged!"
+        }
+    }
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -36,6 +59,17 @@ struct ActionModal: View {
             .transition(.move(edge: .bottom))
         }
         .ignoresSafeArea(edges: .bottom)
+        .sheet(isPresented: $showActionBrowser) {
+            if let url = watch.actionFullURL {
+                InAppBrowser(initialURL: url) { _ in }
+            }
+        }
+        .onChange(of: showActionBrowser) { _, newValue in
+            if !newValue {
+                // User closed the browser — mark action as complete
+                viewModel.runAction()
+            }
+        }
     }
 
     // MARK: - Idle State
@@ -44,7 +78,7 @@ struct ActionModal: View {
         VStack(spacing: 20) {
             // Icon
             VStack(spacing: 14) {
-                Image(systemName: "sparkle")
+                Image(systemName: watch.actionType.isActionable ? watch.actionType.actionButtonIcon : "sparkle")
                     .font(.system(size: 28))
                     .foregroundStyle(Theme.accent)
                     .frame(width: 64, height: 64)
@@ -55,13 +89,17 @@ struct ActionModal: View {
                             .stroke(Theme.accentMid, lineWidth: 1)
                     )
 
-                Text("Steward is ready to act")
+                Text(idleTitle)
                     .font(Theme.serif(19, weight: .bold))
                     .foregroundStyle(Theme.ink)
 
-                Text("Confirm and I'll handle this for you")
+                Text(watch.actionType.isActionable
+                    ? "Tap below to open the page and complete your action"
+                    : "Your watched condition has been met")
                     .font(Theme.body(13))
                     .foregroundStyle(Theme.inkMid)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 24)
             }
 
             // Info card
@@ -97,12 +135,16 @@ struct ActionModal: View {
                 }
 
                 Button {
-                    viewModel.runAction()
+                    if watch.actionType.isActionable {
+                        showActionBrowser = true
+                    } else {
+                        viewModel.runAction()
+                    }
                 } label: {
                     HStack(spacing: 6) {
-                        Image(systemName: "sparkle")
+                        Image(systemName: watch.actionType.isActionable ? watch.actionType.actionButtonIcon : "checkmark")
                             .font(.system(size: 12))
-                        Text("Confirm Action")
+                        Text(watch.actionType.isActionable ? watch.actionType.actionButtonLabel : "Got it")
                             .font(Theme.body(14, weight: .bold))
                     }
                     .foregroundStyle(.white)
@@ -134,7 +176,7 @@ struct ActionModal: View {
                 .foregroundStyle(Theme.ink)
 
             VStack(spacing: 4) {
-                Text("Navigating to \(watch.url)")
+                Text("Opening \(URL(string: watch.actionURL ?? watch.url)?.host ?? watch.url)…")
                     .font(Theme.body(13))
                     .foregroundStyle(Theme.inkLight)
 
@@ -163,11 +205,13 @@ struct ActionModal: View {
                     )
                     .padding(.top, 20)
 
-                Text("Done, consider it handled!")
+                Text(doneMessage)
                     .font(Theme.serif(18, weight: .bold))
                     .foregroundStyle(Theme.ink)
 
-                Text("Steward successfully completed \"\(watch.actionLabel)\"")
+                Text(watch.actionType.isActionable
+                    ? "Steward opened the page for \"\(watch.actionLabel)\""
+                    : "Steward acknowledged \"\(watch.actionLabel)\"")
                     .font(Theme.body(13))
                     .foregroundStyle(Theme.inkMid)
                     .multilineTextAlignment(.center)

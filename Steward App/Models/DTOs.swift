@@ -20,6 +20,7 @@ struct WatchDTO: Codable, Identifiable, Sendable {
     var triggered: Bool
     var changeNote: String?
     var imageURL: String?
+    var actionURL: String?
     var createdAt: Date
 
     enum CodingKeys: String, CodingKey {
@@ -36,6 +37,7 @@ struct WatchDTO: Codable, Identifiable, Sendable {
         case triggered
         case changeNote = "change_note"
         case imageURL = "image_url"
+        case actionURL = "action_url"
         case createdAt = "created_at"
     }
 }

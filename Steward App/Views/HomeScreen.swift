@@ -624,7 +624,15 @@ private struct TriggeredAlertCard: View {
                         .frame(width: 5, height: 5)
                         .modifier(PulseModifier())
 
-                    Text("STEWARD READY TO ACT")
+                    Text({
+                        switch watch.actionType {
+                        case .cart:  return "READY TO ADD TO CART"
+                        case .book:  return "READY TO BOOK"
+                        case .price: return "PRICE TARGET HIT"
+                        case .form:  return "READY TO SUBMIT"
+                        case .notify: return "CHANGE DETECTED"
+                        }
+                    }())
                         .font(Theme.body(11, weight: .semibold))
                         .foregroundStyle(.white)
                         .tracking(0.3)
@@ -648,7 +656,9 @@ private struct TriggeredAlertCard: View {
 
                     Spacer()
 
-                    Text("Review →")
+                    Text(watch.actionType.isActionable
+                        ? "\(watch.actionType.actionButtonLabel) →"
+                        : "Review →")
                         .font(Theme.body(12, weight: .bold))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 14)

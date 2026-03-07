@@ -33,6 +33,33 @@ enum ActionType: String, Codable, CaseIterable {
         case .notify: return "bell.fill"
         }
     }
+
+    var isActionable: Bool {
+        switch self {
+        case .notify: return false
+        case .cart, .form, .book, .price: return true
+        }
+    }
+
+    var actionButtonLabel: String {
+        switch self {
+        case .price: return "Open & Buy"
+        case .cart:  return "Add to Cart"
+        case .book:  return "Open & Book"
+        case .form:  return "Open & Fill"
+        case .notify: return "View Page"
+        }
+    }
+
+    var actionButtonIcon: String {
+        switch self {
+        case .price: return "safari"
+        case .cart:  return "cart.badge.plus"
+        case .book:  return "calendar.badge.plus"
+        case .form:  return "doc.badge.plus"
+        case .notify: return "bell.fill"
+        }
+    }
 }
 
 @Model
@@ -52,6 +79,7 @@ final class Watch {
     var preferredCheckTime: String?
     var notifyChannels: String = "push"
     var imageURL: String?
+    var actionURL: String?
     var lastCheckedAt: Date?
     var createdAt: Date
 
@@ -80,6 +108,7 @@ final class Watch {
         preferredCheckTime: String? = nil,
         notifyChannels: String = "push",
         imageURL: String? = nil,
+        actionURL: String? = nil,
         lastCheckedAt: Date? = nil
     ) {
         self.id = UUID()
@@ -104,6 +133,7 @@ final class Watch {
         }
         self.notifyChannels = notifyChannels
         self.imageURL = imageURL
+        self.actionURL = actionURL
         self.lastCheckedAt = lastCheckedAt
         self.createdAt = Date()
     }
@@ -119,6 +149,15 @@ extension Watch {
             urlString = "https://\(urlString)"
         }
         return URL(string: urlString)
+    }
+
+    /// The action URL to open when the user taps "Act" — uses actionURL if set, otherwise falls back to the watched URL for actionable types
+    var actionFullURL: URL? {
+        let urlStr = actionURL ?? (actionType.isActionable ? url : nil)
+        guard let urlStr else { return nil }
+        var s = urlStr
+        if !s.lowercased().hasPrefix("http") { s = "https://\(s)" }
+        return URL(string: s)
     }
 
     /// The next check date based on last check + frequency interval, aligned to preferred time if set
