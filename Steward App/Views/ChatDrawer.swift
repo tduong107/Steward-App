@@ -66,19 +66,32 @@ struct ChatDrawer: View {
                 .transition(.move(edge: .bottom))
             }
         }
-        .onChange(of: chatVM.messages.count) {
-            // Bridge single watch creation
+        .onChange(of: chatVM.watchReadySignal) {
+            // Bridge single watch creation (with optional initial price)
             if let watch = chatVM.pendingWatch {
-                watchVM.addWatch(watch)
+                if let price = chatVM.pendingWatchInitialPrice {
+                    watchVM.addWatchWithPrice(watch, initialPrice: price)
+                } else {
+                    watchVM.addWatch(watch)
+                }
                 chatVM.pendingWatch = nil
+                chatVM.pendingWatchInitialPrice = nil
             }
-
+        }
+        .onChange(of: chatVM.pendingWishlistWatches.count) {
             // Bridge wishlist bulk import
             if !chatVM.pendingWishlistWatches.isEmpty {
                 for watch in chatVM.pendingWishlistWatches {
                     watchVM.addWatch(watch)
                 }
                 chatVM.pendingWishlistWatches = []
+            }
+        }
+        .onChange(of: chatVM.priceUpdateSignal) {
+            // Bridge price update for an already-created watch
+            if let update = chatVM.pendingPriceUpdateData {
+                watchVM.updateWatchPrice(watchId: update.watchId, price: update.price)
+                chatVM.pendingPriceUpdateData = nil
             }
         }
         .onChange(of: selectedPhotoItem) {
@@ -628,6 +641,7 @@ struct BrowserItem: Identifiable {
     let id = UUID()
     let url: URL
 }
+
 
 // MARK: - Flow Layout
 

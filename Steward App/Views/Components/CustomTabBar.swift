@@ -3,6 +3,7 @@ import SwiftUI
 struct CustomTabBar: View {
     @Binding var selectedTab: WatchViewModel.Tab
     let onChatTap: () -> Void
+    var onHomeReselect: (() -> Void)? = nil
 
     var body: some View {
         HStack(spacing: 0) {
@@ -42,6 +43,9 @@ struct CustomTabBar: View {
 
     private func tabButton(for tab: WatchViewModel.Tab) -> some View {
         Button {
+            if selectedTab == tab && tab == .home {
+                onHomeReselect?()
+            }
             withAnimation(.spring(response: 0.3)) {
                 selectedTab = tab
             }

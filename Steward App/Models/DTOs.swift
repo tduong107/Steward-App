@@ -14,6 +14,8 @@ struct WatchDTO: Codable, Identifiable, Sendable {
     var actionType: String
     var status: String
     var checkFrequency: String
+    var preferredCheckTime: String?
+    var notifyChannels: String?
     var lastChecked: Date?
     var triggered: Bool
     var changeNote: String?
@@ -28,6 +30,8 @@ struct WatchDTO: Codable, Identifiable, Sendable {
         case actionType = "action_type"
         case status
         case checkFrequency = "check_frequency"
+        case preferredCheckTime = "preferred_check_time"
+        case notifyChannels = "notify_channels"
         case lastChecked = "last_checked"
         case triggered
         case changeNote = "change_note"

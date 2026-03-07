@@ -17,6 +17,8 @@ extension Watch {
             triggered: dto.triggered,
             changeNote: dto.changeNote,
             checkFrequency: dto.checkFrequency,
+            preferredCheckTime: dto.preferredCheckTime,
+            notifyChannels: dto.notifyChannels ?? "push",
             imageURL: dto.imageURL,
             lastCheckedAt: dto.lastChecked
         )
@@ -38,6 +40,8 @@ extension Watch {
             actionType: self.actionTypeRaw,
             status: self.statusRaw,
             checkFrequency: self.checkFrequency,
+            preferredCheckTime: self.preferredCheckTime,
+            notifyChannels: self.notifyChannels,
             lastChecked: self.lastCheckedAt,
             triggered: self.triggered,
             changeNote: self.changeNote,

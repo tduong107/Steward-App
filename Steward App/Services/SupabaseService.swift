@@ -75,6 +75,22 @@ final class SupabaseService {
             .value
     }
 
+    /// Stores a user-confirmed price as the initial check_result for a price watch
+    func createInitialPricePoint(watchId: UUID, price: Double) async throws {
+        let now = ISO8601DateFormatter().string(from: Date())
+        try await SupabaseConfig.client
+            .from("check_results")
+            .insert([
+                "id": UUID().uuidString,
+                "watch_id": watchId.uuidString,
+                "result_data": "{\"text\":\"Initial price confirmed by user\"}",
+                "changed": "false",
+                "price": String(price),
+                "checked_at": now
+            ])
+            .execute()
+    }
+
     // MARK: - Activities
 
     func fetchActivities() async throws -> [ActivityDTO] {

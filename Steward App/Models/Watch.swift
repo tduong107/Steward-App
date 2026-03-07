@@ -7,12 +7,32 @@ enum WatchStatus: String, Codable {
     case paused
 }
 
-enum ActionType: String, Codable {
+enum ActionType: String, Codable, CaseIterable {
     case cart
     case form
     case book
     case notify
     case price
+
+    var displayName: String {
+        switch self {
+        case .price: return "Price Drop"
+        case .cart:  return "Add to Cart"
+        case .form:  return "Fill Form"
+        case .book:  return "Book"
+        case .notify: return "Notify Me"
+        }
+    }
+
+    var iconName: String {
+        switch self {
+        case .price: return "tag.fill"
+        case .cart:  return "cart.fill"
+        case .form:  return "doc.text.fill"
+        case .book:  return "calendar"
+        case .notify: return "bell.fill"
+        }
+    }
 }
 
 @Model
@@ -29,6 +49,8 @@ final class Watch {
     var triggered: Bool
     var changeNote: String?
     var checkFrequency: String
+    var preferredCheckTime: String?
+    var notifyChannels: String = "push"
     var imageURL: String?
     var lastCheckedAt: Date?
     var createdAt: Date
@@ -55,6 +77,8 @@ final class Watch {
         triggered: Bool = false,
         changeNote: String? = nil,
         checkFrequency: String = "Daily",
+        preferredCheckTime: String? = nil,
+        notifyChannels: String = "push",
         imageURL: String? = nil,
         lastCheckedAt: Date? = nil
     ) {
@@ -70,8 +94,17 @@ final class Watch {
         self.triggered = triggered
         self.changeNote = changeNote
         self.checkFrequency = checkFrequency
+        // Default preferredCheckTime to current time if not specified
+        if let preferredCheckTime {
+            self.preferredCheckTime = preferredCheckTime
+        } else {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "HH:mm"
+            self.preferredCheckTime = formatter.string(from: Date())
+        }
+        self.notifyChannels = notifyChannels
         self.imageURL = imageURL
-        self.lastCheckedAt = lastCheckedAt
+        self.lastCheckedAt = lastCheckedAt ?? Date() // Creation counts as first check
         self.createdAt = Date()
     }
 }
@@ -88,11 +121,48 @@ extension Watch {
         return URL(string: urlString)
     }
 
-    /// The next check date based on last check + frequency interval
+    /// The next check date based on last check + frequency interval, aligned to preferred time if set
     var nextCheckDate: Date? {
         guard let freq = CheckFrequency.from(string: checkFrequency) else { return nil }
         let baseDate = lastCheckedAt ?? createdAt
-        return baseDate.addingTimeInterval(freq.intervalSeconds)
+        let interval = freq.intervalSeconds
+
+        // No preferred time — use simple interval
+        guard let timeStr = preferredCheckTime,
+              let (hour, minute) = Self.parseTimeString(timeStr) else {
+            return baseDate.addingTimeInterval(interval)
+        }
+
+        let calendar = Calendar.current
+        let now = Date()
+
+        // For daily: next occurrence of HH:mm
+        if interval >= 86400 {
+            var nextCheck = calendar.nextDate(
+                after: baseDate,
+                matching: DateComponents(hour: hour, minute: minute),
+                matchingPolicy: .nextTime
+            ) ?? baseDate.addingTimeInterval(interval)
+            while nextCheck <= now {
+                nextCheck = nextCheck.addingTimeInterval(interval)
+            }
+            return nextCheck
+        }
+
+        // For sub-daily: find the next time slot aligned to preferredCheckTime
+        var candidate = calendar.date(bySettingHour: hour, minute: minute, second: 0, of: baseDate) ?? baseDate
+        while candidate <= now {
+            candidate = candidate.addingTimeInterval(interval)
+        }
+        return candidate
+    }
+
+    private static func parseTimeString(_ str: String) -> (Int, Int)? {
+        let parts = str.split(separator: ":")
+        guard parts.count == 2,
+              let h = Int(parts[0]), let m = Int(parts[1]),
+              h >= 0, h < 24, m >= 0, m < 60 else { return nil }
+        return (h, m)
     }
 
     /// Formatted countdown string to next check (e.g. "in 4h 23m", "in 12m")

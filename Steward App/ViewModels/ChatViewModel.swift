@@ -9,10 +9,24 @@ final class ChatViewModel {
     var inputText = ""
     var isTyping = false
     var pendingWatch: Watch?
+    var pendingWatchInitialPrice: Double?
     var pendingWishlistWatches: [Watch] = []
     var pendingImage: UIImage? // Staged image before sending
     var shouldDismiss = false // Signal to close the chat drawer
     var subscriptionTier: SubscriptionTier = .free // Set by caller to enable frequency prompts
+
+    /// Incremented whenever a new watch is ready — used to reliably trigger .onChange in ChatDrawer
+    var watchReadySignal = 0
+
+    /// Incremented whenever a price update is ready
+    var priceUpdateSignal = 0
+    var pendingPriceUpdateData: (watchId: UUID, price: Double)?
+
+    /// Price detected during URL enrichment (stored for use in watch creation)
+    private var lastDetectedPrice: Double?
+
+    /// Watch ID awaiting a price update from the user (after "Change starting price" suggestion)
+    var pendingPriceUpdateWatchId: UUID?
 
     /// Full conversation history for the AI (role + content pairs)
     private var conversationHistory: [AIService.Message] = []
@@ -25,6 +39,67 @@ final class ChatViewModel {
 
         // Allow sending if there's text OR an image
         guard !messageText.trimmingCharacters(in: .whitespaces).isEmpty || image != nil else { return }
+
+        // Handle price confirmation suggestions locally
+        if pendingPriceUpdateWatchId != nil {
+            let trimmed = messageText.trimmingCharacters(in: .whitespaces)
+
+            if trimmed == "Looks good ✓" {
+                // User confirmed — dismiss and clear
+                let userMsg = ChatMessage(role: .user, text: trimmed)
+                withAnimation(.spring(response: 0.3)) {
+                    messages.append(userMsg)
+                }
+                inputText = ""
+                pendingPriceUpdateWatchId = nil
+                return
+            }
+
+            if trimmed == "Change starting price" {
+                // User wants to change — prompt for new price
+                let userMsg = ChatMessage(role: .user, text: trimmed)
+                withAnimation(.spring(response: 0.3)) {
+                    messages.append(userMsg)
+                }
+                inputText = ""
+
+                let promptMsg = ChatMessage(
+                    role: .steward,
+                    text: "What's the correct starting price? Just type the amount (e.g. 49.99)."
+                )
+                withAnimation(.spring(response: 0.3)) {
+                    messages.append(promptMsg)
+                }
+                return
+            }
+
+            // Check if user typed a price number
+            let cleaned = trimmed.replacingOccurrences(of: "$", with: "")
+                .replacingOccurrences(of: ",", with: "")
+            if let newPrice = Double(cleaned), newPrice > 0 {
+                let watchId = pendingPriceUpdateWatchId!
+                let userMsg = ChatMessage(role: .user, text: trimmed)
+                withAnimation(.spring(response: 0.3)) {
+                    messages.append(userMsg)
+                }
+                inputText = ""
+                pendingPriceUpdateWatchId = nil
+
+                // Signal price update for ChatDrawer to pick up
+                pendingPriceUpdateData = (watchId: watchId, price: newPrice)
+                priceUpdateSignal += 1
+
+                let priceStr = String(format: "$%.2f", newPrice)
+                let confirmMsg = ChatMessage(
+                    role: .steward,
+                    text: "Updated! Starting price set to \(priceStr). I'll track changes from here."
+                )
+                withAnimation(.spring(response: 0.3)) {
+                    messages.append(confirmMsg)
+                }
+                return
+            }
+        }
 
         let displayText = messageText.trimmingCharacters(in: .whitespaces).isEmpty
             ? "📸 [Screenshot]"
@@ -119,13 +194,19 @@ final class ChatViewModel {
         pendingImage = nil
     }
 
+    // Price update flow is handled inline in send()
+
     func reset() {
         messages = [ChatMessage.initial]
         inputText = ""
         isTyping = false
         pendingWatch = nil
+        pendingWatchInitialPrice = nil
         pendingWishlistWatches = []
         pendingImage = nil
+        lastDetectedPrice = nil
+        pendingPriceUpdateWatchId = nil
+        pendingPriceUpdateData = nil
         conversationHistory = []
     }
 
@@ -365,6 +446,13 @@ final class ChatViewModel {
             // Extract price if visible
             let price = extractPrice(from: html)
 
+            // Store detected price for use in watch creation
+            if let priceStr = price,
+               let numericStr = priceStr.replacingOccurrences(of: "[^0-9.]", with: "", options: .regularExpression) as String?,
+               let priceVal = Double(numericStr), priceVal > 0 {
+                lastDetectedPrice = priceVal
+            }
+
             var result = "URL: \(url.absoluteString)"
             if finalURL.absoluteString != url.absoluteString {
                 result += " → resolves to: \(finalURL.absoluteString)"
@@ -421,23 +509,115 @@ final class ChatViewModel {
         return nil
     }
 
-    /// Tries to extract a price from the HTML (common meta tags and patterns)
+    /// Tries to extract a price from the HTML using multiple strategies
     private func extractPrice(from html: String) -> String? {
-        // Try og:price:amount or product:price:amount
-        let pricePatterns = [
+        // 1. OG / product meta tags
+        let metaPatterns = [
             "property=\"(?:og|product):price:amount\"\\s+content=\"([^\"]+)\"",
-            "content=\"([^\"]+)\"\\s+property=\"(?:og|product):price:amount\"",
-            "\"price\"\\s*:\\s*\"?([\\d,.]+)\"?"
+            "content=\"([^\"]+)\"\\s+property=\"(?:og|product):price:amount\""
         ]
-        for pattern in pricePatterns {
-            if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
-               let match = regex.firstMatch(in: html, range: NSRange(html.startIndex..., in: html)),
-               let range = Range(match.range(at: 1), in: html) {
-                let price = String(html[range]).trimmingCharacters(in: .whitespacesAndNewlines)
-                if !price.isEmpty { return "$\(price)" }
+        for pattern in metaPatterns {
+            if let price = firstMatch(pattern: pattern, in: html) {
+                let cleaned = price.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !cleaned.isEmpty, Double(cleaned.replacingOccurrences(of: ",", with: "")) != nil {
+                    return "$\(cleaned)"
+                }
             }
         }
+
+        // 2. JSON-LD structured data (common on modern e-commerce sites)
+        let jsonLdPattern = "<script[^>]*type=\"application/ld\\+json\"[^>]*>([\\s\\S]*?)</script>"
+        if let regex = try? NSRegularExpression(pattern: jsonLdPattern, options: .caseInsensitive) {
+            let matches = regex.matches(in: html, range: NSRange(html.startIndex..., in: html))
+            for match in matches {
+                if let range = Range(match.range(at: 1), in: html) {
+                    let jsonStr = String(html[range])
+                    if let price = extractPriceFromJSONLD(jsonStr) {
+                        return "$\(String(format: "%.2f", price))"
+                    }
+                }
+            }
+        }
+
+        // 3. Structured HTML price selectors (Amazon, generic e-commerce)
+        let structuredPatterns = [
+            "priceAmount[^>]*>\\s*\\$?\\s*([\\d,]+\\.?\\d{0,2})",
+            "priceToPay[^>]*>.*?\\$?\\s*([\\d,]+\\.?\\d{0,2})",
+            "product[_-]?price[^>]*>\\s*\\$?\\s*([\\d,]+\\.?\\d{0,2})",
+            "sale[_-]?price[^>]*>\\s*\\$?\\s*([\\d,]+\\.?\\d{0,2})",
+            "current[_-]?price[^>]*>\\s*\\$?\\s*([\\d,]+\\.?\\d{0,2})"
+        ]
+        for pattern in structuredPatterns {
+            if let priceStr = firstMatch(pattern: pattern, in: html),
+               let price = Double(priceStr.replacingOccurrences(of: ",", with: "")),
+               price > 0.50, price < 100_000 {
+                return "$\(String(format: "%.2f", price))"
+            }
+        }
+
+        // 4. Dollar amounts near price context words
+        let contextPattern = "(?:price|cost|now|sale|buy|pay)[^$]{0,40}\\$([\\d,]+\\.\\d{2})"
+        if let priceStr = firstMatch(pattern: contextPattern, in: html),
+           let price = Double(priceStr.replacingOccurrences(of: ",", with: "")),
+           price > 0.50, price < 100_000 {
+            return "$\(String(format: "%.2f", price))"
+        }
+
+        // 5. Most frequent $X.XX on page (fallback)
+        let allPricePattern = "\\$([\\d,]+\\.\\d{2})"
+        if let regex = try? NSRegularExpression(pattern: allPricePattern, options: []) {
+            let matches = regex.matches(in: html, range: NSRange(html.startIndex..., in: html))
+            var freq: [Double: Int] = [:]
+            for match in matches {
+                if let range = Range(match.range(at: 1), in: html),
+                   let price = Double(String(html[range]).replacingOccurrences(of: ",", with: "")),
+                   price > 0.50, price < 100_000 {
+                    freq[price, default: 0] += 1
+                }
+            }
+            if let best = freq.max(by: { $0.value < $1.value }), best.value >= 2 {
+                return "$\(String(format: "%.2f", best.key))"
+            }
+        }
+
         return nil
+    }
+
+    private func firstMatch(pattern: String, in text: String) -> String? {
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive, .dotMatchesLineSeparators]),
+              let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+              let range = Range(match.range(at: 1), in: text) else { return nil }
+        return String(text[range])
+    }
+
+    private func extractPriceFromJSONLD(_ jsonStr: String) -> Double? {
+        guard let data = jsonStr.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) else { return nil }
+
+        func findPrice(in obj: Any) -> Double? {
+            if let dict = obj as? [String: Any] {
+                // Direct price field
+                if let price = dict["price"] {
+                    if let p = price as? Double, p > 0 { return p }
+                    if let s = price as? String, let p = Double(s.replacingOccurrences(of: ",", with: "")), p > 0 { return p }
+                }
+                // Check offers.price or offers.lowPrice
+                if let offers = dict["offers"] {
+                    if let result = findPrice(in: offers) { return result }
+                }
+                if let lowPrice = dict["lowPrice"] {
+                    if let p = lowPrice as? Double, p > 0 { return p }
+                    if let s = lowPrice as? String, let p = Double(s.replacingOccurrences(of: ",", with: "")), p > 0 { return p }
+                }
+            } else if let arr = obj as? [Any] {
+                for item in arr {
+                    if let result = findPrice(in: item) { return result }
+                }
+            }
+            return nil
+        }
+
+        return findPrice(in: json)
     }
 
     // MARK: - Create Watch from AI JSON
@@ -481,7 +661,6 @@ final class ChatViewModel {
                 checkFrequency: frequency,
                 imageURL: payload.imageURL
             )
-            pendingWatch = watch
 
             // If no image was provided by the AI, try to fetch og:image from the URL
             if payload.imageURL == nil || payload.imageURL?.isEmpty == true {
@@ -490,6 +669,36 @@ final class ChatViewModel {
                         watch.imageURL = ogImage
                     }
                 }
+            }
+
+            // For price watches, create immediately and present detected price
+            if actionType == .price {
+                let detectedPrice = lastDetectedPrice
+                lastDetectedPrice = nil
+
+                // Create the watch (with initial price if detected)
+                pendingWatch = watch
+                pendingWatchInitialPrice = detectedPrice
+                watchReadySignal += 1
+
+                if let detectedPrice {
+                    // Present the detected price with suggestions to confirm or change
+                    let priceStr = String(format: "$%.2f", detectedPrice)
+                    let msg = ChatMessage(
+                        role: .steward,
+                        text: "I detected the current price as \(priceStr). I'll start tracking from this price.",
+                        suggestions: ["Looks good ✓", "Change starting price"]
+                    )
+                    withAnimation(.spring(response: 0.3)) {
+                        messages.append(msg)
+                    }
+                    // Store watch ID in case user wants to change the price
+                    pendingPriceUpdateWatchId = watch.id
+                }
+            } else {
+                pendingWatch = watch
+                pendingWatchInitialPrice = nil
+                watchReadySignal += 1
             }
         } catch {
             #if DEBUG

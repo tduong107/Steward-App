@@ -47,6 +47,15 @@ struct ContentView: View {
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                             viewModel.isChatOpen = true
                         }
+                    },
+                    onHomeReselect: {
+                        if viewModel.showDetail {
+                            viewModel.showDetail = false
+                            viewModel.selectedWatch = nil
+                        }
+                        if viewModel.showPriceInsights {
+                            viewModel.showPriceInsights = false
+                        }
                     }
                 )
             }

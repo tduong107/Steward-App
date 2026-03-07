@@ -8,6 +8,14 @@ struct HomeScreen: View {
     @AppStorage("defaultCheckFrequency") private var defaultCheckFrequency = "Daily"
     @State private var showFrequencyPicker = false
 
+    // Category filter
+    @State private var selectedCategory: ActionType? = nil
+
+    // Bulk delete
+    @State private var isEditMode = false
+    @State private var selectedWatchIds: Set<UUID> = []
+    @State private var showBulkDeleteConfirm = false
+
     // Savings milestone celebration
     @AppStorage("achievedMilestoneAmount") private var achievedMilestoneAmount: Double = 0
     @State private var showCelebration = false
@@ -22,8 +30,7 @@ struct HomeScreen: View {
                     triggeredAlerts
                     priceInsightsCard
                     savingsMilestoneSection
-
-                    checkFrequencyCard
+                    categoryFilterBar
 
                     if viewModel.watches.isEmpty {
                         emptyState
@@ -56,6 +63,22 @@ struct HomeScreen: View {
         .onChange(of: viewModel.savingsCalculation.totalSavings) { _, _ in
             checkForNewMilestone()
         }
+        .sheet(isPresented: $showFrequencyPicker) {
+            FrequencyPickerSheet(selectedFrequency: $defaultCheckFrequency)
+        }
+        .alert("Delete \(selectedWatchIds.count) watches?", isPresented: $showBulkDeleteConfirm) {
+            Button("Delete", role: .destructive) {
+                let idsToDelete = selectedWatchIds
+                withAnimation(.spring(response: 0.3)) {
+                    viewModel.removeWatches(ids: idsToDelete)
+                }
+                selectedWatchIds.removeAll()
+                isEditMode = false
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This action cannot be undone.")
+        }
     }
 
     // MARK: - Milestone Detection
@@ -74,7 +97,7 @@ struct HomeScreen: View {
     // MARK: - Header
 
     private var headerSection: some View {
-        HStack {
+        HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 8) {
                     StewardLogo(size: 30)
@@ -90,6 +113,34 @@ struct HomeScreen: View {
             }
 
             Spacer()
+
+            // Compact frequency pill
+            Button { showFrequencyPicker = true } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "clock.arrow.circlepath")
+                        .font(.system(size: 10))
+
+                    Text(compactFrequencyLabel)
+                        .font(Theme.body(11, weight: .semibold))
+
+                    if let freq = CheckFrequency.from(string: defaultCheckFrequency),
+                       freq.requiredTier != .free {
+                        Text(freq.requiredTier.displayName.uppercased())
+                            .font(Theme.body(8, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(freq.requiredTier == .premium ? Theme.gold : Theme.accent)
+                            .clipShape(Capsule())
+                    }
+                }
+                .foregroundStyle(Theme.accent)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Theme.accentLight)
+                .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
 
             Button(action: { viewModel.selectedTab = .activity }) {
                 ZStack(alignment: .topTrailing) {
@@ -299,97 +350,118 @@ struct HomeScreen: View {
         }
     }
 
-    // MARK: - Check Frequency Card
+    // MARK: - Compact Frequency Label
 
-    private var checkFrequencyCard: some View {
-        Button {
-            showFrequencyPicker = true
-        } label: {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Image(systemName: "clock.arrow.circlepath")
-                        .font(.system(size: 14))
-                        .foregroundStyle(Theme.accent)
-
-                    Text("Check Frequency")
-                        .font(Theme.body(13, weight: .semibold))
-                        .foregroundStyle(Theme.ink)
-
-                    Spacer()
-
-                    // Current frequency badge
-                    HStack(spacing: 5) {
-                        if let freq = CheckFrequency.from(string: defaultCheckFrequency),
-                           freq.requiredTier != .free {
-                            Text(freq.requiredTier.displayName.uppercased())
-                                .font(Theme.body(9, weight: .bold))
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(freq.requiredTier == .premium ? Theme.gold : Theme.accent)
-                                .clipShape(Capsule())
-                        }
-
-                        Text(defaultCheckFrequency)
-                            .font(Theme.body(12, weight: .semibold))
-                            .foregroundStyle(Theme.accent)
-
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(Theme.borderMid)
-                    }
-                }
-
-                // Tier speed indicators
-                HStack(spacing: 6) {
-                    frequencyTierPill("Daily", tier: .free, isCurrent: defaultCheckFrequency == "Daily")
-
-                    frequencyTierPill("30 min", tier: .pro, isCurrent: CheckFrequency.proTier.contains { $0.rawValue == defaultCheckFrequency })
-
-                    frequencyTierPill("5 min", tier: .premium, isCurrent: CheckFrequency.premiumTier.contains { $0.rawValue == defaultCheckFrequency })
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
-            .background(Theme.bgCard)
-            .clipShape(RoundedRectangle(cornerRadius: 14))
-            .overlay(
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(Theme.border, lineWidth: 1)
-            )
-            .shadow(color: .black.opacity(0.04), radius: 8, y: 4)
-        }
-        .buttonStyle(.plain)
-        .padding(.horizontal, 24)
-        .padding(.bottom, 16)
-        .sheet(isPresented: $showFrequencyPicker) {
-            FrequencyPickerSheet(selectedFrequency: $defaultCheckFrequency)
+    private var compactFrequencyLabel: String {
+        switch defaultCheckFrequency {
+        case "Every 5 minutes": return "5m"
+        case "Every 15 minutes": return "15m"
+        case "Every 30 minutes": return "30m"
+        case "Every hour": return "1h"
+        case "Every 6 hours": return "6h"
+        case "Every 12 hours": return "12h"
+        default: return defaultCheckFrequency // "Daily" stays as-is
         }
     }
 
-    private func frequencyTierPill(_ label: String, tier: SubscriptionTier, isCurrent: Bool) -> some View {
-        let unlocked = subscriptionManager.currentTier.includes(tier)
-        let isActive = isCurrent
+    // MARK: - Bulk Delete
 
-        return HStack(spacing: 4) {
-            if !unlocked {
-                Image(systemName: "lock.fill")
-                    .font(.system(size: 8))
-            }
-
-            Text(tier == .free ? "Free · \(label)" : "\(tier.displayName) · \(label)")
-                .font(Theme.body(10, weight: isActive ? .bold : .medium))
+    private func toggleSelection(_ id: UUID) {
+        if selectedWatchIds.contains(id) {
+            selectedWatchIds.remove(id)
+        } else {
+            selectedWatchIds.insert(id)
         }
-        .foregroundStyle(isActive ? .white : (unlocked ? Theme.inkMid : Theme.inkLight))
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .frame(maxWidth: .infinity)
-        .background(
-            isActive
-                ? (tier == .premium ? Theme.gold : (tier == .pro ? Theme.accent : Theme.inkMid))
-                : Theme.bgDeep
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    private var bulkDeleteBar: some View {
+        HStack {
+            Button {
+                if selectedWatchIds.count == filteredWatches.count {
+                    selectedWatchIds.removeAll()
+                } else {
+                    selectedWatchIds = Set(filteredWatches.map(\.id))
+                }
+            } label: {
+                Text(selectedWatchIds.count == filteredWatches.count ? "Deselect All" : "Select All")
+                    .font(Theme.body(13, weight: .medium))
+                    .foregroundStyle(Theme.accent)
+            }
+            .buttonStyle(.plain)
+
+            Spacer()
+
+            Button(role: .destructive) {
+                showBulkDeleteConfirm = true
+            } label: {
+                Label("Delete (\(selectedWatchIds.count))", systemImage: "trash")
+                    .font(Theme.body(13, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(Color.red)
+                    .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.vertical, 8)
+    }
+
+    // MARK: - Category Filter Bar
+
+    private var availableCategories: [ActionType] {
+        let types = Set(viewModel.watches.map { $0.actionType })
+        return ActionType.allCases.filter { types.contains($0) }
+    }
+
+    private var filteredWatches: [Watch] {
+        guard let category = selectedCategory else { return viewModel.watches }
+        return viewModel.watches.filter { $0.actionType == category }
+    }
+
+    @ViewBuilder
+    private var categoryFilterBar: some View {
+        if availableCategories.count >= 2 {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    // "All" pill
+                    filterPill(label: "All", icon: "square.grid.2x2", isSelected: selectedCategory == nil) {
+                        withAnimation(.spring(response: 0.3)) {
+                            selectedCategory = nil
+                        }
+                    }
+
+                    // Category pills
+                    ForEach(availableCategories, id: \.self) { category in
+                        filterPill(label: category.displayName, icon: category.iconName, isSelected: selectedCategory == category) {
+                            withAnimation(.spring(response: 0.3)) {
+                                selectedCategory = category
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, 24)
+            }
+            .padding(.bottom, 12)
+        }
+    }
+
+    private func filterPill(label: String, icon: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                Image(systemName: icon)
+                    .font(.system(size: 10))
+
+                Text(label)
+                    .font(Theme.body(11, weight: .semibold))
+            }
+            .foregroundStyle(isSelected ? .white : Theme.inkMid)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(isSelected ? Theme.accent : Theme.bgDeep)
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Empty State
@@ -427,29 +499,64 @@ struct HomeScreen: View {
 
                 Spacer()
 
-                if subscriptionManager.currentTier.maxWatches < Int.max {
-                    Text("\(viewModel.watches.count)/\(subscriptionManager.currentTier.maxWatches) watches")
-                        .font(Theme.body(12))
-                        .foregroundStyle(Theme.inkLight)
-                } else {
-                    Text("\(viewModel.watches.count) watching")
-                        .font(Theme.body(12))
-                        .foregroundStyle(Theme.inkLight)
+                if !isEditMode {
+                    if selectedCategory != nil {
+                        Text("\(filteredWatches.count) of \(viewModel.watches.count)")
+                            .font(Theme.body(12))
+                            .foregroundStyle(Theme.inkLight)
+                    } else if subscriptionManager.currentTier.maxWatches < Int.max {
+                        Text("\(viewModel.watches.count)/\(subscriptionManager.currentTier.maxWatches) watches")
+                            .font(Theme.body(12))
+                            .foregroundStyle(Theme.inkLight)
+                    } else {
+                        Text("\(viewModel.watches.count) watching")
+                            .font(Theme.body(12))
+                            .foregroundStyle(Theme.inkLight)
+                    }
+                }
+
+                if viewModel.watches.count > 1 {
+                    Button {
+                        withAnimation(.spring(response: 0.3)) {
+                            isEditMode.toggle()
+                            if !isEditMode { selectedWatchIds.removeAll() }
+                        }
+                    } label: {
+                        Text(isEditMode ? "Done" : "Edit")
+                            .font(Theme.body(13, weight: .medium))
+                            .foregroundStyle(Theme.accent)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
 
             VStack(spacing: 10) {
-                ForEach(viewModel.watches) { watch in
-                    WatchCard(watch: watch) {
-                        viewModel.openDetail(for: watch)
+                ForEach(filteredWatches) { watch in
+                    HStack(spacing: 12) {
+                        if isEditMode {
+                            Image(systemName: selectedWatchIds.contains(watch.id) ? "checkmark.circle.fill" : "circle")
+                                .font(.system(size: 22))
+                                .foregroundStyle(selectedWatchIds.contains(watch.id) ? Theme.accent : Theme.inkLight)
+                                .onTapGesture { toggleSelection(watch.id) }
+                        }
+
+                        WatchCard(watch: watch) {
+                            if isEditMode {
+                                toggleSelection(watch.id)
+                            } else {
+                                viewModel.openDetail(for: watch)
+                            }
+                        }
                     }
                     .contextMenu {
-                        Button(role: .destructive) {
-                            withAnimation(.spring(response: 0.3)) {
-                                viewModel.removeWatch(watch)
+                        if !isEditMode {
+                            Button(role: .destructive) {
+                                withAnimation(.spring(response: 0.3)) {
+                                    viewModel.removeWatch(watch)
+                                }
+                            } label: {
+                                Label("Delete Watch", systemImage: "trash")
                             }
-                        } label: {
-                            Label("Delete Watch", systemImage: "trash")
                         }
                     }
                     .transition(.asymmetric(
@@ -457,6 +564,11 @@ struct HomeScreen: View {
                         removal: .opacity
                     ))
                 }
+            }
+
+            // Bulk delete bar
+            if isEditMode && !selectedWatchIds.isEmpty {
+                bulkDeleteBar
             }
         }
         .padding(.horizontal, 24)

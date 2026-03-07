@@ -19,6 +19,8 @@ struct DetailScreen: View {
     @State private var checkResults: [CheckResultDTO] = []
     @State private var isLoadingChecks = true
     @State private var showFrequencyPicker = false
+    @State private var showTimePicker = false
+    @State private var showNotifyPicker = false
 
     /// Show price chart for price-related watches
     private var showsPriceChart: Bool {
@@ -105,6 +107,30 @@ struct DetailScreen: View {
                 )
             )
             .presentationDetents([.medium, .large])
+        }
+        .sheet(isPresented: $showTimePicker) {
+            StartTimePickerSheet(
+                preferredTime: Binding(
+                    get: { watch.preferredCheckTime },
+                    set: { newValue in
+                        watch.preferredCheckTime = newValue
+                        try? viewModel.saveAndSync(watch)
+                    }
+                )
+            )
+            .presentationDetents([.medium])
+        }
+        .sheet(isPresented: $showNotifyPicker) {
+            NotificationPickerSheet(
+                notifyChannels: Binding(
+                    get: { watch.notifyChannels },
+                    set: { newValue in
+                        watch.notifyChannels = newValue
+                        try? viewModel.saveAndSync(watch)
+                    }
+                )
+            )
+            .presentationDetents([.medium])
         }
         .task {
             await loadCheckResults()
@@ -260,8 +286,15 @@ struct DetailScreen: View {
                 DetailRow(icon: "⏱", label: "Check frequency", value: watch.checkFrequency, showChevron: true)
             }
             .buttonStyle(.plain)
+            Button { showTimePicker = true } label: {
+                DetailRow(icon: "🕐", label: "Check start time", value: formatPreferredTime(watch.preferredCheckTime), showChevron: true)
+            }
+            .buttonStyle(.plain)
             nextCheckRow
-            DetailRow(icon: "🔔", label: "Notify via", value: "Push notification · Email")
+            Button { showNotifyPicker = true } label: {
+                DetailRow(icon: "🔔", label: "Notify via", value: formatNotifyChannels(watch.notifyChannels), showChevron: true)
+            }
+            .buttonStyle(.plain)
 
             // Visit website button
             visitWebsiteCard
@@ -407,6 +440,35 @@ struct DetailScreen: View {
         .disabled(!watch.triggered)
         .padding(.top, 8)
         .accessibilityLabel(watch.triggered ? "Let Steward act now" : "Waiting for trigger")
+    }
+
+    // MARK: - Format Preferred Time
+
+    private func formatPreferredTime(_ time: String?) -> String {
+        guard let time else { return "Not set" }
+        let parts = time.split(separator: ":")
+        guard parts.count == 2,
+              let h = Int(parts[0]), let m = Int(parts[1]) else { return time }
+        var comps = DateComponents()
+        comps.hour = h
+        comps.minute = m
+        let formatter = DateFormatter()
+        formatter.dateFormat = "h:mm a"
+        if let date = Calendar.current.date(from: comps) {
+            return formatter.string(from: date)
+        }
+        return time
+    }
+
+    // MARK: - Format Notify Channels
+
+    private func formatNotifyChannels(_ channels: String) -> String {
+        let set = Set(channels.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) })
+        var labels: [String] = []
+        if set.contains("push") { labels.append("Push") }
+        if set.contains("email") { labels.append("Email") }
+        if labels.isEmpty { return "Push" }
+        return labels.joined(separator: " · ")
     }
 
     // MARK: - Next Check Countdown

@@ -1,4 +1,5 @@
 import SwiftUI
+import Charts
 
 struct PriceInsightsScreen: View {
     @Environment(WatchViewModel.self) private var viewModel
@@ -35,17 +36,25 @@ struct PriceInsightsScreen: View {
                 } else if priceWatches.isEmpty {
                     emptyState
                 } else {
-                    // Watch list
-                    VStack(spacing: 10) {
+                    // Watch list with inline charts
+                    VStack(spacing: 14) {
                         ForEach(priceWatches) { watch in
-                            PriceWatchRow(
-                                watch: watch,
-                                priceHistory: priceData[watch.id] ?? [],
-                                dealInsight: dealInsights[watch.id],
-                                onTap: {
-                                    viewModel.openDetail(for: watch)
+                            VStack(spacing: 0) {
+                                PriceWatchRow(
+                                    watch: watch,
+                                    priceHistory: priceData[watch.id] ?? [],
+                                    dealInsight: dealInsights[watch.id],
+                                    onTap: {
+                                        viewModel.openDetail(for: watch)
+                                    }
+                                )
+
+                                // Compact inline chart preview
+                                if let points = priceData[watch.id], points.count >= 2 {
+                                    compactChart(points: points)
+                                        .padding(.top, -1) // Visually connect with row above
                                 }
-                            )
+                            }
                         }
                     }
                 }
@@ -189,6 +198,132 @@ struct PriceInsightsScreen: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 40)
+    }
+
+    // MARK: - Compact Chart
+
+    private func compactChart(points: [PricePoint]) -> some View {
+        let minPrice = (points.map(\.price).min() ?? 0) * 0.97
+        let maxPrice = (points.map(\.price).max() ?? 100) * 1.03
+        let priceChange = points.count >= 2
+            ? ((points.last!.price - points.first!.price) / points.first!.price) * 100
+            : 0.0
+        let chartColor: Color = priceChange >= 0 ? Theme.red : Theme.accent
+
+        return VStack(alignment: .leading, spacing: 8) {
+            // Current price + change
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                if let current = points.last {
+                    Text(formatPrice(current.price))
+                        .font(Theme.serif(18, weight: .bold))
+                        .foregroundStyle(Theme.ink)
+                }
+
+                if points.count >= 2 {
+                    HStack(spacing: 2) {
+                        Image(systemName: priceChange >= 0 ? "arrow.up.right" : "arrow.down.right")
+                            .font(.system(size: 9, weight: .bold))
+                        Text("\(priceChange >= 0 ? "+" : "")\(String(format: "%.1f", priceChange))%")
+                            .font(Theme.body(11, weight: .semibold))
+                    }
+                    .foregroundStyle(chartColor)
+                }
+
+                Spacer()
+
+                // Date range
+                if let first = points.first?.date, let last = points.last?.date {
+                    let days = max(1, Calendar.current.dateComponents([.day], from: first, to: last).day ?? 1)
+                    Text("\(days)d")
+                        .font(Theme.body(10, weight: .medium))
+                        .foregroundStyle(Theme.inkLight)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Theme.bgDeep)
+                        .clipShape(Capsule())
+                }
+            }
+
+            // Chart
+            Chart(points) { point in
+                AreaMark(
+                    x: .value("Date", point.date),
+                    yStart: .value("Min", minPrice),
+                    yEnd: .value("Price", point.price)
+                )
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [chartColor.opacity(0.15), chartColor.opacity(0.02)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+
+                LineMark(
+                    x: .value("Date", point.date),
+                    y: .value("Price", point.price)
+                )
+                .foregroundStyle(chartColor)
+                .lineStyle(StrokeStyle(lineWidth: 2))
+            }
+            .chartYScale(domain: minPrice...maxPrice)
+            .chartXAxis(.hidden)
+            .chartYAxis {
+                AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) { value in
+                    AxisValueLabel {
+                        if let price = value.as(Double.self) {
+                            Text(formatPrice(price))
+                                .font(Theme.body(9))
+                                .foregroundStyle(Theme.inkLight)
+                        }
+                    }
+                }
+            }
+            .chartLegend(.hidden)
+            .frame(height: 120)
+
+            // Low / High badges
+            HStack(spacing: 10) {
+                if let low = PricePoint.lowestPrice(in: points) {
+                    compactBadge(label: "Low", price: low.price, color: Theme.accent, icon: "arrow.down")
+                }
+                if let high = PricePoint.highestPrice(in: points) {
+                    compactBadge(label: "High", price: high.price, color: Theme.red, icon: "arrow.up")
+                }
+            }
+        }
+        .padding(14)
+        .background(Theme.bgCard)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(Theme.border, lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.04), radius: 8, y: 4)
+    }
+
+    private func compactBadge(label: String, price: Double, color: Color, icon: String) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: icon)
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(color)
+
+            Text(label)
+                .font(Theme.body(10))
+                .foregroundStyle(Theme.inkLight)
+
+            Text(formatPrice(price))
+                .font(Theme.body(10, weight: .semibold))
+                .foregroundStyle(Theme.ink)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(Theme.bgDeep)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    private func formatPrice(_ price: Double) -> String {
+        "$\(String(format: "%.2f", price))"
     }
 
     // MARK: - Load Data

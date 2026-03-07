@@ -135,6 +135,9 @@ final class WatchViewModel {
 
         // Load savings data after sync completes
         await loadSavings()
+
+        // Backfill product images for watches missing them
+        backfillMissingImages()
     }
 
     // MARK: - Savings
@@ -179,6 +182,32 @@ final class WatchViewModel {
         )
 
         isLoadingSavings = false
+    }
+
+    // MARK: - Image Backfill
+
+    /// Fetches OG images for any watches that don't have a product image yet.
+    /// Runs as a fire-and-forget Task so it doesn't block the sync flow.
+    private func backfillMissingImages() {
+        let watchesMissingImages = watches.filter { $0.imageURL == nil }
+        guard !watchesMissingImages.isEmpty else { return }
+
+        Task {
+            for watch in watchesMissingImages {
+                if let ogImage = await fetchOGImageURL(for: watch.url) {
+                    watch.imageURL = ogImage
+                    try? modelContext?.save()
+
+                    // Push update to Supabase
+                    if let userId = auth?.currentUserId {
+                        let dto = watch.toDTO(userId: userId)
+                        try? await supabase?.updateWatch(dto)
+                    }
+                }
+            }
+            // Refresh UI once after all backfills complete
+            fetchLocalWatches()
+        }
     }
 
     // MARK: - Watch Management
@@ -242,6 +271,21 @@ final class WatchViewModel {
             } catch {
                 syncError = "Failed to sync watch: \(error.localizedDescription)"
             }
+        }
+    }
+
+    /// Creates a watch and stores the user-confirmed price as the first check_result
+    func addWatchWithPrice(_ watch: Watch, initialPrice: Double) {
+        addWatch(watch)
+        Task {
+            try? await supabase?.createInitialPricePoint(watchId: watch.id, price: initialPrice)
+        }
+    }
+
+    /// Updates the starting price for an existing watch (replaces or creates the initial price point)
+    func updateWatchPrice(watchId: UUID, price: Double) {
+        Task {
+            try? await supabase?.createInitialPricePoint(watchId: watchId, price: price)
         }
     }
 
@@ -314,6 +358,26 @@ final class WatchViewModel {
                 try await supabase?.deleteWatch(id: watchId)
             } catch {
                 syncError = "Failed to delete from cloud: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    /// Bulk delete multiple watches by their IDs
+    func removeWatches(ids: Set<UUID>) {
+        guard let context = modelContext else { return }
+        let watchesToDelete = watches.filter { ids.contains($0.id) }
+
+        for watch in watchesToDelete {
+            context.delete(watch)
+        }
+        try? context.save()
+        withAnimation(.spring(response: 0.3)) {
+            fetchLocalWatches()
+        }
+
+        Task {
+            for id in ids {
+                try? await supabase?.deleteWatch(id: id)
             }
         }
     }
