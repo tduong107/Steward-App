@@ -4,6 +4,10 @@ struct HomeScreen: View {
     @Environment(WatchViewModel.self) private var viewModel
     @Environment(SubscriptionManager.self) private var subscriptionManager
 
+    // Default frequency
+    @AppStorage("defaultCheckFrequency") private var defaultCheckFrequency = "Daily"
+    @State private var showFrequencyPicker = false
+
     // Savings milestone celebration
     @AppStorage("achievedMilestoneAmount") private var achievedMilestoneAmount: Double = 0
     @State private var showCelebration = false
@@ -18,6 +22,8 @@ struct HomeScreen: View {
                     triggeredAlerts
                     priceInsightsCard
                     savingsMilestoneSection
+
+                    checkFrequencyCard
 
                     if viewModel.watches.isEmpty {
                         emptyState
@@ -291,6 +297,99 @@ struct HomeScreen: View {
                 .padding(.bottom, 16)
                 .transition(.move(edge: .top).combined(with: .opacity))
         }
+    }
+
+    // MARK: - Check Frequency Card
+
+    private var checkFrequencyCard: some View {
+        Button {
+            showFrequencyPicker = true
+        } label: {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Image(systemName: "clock.arrow.circlepath")
+                        .font(.system(size: 14))
+                        .foregroundStyle(Theme.accent)
+
+                    Text("Check Frequency")
+                        .font(Theme.body(13, weight: .semibold))
+                        .foregroundStyle(Theme.ink)
+
+                    Spacer()
+
+                    // Current frequency badge
+                    HStack(spacing: 5) {
+                        if let freq = CheckFrequency.from(string: defaultCheckFrequency),
+                           freq.requiredTier != .free {
+                            Text(freq.requiredTier.displayName.uppercased())
+                                .font(Theme.body(9, weight: .bold))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(freq.requiredTier == .premium ? Theme.gold : Theme.accent)
+                                .clipShape(Capsule())
+                        }
+
+                        Text(defaultCheckFrequency)
+                            .font(Theme.body(12, weight: .semibold))
+                            .foregroundStyle(Theme.accent)
+
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(Theme.borderMid)
+                    }
+                }
+
+                // Tier speed indicators
+                HStack(spacing: 6) {
+                    frequencyTierPill("Daily", tier: .free, isCurrent: defaultCheckFrequency == "Daily")
+
+                    frequencyTierPill("30 min", tier: .pro, isCurrent: CheckFrequency.proTier.contains { $0.rawValue == defaultCheckFrequency })
+
+                    frequencyTierPill("5 min", tier: .premium, isCurrent: CheckFrequency.premiumTier.contains { $0.rawValue == defaultCheckFrequency })
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .background(Theme.bgCard)
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(Theme.border, lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.04), radius: 8, y: 4)
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 24)
+        .padding(.bottom, 16)
+        .sheet(isPresented: $showFrequencyPicker) {
+            FrequencyPickerSheet(selectedFrequency: $defaultCheckFrequency)
+        }
+    }
+
+    private func frequencyTierPill(_ label: String, tier: SubscriptionTier, isCurrent: Bool) -> some View {
+        let unlocked = subscriptionManager.currentTier.includes(tier)
+        let isActive = isCurrent
+
+        return HStack(spacing: 4) {
+            if !unlocked {
+                Image(systemName: "lock.fill")
+                    .font(.system(size: 8))
+            }
+
+            Text(tier == .free ? "Free · \(label)" : "\(tier.displayName) · \(label)")
+                .font(Theme.body(10, weight: isActive ? .bold : .medium))
+        }
+        .foregroundStyle(isActive ? .white : (unlocked ? Theme.inkMid : Theme.inkLight))
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity)
+        .background(
+            isActive
+                ? (tier == .premium ? Theme.gold : (tier == .pro ? Theme.accent : Theme.inkMid))
+                : Theme.bgDeep
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
     // MARK: - Empty State
