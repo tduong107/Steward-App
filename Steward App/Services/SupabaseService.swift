@@ -91,6 +91,34 @@ final class SupabaseService {
             .execute()
     }
 
+    // MARK: - Trigger Check
+
+    /// Invokes the check-watch edge function to perform an immediate check for a watch
+    func triggerCheck(watchId: UUID) async throws {
+        let url = SupabaseConfig.url.appendingPathComponent("functions/v1/check-watch")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(SupabaseConfig.anonKey)", forHTTPHeaderField: "Authorization")
+        request.setValue(SupabaseConfig.anonKey, forHTTPHeaderField: "apikey")
+
+        // Get the current session token for authenticated invocation
+        if let accessToken = try? await SupabaseConfig.client.auth.session.accessToken {
+            request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        }
+
+        request.httpBody = try JSONEncoder().encode(["watch_id": watchId.uuidString])
+        request.timeoutInterval = 30
+
+        let (_, response) = try await URLSession.shared.data(for: request)
+
+        if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode != 200 {
+            #if DEBUG
+            print("[SupabaseService] triggerCheck failed with status \(httpResponse.statusCode)")
+            #endif
+        }
+    }
+
     // MARK: - Activities
 
     func fetchActivities() async throws -> [ActivityDTO] {

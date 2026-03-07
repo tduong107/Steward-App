@@ -268,6 +268,17 @@ final class WatchViewModel {
             do {
                 let dto = watch.toDTO(userId: userId)
                 try await supabase?.createWatch(dto)
+
+                // Trigger the first check immediately so the user gets a data point right away
+                try? await supabase?.triggerCheck(watchId: watch.id)
+
+                // Refresh local data after the check updates last_checked and potentially adds check_results
+                await MainActor.run {
+                    try? context.save()
+                    withAnimation(.spring(response: 0.3)) {
+                        fetchLocalWatches()
+                    }
+                }
             } catch {
                 syncError = "Failed to sync watch: \(error.localizedDescription)"
             }

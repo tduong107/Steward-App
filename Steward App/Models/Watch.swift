@@ -104,7 +104,7 @@ final class Watch {
         }
         self.notifyChannels = notifyChannels
         self.imageURL = imageURL
-        self.lastCheckedAt = lastCheckedAt ?? Date() // Creation counts as first check
+        self.lastCheckedAt = lastCheckedAt
         self.createdAt = Date()
     }
 }
