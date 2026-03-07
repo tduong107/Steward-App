@@ -2,16 +2,21 @@ import SwiftUI
 
 /// A reusable swipe-to-delete wrapper for use inside ScrollView / VStack layouts.
 /// Swipe left to reveal a red "Delete" button, then tap to confirm.
+///
+/// Uses `.simultaneousGesture` so that vertical scrolling is never blocked.
+/// Direction is locked on the first significant movement — vertical yields to
+/// the parent ScrollView, horizontal activates the swipe.
 struct SwipeToDelete<Content: View>: View {
     let content: Content
     let onDelete: () -> Void
 
     @State private var offset: CGFloat = 0
     @State private var isSwiping = false
+    @State private var isVerticalScroll = false
     @State private var showConfirm = false
 
     private let deleteWidth: CGFloat = 80
-    private let activationThreshold: CGFloat = 15
+    private let directionThreshold: CGFloat = 10
 
     init(onDelete: @escaping () -> Void, @ViewBuilder content: () -> Content) {
         self.onDelete = onDelete
@@ -44,7 +49,9 @@ struct SwipeToDelete<Content: View>: View {
                 }
         }
         .contentShape(Rectangle())
-        .highPriorityGesture(swipeGesture)
+        // simultaneousGesture lets the parent ScrollView's vertical drag
+        // coexist with our horizontal swipe — no more scroll blocking.
+        .simultaneousGesture(swipeGesture)
         .clipped()
         .alert("Delete Watch", isPresented: $showConfirm) {
             Button("Cancel", role: .cancel) {
@@ -92,14 +99,26 @@ struct SwipeToDelete<Content: View>: View {
     // MARK: - Swipe Gesture
 
     private var swipeGesture: some Gesture {
-        DragGesture(minimumDistance: 15)
+        DragGesture(minimumDistance: 8)
             .onChanged { value in
+                // Once locked as a vertical scroll, ignore all horizontal movement
+                // so the ScrollView handles it without any resistance.
+                if isVerticalScroll { return }
+
                 let horizontal = abs(value.translation.width)
                 let vertical = abs(value.translation.height)
 
-                // Only activate for primarily horizontal swipes
+                // First significant movement locks the direction for this gesture
                 if !isSwiping {
-                    guard horizontal > vertical, horizontal > activationThreshold else { return }
+                    let distance = max(horizontal, vertical)
+                    guard distance > directionThreshold else { return }
+
+                    if vertical > horizontal {
+                        // Vertical — hand off to ScrollView entirely
+                        isVerticalScroll = true
+                        return
+                    }
+                    // Horizontal — activate swipe mode
                     isSwiping = true
                 }
 
@@ -114,19 +133,20 @@ struct SwipeToDelete<Content: View>: View {
                 }
             }
             .onEnded { _ in
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
-                    if -offset > deleteWidth / 2 {
-                        // Snap open
-                        offset = -deleteWidth
-                    } else {
-                        // Snap closed
-                        offset = 0
+                if isSwiping {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                        if -offset > deleteWidth / 2 {
+                            offset = -deleteWidth
+                        } else {
+                            offset = 0
+                        }
                     }
                 }
 
-                // Reset isSwiping after the animation settles
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                // Reset flags after animation settles
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
                     isSwiping = false
+                    isVerticalScroll = false
                 }
             }
     }
