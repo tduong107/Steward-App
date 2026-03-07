@@ -28,8 +28,14 @@ final class RealtimeManager {
 
         // Subscribe to the channel
         Task {
-            await channel.subscribe()
-            isConnected = true
+            do {
+                try await channel.subscribeWithError()
+                isConnected = true
+            } catch {
+                #if DEBUG
+                print("[Realtime] Subscribe error: \(error)")
+                #endif
+            }
         }
 
         // Listen for changes in a separate task — debounced

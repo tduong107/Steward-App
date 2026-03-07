@@ -19,19 +19,18 @@ final class SubscriptionManager {
     var paywallHighlightedTier: SubscriptionTier = .pro
     var paywallReason: String?
 
-    // MARK: - Private
-
-    nonisolated(unsafe) private var transactionListener: Task<Void, Never>?
-
-    // MARK: - Init / Deinit
+    // MARK: - Init
 
     init() {
-        // Start listening for transaction updates immediately
-        transactionListener = listenForTransactions()
-    }
-
-    deinit {
-        transactionListener?.cancel()
+        // Start listening for transaction updates immediately.
+        // Uses [weak self] so the task naturally stops when the manager is deallocated.
+        Task { [weak self] in
+            for await result in Transaction.updates {
+                guard case .verified(let transaction) = result else { continue }
+                await transaction.finish()
+                await self?.checkEntitlements()
+            }
+        }
     }
 
     // MARK: - Load Products
@@ -144,18 +143,6 @@ final class SubscriptionManager {
         }
 
         isPurchasing = false
-    }
-
-    // MARK: - Transaction Listener
-
-    private func listenForTransactions() -> Task<Void, Never> {
-        Task.detached { [weak self] in
-            for await result in Transaction.updates {
-                guard case .verified(let transaction) = result else { continue }
-                await transaction.finish()
-                await self?.checkEntitlements()
-            }
-        }
     }
 
     // MARK: - Paywall Presentation

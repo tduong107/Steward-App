@@ -4,10 +4,8 @@ actor AIService {
     static let shared = AIService()
 
     /// Edge Function URL — the AI chat proxy that holds the API key server-side
-    private let functionURL: URL = {
-        let base = SupabaseConfig.url.absoluteString
-        return URL(string: "\(base)/functions/v1/ai-chat")!
-    }()
+    private let functionURL = URL(string: "https://lwtzutbaqcafqkpaaaib.supabase.co/functions/v1/ai-chat")!
+    private let apiKey = "sb_publishable_p1md1ejTmoPsoJnhrBm9nA_HfVPRd4q"
 
     struct Message {
         let role: String // "user" or "assistant"
@@ -60,7 +58,7 @@ actor AIService {
         var request = URLRequest(url: functionURL)
         request.httpMethod = "POST"
         // Authenticate with Supabase anon key (deployed with --no-verify-jwt)
-        request.setValue(SupabaseConfig.anonKey, forHTTPHeaderField: "apikey")
+        request.setValue(apiKey, forHTTPHeaderField: "apikey")
         request.setValue("application/json", forHTTPHeaderField: "content-type")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         request.timeoutInterval = 60 // Longer timeout for vision requests

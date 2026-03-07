@@ -63,7 +63,7 @@ final class AuthManager {
                 .joined(separator: " ")
             if !name.isEmpty {
                 self.displayName = name
-                try? await SupabaseConfig.client
+                _ = try? await SupabaseConfig.client
                     .from("profiles")
                     .update(["display_name": name])
                     .eq("id", value: session.user.id.uuidString)
