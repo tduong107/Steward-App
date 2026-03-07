@@ -40,6 +40,8 @@ final class WatchViewModel {
     private var auth: AuthManager?
     private var supabase: SupabaseService?
     private var subscriptionManager: SubscriptionManager?
+    private var hasConfigured = false
+    private var lastSyncTime: Date?
 
     enum Tab: String, CaseIterable {
         case home = "Watches"
@@ -58,6 +60,9 @@ final class WatchViewModel {
     // MARK: - Setup
 
     func configure(with context: ModelContext, auth: AuthManager, supabase: SupabaseService, subscription: SubscriptionManager? = nil) {
+        guard !hasConfigured else { return }
+        hasConfigured = true
+
         self.modelContext = context
         self.auth = auth
         self.supabase = supabase
@@ -91,41 +96,41 @@ final class WatchViewModel {
 
     func syncFromCloud() async {
         guard let context = modelContext, auth?.isAuthenticated == true else { return }
+
+        // Throttle: don't re-sync if we synced within the last 3 seconds
+        if let lastSync = lastSyncTime, Date().timeIntervalSince(lastSync) < 3 {
+            return
+        }
+
+        // Prevent concurrent syncs
+        guard !isSyncing else { return }
         isSyncing = true
         syncError = nil
 
         do {
-            // Sync watches
+            // Fetch remote data (async — frees main thread while waiting)
             let remoteDTOs = try await supabase?.fetchWatches() ?? []
-
-            let existing = (try? context.fetch(FetchDescriptor<Watch>())) ?? []
-            for watch in existing {
-                context.delete(watch)
-            }
-            for dto in remoteDTOs {
-                let watch = Watch(from: dto)
-                context.insert(watch)
-            }
-
-            // Sync activities
             let remoteActivities = try await supabase?.fetchActivities() ?? []
+
+            // Batch all SwiftData updates together to minimise re-renders
+            let existing = (try? context.fetch(FetchDescriptor<Watch>())) ?? []
+            for watch in existing { context.delete(watch) }
+            for dto in remoteDTOs { context.insert(Watch(from: dto)) }
+
             let existingActivities = (try? context.fetch(FetchDescriptor<ActivityItem>())) ?? []
-            for activity in existingActivities {
-                context.delete(activity)
-            }
-            for dto in remoteActivities {
-                let activity = ActivityItem(from: dto)
-                context.insert(activity)
-            }
+            for activity in existingActivities { context.delete(activity) }
+            for dto in remoteActivities { context.insert(ActivityItem(from: dto)) }
 
             try? context.save()
+
+            // Single UI update after all data is ready
             fetchLocalWatches()
             fetchLocalActivities()
         } catch {
             syncError = error.localizedDescription
-            // On failure, keep using local cache
         }
 
+        lastSyncTime = Date()
         isSyncing = false
 
         // Load savings data after sync completes
@@ -145,15 +150,25 @@ final class WatchViewModel {
             watch.actionLabel.lowercased().contains("price")
         }
 
+        // Fetch all price histories concurrently instead of sequentially
+        let watchIds = priceWatches.map { $0.id }
         var priceHistories: [UUID: [PricePoint]] = [:]
 
-        for watch in priceWatches {
-            do {
-                let results = try await supabase.fetchPriceHistory(forWatchId: watch.id)
-                let points = PricePoint.fromCheckResults(results)
-                priceHistories[watch.id] = points
-            } catch {
-                // Skip watches we can't load
+        await withTaskGroup(of: (UUID, [CheckResultDTO]).self) { group in
+            for watchId in watchIds {
+                group.addTask {
+                    do {
+                        let results = try await supabase.fetchPriceHistory(forWatchId: watchId)
+                        return (watchId, results)
+                    } catch {
+                        return (watchId, [])
+                    }
+                }
+            }
+
+            // Convert to PricePoints on the main actor (after async fetches complete)
+            for await (watchId, results) in group {
+                priceHistories[watchId] = PricePoint.fromCheckResults(results)
             }
         }
 

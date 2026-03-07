@@ -1,6 +1,6 @@
 import Foundation
 
-struct PricePoint: Identifiable {
+struct PricePoint: Identifiable, Sendable {
     let id = UUID()
     let date: Date
     let price: Double

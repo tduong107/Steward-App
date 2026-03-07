@@ -9,6 +9,7 @@ final class RealtimeManager {
 
     private var watchChannel: RealtimeChannelV2?
     private var viewModel: WatchViewModel?
+    private var pendingSyncTask: Task<Void, Never>?
 
     // MARK: - Start Listening
 
@@ -31,14 +32,22 @@ final class RealtimeManager {
             isConnected = true
         }
 
-        // Listen for changes in a separate task
+        // Listen for changes in a separate task — debounced
         Task { [weak self] in
             for await _ in changes {
                 guard let self else { return }
                 #if DEBUG
-                print("[Realtime] Watch table changed — syncing from cloud")
+                print("[Realtime] Watch table changed — scheduling sync")
                 #endif
-                await self.viewModel?.syncFromCloud()
+
+                // Debounce: cancel any pending sync and wait 1 second
+                // so rapid-fire changes are batched into a single sync
+                self.pendingSyncTask?.cancel()
+                self.pendingSyncTask = Task {
+                    try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+                    guard !Task.isCancelled else { return }
+                    await self.viewModel?.syncFromCloud()
+                }
             }
         }
 
