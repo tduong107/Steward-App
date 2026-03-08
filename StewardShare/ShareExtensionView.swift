@@ -16,6 +16,7 @@ struct ShareExtensionView: View {
     // MARK: - State
 
     @State private var sharedURL: String = ""
+    @State private var sharedText: String = ""   // context text shared alongside URL
     @State private var pageTitle: String?
     @State private var phase: Phase = .extracting
     @State private var chatMessages: [ChatMessage] = []
@@ -146,27 +147,41 @@ struct ShareExtensionView: View {
     // MARK: - URL Card
 
     private var urlCard: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "link")
-                .font(.system(size: 13))
-                .foregroundStyle(.white)
-                .frame(width: 28, height: 28)
-                .background(accentGreen)
-                .clipShape(RoundedRectangle(cornerRadius: 7))
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(pageTitle ?? displayHost)
-                    .font(.system(size: 14, weight: .medium))
+        VStack(spacing: 8) {
+            HStack(spacing: 10) {
+                Image(systemName: "link")
+                    .font(.system(size: 13))
                     .foregroundStyle(.white)
-                    .lineLimit(1)
-                if pageTitle != nil {
+                    .frame(width: 28, height: 28)
+                    .background(accentGreen)
+                    .clipShape(RoundedRectangle(cornerRadius: 7))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    // Show shared text as title if it's more descriptive than the host
+                    Text(pageTitle ?? (sharedText.isEmpty ? displayHost : sharedText))
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.white)
+                        .lineLimit(2)
                     Text(displayHost)
                         .font(.system(size: 12))
                         .foregroundStyle(.gray)
                         .lineLimit(1)
                 }
+                Spacer()
             }
-            Spacer()
+
+            // Auth warning
+            if isAuthWalled {
+                HStack(spacing: 6) {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 10))
+                    Text("This site requires login — Steward can only check public pages")
+                        .font(.system(size: 11))
+                }
+                .foregroundStyle(.orange)
+                .padding(.horizontal, 4)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
         .padding(12)
         .background(cardBg)
@@ -554,61 +569,116 @@ struct ShareExtensionView: View {
         URL(string: sharedURL)?.host ?? sharedURL
     }
 
+    /// Whether this URL likely requires login to access content
+    private var isAuthWalled: Bool {
+        let host = displayHost.lowercased()
+        // Domains known to require login for meaningful content
+        let authDomains = ["resy.com", "opentable.com", "yelp.com/reservations"]
+        return authDomains.contains(where: { host.contains($0) })
+    }
+
+    /// A description of the context text + URL for the AI
+    private var fullContext: String {
+        var parts: [String] = []
+        parts.append("URL: \(sharedURL)")
+        parts.append("Website: \(displayHost)")
+        if let title = pageTitle {
+            parts.append("Page title: \(title)")
+        }
+        if let pathName = urlPathName {
+            parts.append("Name from URL: \(pathName)")
+        }
+        if !sharedText.isEmpty {
+            parts.append("Shared text: \(sharedText)")
+        }
+        if isAuthWalled {
+            parts.append("NOTE: This page requires user login. Steward cannot access logged-in content, so the watch should focus on publicly accessible aspects of this URL, or warn the user about this limitation.")
+        }
+        return parts.joined(separator: "\n")
+    }
+
     /// Extracts a human-readable name from the URL path (e.g. "carbone" from resy.com/cities/ny/carbone)
     private var urlPathName: String? {
         guard let url = URL(string: sharedURL) else { return nil }
         let pathComponents = url.pathComponents.filter { $0 != "/" }
-        // Take the last meaningful path segment and clean it up
-        guard let last = pathComponents.last, !last.isEmpty else { return nil }
-        // Skip if it's just a number or query-like
-        if last.allSatisfy({ $0.isNumber }) { return nil }
-        // Convert slugs like "le-bernardin" to "Le Bernardin"
-        let cleaned = last
-            .replacingOccurrences(of: "-", with: " ")
-            .replacingOccurrences(of: "_", with: " ")
-            .split(separator: " ")
-            .map { $0.prefix(1).uppercased() + $0.dropFirst() }
-            .joined(separator: " ")
-        return cleaned.isEmpty ? nil : cleaned
+        // Skip common structural segments
+        let skipWords: Set<String> = ["cities", "venues", "products", "items", "pages", "p", "dp", "gp", "www"]
+
+        // Scan all path segments from last to first, find the best human-readable one
+        for segment in pathComponents.reversed() {
+            // Skip empty, numbers-only, short IDs, or structural words
+            if segment.isEmpty { continue }
+            if segment.allSatisfy({ $0.isNumber }) { continue }
+            if segment.count <= 2 { continue }
+            if skipWords.contains(segment.lowercased()) { continue }
+            // Skip UUID-like and hex hash segments
+            if segment.range(of: "^[0-9a-f-]{8,}$", options: .regularExpression) != nil { continue }
+
+            // Convert slugs like "le-bernardin" to "Le Bernardin"
+            let cleaned = segment
+                .replacingOccurrences(of: "-", with: " ")
+                .replacingOccurrences(of: "_", with: " ")
+                .split(separator: " ")
+                .map { $0.prefix(1).uppercased() + $0.dropFirst() }
+                .joined(separator: " ")
+            if !cleaned.isEmpty {
+                return cleaned
+            }
+        }
+        return nil
     }
 
     // MARK: - URL Extraction
 
     private func extractURL() async {
+        // First pass: try to get a URL object (Safari, Chrome, etc.)
         for provider in attachments {
-            // Try URL type first (Safari, Chrome, etc.)
             if provider.hasItemConformingToTypeIdentifier(UTType.url.identifier) {
                 do {
                     if let url = try await provider.loadItem(
                         forTypeIdentifier: UTType.url.identifier
                     ) as? URL {
                         sharedURL = url.absoluteString
-                        await fetchPageTitle()
-                        checkAuthAndProceed()
-                        return
                     }
                 } catch { /* fall through */ }
             }
+        }
 
-            // Fallback: plain text that contains a URL (Amazon, Resy, Instagram, etc.)
+        // Second pass: try to get plain text (may contain URL + context like "Check out Carbone on Resy!")
+        for provider in attachments {
             if provider.hasItemConformingToTypeIdentifier(UTType.plainText.identifier) {
                 do {
                     if let text = try await provider.loadItem(
                         forTypeIdentifier: UTType.plainText.identifier
                     ) as? String {
-                        if let url = extractURLFromText(text) {
-                            sharedURL = url
-                            await fetchPageTitle()
-                            checkAuthAndProceed()
-                            return
+                        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+
+                        // If we don't have a URL yet, try to extract from text
+                        if sharedURL.isEmpty {
+                            if let url = extractURLFromText(trimmed) {
+                                sharedURL = url
+                            }
+                        }
+
+                        // Capture surrounding text as context (strip out the URL itself)
+                        let contextText = trimmed
+                            .replacingOccurrences(of: sharedURL, with: "")
+                            .trimmingCharacters(in: .whitespacesAndNewlines)
+                        if !contextText.isEmpty && contextText.count > 2 {
+                            sharedText = contextText
                         }
                     }
                 } catch { /* fall through */ }
             }
         }
 
-        // No valid URL found -- dismiss
-        onCancel()
+        guard !sharedURL.isEmpty else {
+            onCancel()
+            return
+        }
+
+        await fetchPageTitle()
+        checkAuthAndProceed()
     }
 
     /// Extracts the first HTTP(S) URL from a block of text
@@ -696,15 +766,7 @@ struct ShareExtensionView: View {
         }
 
         // Build enriched message with URL context
-        var message = "I want to watch this page."
-        message += "\nURL: \(sharedURL)"
-        message += "\nWebsite: \(displayHost)"
-        if let title = pageTitle {
-            message += "\nPage title: \(title)"
-        }
-        if let pathName = urlPathName {
-            message += "\nName from URL: \(pathName)"
-        }
+        var message = "I want to watch this page.\n\(fullContext)"
         message += "\n\n\(typeDescription)"
         message += "\n\nIMPORTANT: Respond ONLY with a [CREATE_WATCH] JSON block. Do NOT include [URL_CONTEXT], [SUGGESTIONS], or any other bracket tags."
 
@@ -741,15 +803,7 @@ struct ShareExtensionView: View {
 
         Task {
             // Build message with rich URL context so the AI knows the page
-            var aiMessage = "I'm sharing a link and want to set up a watch."
-            aiMessage += "\nURL: \(sharedURL)"
-            aiMessage += "\nWebsite: \(displayHost)"
-            if let title = pageTitle {
-                aiMessage += "\nPage title: \(title)"
-            }
-            if let pathName = urlPathName {
-                aiMessage += "\nName from URL: \(pathName)"
-            }
+            var aiMessage = "I'm sharing a link and want to set up a watch.\n\(fullContext)"
             aiMessage += "\n\nMy request: \(text)"
             aiMessage += "\n\nIMPORTANT: Respond in plain conversational text only. Do NOT use any bracket tags like [URL_CONTEXT], [SUGGESTIONS], etc. If you're ready to create the watch, include a [CREATE_WATCH] JSON block. Otherwise, ask me a clarifying question in plain text."
 
