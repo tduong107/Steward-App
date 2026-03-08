@@ -8,6 +8,7 @@ struct Steward_AppApp: App {
     @State private var supabaseService = SupabaseService()
     @State private var notificationManager = NotificationManager()
     @State private var subscriptionManager = SubscriptionManager()
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
         WindowGroup {
@@ -37,6 +38,11 @@ struct Steward_AppApp: App {
                         userInfo: ["share_code": String(code)]
                     )
                 }
+                .onChange(of: scenePhase) { _, newPhase in
+                    if newPhase == .active {
+                        checkForSharedURL()
+                    }
+                }
                 .task {
                     notificationManager.configure(supabase: supabaseService)
                     await notificationManager.checkCurrentStatus()
@@ -45,5 +51,34 @@ struct Steward_AppApp: App {
                 }
         }
         .modelContainer(for: [Watch.self, ActivityItem.self])
+    }
+
+    // MARK: - Share Extension URL Pickup
+
+    /// Checks App Group storage for a URL shared via the Share Extension.
+    /// Posts a notification so ContentView can open the chat with the URL pre-filled.
+    private func checkForSharedURL() {
+        guard let defaults = UserDefaults(suiteName: "group.Steward.Steward-App"),
+              let url = defaults.string(forKey: "pendingSharedURL") else { return }
+
+        // Ignore stale URLs (older than 24 hours)
+        let timestamp = defaults.double(forKey: "pendingSharedURLTimestamp")
+        let age = Date().timeIntervalSince1970 - timestamp
+        guard age < 86400 else {
+            defaults.removeObject(forKey: "pendingSharedURL")
+            defaults.removeObject(forKey: "pendingSharedURLTimestamp")
+            return
+        }
+
+        // Clear immediately to prevent re-processing
+        defaults.removeObject(forKey: "pendingSharedURL")
+        defaults.removeObject(forKey: "pendingSharedURLTimestamp")
+
+        // Post notification for ContentView to pick up
+        NotificationCenter.default.post(
+            name: .didReceiveSharedURL,
+            object: nil,
+            userInfo: ["url": url]
+        )
     }
 }

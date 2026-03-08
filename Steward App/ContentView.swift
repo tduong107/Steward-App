@@ -141,6 +141,15 @@ struct ContentView: View {
                 }
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .didReceiveSharedURL)) { notification in
+            if let url = notification.userInfo?["url"] as? String {
+                viewModel.selectedTab = .home
+                viewModel.pendingChatURL = url
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                    viewModel.isChatOpen = true
+                }
+            }
+        }
         .sheet(isPresented: $showJoinSheet) {
             if let data = sharedWatchData {
                 JoinWatchSheet(sharedWatch: data) {

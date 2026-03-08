@@ -96,4 +96,5 @@ extension Notification.Name {
     static let didFailToRegisterForRemoteNotifications = Notification.Name("didFailToRegisterForRemoteNotifications")
     static let didTapWatchNotification = Notification.Name("didTapWatchNotification")
     static let didOpenSharedWatch = Notification.Name("didOpenSharedWatch")
+    static let didReceiveSharedURL = Notification.Name("didReceiveSharedURL")
 }

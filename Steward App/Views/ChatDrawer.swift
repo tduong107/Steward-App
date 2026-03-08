@@ -120,6 +120,12 @@ struct ChatDrawer: View {
         }
         .onAppear {
             chatVM.subscriptionTier = subscriptionManager.currentTier
+
+            // If there's a shared URL from the Share Extension, auto-send it to the AI
+            if let pendingURL = watchVM.pendingChatURL {
+                watchVM.pendingChatURL = nil
+                chatVM.send("I want to watch this: \(pendingURL)")
+            }
         }
     }
 

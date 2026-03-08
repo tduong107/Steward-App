@@ -23,6 +23,7 @@ final class WatchViewModel {
 
     // Chat
     var isChatOpen = false
+    var pendingChatURL: String?  // URL shared via Share Extension
 
     // Action modal
     var actionModalWatch: Watch?
