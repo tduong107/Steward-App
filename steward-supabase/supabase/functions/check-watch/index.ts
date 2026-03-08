@@ -11,6 +11,25 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+// ─── Action URL Generation ──────────────────────────────────────────
+
+function generateActionURL(watch: any): string | null {
+  if (watch.action_type === "notify") return null;
+
+  const url = watch.url?.startsWith("http") ? watch.url : `https://${watch.url}`;
+
+  // Amazon: generate add-to-cart deep link via ASIN
+  if (url.includes("amazon.com")) {
+    const asinMatch = url.match(/\/(?:dp|gp\/product)\/([A-Z0-9]{10})/);
+    if (asinMatch) {
+      return `https://www.amazon.com/gp/aws/cart/add.html?ASIN.1=${asinMatch[1]}&Quantity.1=1`;
+    }
+  }
+
+  // Default: use the watched URL itself (product page, booking page, etc.)
+  return url;
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -67,18 +86,102 @@ serve(async (req) => {
       fetchUrl = `https://${fetchUrl}`;
     }
 
+    // Build fetch headers (include cookies for auth-walled sites)
+    const fetchHeaders: Record<string, string> = {
+      "User-Agent":
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    };
+
+    let cookiesExpired = false;
+    if (watch.site_cookies && watch.cookie_status === "active") {
+      try {
+        const cookies: Array<{
+          name: string;
+          value: string;
+          domain: string;
+          expiresDate: number | null;
+          isSecure: boolean;
+        }> = JSON.parse(watch.site_cookies);
+
+        const now = Date.now() / 1000; // seconds since epoch
+        const validCookies = cookies.filter((c) => {
+          // Keep cookies without expiry (session cookies) or not yet expired
+          return !c.expiresDate || c.expiresDate > now;
+        });
+
+        if (validCookies.length === 0 && cookies.length > 0) {
+          // All cookies have expired
+          cookiesExpired = true;
+          console.log(`[check-watch] All cookies expired for ${watch.id}`);
+        } else if (validCookies.length > 0) {
+          const cookieHeader = validCookies
+            .map((c) => `${c.name}=${c.value}`)
+            .join("; ");
+          fetchHeaders["Cookie"] = cookieHeader;
+          console.log(`[check-watch] Using ${validCookies.length} cookies for ${watch.id}`);
+        }
+      } catch (cookieErr) {
+        console.error(`[check-watch] Failed to parse cookies: ${cookieErr.message}`);
+      }
+    }
+
+    // If all cookies expired, update status and notify user
+    if (cookiesExpired) {
+      await supabase
+        .from("watches")
+        .update({ cookie_status: "expired", last_checked: new Date().toISOString() })
+        .eq("id", watch.id);
+
+      return new Response(
+        JSON.stringify({
+          watch_id: watch.id,
+          changed: false,
+          result_text: "Session expired — please sign in again",
+          cookie_status: "expired",
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Fetch the URL content
     let pageText = "";
     let fetchSuccess = true;
     try {
       const response = await fetch(fetchUrl, {
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (compatible; StewardBot/1.0; +https://steward.app)",
-        },
+        headers: fetchHeaders,
         redirect: "follow",
       });
       pageText = await response.text();
+
+      // Detect login page redirect (page requires re-authentication)
+      if (watch.site_cookies && watch.cookie_status === "active") {
+        const finalUrl = response.url?.toLowerCase() ?? "";
+        const textLower = pageText.toLowerCase().substring(0, 5000);
+        const isLoginPage =
+          finalUrl.includes("/login") ||
+          finalUrl.includes("/signin") ||
+          finalUrl.includes("/sign-in") ||
+          finalUrl.includes("/auth") ||
+          (textLower.includes('type="password"') && textLower.includes("sign in"));
+
+        if (isLoginPage) {
+          console.log(`[check-watch] Login page detected for ${watch.id}, marking cookies expired`);
+          await supabase
+            .from("watches")
+            .update({ cookie_status: "expired", last_checked: new Date().toISOString() })
+            .eq("id", watch.id);
+
+          return new Response(
+            JSON.stringify({
+              watch_id: watch.id,
+              changed: false,
+              result_text: "Session expired — please sign in again",
+              cookie_status: "expired",
+            }),
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      }
     } catch (fetchErr) {
       fetchSuccess = false;
       pageText = `Fetch error: ${fetchErr.message}`;
@@ -90,19 +193,81 @@ serve(async (req) => {
     // Strip HTML for condition evaluation (AI and regex work better on plain text)
     const plainText = fetchSuccess ? stripHtml(pageText) : pageText;
 
-    // Evaluate the condition against the page content (async for AI-powered evaluation)
+    // ─── Content Hash: skip evaluation if page hasn't changed ───
+    let contentHash: string | null = null;
+    let lastContentHash: string | null = null;
+    let lastKnownPrice: number | null = null;
+
+    if (fetchSuccess) {
+      contentHash = await computeContentHash(plainText);
+
+      // Fetch last check result for hash comparison and price history
+      try {
+        const { data: lastCheck } = await supabase
+          .from("check_results")
+          .select("result_data, price")
+          .eq("watch_id", watch.id)
+          .order("checked_at", { ascending: false })
+          .limit(1)
+          .single();
+
+        if (lastCheck) {
+          lastContentHash = lastCheck.result_data?.content_hash ?? null;
+          if (lastCheck.price != null) {
+            lastKnownPrice = parseFloat(lastCheck.price);
+            if (isNaN(lastKnownPrice)) lastKnownPrice = null;
+          }
+        }
+      } catch {
+        // No previous check — that's fine
+      }
+
+      // If page content is identical to last check, skip evaluation entirely
+      // (Still record the check for price tracking, but avoid expensive AI calls)
+      if (contentHash && lastContentHash && contentHash === lastContentHash) {
+        const now = new Date().toISOString();
+        console.log(`[check-watch] Content unchanged for ${watch.id}, skipping evaluation`);
+
+        await supabase.from("check_results").insert({
+          id: crypto.randomUUID(),
+          watch_id: watch.id,
+          result_data: { text: "No change detected", content_hash: contentHash },
+          changed: false,
+          price: currentPrice,
+          checked_at: now,
+        });
+
+        await supabase.from("watches").update({ last_checked: now }).eq("id", watch.id);
+
+        return new Response(
+          JSON.stringify({
+            watch_id: watch.id,
+            changed: false,
+            result_text: "No change detected",
+            price: currentPrice,
+            checked_at: now,
+            skipped_reason: "content_unchanged",
+          }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    // Evaluate the condition against the page content
     const { changed, resultText } = await evaluateConditionAsync(
       watch.condition,
       plainText,
-      fetchSuccess
+      fetchSuccess,
+      lastKnownPrice,
+      watch.action_type
     );
 
-    // Store the check result
+    // Store the check result (with content hash for future change detection)
     const now = new Date().toISOString();
     const { error: insertError } = await supabase.from("check_results").insert({
       id: crypto.randomUUID(),
       watch_id: watch.id,
-      result_data: { text: resultText },
+      result_data: { text: resultText, content_hash: contentHash },
       changed: changed,
       price: currentPrice,
       checked_at: now,
@@ -117,10 +282,17 @@ serve(async (req) => {
       last_checked: now,
     };
 
+    let actionUrl: string | null = null;
     if (changed) {
       updateData.triggered = true;
       updateData.status = "triggered";
       updateData.change_note = resultText;
+
+      // Generate action URL for actionable watch types
+      actionUrl = generateActionURL(watch);
+      if (actionUrl) {
+        updateData.action_url = actionUrl;
+      }
     }
 
     const { error: updateError } = await supabase
@@ -147,7 +319,7 @@ serve(async (req) => {
     if (changed) {
       try {
         await supabase.functions.invoke("notify-user", {
-          body: { watch_id: watch.id, user_id: watch.user_id },
+          body: { watch_id: watch.id, user_id: watch.user_id, action_url: actionUrl },
         });
       } catch {
         // Notification failure shouldn't fail the check
@@ -185,7 +357,9 @@ const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
 async function evaluateConditionAsync(
   condition: string,
   pageText: string,
-  fetchSuccess: boolean
+  fetchSuccess: boolean,
+  lastKnownPrice: number | null = null,
+  actionType: string = "notify"
 ): Promise<{ changed: boolean; resultText: string }> {
   if (!fetchSuccess) {
     return { changed: false, resultText: "Could not reach page" };
@@ -202,6 +376,17 @@ async function evaluateConditionAsync(
     const targetPrice = parseFloat(priceMatch[1].replace(/,/g, ""));
     const currentPrice = extractPrice(pageText);
     if (currentPrice !== null) {
+      // Sanity check: if we have a previous price, reject implausible drops (>70%)
+      if (lastKnownPrice !== null && lastKnownPrice > 0) {
+        const dropPct = (lastKnownPrice - currentPrice) / lastKnownPrice;
+        if (dropPct > 0.70) {
+          console.log(`[check-watch] Suspicious price drop: $${lastKnownPrice.toFixed(2)} → $${currentPrice.toFixed(2)} (${(dropPct * 100).toFixed(0)}% drop). Likely extraction error.`);
+          return {
+            changed: false,
+            resultText: `Current price: $${lastKnownPrice.toFixed(2)} (verifying)`,
+          };
+        }
+      }
       if (currentPrice < targetPrice) {
         return {
           changed: true,
@@ -224,6 +409,17 @@ async function evaluateConditionAsync(
     const targetPrice = parseFloat(priceAboveMatch[1].replace(/,/g, ""));
     const currentPrice = extractPrice(pageText);
     if (currentPrice !== null) {
+      // Sanity check: reject implausible jumps (>300% increase)
+      if (lastKnownPrice !== null && lastKnownPrice > 0) {
+        const jumpPct = (currentPrice - lastKnownPrice) / lastKnownPrice;
+        if (jumpPct > 3.0) {
+          console.log(`[check-watch] Suspicious price jump: $${lastKnownPrice.toFixed(2)} → $${currentPrice.toFixed(2)} (${(jumpPct * 100).toFixed(0)}% jump). Likely extraction error.`);
+          return {
+            changed: false,
+            resultText: `Current price: $${lastKnownPrice.toFixed(2)} (verifying)`,
+          };
+        }
+      }
       if (currentPrice > targetPrice) {
         return {
           changed: true,
@@ -289,7 +485,17 @@ async function evaluateConditionAsync(
     return { changed: false, resultText: `"${searchText}" not found` };
   }
 
-  // 6) AI-powered evaluation for generic/ambiguous conditions
+  // 6) For price/cart type watches that didn't match regex patterns above,
+  //    don't fall through to expensive AI — just report price if available
+  if (actionType === "price") {
+    const price = extractPrice(pageText);
+    if (price !== null) {
+      return { changed: false, resultText: `Current price: $${price.toFixed(2)}` };
+    }
+    return { changed: false, resultText: "Price not found on page" };
+  }
+
+  // 7) AI-powered evaluation for generic/ambiguous conditions
   // Use Claude Haiku to intelligently evaluate whether the condition is met
   if (ANTHROPIC_API_KEY) {
     try {
@@ -303,7 +509,7 @@ async function evaluateConditionAsync(
     }
   }
 
-  // 7) Fallback: Basic keyword check (if AI is unavailable)
+  // 8) Fallback: Basic keyword check (if AI is unavailable)
   const keywords = condLower
     .replace(/[^a-z0-9\s]/g, "")
     .split(/\s+/)
@@ -333,10 +539,12 @@ async function evaluateWithAI(
   condition: string,
   pageText: string
 ): Promise<{ changed: boolean; resultText: string } | null> {
-  // Truncate page text to avoid token limits (keep first ~4000 chars which usually has the key info)
-  const truncatedPage = pageText.length > 4000
-    ? pageText.substring(0, 4000) + "\n...[page truncated]"
-    : pageText;
+  // Aggressively strip HTML to reduce tokens: remove nav, footer, sidebar, ads, etc.
+  const cleanedPage = stripHtmlAggressive(pageText);
+  // Truncate to ~4000 chars (keep the first part which usually has key product/page info)
+  const truncatedPage = cleanedPage.length > 4000
+    ? cleanedPage.substring(0, 4000) + "\n...[page truncated]"
+    : cleanedPage;
 
   const prompt = `You are evaluating whether a specific condition has been met on a web page.
 
@@ -367,22 +575,34 @@ RULES FOR resultText:
 
 Respond ONLY with the JSON object:`;
 
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 150,
-      messages: [{ role: "user", content: prompt }],
-    }),
-  });
+  // Retry on 429/529 with exponential backoff
+  let response: Response | null = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 150,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
 
-  if (!response.ok) {
-    console.error(`[check-watch] Anthropic API error: ${response.status}`);
+    if (response.status === 429 || response.status === 529) {
+      const waitMs = Math.min(1000 * Math.pow(2, attempt), 8000);
+      console.log(`[check-watch] Rate limited (${response.status}), retrying in ${waitMs}ms (attempt ${attempt + 1}/3)`);
+      await new Promise((r) => setTimeout(r, waitMs));
+      continue;
+    }
+    break;
+  }
+
+  if (!response || !response.ok) {
+    console.error(`[check-watch] Anthropic API error: ${response?.status ?? "no response"}`);
     return null;
   }
 
@@ -421,6 +641,23 @@ Respond ONLY with the JSON object:`;
   return null;
 }
 
+// ─── Content Hash ─────────────────────────────────────────────────
+
+async function computeContentHash(text: string): Promise<string> {
+  // Normalize whitespace before hashing to avoid false "changes" from trivial formatting diffs
+  const normalized = text.replace(/\s+/g, " ").trim().substring(0, 10000);
+  const data = new TextEncoder().encode(normalized);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = new Uint8Array(hashBuffer);
+  // Use first 16 hex chars (64 bits) — collision-safe for our purpose
+  return Array.from(hashArray)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("")
+    .substring(0, 16);
+}
+
+// ─── HTML Stripping ───────────────────────────────────────────────
+
 function stripHtml(html: string): string {
   return html
     .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, " ")
@@ -435,13 +672,99 @@ function stripHtml(html: string): string {
     .trim();
 }
 
+/** Aggressive HTML strip for AI: removes nav, footer, sidebar, ads, etc. to minimize tokens */
+function stripHtmlAggressive(html: string): string {
+  return html
+    // Remove entire blocks that are typically non-content
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, " ")
+    .replace(/<noscript[^>]*>[\s\S]*?<\/noscript>/gi, " ")
+    .replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, " ")
+    .replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, " ")
+    .replace(/<header[^>]*>[\s\S]*?<\/header>/gi, " ")
+    .replace(/<aside[^>]*>[\s\S]*?<\/aside>/gi, " ")
+    .replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, " ")
+    .replace(/<svg[^>]*>[\s\S]*?<\/svg>/gi, " ")
+    // Remove HTML comments
+    .replace(/<!--[\s\S]*?-->/g, " ")
+    // Remove data URIs and long base64 strings
+    .replace(/data:[^"'\s]{50,}/g, " ")
+    // Remove inline event handlers and long attribute values
+    .replace(/\s(?:on\w+|data-[\w-]+)="[^"]*"/gi, " ")
+    // Now strip remaining tags
+    .replace(/<[^>]+>/g, " ")
+    // Decode common entities
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#\d+;/g, " ")
+    // Collapse whitespace
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function extractPrice(text: string): number | null {
-  // Strategy: look for prices near known product-price HTML patterns first,
-  // then fall back to the most common price on the page.
+  // Strategy: meta tags → JSON-LD → Amazon-specific → structured HTML → context → frequency fallback
+
+  // 0a) og:price:amount or product:price:amount meta tags (most reliable)
+  const ogPricePatterns = [
+    /property="(?:og|product):price:amount"\s+content="([^"]+)"/i,
+    /content="([^"]+)"\s+property="(?:og|product):price:amount"/i,
+  ];
+  for (const pattern of ogPricePatterns) {
+    const match = text.match(pattern);
+    if (match) {
+      const price = parseFloat(match[1].replace(/,/g, ""));
+      if (price > 0.50 && price < 100_000) return price;
+    }
+  }
+
+  // 0b) JSON-LD structured data: <script type="application/ld+json">
+  const jsonLdPattern = /<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi;
+  let jsonLdMatch;
+  while ((jsonLdMatch = jsonLdPattern.exec(text)) !== null) {
+    try {
+      const jsonData = JSON.parse(jsonLdMatch[1]);
+      const price = findPriceInJsonLd(jsonData);
+      if (price !== null && price > 0.50 && price < 100_000) return price;
+    } catch {
+      // Invalid JSON, skip
+    }
+  }
+
+  // 0c) Amazon-specific: look for the main product price in known Amazon HTML structures
+  //     These target the primary buy box price, NOT accessories/related items/warranties
+  const isAmazon = /amazon\.(com|co\.|ca|de|fr|it|es)/i.test(text);
+  if (isAmazon) {
+    const amazonPricePatterns = [
+      // "corePrice" data attribute often has the real price
+      /corePrice[^}]*"value":\s*([\d.]+)/i,
+      // Desktop buy box: <span class="a-price" data-a-color="price">...<span class="a-offscreen">$XX.XX</span>
+      /id="corePrice[^"]*"[\s\S]{0,500}?a-offscreen[^>]*>\s*\$\s*([\d,]+\.\d{2})/i,
+      // "priceblock_ourprice" or "priceblock_dealprice"
+      /id="priceblock_(?:ourprice|dealprice|saleprice)"[^>]*>\s*\$?\s*([\d,]+\.?\d{0,2})/i,
+      // "price_inside_buybox"
+      /id="price_inside_buybox"[^>]*>\s*\$?\s*([\d,]+\.?\d{0,2})/i,
+      // "tp_price_block_total_price" — whole price
+      /tp_price_block_total_price[\s\S]{0,300}?a-offscreen[^>]*>\s*\$\s*([\d,]+\.\d{2})/i,
+      // "priceToPay" specifically in the buy box area
+      /priceToPay[\s\S]{0,200}?a-offscreen[^>]*>\s*\$\s*([\d,]+\.\d{2})/i,
+      // General Amazon "a-price" with "a-offscreen" for main product (first occurrence is usually the product)
+      /a-price[^>]*data-a-color="(?:price|base)"[\s\S]{0,200}?a-offscreen[^>]*>\s*\$\s*([\d,]+\.\d{2})/i,
+    ];
+
+    for (const pattern of amazonPricePatterns) {
+      const match = text.match(pattern);
+      if (match) {
+        const price = parseFloat(match[1].replace(/,/g, ""));
+        if (price > 0.50 && price < 100_000) return price;
+      }
+    }
+  }
 
   // 1) Try structured price selectors common on e-commerce sites
-  //    Amazon: "priceAmount", "a-price-whole", "priceToPay"
-  //    Generic: "product-price", "sale-price", "current-price"
   const structuredPatterns = [
     /priceAmount[^>]*>\s*\$?\s*([\d,]+\.?\d{0,2})/i,
     /priceToPay[^>]*>.*?\$?\s*([\d,]+\.?\d{0,2})/is,
@@ -487,15 +810,45 @@ function extractPrice(text: string): number | null {
     freq.set(p, (freq.get(p) ?? 0) + 1);
   }
 
-  // Return the most frequent price
+  // Return the most frequent price, but if tied, prefer the higher price
+  // (accessories/add-ons tend to be cheaper and can pollute results)
   let bestPrice = prices[0];
   let bestCount = 0;
   for (const [price, count] of freq) {
-    if (count > bestCount) {
+    if (count > bestCount || (count === bestCount && price > bestPrice)) {
       bestCount = count;
       bestPrice = price;
     }
   }
 
   return bestPrice;
+}
+
+// deno-lint-ignore no-explicit-any
+function findPriceInJsonLd(obj: any): number | null {
+  if (Array.isArray(obj)) {
+    for (const item of obj) {
+      const result = findPriceInJsonLd(item);
+      if (result !== null) return result;
+    }
+    return null;
+  }
+  if (obj && typeof obj === "object") {
+    // Direct price field
+    if (obj.price !== undefined) {
+      const p = typeof obj.price === "number" ? obj.price : parseFloat(String(obj.price).replace(/,/g, ""));
+      if (!isNaN(p) && p > 0) return p;
+    }
+    // Check lowPrice
+    if (obj.lowPrice !== undefined) {
+      const p = typeof obj.lowPrice === "number" ? obj.lowPrice : parseFloat(String(obj.lowPrice).replace(/,/g, ""));
+      if (!isNaN(p) && p > 0) return p;
+    }
+    // Recurse into offers
+    if (obj.offers) {
+      const result = findPriceInJsonLd(obj.offers);
+      if (result !== null) return result;
+    }
+  }
+  return null;
 }
