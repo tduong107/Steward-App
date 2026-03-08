@@ -12,6 +12,9 @@ final class AuthManager {
     var displayName: String?
     var errorMessage: String?
 
+    // Shared App Group suite for communicating with the Share Extension
+    private static let sharedDefaults = UserDefaults(suiteName: "group.Steward.Steward-App")
+
     // MARK: - Initialize (check existing session)
 
     func initialize() async {
@@ -19,6 +22,9 @@ final class AuthManager {
             let session = try await SupabaseConfig.client.auth.session
             self.currentUserId = session.user.id
             self.isAuthenticated = true
+
+            // Sync auth token to App Group so Share Extension can use it
+            Self.syncTokenToAppGroup(accessToken: session.accessToken, userId: session.user.id)
 
             // Fetch display name from profile
             if let profile: ProfileDTO = try? await SupabaseConfig.client
@@ -32,6 +38,7 @@ final class AuthManager {
             }
         } catch {
             self.isAuthenticated = false
+            Self.clearTokenFromAppGroup()
         }
         self.isLoading = false
     }
@@ -55,6 +62,9 @@ final class AuthManager {
 
         self.currentUserId = session.user.id
         self.isAuthenticated = true
+
+        // Sync auth token to App Group so Share Extension can use it
+        Self.syncTokenToAppGroup(accessToken: session.accessToken, userId: session.user.id)
 
         // Save display name if Apple provides it (only on first sign-in)
         if let fullName = credential.fullName {
@@ -83,6 +93,23 @@ final class AuthManager {
         self.isAuthenticated = false
         self.currentUserId = nil
         self.displayName = nil
+        Self.clearTokenFromAppGroup()
+    }
+
+    // MARK: - App Group Token Sync (for Share Extension)
+
+    /// Writes the current auth token to shared App Group storage
+    static func syncTokenToAppGroup(accessToken: String, userId: UUID) {
+        guard let defaults = sharedDefaults else { return }
+        defaults.set(accessToken, forKey: "accessToken")
+        defaults.set(userId.uuidString, forKey: "userId")
+    }
+
+    /// Removes auth token from App Group on sign-out
+    static func clearTokenFromAppGroup() {
+        guard let defaults = sharedDefaults else { return }
+        defaults.removeObject(forKey: "accessToken")
+        defaults.removeObject(forKey: "userId")
     }
 
     // MARK: - Errors

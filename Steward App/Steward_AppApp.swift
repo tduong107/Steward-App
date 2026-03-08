@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import Supabase
 
 @main
 struct Steward_AppApp: App {
@@ -41,6 +42,7 @@ struct Steward_AppApp: App {
                 .onChange(of: scenePhase) { _, newPhase in
                     if newPhase == .active {
                         checkForSharedURL()
+                        refreshSharedToken()
                     }
                 }
                 .task {
@@ -51,6 +53,17 @@ struct Steward_AppApp: App {
                 }
         }
         .modelContainer(for: [Watch.self, ActivityItem.self])
+    }
+
+    // MARK: - Auth Token Refresh for Share Extension
+
+    /// Keeps the App Group access token fresh so the Share Extension can authenticate
+    private func refreshSharedToken() {
+        Task {
+            if let session = try? await SupabaseConfig.client.auth.session {
+                AuthManager.syncTokenToAppGroup(accessToken: session.accessToken, userId: session.user.id)
+            }
+        }
     }
 
     // MARK: - Share Extension URL Pickup

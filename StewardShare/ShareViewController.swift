@@ -3,7 +3,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 /// Share Extension entry point — presents a compact SwiftUI modal
-/// that saves the shared URL to App Groups for the main app to pick up.
+/// that lets users create a watch directly from the share sheet.
 class ShareViewController: UIViewController {
 
     override func viewDidLoad() {
@@ -18,8 +18,8 @@ class ShareViewController: UIViewController {
         let hostingController = UIHostingController(
             rootView: ShareExtensionView(
                 attachments: attachments,
-                onComplete: { [weak self] url in
-                    self?.saveAndDismiss(url: url)
+                onComplete: { [weak self] _ in
+                    self?.extensionContext?.completeRequest(returningItems: nil)
                 },
                 onCancel: { [weak self] in
                     self?.close()
@@ -43,14 +43,6 @@ class ShareViewController: UIViewController {
     }
 
     // MARK: - Actions
-
-    private func saveAndDismiss(url: String) {
-        if let defaults = UserDefaults(suiteName: "group.Steward.Steward-App") {
-            defaults.set(url, forKey: "pendingSharedURL")
-            defaults.set(Date().timeIntervalSince1970, forKey: "pendingSharedURLTimestamp")
-        }
-        extensionContext?.completeRequest(returningItems: nil)
-    }
 
     private func close() {
         extensionContext?.cancelRequest(
