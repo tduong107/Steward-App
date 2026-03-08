@@ -18,10 +18,13 @@ struct ShareExtensionView: View {
     @State private var sharedURL: String = ""
     @State private var sharedText: String = ""   // context text shared alongside URL
     @State private var pageTitle: String?
+    @State private var rewriteResult: RewriteResult?   // URL rewriting for known sites
     @State private var phase: Phase = .extracting
     @State private var chatMessages: [ChatMessage] = []
     @State private var userInput: String = ""
     @State private var isSendingChat = false
+    @State private var capturedCookies: [SerializedCookie]?  // cookies from WebView login
+    @State private var cookieDomain: String?
     @FocusState private var isInputFocused: Bool
 
     enum Phase: Equatable {
@@ -29,6 +32,7 @@ struct ShareExtensionView: View {
         case ready
         case analyzing
         case customChat          // AI conversational flow
+        case loginWebView(URL)   // WebView for auth cookie capture
         case watchCreated(WatchInfo)
         case saving(WatchInfo)
         case success(WatchInfo)
@@ -86,6 +90,20 @@ struct ShareExtensionView: View {
 
                 case .customChat:
                     customChatContent
+
+                case .loginWebView(let url):
+                    LoginWebView(
+                        url: url,
+                        targetDomain: displayHost,
+                        onCookiesCaptured: { cookies in
+                            capturedCookies = cookies
+                            cookieDomain = displayHost
+                            withAnimation { phase = .ready }
+                        },
+                        onDismiss: {
+                            withAnimation { phase = .ready }
+                        }
+                    )
 
                 case .watchCreated(let info):
                     watchProposalContent(info)
@@ -170,17 +188,62 @@ struct ShareExtensionView: View {
                 Spacer()
             }
 
-            // Auth warning
-            if isAuthWalled {
+            // URL rewritten for known site
+            if rewriteResult != nil {
                 HStack(spacing: 6) {
-                    Image(systemName: "lock.fill")
+                    Image(systemName: "checkmark.shield.fill")
                         .font(.system(size: 10))
-                    Text("This site requires login — Steward can only check public pages")
+                    Text("Public page — no login needed")
                         .font(.system(size: 11))
                 }
-                .foregroundStyle(.orange)
+                .foregroundStyle(mintGreen)
                 .padding(.horizontal, 4)
                 .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            // Auth-walled site with cookies captured
+            else if isAuthWalled && capturedCookies != nil {
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.shield.fill")
+                        .font(.system(size: 10))
+                    Text("Signed in — Steward can check this page")
+                        .font(.system(size: 11))
+                }
+                .foregroundStyle(mintGreen)
+                .padding(.horizontal, 4)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            // Auth-walled site, no cookies yet
+            else if isAuthWalled {
+                VStack(spacing: 8) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 10))
+                        Text("This site requires login to check content")
+                            .font(.system(size: 11))
+                    }
+                    .foregroundStyle(.orange)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    Button {
+                        if let url = URL(string: sharedURL) {
+                            withAnimation { phase = .loginWebView(url) }
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "person.crop.circle.badge.checkmark")
+                                .font(.system(size: 12))
+                            Text("Sign in to watch")
+                                .font(.system(size: 13, weight: .medium))
+                        }
+                        .foregroundStyle(mintGreen)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 7)
+                        .background(accentGreen.opacity(0.2))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(.horizontal, 4)
             }
         }
         .padding(12)
@@ -569,11 +632,16 @@ struct ShareExtensionView: View {
         URL(string: sharedURL)?.host ?? sharedURL
     }
 
-    /// Whether this URL likely requires login to access content
+    /// Whether this URL likely requires login to access content.
+    /// Sites handled by URLRewriter are NOT considered auth-walled (they have public pages).
     private var isAuthWalled: Bool {
+        // If URLRewriter handled it, it's been rewritten to a public page
+        if rewriteResult != nil { return false }
+
         let host = displayHost.lowercased()
         // Domains known to require login for meaningful content
-        let authDomains = ["resy.com", "opentable.com", "yelp.com/reservations"]
+        // NOTE: resy.com, opentable.com, ticketmaster.com are handled by URLRewriter
+        let authDomains = ["yelp.com/reservations"]
         return authDomains.contains(where: { host.contains($0) })
     }
 
@@ -591,8 +659,16 @@ struct ShareExtensionView: View {
         if !sharedText.isEmpty {
             parts.append("Shared text: \(sharedText)")
         }
+        // Include rich context from URL rewriter (restaurant name, date, event, etc.)
+        if let rewrite = rewriteResult {
+            parts.append(rewrite.extraContext)
+        }
         if isAuthWalled {
-            parts.append("NOTE: This page requires user login. Steward cannot access logged-in content, so the watch should focus on publicly accessible aspects of this URL, or warn the user about this limitation.")
+            if capturedCookies != nil {
+                parts.append("NOTE: User has signed in. Steward has session cookies and can check this page's logged-in content.")
+            } else {
+                parts.append("NOTE: This page requires user login. Steward cannot access logged-in content, so the watch should focus on publicly accessible aspects of this URL, or warn the user about this limitation.")
+            }
         }
         return parts.joined(separator: "\n")
     }
@@ -675,6 +751,25 @@ struct ShareExtensionView: View {
         guard !sharedURL.isEmpty else {
             onCancel()
             return
+        }
+
+        // Try URL rewriting for known sites (Resy, OpenTable, Ticketmaster)
+        if let result = URLRewriter.rewrite(sharedURL) {
+            rewriteResult = result
+            if result.wasRewritten {
+                sharedURL = result.rewrittenURL  // Use the public URL for monitoring
+            }
+            // Use the rewriter's site name as page title if we don't have one
+            if pageTitle == nil {
+                // Extract name from extraContext (e.g. "Restaurant: Carbone")
+                let lines = result.extraContext.components(separatedBy: "\n")
+                for line in lines {
+                    if line.hasPrefix("Restaurant:") || line.hasPrefix("Event:") {
+                        pageTitle = line.components(separatedBy: ": ").dropFirst().joined(separator: ": ")
+                        break
+                    }
+                }
+            }
         }
 
         await fetchPageTitle()
@@ -956,6 +1051,14 @@ struct ShareExtensionView: View {
             watchURL = "https://\(watchURL)"
         }
 
+        // Serialize captured cookies if present
+        var cookiesJSON: String?
+        if let cookies = capturedCookies {
+            if let data = try? JSONEncoder().encode(cookies) {
+                cookiesJSON = String(data: data, encoding: .utf8)
+            }
+        }
+
         let dto = ShareWatchDTO(
             id: watchId,
             user_id: userId,
@@ -971,7 +1074,10 @@ struct ShareExtensionView: View {
             notify_channels: "push",
             triggered: false,
             image_url: info.imageURL,
-            created_at: now
+            created_at: now,
+            site_cookies: cookiesJSON,
+            cookie_domain: cookieDomain,
+            cookie_status: cookiesJSON != nil ? "active" : nil
         )
 
         do {

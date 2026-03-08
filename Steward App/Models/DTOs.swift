@@ -23,6 +23,11 @@ struct WatchDTO: Codable, Identifiable, Sendable {
     var actionURL: String?
     var createdAt: Date
 
+    // Cookie fields for auth-walled sites
+    var siteCookies: String?
+    var cookieDomain: String?
+    var cookieStatus: String?
+
     enum CodingKeys: String, CodingKey {
         case id
         case userId = "user_id"
@@ -39,6 +44,9 @@ struct WatchDTO: Codable, Identifiable, Sendable {
         case imageURL = "image_url"
         case actionURL = "action_url"
         case createdAt = "created_at"
+        case siteCookies = "site_cookies"
+        case cookieDomain = "cookie_domain"
+        case cookieStatus = "cookie_status"
     }
 }
 

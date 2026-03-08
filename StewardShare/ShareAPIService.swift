@@ -151,4 +151,9 @@ struct ShareWatchDTO: Codable {
     let triggered: Bool
     let image_url: String?
     let created_at: String
+
+    // Cookie fields for auth-walled sites
+    let site_cookies: String?     // JSON-serialized cookie array
+    let cookie_domain: String?    // Domain the cookies belong to
+    let cookie_status: String?    // "active" or "expired"
 }
