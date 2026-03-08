@@ -535,28 +535,11 @@ async function evaluateConditionAsync(
 
 // ─── AI-Powered Condition Evaluation ──────────────────────────────
 
-async function evaluateWithAI(
-  condition: string,
-  pageText: string
-): Promise<{ changed: boolean; resultText: string } | null> {
-  // Aggressively strip HTML to reduce tokens: remove nav, footer, sidebar, ads, etc.
-  const cleanedPage = stripHtmlAggressive(pageText);
-  // Truncate to ~4000 chars (keep the first part which usually has key product/page info)
-  const truncatedPage = cleanedPage.length > 4000
-    ? cleanedPage.substring(0, 4000) + "\n...[page truncated]"
-    : cleanedPage;
+// Static evaluation instructions — cached across all watch checks to save tokens
+const EVALUATION_SYSTEM_PROMPT = `You are evaluating whether a specific condition has been met on a web page.
+You will receive the user's watch condition and the page content. Determine if the condition is CLEARLY met.
 
-  const prompt = `You are evaluating whether a specific condition has been met on a web page.
-
-CONDITION THE USER IS WATCHING FOR:
-"${condition}"
-
-PAGE CONTENT (plain text, may be truncated):
-${truncatedPage}
-
-INSTRUCTIONS:
-1. Analyze the page content carefully and determine if the user's condition has CLEARLY been met.
-2. Respond with EXACTLY this JSON format, nothing else:
+Respond with EXACTLY this JSON format, nothing else:
 {"changed": true/false, "resultText": "A short, specific description of what you found"}
 
 CRITICAL RULES:
@@ -573,7 +556,24 @@ RULES FOR resultText:
 - If the condition is NOT met, briefly state the current status (e.g., "Still showing $349.99", "No restock yet")
 - Write in a friendly, natural tone
 
-Respond ONLY with the JSON object:`;
+Respond ONLY with the JSON object.`;
+
+async function evaluateWithAI(
+  condition: string,
+  pageText: string
+): Promise<{ changed: boolean; resultText: string } | null> {
+  // Aggressively strip HTML to reduce tokens: remove nav, footer, sidebar, ads, etc.
+  const cleanedPage = stripHtmlAggressive(pageText);
+  // Truncate to ~4000 chars (keep the first part which usually has key product/page info)
+  const truncatedPage = cleanedPage.length > 4000
+    ? cleanedPage.substring(0, 4000) + "\n...[page truncated]"
+    : cleanedPage;
+
+  const userMessage = `CONDITION THE USER IS WATCHING FOR:
+"${condition}"
+
+PAGE CONTENT (plain text, may be truncated):
+${truncatedPage}`;
 
   // Retry on 429/529 with exponential backoff
   let response: Response | null = null;
@@ -584,11 +584,19 @@ Respond ONLY with the JSON object:`;
         "Content-Type": "application/json",
         "x-api-key": ANTHROPIC_API_KEY,
         "anthropic-version": "2023-06-01",
+        "anthropic-beta": "prompt-caching-2024-07-31",
       },
       body: JSON.stringify({
         model: "claude-haiku-4-5-20251001",
         max_tokens: 150,
-        messages: [{ role: "user", content: prompt }],
+        system: [
+          {
+            type: "text",
+            text: EVALUATION_SYSTEM_PROMPT,
+            cache_control: { type: "ephemeral" },
+          },
+        ],
+        messages: [{ role: "user", content: userMessage }],
       }),
     });
 

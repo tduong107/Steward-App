@@ -101,6 +101,15 @@ Examples:
 - After analyzing a screenshot: [SUGGESTIONS]Watch for price drop|Alert when restocked|Track any changes[/SUGGESTIONS]
 - Keep each option short (2-6 words max), natural, and relevant to what you just asked
 
+PRICE CONFIRMATION (for price watches):
+When setting up a price watch, ALWAYS verify the current price before proposing. Include this marker with the URL:
+[FETCH_PRICE]https://example.com/product[/FETCH_PRICE]
+The server will fetch the page and replace this with the actual current price (e.g. "Currently $59.99 on Amazon").
+Write your message so it flows naturally around this marker, for example:
+"Great, I'll watch that for you! [FETCH_PRICE]https://a.co/d/abc123[/FETCH_PRICE] I'll alert you when it drops below $50. Does the current price look right?"
+This lets the user verify the price Steward is seeing. If they say it's wrong, ask them to provide the correct current price and note it.
+IMPORTANT: Only use [FETCH_PRICE] for price-related watches. Do not use it for stock checks, booking watches, etc.
+
 PROPOSING A WATCH:
 When you have enough info (URL + condition + action) but the user hasn't confirmed yet, propose what you'll set up and include this marker:
 [PROPOSE_WATCH]
@@ -115,6 +124,20 @@ After the user confirms (says "yes", "looks good", "do it", "start watching", et
 After creating a watch, include [SUGGESTIONS] with follow-up options like: [SUGGESTIONS]Watch something else|Adjust this watch|That's all for now[/SUGGESTIONS]
 
 Valid actionType values: "cart" (add to cart), "price" (price monitoring), "book" (book a slot), "form" (submit a form), "notify" (just alert the user)
+
+ACTION TYPE GUIDE — pick based on user intent:
+- "price": Monitor price, open purchase page at target. Use for: flights, hotels, product price drops, deal hunting.
+- "cart": Watch for restock/availability, open product page or auto-add to cart. Use for: limited drops, restocks, size availability, sneakers, electronics.
+- "book": Watch for open slots/tickets, open booking page. Use for: appointments (DMV, doctor), restaurant reservations, concert tickets, event tickets, sports tickets.
+- "form": Watch for form availability, open form page. Use for: applications, registrations, enrollment windows.
+- "notify": Just notify, no action link. Use for: general content changes, news monitoring, page updates.
+
+Match actionLabel to the action type:
+- price: "Open purchase page at target price" or "Buy when price drops to $X"
+- cart: "Open product page when restocked" or "Add to cart when available"
+- book: "Open booking page when available" or "Book when slot opens"
+- form: "Open form when available"
+- notify: "Notify when changed"
 
 ENDING A CONVERSATION:
 When the user says something like "that's all", "I'm done", "thanks", "no more", "nothing else", or selects a suggestion like "That's all for now":
@@ -205,33 +228,54 @@ serve(async (req) => {
       );
     }
 
-    // Forward to Anthropic API
-    const anthropicResponse = await fetch(
-      "https://api.anthropic.com/v1/messages",
-      {
-        method: "POST",
-        headers: {
-          "x-api-key": ANTHROPIC_API_KEY,
-          "anthropic-version": "2023-06-01",
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          model: MODEL,
-          max_tokens: MAX_TOKENS,
-          system: SYSTEM_PROMPT,
-          messages,
-        }),
-      }
-    );
+    // Forward to Anthropic API (with retry on 429/529)
+    const MAX_RETRIES = 3;
+    let anthropicResponse: Response | null = null;
 
-    if (!anthropicResponse.ok) {
-      const errorText = await anthropicResponse.text();
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      anthropicResponse = await fetch(
+        "https://api.anthropic.com/v1/messages",
+        {
+          method: "POST",
+          headers: {
+            "x-api-key": ANTHROPIC_API_KEY,
+            "anthropic-version": "2023-06-01",
+            "anthropic-beta": "prompt-caching-2024-07-31",
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            model: MODEL,
+            max_tokens: MAX_TOKENS,
+            system: [
+              {
+                type: "text",
+                text: SYSTEM_PROMPT,
+                cache_control: { type: "ephemeral" },
+              },
+            ],
+            messages,
+          }),
+        }
+      );
+
+      if (anthropicResponse.status === 429 || anthropicResponse.status === 529) {
+        const waitMs = Math.min(1000 * Math.pow(2, attempt), 8000); // 1s, 2s, 4s
+        console.log(`[ai-chat] Rate limited (${anthropicResponse.status}), retrying in ${waitMs}ms (attempt ${attempt + 1}/${MAX_RETRIES})`);
+        await new Promise((r) => setTimeout(r, waitMs));
+        continue;
+      }
+      break;
+    }
+
+    if (!anthropicResponse || !anthropicResponse.ok) {
+      const errorText = anthropicResponse ? await anthropicResponse.text() : "No response";
+      const status = anthropicResponse?.status ?? 500;
       console.error(
-        `[ai-chat] Anthropic HTTP ${anthropicResponse.status}: ${errorText}`
+        `[ai-chat] Anthropic HTTP ${status}: ${errorText}`
       );
       return new Response(
         JSON.stringify({
-          error: `AI service error (${anthropicResponse.status})`,
+          error: `AI service error (${status})`,
         }),
         {
           status: 502,
@@ -246,6 +290,11 @@ serve(async (req) => {
     // Post-process: replace [PRODUCT_LINKS] search queries with real shopping results
     if (text.includes("[PRODUCT_LINKS]")) {
       text = await enrichProductLinks(text);
+    }
+
+    // Post-process: replace [FETCH_PRICE] with actual live price from the URL
+    if (text.includes("[FETCH_PRICE]")) {
+      text = await enrichPriceCheck(text);
     }
 
     return new Response(JSON.stringify({ text }), {
@@ -381,4 +430,172 @@ function generateFallbackLinks(query: string): string[] {
       imageURL: null,
     }),
   ];
+}
+
+// ────────────────────────────────────────────────────────────────
+// Live Price Check: Replaces [FETCH_PRICE] blocks with real price
+// ────────────────────────────────────────────────────────────────
+
+async function enrichPriceCheck(responseText: string): Promise<string> {
+  const match = responseText.match(
+    /\[FETCH_PRICE\]([\s\S]*?)\[\/FETCH_PRICE\]/
+  );
+  if (!match) return responseText;
+
+  let url = match[1].trim();
+  if (!url.match(/^https?:\/\//i)) {
+    url = `https://${url}`;
+  }
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      },
+      redirect: "follow",
+    });
+
+    if (!response.ok) {
+      return responseText.replace(
+        /\[FETCH_PRICE\][\s\S]*?\[\/FETCH_PRICE\]/,
+        "*(Couldn't reach the page to verify the price)*"
+      );
+    }
+
+    const html = await response.text();
+    const price = extractPriceFromHtml(html);
+    const hostname = new URL(url).hostname.replace("www.", "");
+
+    if (price !== null) {
+      const replacement = `Currently **$${price.toFixed(2)}** on ${hostname}.`;
+      return responseText.replace(
+        /\[FETCH_PRICE\][\s\S]*?\[\/FETCH_PRICE\]/,
+        replacement
+      );
+    } else {
+      return responseText.replace(
+        /\[FETCH_PRICE\][\s\S]*?\[\/FETCH_PRICE\]/,
+        "*(Couldn't extract the current price from the page — can you tell me what you're seeing?)*"
+      );
+    }
+  } catch (err) {
+    console.error(`[ai-chat] Price fetch error: ${err.message}`);
+    return responseText.replace(
+      /\[FETCH_PRICE\][\s\S]*?\[\/FETCH_PRICE\]/,
+      "*(Couldn't load the page to check the price)*"
+    );
+  }
+}
+
+// Streamlined price extraction for chat context (mirrors check-watch logic)
+function extractPriceFromHtml(html: string): number | null {
+  // 1) OG / product meta tags (most reliable)
+  const ogPatterns = [
+    /property="(?:og|product):price:amount"\s+content="([^"]+)"/i,
+    /content="([^"]+)"\s+property="(?:og|product):price:amount"/i,
+  ];
+  for (const p of ogPatterns) {
+    const m = html.match(p);
+    if (m) {
+      const price = parseFloat(m[1].replace(/,/g, ""));
+      if (price > 0.50 && price < 100_000) return price;
+    }
+  }
+
+  // 2) JSON-LD structured data
+  const jsonLdPattern = /<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi;
+  let jsonLdMatch;
+  while ((jsonLdMatch = jsonLdPattern.exec(html)) !== null) {
+    try {
+      const data = JSON.parse(jsonLdMatch[1]);
+      const price = findPriceInJsonLdChat(data);
+      if (price !== null && price > 0.50 && price < 100_000) return price;
+    } catch { /* skip */ }
+  }
+
+  // 3) Amazon-specific selectors
+  const isAmazon = /amazon\.(com|co\.|ca|de|fr|it|es)/i.test(html);
+  if (isAmazon) {
+    const amazonPatterns = [
+      /corePrice[^}]*"value":\s*([\d.]+)/i,
+      /id="corePrice[^"]*"[\s\S]{0,500}?a-offscreen[^>]*>\s*\$\s*([\d,]+\.\d{2})/i,
+      /id="priceblock_(?:ourprice|dealprice|saleprice)"[^>]*>\s*\$?\s*([\d,]+\.?\d{0,2})/i,
+      /id="price_inside_buybox"[^>]*>\s*\$?\s*([\d,]+\.?\d{0,2})/i,
+      /tp_price_block_total_price[\s\S]{0,300}?a-offscreen[^>]*>\s*\$\s*([\d,]+\.\d{2})/i,
+      /priceToPay[\s\S]{0,200}?a-offscreen[^>]*>\s*\$\s*([\d,]+\.\d{2})/i,
+    ];
+    for (const p of amazonPatterns) {
+      const m = html.match(p);
+      if (m) {
+        const price = parseFloat(m[1].replace(/,/g, ""));
+        if (price > 0.50 && price < 100_000) return price;
+      }
+    }
+  }
+
+  // 4) Generic e-commerce selectors
+  const structuredPatterns = [
+    /priceAmount[^>]*>\s*\$?\s*([\d,]+\.?\d{0,2})/i,
+    /product[_-]?price[^>]*>\s*\$?\s*([\d,]+\.?\d{0,2})/i,
+    /sale[_-]?price[^>]*>\s*\$?\s*([\d,]+\.?\d{0,2})/i,
+    /current[_-]?price[^>]*>\s*\$?\s*([\d,]+\.?\d{0,2})/i,
+  ];
+  for (const p of structuredPatterns) {
+    const m = html.match(p);
+    if (m) {
+      const price = parseFloat(m[1].replace(/,/g, ""));
+      if (price > 0.50 && price < 100_000) return price;
+    }
+  }
+
+  // 5) Fallback: most frequent $X.XX on the page, preferring higher prices
+  const pricePattern = /\$([\d,]+\.\d{2})/g;
+  const matches = [...html.matchAll(pricePattern)];
+  const prices = matches
+    .map((m) => parseFloat(m[1].replace(/,/g, "")))
+    .filter((p) => p > 0.50 && p < 100_000);
+
+  if (prices.length === 0) return null;
+
+  const freq = new Map<number, number>();
+  for (const p of prices) {
+    freq.set(p, (freq.get(p) ?? 0) + 1);
+  }
+
+  let bestPrice = prices[0];
+  let bestCount = 0;
+  for (const [price, count] of freq) {
+    if (count > bestCount || (count === bestCount && price > bestPrice)) {
+      bestCount = count;
+      bestPrice = price;
+    }
+  }
+  return bestPrice;
+}
+
+// deno-lint-ignore no-explicit-any
+function findPriceInJsonLdChat(obj: any): number | null {
+  if (Array.isArray(obj)) {
+    for (const item of obj) {
+      const r = findPriceInJsonLdChat(item);
+      if (r !== null) return r;
+    }
+    return null;
+  }
+  if (obj && typeof obj === "object") {
+    if (obj.price !== undefined) {
+      const p = typeof obj.price === "number" ? obj.price : parseFloat(String(obj.price).replace(/,/g, ""));
+      if (!isNaN(p) && p > 0) return p;
+    }
+    if (obj.lowPrice !== undefined) {
+      const p = typeof obj.lowPrice === "number" ? obj.lowPrice : parseFloat(String(obj.lowPrice).replace(/,/g, ""));
+      if (!isNaN(p) && p > 0) return p;
+    }
+    if (obj.offers) {
+      const r = findPriceInJsonLdChat(obj.offers);
+      if (r !== null) return r;
+    }
+  }
+  return null;
 }
