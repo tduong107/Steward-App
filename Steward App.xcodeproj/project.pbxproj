@@ -59,11 +59,21 @@
 		F0F3F8C42F580D570016A83A /* Steward AppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Steward AppUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		F0C58FB62F5D6B0A00F8DCE9 /* Exceptions for "StewardShare" folder in "StewardShare" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = F0C58FA52F5D6A0A00F8DCE9 /* StewardShare */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		F0C58FA72F5D6A0A00F8DCE9 /* StewardShare */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				F0C58FB62F5D6B0A00F8DCE9 /* PBXFileSystemSynchronizedBuildFileExceptionSet */,
+				F0C58FB62F5D6B0A00F8DCE9 /* Exceptions for "StewardShare" folder in "StewardShare" target */,
 			);
 			path = StewardShare;
 			sourceTree = "<group>";
@@ -84,16 +94,6 @@
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
-
-/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		F0C58FB62F5D6B0A00F8DCE9 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Info.plist,
-			);
-			target = F0C58FA52F5D6A0A00F8DCE9 /* StewardShare */;
-		};
-/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		F0C58FA32F5D6A0A00F8DCE9 /* Frameworks */ = {

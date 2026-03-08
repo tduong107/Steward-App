@@ -5,9 +5,9 @@ import UniformTypeIdentifiers
 ///
 /// Flow:
 /// 1. Extract URL from shared content
-/// 2. User picks watch type (Price Drop, Restock, Any Changes)
+/// 2. User picks watch type (Price Drop, Restock, Any Changes) or enters a custom prompt
 /// 3. AI analyzes the URL and creates the watch
-/// 4. Watch saved to Supabase → success → dismiss
+/// 4. Watch saved to Supabase -> success -> dismiss
 struct ShareExtensionView: View {
     let attachments: [NSItemProvider]
     let onComplete: (String) -> Void
@@ -18,11 +18,16 @@ struct ShareExtensionView: View {
     @State private var sharedURL: String = ""
     @State private var pageTitle: String?
     @State private var phase: Phase = .extracting
+    @State private var chatMessages: [ChatMessage] = []
+    @State private var userInput: String = ""
+    @State private var isSendingChat = false
+    @FocusState private var isInputFocused: Bool
 
     enum Phase: Equatable {
         case extracting
         case ready
         case analyzing
+        case customChat          // AI conversational flow
         case watchCreated(WatchInfo)
         case saving(WatchInfo)
         case success(WatchInfo)
@@ -39,10 +44,19 @@ struct ShareExtensionView: View {
         let imageURL: String?
     }
 
+    struct ChatMessage: Identifiable, Equatable {
+        let id = UUID()
+        let role: Role
+        let text: String
+        enum Role: Equatable { case user, assistant }
+    }
+
     // Steward colors
     private let accentGreen = Color(red: 0.165, green: 0.361, blue: 0.271)
+    private let mintGreen = Color(red: 0.431, green: 0.906, blue: 0.718)  // #6EE7B7
     private let cardBg = Color(red: 0.12, green: 0.13, blue: 0.12)
     private let darkBg = Color(red: 0.07, green: 0.08, blue: 0.07)
+    private let inputBg = Color(red: 0.15, green: 0.16, blue: 0.15)
 
     // MARK: - Body
 
@@ -51,12 +65,14 @@ struct ShareExtensionView: View {
             darkBg.ignoresSafeArea()
 
             VStack(spacing: 0) {
-                // ── Header ──
+                // -- Header --
                 header
+                    .padding(.top, 12)
 
-                Divider().overlay(Color.white.opacity(0.1))
+                Divider()
+                    .overlay(Color.white.opacity(0.08))
 
-                // ── Content ──
+                // -- Content --
                 switch phase {
                 case .extracting:
                     loadingContent(message: "Reading shared content...")
@@ -66,6 +82,9 @@ struct ShareExtensionView: View {
 
                 case .analyzing:
                     loadingContent(message: "Analyzing page...")
+
+                case .customChat:
+                    customChatContent
 
                 case .watchCreated(let info):
                     watchProposalContent(info)
@@ -92,19 +111,35 @@ struct ShareExtensionView: View {
     // MARK: - Header
 
     private var header: some View {
-        HStack {
-            Button("Cancel") { onCancel() }
-                .font(.system(size: 15))
-                .foregroundStyle(.gray)
+        HStack(spacing: 10) {
+            // App icon + title
+            HStack(spacing: 8) {
+                Image("StewardIcon", bundle: .main)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 30, height: 30)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+
+                Text("Steward")
+                    .font(.system(size: 18, weight: .semibold, design: .serif))
+                    .foregroundStyle(.white)
+            }
+
             Spacer()
-            Text("Steward")
-                .font(.system(size: 17, weight: .semibold, design: .serif))
-                .foregroundStyle(.white)
-            Spacer()
-            Color.clear.frame(width: 60)
+
+            // Close button
+            Button {
+                onCancel()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.gray)
+                    .frame(width: 28, height: 28)
+                    .background(Color.white.opacity(0.1))
+                    .clipShape(Circle())
+            }
         }
         .padding(.horizontal, 20)
-        .padding(.top, 16)
         .padding(.bottom, 12)
     }
 
@@ -124,10 +159,12 @@ struct ShareExtensionView: View {
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(.white)
                     .lineLimit(1)
-                Text(displayHost)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.gray)
-                    .lineLimit(1)
+                if pageTitle != nil {
+                    Text(displayHost)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.gray)
+                        .lineLimit(1)
+                }
             }
             Spacer()
         }
@@ -140,27 +177,85 @@ struct ShareExtensionView: View {
     // MARK: - Ready Content (pick watch type)
 
     private var readyContent: some View {
-        VStack(spacing: 16) {
-            urlCard
-                .padding(.top, 16)
+        ScrollView {
+            VStack(spacing: 14) {
+                urlCard
+                    .padding(.top, 14)
 
-            Text("What should I watch for?")
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(.white.opacity(0.7))
-                .padding(.top, 4)
+                Text("What should I watch for?")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.6))
+                    .padding(.top, 2)
 
-            VStack(spacing: 10) {
-                watchTypeButton(icon: "tag.fill", label: "Price Drop", type: "price")
-                watchTypeButton(icon: "cart.fill", label: "Back in Stock", type: "cart")
-                watchTypeButton(icon: "bell.fill", label: "Any Changes", type: "notify")
+                // Preset watch types
+                VStack(spacing: 8) {
+                    watchTypeButton(icon: "tag.fill", label: "Price Drop", subtitle: "Get notified when price decreases", type: "price")
+                    watchTypeButton(icon: "cart.fill", label: "Back in Stock", subtitle: "Know when it's available again", type: "cart")
+                    watchTypeButton(icon: "bell.fill", label: "Any Changes", subtitle: "Monitor for any page updates", type: "notify")
+                }
+                .padding(.horizontal, 20)
+
+                // Divider with "or"
+                HStack(spacing: 12) {
+                    Rectangle()
+                        .fill(Color.white.opacity(0.08))
+                        .frame(height: 1)
+                    Text("or")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.gray)
+                    Rectangle()
+                        .fill(Color.white.opacity(0.08))
+                        .frame(height: 1)
+                }
+                .padding(.horizontal, 32)
+                .padding(.vertical, 2)
+
+                // Custom AI option
+                Button {
+                    withAnimation(.spring(response: 0.3)) {
+                        phase = .customChat
+                        chatMessages = [
+                            ChatMessage(
+                                role: .assistant,
+                                text: "Tell me what you'd like to watch for on this page. For example: \"notify me when tickets go on sale\" or \"watch for new sizes.\""
+                            )
+                        ]
+                    }
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 14))
+                            .foregroundStyle(mintGreen)
+                            .frame(width: 24)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text("Something else...")
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundStyle(.white)
+                            Text("Describe what you want to watch")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.gray)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.gray)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(cardBg)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .strokeBorder(mintGreen.opacity(0.2), lineWidth: 1)
+                    )
+                }
+                .padding(.horizontal, 20)
             }
-            .padding(.horizontal, 20)
-
-            Spacer()
+            .padding(.bottom, 20)
         }
     }
 
-    private func watchTypeButton(icon: String, label: String, type: String) -> some View {
+    private func watchTypeButton(icon: String, label: String, subtitle: String, type: String) -> some View {
         Button {
             Task { await analyzeAndCreateWatch(watchType: type) }
         } label: {
@@ -169,28 +264,141 @@ struct ShareExtensionView: View {
                     .font(.system(size: 14))
                     .foregroundStyle(accentGreen)
                     .frame(width: 24)
-                Text(label)
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(.white)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(label)
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(.white)
+                    Text(subtitle)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.gray)
+                }
                 Spacer()
                 Image(systemName: "chevron.right")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.gray)
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 14)
+            .padding(.vertical, 12)
             .background(cardBg)
             .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+    }
+
+    // MARK: - Custom Chat Content
+
+    private var customChatContent: some View {
+        VStack(spacing: 0) {
+            // Compact URL card
+            urlCard
+                .padding(.top, 10)
+
+            // Chat messages
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(spacing: 10) {
+                        ForEach(chatMessages) { msg in
+                            chatBubble(msg)
+                                .id(msg.id)
+                        }
+
+                        if isSendingChat {
+                            HStack(spacing: 6) {
+                                ProgressView()
+                                    .tint(mintGreen)
+                                    .scaleEffect(0.7)
+                                Text("Thinking...")
+                                    .font(.system(size: 13))
+                                    .foregroundStyle(.gray)
+                                Spacer()
+                            }
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 4)
+                            .id("typing")
+                        }
+                    }
+                    .padding(.vertical, 12)
+                }
+                .onChange(of: chatMessages.count) { _, _ in
+                    withAnimation {
+                        proxy.scrollTo(chatMessages.last?.id, anchor: .bottom)
+                    }
+                }
+                .onChange(of: isSendingChat) { _, sending in
+                    if sending {
+                        withAnimation {
+                            proxy.scrollTo("typing", anchor: .bottom)
+                        }
+                    }
+                }
+            }
+
+            Divider()
+                .overlay(Color.white.opacity(0.08))
+
+            // Input bar
+            chatInputBar
+        }
+    }
+
+    private func chatBubble(_ message: ChatMessage) -> some View {
+        HStack {
+            if message.role == .user { Spacer(minLength: 48) }
+
+            Text(message.text)
+                .font(.system(size: 14))
+                .foregroundStyle(message.role == .user ? .white : .white.opacity(0.9))
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(
+                    message.role == .user
+                        ? accentGreen
+                        : cardBg
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+
+            if message.role == .assistant { Spacer(minLength: 48) }
+        }
+        .padding(.horizontal, 20)
+    }
+
+    private var chatInputBar: some View {
+        HStack(spacing: 10) {
+            TextField("Describe what to watch...", text: $userInput)
+                .font(.system(size: 15))
+                .foregroundStyle(.white)
+                .tint(mintGreen)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(inputBg)
+                .clipShape(RoundedRectangle(cornerRadius: 20))
+                .focused($isInputFocused)
+
+            Button {
+                sendChatMessage()
+            } label: {
+                Image(systemName: "arrow.up.circle.fill")
+                    .font(.system(size: 30))
+                    .foregroundStyle(
+                        userInput.trimmingCharacters(in: .whitespaces).isEmpty || isSendingChat
+                            ? Color.gray.opacity(0.4)
+                            : mintGreen
+                    )
+            }
+            .disabled(userInput.trimmingCharacters(in: .whitespaces).isEmpty || isSendingChat)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                isInputFocused = true
+            }
         }
     }
 
     // MARK: - Watch Proposal Content
 
     private func watchProposalContent(_ info: WatchInfo) -> some View {
-        VStack(spacing: 16) {
-            urlCard
-                .padding(.top, 16)
-
+        VStack(spacing: 14) {
             // Watch preview card
             VStack(spacing: 8) {
                 Text(info.emoji)
@@ -220,6 +428,7 @@ struct ShareExtensionView: View {
             .background(cardBg)
             .clipShape(RoundedRectangle(cornerRadius: 14))
             .padding(.horizontal, 20)
+            .padding(.top, 16)
 
             Spacer()
 
@@ -250,7 +459,7 @@ struct ShareExtensionView: View {
         VStack(spacing: 16) {
             Spacer()
             ProgressView()
-                .tint(accentGreen)
+                .tint(mintGreen)
                 .scaleEffect(1.2)
             Text(message)
                 .font(.system(size: 14))
@@ -265,7 +474,7 @@ struct ShareExtensionView: View {
             Text(info.emoji)
                 .font(.system(size: 40))
             ProgressView()
-                .tint(accentGreen)
+                .tint(mintGreen)
             Text("Creating watch...")
                 .font(.system(size: 14))
                 .foregroundStyle(.gray)
@@ -282,7 +491,7 @@ struct ShareExtensionView: View {
                     .frame(width: 72, height: 72)
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 48))
-                    .foregroundStyle(accentGreen)
+                    .foregroundStyle(mintGreen)
             }
             Text("Watching!")
                 .font(.system(size: 20, weight: .semibold))
@@ -316,7 +525,7 @@ struct ShareExtensionView: View {
                 withAnimation { phase = .ready }
             }
             .font(.system(size: 15, weight: .medium))
-            .foregroundStyle(accentGreen)
+            .foregroundStyle(mintGreen)
 
             Spacer()
         }
@@ -380,7 +589,7 @@ struct ShareExtensionView: View {
             }
         }
 
-        // No valid URL found — dismiss
+        // No valid URL found -- dismiss
         onCancel()
     }
 
@@ -484,7 +693,7 @@ struct ShareExtensionView: View {
                     phase = .watchCreated(watchInfo)
                 }
             } else {
-                // AI didn't return a create block — create a fallback watch
+                // AI didn't return a create block -- create a fallback watch
                 let fallback = createFallbackWatch(type: watchType)
                 withAnimation(.spring(response: 0.3)) {
                     phase = .watchCreated(fallback)
@@ -493,6 +702,64 @@ struct ShareExtensionView: View {
         } catch {
             withAnimation { phase = .error(error.localizedDescription) }
         }
+    }
+
+    // MARK: - Custom Chat
+
+    private func sendChatMessage() {
+        let text = userInput.trimmingCharacters(in: .whitespaces)
+        guard !text.isEmpty else { return }
+
+        // Add user message
+        chatMessages.append(ChatMessage(role: .user, text: text))
+        userInput = ""
+        isSendingChat = true
+
+        Task {
+            // Build message with full URL context
+            var aiMessage = "I want to watch this URL: \(sharedURL)"
+            if let title = pageTitle {
+                aiMessage += "\n[URL_CONTEXT: Page title: \"\(title)\" | Website: \(displayHost)]"
+            }
+            aiMessage += "\n\nThe user says: \"\(text)\""
+            aiMessage += "\n\nCreate a watch based on what they described. Respond with a [CREATE_WATCH] JSON block."
+
+            do {
+                let response = try await ShareAPIService.chatWithAI(userMessage: aiMessage)
+
+                // Try to parse [CREATE_WATCH]
+                if let watchInfo = parseCreateWatch(from: response) {
+                    isSendingChat = false
+                    withAnimation(.spring(response: 0.3)) {
+                        phase = .watchCreated(watchInfo)
+                    }
+                } else {
+                    // AI responded conversationally - show its message and let user continue
+                    let cleanResponse = stripCreateWatchTags(from: response)
+                    chatMessages.append(ChatMessage(role: .assistant, text: cleanResponse))
+                    isSendingChat = false
+                }
+            } catch {
+                chatMessages.append(ChatMessage(role: .assistant, text: "Something went wrong. Please try again."))
+                isSendingChat = false
+            }
+        }
+    }
+
+    /// Removes any partial [CREATE_WATCH] tags from text for display
+    private func stripCreateWatchTags(from text: String) -> String {
+        var result = text
+        // Remove full blocks
+        if let regex = try? NSRegularExpression(
+            pattern: "\\[CREATE_WATCH\\].*?\\[/CREATE_WATCH\\]",
+            options: .dotMatchesLineSeparators
+        ) {
+            result = regex.stringByReplacingMatches(in: result, range: NSRange(result.startIndex..., in: result), withTemplate: "")
+        }
+        // Remove orphan tags
+        result = result.replacingOccurrences(of: "[CREATE_WATCH]", with: "")
+        result = result.replacingOccurrences(of: "[/CREATE_WATCH]", with: "")
+        return result.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// Extracts [CREATE_WATCH] JSON from the AI response
