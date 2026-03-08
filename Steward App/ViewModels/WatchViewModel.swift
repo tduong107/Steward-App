@@ -95,11 +95,11 @@ final class WatchViewModel {
 
     // MARK: - Cloud Sync
 
-    func syncFromCloud() async {
+    func syncFromCloud(force: Bool = false) async {
         guard let context = modelContext, auth?.isAuthenticated == true else { return }
 
-        // Throttle: don't re-sync if we synced within the last 3 seconds
-        if let lastSync = lastSyncTime, Date().timeIntervalSince(lastSync) < 3 {
+        // Throttle: don't re-sync if we synced within the last 3 seconds (unless forced)
+        if !force, let lastSync = lastSyncTime, Date().timeIntervalSince(lastSync) < 3 {
             return
         }
 

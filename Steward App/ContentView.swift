@@ -5,6 +5,7 @@ struct ContentView: View {
     @State private var viewModel = WatchViewModel()
     @State private var realtimeManager = RealtimeManager()
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(AuthManager.self) private var authManager
     @Environment(SupabaseService.self) private var supabaseService
     @Environment(SubscriptionManager.self) private var subscriptionManager
@@ -148,6 +149,11 @@ struct ContentView: View {
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                     viewModel.isChatOpen = true
                 }
+            }
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                Task { await viewModel.syncFromCloud() }
             }
         }
         .sheet(isPresented: $showJoinSheet) {

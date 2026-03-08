@@ -42,6 +42,9 @@ struct HomeScreen: View {
                 }
                 .padding(.bottom, 24)
             }
+            .refreshable {
+                await viewModel.syncFromCloud(force: true)
+            }
             .background(Theme.bg)
 
             // Celebration overlay
