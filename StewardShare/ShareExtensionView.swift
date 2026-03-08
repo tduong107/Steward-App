@@ -554,6 +554,24 @@ struct ShareExtensionView: View {
         URL(string: sharedURL)?.host ?? sharedURL
     }
 
+    /// Extracts a human-readable name from the URL path (e.g. "carbone" from resy.com/cities/ny/carbone)
+    private var urlPathName: String? {
+        guard let url = URL(string: sharedURL) else { return nil }
+        let pathComponents = url.pathComponents.filter { $0 != "/" }
+        // Take the last meaningful path segment and clean it up
+        guard let last = pathComponents.last, !last.isEmpty else { return nil }
+        // Skip if it's just a number or query-like
+        if last.allSatisfy({ $0.isNumber }) { return nil }
+        // Convert slugs like "le-bernardin" to "Le Bernardin"
+        let cleaned = last
+            .replacingOccurrences(of: "-", with: " ")
+            .replacingOccurrences(of: "_", with: " ")
+            .split(separator: " ")
+            .map { $0.prefix(1).uppercased() + $0.dropFirst() }
+            .joined(separator: " ")
+        return cleaned.isEmpty ? nil : cleaned
+    }
+
     // MARK: - URL Extraction
 
     private func extractURL() async {
@@ -678,11 +696,17 @@ struct ShareExtensionView: View {
         }
 
         // Build enriched message with URL context
-        var message = "I want to watch this: \(sharedURL)"
+        var message = "I want to watch this page."
+        message += "\nURL: \(sharedURL)"
+        message += "\nWebsite: \(displayHost)"
         if let title = pageTitle {
-            message += "\n\n[URL_CONTEXT: Page title: \"\(title)\" | Website: \(displayHost)]"
+            message += "\nPage title: \(title)"
         }
-        message += "\n\n\(typeDescription) Respond with a [CREATE_WATCH] JSON block."
+        if let pathName = urlPathName {
+            message += "\nName from URL: \(pathName)"
+        }
+        message += "\n\n\(typeDescription)"
+        message += "\n\nIMPORTANT: Respond ONLY with a [CREATE_WATCH] JSON block. Do NOT include [URL_CONTEXT], [SUGGESTIONS], or any other bracket tags."
 
         do {
             let response = try await ShareAPIService.chatWithAI(userMessage: message)
@@ -716,13 +740,18 @@ struct ShareExtensionView: View {
         isSendingChat = true
 
         Task {
-            // Build message with full URL context
-            var aiMessage = "I want to watch this URL: \(sharedURL)"
+            // Build message with rich URL context so the AI knows the page
+            var aiMessage = "I'm sharing a link and want to set up a watch."
+            aiMessage += "\nURL: \(sharedURL)"
+            aiMessage += "\nWebsite: \(displayHost)"
             if let title = pageTitle {
-                aiMessage += "\n[URL_CONTEXT: Page title: \"\(title)\" | Website: \(displayHost)]"
+                aiMessage += "\nPage title: \(title)"
             }
-            aiMessage += "\n\nThe user says: \"\(text)\""
-            aiMessage += "\n\nCreate a watch based on what they described. Respond with a [CREATE_WATCH] JSON block."
+            if let pathName = urlPathName {
+                aiMessage += "\nName from URL: \(pathName)"
+            }
+            aiMessage += "\n\nMy request: \(text)"
+            aiMessage += "\n\nIMPORTANT: Respond in plain conversational text only. Do NOT use any bracket tags like [URL_CONTEXT], [SUGGESTIONS], etc. If you're ready to create the watch, include a [CREATE_WATCH] JSON block. Otherwise, ask me a clarifying question in plain text."
 
             do {
                 let response = try await ShareAPIService.chatWithAI(userMessage: aiMessage)
@@ -735,7 +764,7 @@ struct ShareExtensionView: View {
                     }
                 } else {
                     // AI responded conversationally - show its message and let user continue
-                    let cleanResponse = stripCreateWatchTags(from: response)
+                    let cleanResponse = stripAllTags(from: response)
                     chatMessages.append(ChatMessage(role: .assistant, text: cleanResponse))
                     isSendingChat = false
                 }
@@ -746,19 +775,31 @@ struct ShareExtensionView: View {
         }
     }
 
-    /// Removes any partial [CREATE_WATCH] tags from text for display
-    private func stripCreateWatchTags(from text: String) -> String {
+    /// Removes ALL bracket-style tags from AI responses for clean display
+    private func stripAllTags(from text: String) -> String {
         var result = text
-        // Remove full blocks
+
+        // Remove all [TAG]...[/TAG] blocks (CREATE_WATCH, URL_CONTEXT, SUGGESTIONS, etc.)
         if let regex = try? NSRegularExpression(
-            pattern: "\\[CREATE_WATCH\\].*?\\[/CREATE_WATCH\\]",
+            pattern: "\\[[A-Z_]+\\].*?\\[/[A-Z_]+\\]",
             options: .dotMatchesLineSeparators
         ) {
             result = regex.stringByReplacingMatches(in: result, range: NSRange(result.startIndex..., in: result), withTemplate: "")
         }
-        // Remove orphan tags
-        result = result.replacingOccurrences(of: "[CREATE_WATCH]", with: "")
-        result = result.replacingOccurrences(of: "[/CREATE_WATCH]", with: "")
+
+        // Remove any orphan opening/closing tags like [CREATE_WATCH] or [/SUGGESTIONS]
+        if let orphanRegex = try? NSRegularExpression(
+            pattern: "\\[/?[A-Z_]+\\]",
+            options: []
+        ) {
+            result = orphanRegex.stringByReplacingMatches(in: result, range: NSRange(result.startIndex..., in: result), withTemplate: "")
+        }
+
+        // Clean up extra whitespace/newlines left behind
+        while result.contains("\n\n\n") {
+            result = result.replacingOccurrences(of: "\n\n\n", with: "\n\n")
+        }
+
         return result.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
