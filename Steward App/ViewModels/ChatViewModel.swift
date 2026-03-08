@@ -8,134 +8,747 @@ final class ChatViewModel {
     var messages: [ChatMessage] = [ChatMessage.initial]
     var inputText = ""
     var isTyping = false
+    var pendingWatch: Watch?
+    var pendingWatchInitialPrice: Double?
+    var pendingWishlistWatches: [Watch] = []
+    var pendingImage: UIImage? // Staged image before sending
+    var shouldDismiss = false // Signal to close the chat drawer
+    var subscriptionTier: SubscriptionTier = .free // Set by caller to enable frequency prompts
 
-    // Multi-turn conversation state
-    private enum ConversationStage {
-        case initial
-        case awaitingURL(intent: String)
-        case awaitingConfirmation(url: String, actionType: ActionType)
-        case complete
-    }
+    /// Incremented whenever a new watch is ready — used to reliably trigger .onChange in ChatDrawer
+    var watchReadySignal = 0
 
-    private var stage: ConversationStage = .initial
+    /// Incremented whenever a price update is ready
+    var priceUpdateSignal = 0
+    var pendingPriceUpdateData: (watchId: UUID, price: Double)?
+
+    /// Price detected during URL enrichment (stored for use in watch creation)
+    private var lastDetectedPrice: Double?
+
+    /// Watch ID awaiting a price update from the user (after "Change starting price" suggestion)
+    var pendingPriceUpdateWatchId: UUID?
+
+    /// Full conversation history for the AI (role + content pairs)
+    private var conversationHistory: [AIService.Message] = []
+
+    // MARK: - Public API
 
     func send(_ text: String? = nil) {
         let messageText = text ?? inputText
-        guard !messageText.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        let image = pendingImage
 
-        let userMsg = ChatMessage(role: .user, text: messageText)
+        // Allow sending if there's text OR an image
+        guard !messageText.trimmingCharacters(in: .whitespaces).isEmpty || image != nil else { return }
+
+        // Handle price confirmation suggestions locally
+        if pendingPriceUpdateWatchId != nil {
+            let trimmed = messageText.trimmingCharacters(in: .whitespaces)
+
+            if trimmed == "Looks good ✓" {
+                // User confirmed — dismiss and clear
+                let userMsg = ChatMessage(role: .user, text: trimmed)
+                withAnimation(.spring(response: 0.3)) {
+                    messages.append(userMsg)
+                }
+                inputText = ""
+                pendingPriceUpdateWatchId = nil
+                return
+            }
+
+            if trimmed == "Change starting price" {
+                // User wants to change — prompt for new price
+                let userMsg = ChatMessage(role: .user, text: trimmed)
+                withAnimation(.spring(response: 0.3)) {
+                    messages.append(userMsg)
+                }
+                inputText = ""
+
+                let promptMsg = ChatMessage(
+                    role: .steward,
+                    text: "What's the correct starting price? Just type the amount (e.g. 49.99)."
+                )
+                withAnimation(.spring(response: 0.3)) {
+                    messages.append(promptMsg)
+                }
+                return
+            }
+
+            // Check if user typed a price number
+            let cleaned = trimmed.replacingOccurrences(of: "$", with: "")
+                .replacingOccurrences(of: ",", with: "")
+            if let newPrice = Double(cleaned), newPrice > 0 {
+                let watchId = pendingPriceUpdateWatchId!
+                let userMsg = ChatMessage(role: .user, text: trimmed)
+                withAnimation(.spring(response: 0.3)) {
+                    messages.append(userMsg)
+                }
+                inputText = ""
+                pendingPriceUpdateWatchId = nil
+
+                // Signal price update for ChatDrawer to pick up
+                pendingPriceUpdateData = (watchId: watchId, price: newPrice)
+                priceUpdateSignal += 1
+
+                let priceStr = String(format: "$%.2f", newPrice)
+                let confirmMsg = ChatMessage(
+                    role: .steward,
+                    text: "Updated! Starting price set to \(priceStr). I'll track changes from here."
+                )
+                withAnimation(.spring(response: 0.3)) {
+                    messages.append(confirmMsg)
+                }
+                return
+            }
+        }
+
+        let displayText = messageText.trimmingCharacters(in: .whitespaces).isEmpty
+            ? "📸 [Screenshot]"
+            : messageText
+
+        let userMsg = ChatMessage(role: .user, text: displayText, image: image)
         withAnimation(.spring(response: 0.3)) {
             messages.append(userMsg)
         }
         inputText = ""
-
+        pendingImage = nil
         isTyping = true
 
+        // Compress image to JPEG for API
+        var imageData: Data?
+        if let image = image {
+            imageData = compressImage(image)
+        }
+
+        // Build the text for conversation history
+        var historyText = messageText.trimmingCharacters(in: .whitespaces).isEmpty
+            ? "I'm sending you a screenshot. What product/item is this? Help me set up a watch for it."
+            : messageText
+
         Task {
-            try? await Task.sleep(for: .seconds(1.0))
-            let replies = buildReply(for: messageText)
-            withAnimation(.spring(response: 0.3)) {
-                isTyping = false
-                messages.append(contentsOf: replies)
+            // Enrich URLs: resolve shortened links and fetch page titles before sending to AI
+            if imageData == nil {
+                let enriched = await enrichURLsInText(historyText)
+                if enriched != historyText {
+                    historyText = enriched
+                }
+            }
+
+            // Inject subscription tier context on first message so AI knows which frequencies to offer
+            if conversationHistory.isEmpty && subscriptionTier != .free {
+                historyText = "[USER_TIER]\(subscriptionTier.rawValue)[/USER_TIER]\n" + historyText
+            }
+
+            // Add to conversation history (with enriched URL context)
+            conversationHistory.append(AIService.Message(role: "user", content: historyText, imageData: imageData))
+
+            do {
+                let response = try await AIService.shared.chat(messages: conversationHistory)
+
+                // Parse AI response for display text, watch JSON, suggestions, and proposal flag
+                let parsed = parseResponse(response)
+
+                // Add full response (with markers) to history so AI has context
+                conversationHistory.append(AIService.Message(role: "assistant", content: response))
+
+                withAnimation(.spring(response: 0.3)) {
+                    isTyping = false
+                    messages.append(ChatMessage(
+                        role: .steward,
+                        text: parsed.displayText,
+                        suggestions: parsed.suggestions,
+                        productLinks: parsed.productLinks
+                    ))
+                }
+
+                // Create watch if AI included the marker
+                if let json = parsed.watchJSON {
+                    createWatchFromJSON(json)
+                }
+
+                // Signal dismiss if AI wants to end the conversation
+                if parsed.shouldDismiss {
+                    // Delay so user can read the goodbye message
+                    Task { @MainActor in
+                        try? await Task.sleep(for: .seconds(2.0))
+                        shouldDismiss = true
+                    }
+                }
+
+            } catch {
+                let errorDetail = error.localizedDescription
+                withAnimation(.spring(response: 0.3)) {
+                    isTyping = false
+                    messages.append(ChatMessage(
+                        role: .steward,
+                        text: "Sorry, I had trouble connecting. Error: \(errorDetail)"
+                    ))
+                }
+                #if DEBUG
+                print("[ChatViewModel] AI error: \(error)")
+                #endif
             }
         }
     }
+
+    func clearPendingImage() {
+        pendingImage = nil
+    }
+
+    // Price update flow is handled inline in send()
 
     func reset() {
         messages = [ChatMessage.initial]
         inputText = ""
         isTyping = false
-        stage = .initial
+        pendingWatch = nil
+        pendingWatchInitialPrice = nil
+        pendingWishlistWatches = []
+        pendingImage = nil
+        lastDetectedPrice = nil
+        pendingPriceUpdateWatchId = nil
+        pendingPriceUpdateData = nil
+        conversationHistory = []
     }
 
-    // MARK: - Conversation Logic
+    // MARK: - Image Compression
 
-    private func buildReply(for text: String) -> [ChatMessage] {
-        let lower = text.lowercased()
+    /// Compresses and resizes image for API (max ~1MB, max 1568px on longest side)
+    private func compressImage(_ image: UIImage) -> Data? {
+        let maxDimension: CGFloat = 1024
+        let size = image.size
 
-        switch stage {
-        case .initial:
-            return handleInitialMessage(lower, original: text)
-        case .awaitingURL(let intent):
-            return handleURLInput(lower, intent: intent)
-        case .awaitingConfirmation(let url, let actionType):
-            return handleConfirmation(lower, url: url, actionType: actionType)
-        case .complete:
-            stage = .initial
-            return [ChatMessage(
-                role: .steward,
-                text: "Anything else you'd like me to watch?",
-                suggestions: ["Monitor a product price", "Watch for a restock", "Track an appointment slot"]
-            )]
+        var newSize = size
+        if size.width > maxDimension || size.height > maxDimension {
+            let ratio = min(maxDimension / size.width, maxDimension / size.height)
+            newSize = CGSize(width: size.width * ratio, height: size.height * ratio)
+        }
+
+        let renderer = UIGraphicsImageRenderer(size: newSize)
+        let resized = renderer.image { _ in
+            image.draw(in: CGRect(origin: .zero, size: newSize))
+        }
+
+        return resized.jpegData(compressionQuality: 0.7)
+    }
+
+    // MARK: - Parse AI Response
+
+    struct ParsedResponse {
+        let displayText: String
+        let watchJSON: String?
+        let suggestions: [String]?
+        let productLinks: [ProductLink]?
+        let isProposal: Bool
+        let shouldDismiss: Bool
+    }
+
+    /// Extracts display text, optional watch JSON, suggestions, product links, and proposal flag from AI response
+    private func parseResponse(_ response: String) -> ParsedResponse {
+        var text = response
+
+        // 1. Extract [CREATE_WATCH] JSON if present
+        var watchJSON: String?
+        if let regex = try? NSRegularExpression(pattern: "\\[CREATE_WATCH\\](.*?)\\[/CREATE_WATCH\\]", options: .dotMatchesLineSeparators),
+           let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+           let jsonRange = Range(match.range(at: 1), in: text) {
+            watchJSON = String(text[jsonRange])
+            text = text.replacingOccurrences(of: "\\[CREATE_WATCH\\].*?\\[/CREATE_WATCH\\]", with: "", options: .regularExpression)
+        }
+
+        // 2. Check for [PROPOSE_WATCH] marker — handle both block and standalone forms
+        let isProposal = text.contains("[PROPOSE_WATCH]")
+        // Strip block form: [PROPOSE_WATCH]...content...[/PROPOSE_WATCH]
+        if let proposeRegex = try? NSRegularExpression(pattern: "\\[PROPOSE_WATCH\\].*?\\[/PROPOSE_WATCH\\]", options: .dotMatchesLineSeparators) {
+            text = proposeRegex.stringByReplacingMatches(in: text, range: NSRange(text.startIndex..., in: text), withTemplate: "")
+        }
+        // Strip standalone markers (in case AI uses them without closing tag)
+        text = text.replacingOccurrences(of: "[PROPOSE_WATCH]", with: "")
+        text = text.replacingOccurrences(of: "[/PROPOSE_WATCH]", with: "")
+
+        // 3. Extract [PRODUCT_LINKS] if present
+        var productLinks: [ProductLink]?
+        if let regex = try? NSRegularExpression(pattern: "\\[PRODUCT_LINKS\\](.*?)\\[/PRODUCT_LINKS\\]", options: .dotMatchesLineSeparators),
+           let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+           let linkRange = Range(match.range(at: 1), in: text) {
+            let raw = String(text[linkRange])
+            productLinks = parseProductLinks(raw)
+            text = text.replacingOccurrences(of: "\\[PRODUCT_LINKS\\].*?\\[/PRODUCT_LINKS\\]", with: "", options: .regularExpression)
+        }
+        // Strip any remaining standalone PRODUCT_LINKS markers (empty tags, partial tags, etc.)
+        text = text.replacingOccurrences(of: "[PRODUCT_LINKS]", with: "")
+        text = text.replacingOccurrences(of: "[/PRODUCT_LINKS]", with: "")
+
+        // 4. Extract [SUGGESTIONS] if present
+        var suggestions: [String]?
+        if let regex = try? NSRegularExpression(pattern: "\\[SUGGESTIONS\\](.*?)\\[/SUGGESTIONS\\]", options: .dotMatchesLineSeparators),
+           let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+           let sugRange = Range(match.range(at: 1), in: text) {
+            let raw = String(text[sugRange])
+            suggestions = raw.components(separatedBy: "|").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+            text = text.replacingOccurrences(of: "\\[SUGGESTIONS\\].*?\\[/SUGGESTIONS\\]", with: "", options: .regularExpression)
+        }
+
+        // 5. Strip any raw watch JSON objects that leaked into display text
+        //    (e.g., {"emoji":"...","name":"...","url":"...","condition":"...",...})
+        if let jsonRegex = try? NSRegularExpression(pattern: "\\{\"emoji\".*?\\}", options: .dotMatchesLineSeparators) {
+            text = jsonRegex.stringByReplacingMatches(in: text, range: NSRange(text.startIndex..., in: text), withTemplate: "")
+        }
+
+        // 5b. Strip leaked product-link JSON objects from display text
+        //     (AI sometimes outputs {"title":"...","url":"...","source":"..."} without wrapping in [PRODUCT_LINKS])
+        if let linkJsonRegex = try? NSRegularExpression(
+            pattern: "\\{\\s*\"title\"\\s*:.*?\"source\"\\s*:.*?\\}",
+            options: .dotMatchesLineSeparators
+        ) {
+            let linkMatches = linkJsonRegex.matches(in: text, range: NSRange(text.startIndex..., in: text))
+            if !linkMatches.isEmpty {
+                // If we didn't already find product links from the tagged block, try parsing these
+                if productLinks == nil || productLinks!.isEmpty {
+                    var rawLines: [String] = []
+                    for match in linkMatches {
+                        if let range = Range(match.range, in: text) {
+                            rawLines.append(String(text[range]))
+                        }
+                    }
+                    let parsed = parseProductLinks(rawLines.joined(separator: "\n"))
+                    if let parsed = parsed, !parsed.isEmpty {
+                        productLinks = parsed
+                    }
+                }
+                // Strip the raw JSON from display text regardless
+                text = linkJsonRegex.stringByReplacingMatches(in: text, range: NSRange(text.startIndex..., in: text), withTemplate: "")
+            }
+        }
+
+        // 6. If product links are present, strip bare URLs from the display text
+        //    (safety net in case the AI still writes URLs in its conversational text)
+        if productLinks != nil, !productLinks!.isEmpty {
+            // Remove standalone URLs (http/https) that appear on their own or in sentences
+            text = text.replacingOccurrences(
+                of: "https?://[^\\s\\)\\]>]+",
+                with: "",
+                options: .regularExpression
+            )
+            // Clean up leftover artifacts: bullets/dashes with just whitespace, empty parentheses, double spaces
+            text = text.replacingOccurrences(of: "()", with: "")
+            text = text.replacingOccurrences(of: "[ ]+", with: " ", options: .regularExpression)
+            // Remove lines that are now just whitespace, bullets, or dashes
+            let cleanedLines = text.components(separatedBy: "\n").filter { line in
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+                return !trimmed.isEmpty && trimmed != "-" && trimmed != "•" && trimmed != "*"
+            }
+            text = cleanedLines.joined(separator: "\n")
+        }
+
+        // 7. Check for [DISMISS] marker (AI wants to end the conversation)
+        let shouldDismiss = text.contains("[DISMISS]")
+        text = text.replacingOccurrences(of: "[DISMISS]", with: "")
+
+        // 8. If it's a proposal, override suggestions with confirm/deny buttons
+        if isProposal {
+            suggestions = ["Yes, set it up! ✅", "No, let me change something"]
+        }
+
+        return ParsedResponse(
+            displayText: text.trimmingCharacters(in: .whitespacesAndNewlines),
+            watchJSON: watchJSON,
+            suggestions: suggestions,
+            productLinks: productLinks,
+            isProposal: isProposal,
+            shouldDismiss: shouldDismiss
+        )
+    }
+
+    /// Parse product links from the [PRODUCT_LINKS] block (one JSON object per line)
+    private func parseProductLinks(_ raw: String) -> [ProductLink]? {
+        struct LinkPayload: Codable {
+            let title: String
+            let url: String
+            let source: String
+            let price: String?
+            let imageURL: String?
+        }
+
+        var links: [ProductLink] = []
+        let lines = raw.components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+
+        for line in lines {
+            guard let data = line.data(using: .utf8) else { continue }
+            do {
+                let payload = try JSONDecoder().decode(LinkPayload.self, from: data)
+                links.append(ProductLink(
+                    title: payload.title,
+                    url: payload.url,
+                    source: payload.source,
+                    price: payload.price,
+                    imageURL: payload.imageURL
+                ))
+            } catch {
+                #if DEBUG
+                print("[ChatViewModel] Failed to parse product link: \(line)")
+                #endif
+            }
+        }
+
+        return links.isEmpty ? nil : links
+    }
+
+    // MARK: - URL Enrichment
+
+    /// Finds URLs in text, resolves shortened ones, fetches page titles, and appends context for the AI
+    private func enrichURLsInText(_ text: String) async -> String {
+        // Find all URLs in the text
+        guard let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue) else {
+            return text
+        }
+        let matches = detector.matches(in: text, range: NSRange(text.startIndex..., in: text))
+        guard !matches.isEmpty else { return text }
+
+        var enrichments: [String] = []
+
+        for match in matches {
+            guard let range = Range(match.range, in: text),
+                  let url = URL(string: String(text[range])) else { continue }
+
+            // Resolve the URL and fetch page metadata
+            if let metadata = await resolveAndFetchMetadata(url: url) {
+                enrichments.append(metadata)
+            }
+        }
+
+        if enrichments.isEmpty { return text }
+
+        // Append URL context as a system note the AI can use
+        let context = enrichments.joined(separator: "\n")
+        return text + "\n\n[URL_CONTEXT: I resolved the URLs for you. Here's what I found:\n\(context)\nUse this info to understand what the user is referring to. Use the ORIGINAL URL the user provided for the watch, not the resolved one.]"
+    }
+
+    /// Resolves a URL (follows redirects) and fetches the page title + price info
+    private func resolveAndFetchMetadata(url: URL) async -> String? {
+        // Use a custom session that follows redirects so we can capture the final URL
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 10
+        let session = URLSession(configuration: config)
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        // Mimic a real browser to avoid blocks
+        request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1", forHTTPHeaderField: "User-Agent")
+
+        do {
+            let (data, response) = try await session.data(for: request)
+
+            let finalURL = response.url ?? url
+            let html = String(data: data, encoding: .utf8) ?? ""
+
+            // Extract page title
+            let title = extractTitle(from: html)
+            // Extract price if visible
+            let price = extractPrice(from: html)
+
+            // Store detected price for use in watch creation
+            if let priceStr = price,
+               let numericStr = priceStr.replacingOccurrences(of: "[^0-9.]", with: "", options: .regularExpression) as String?,
+               let priceVal = Double(numericStr), priceVal > 0 {
+                lastDetectedPrice = priceVal
+            }
+
+            var result = "URL: \(url.absoluteString)"
+            if finalURL.absoluteString != url.absoluteString {
+                result += " → resolves to: \(finalURL.absoluteString)"
+            }
+            if let title = title {
+                result += " | Page title: \"\(title)\""
+            }
+            if let price = price {
+                result += " | Price found: \(price)"
+            }
+
+            // Try to identify the website
+            if let host = finalURL.host {
+                result += " | Website: \(host)"
+            }
+
+            return result
+        } catch {
+            #if DEBUG
+            print("[ChatViewModel] Failed to resolve URL: \(url) — \(error.localizedDescription)")
+            #endif
+            return nil
         }
     }
 
-    private func handleInitialMessage(_ lower: String, original: String) -> [ChatMessage] {
-        if lower.contains("price") || lower.contains("tesla") || lower.contains("drop") {
-            stage = .awaitingURL(intent: "price")
-            return [ChatMessage(
-                role: .steward,
-                text: "I can watch that page for a price change. What's the URL?"
-            )]
+    /// Extracts the <title> or og:title from HTML
+    private func extractTitle(from html: String) -> String? {
+        // Try og:title first (more descriptive for product pages)
+        let ogPatterns = [
+            "property=\"og:title\"\\s+content=\"([^\"]+)\"",
+            "content=\"([^\"]+)\"\\s+property=\"og:title\"",
+            "property='og:title'\\s+content='([^']+)'",
+            "content='([^']+)'\\s+property='og:title'"
+        ]
+        for pattern in ogPatterns {
+            if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
+               let match = regex.firstMatch(in: html, range: NSRange(html.startIndex..., in: html)),
+               let range = Range(match.range(at: 1), in: html) {
+                let title = String(html[range]).trimmingCharacters(in: .whitespacesAndNewlines)
+                if !title.isEmpty { return title }
+            }
         }
 
-        if lower.contains("restock") || lower.contains("stock") || lower.contains("nike") || lower.contains("shoe") {
-            stage = .awaitingURL(intent: "restock")
-            return [ChatMessage(
-                role: .steward,
-                text: "Got it — I'll monitor that page for a restock. Paste the product URL and I'll get started."
-            )]
+        // Fallback to <title> tag
+        if let regex = try? NSRegularExpression(pattern: "<title[^>]*>([^<]+)</title>", options: .caseInsensitive),
+           let match = regex.firstMatch(in: html, range: NSRange(html.startIndex..., in: html)),
+           let range = Range(match.range(at: 1), in: html) {
+            let title = String(html[range])
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            if !title.isEmpty { return title }
         }
 
-        if lower.contains("appointment") || lower.contains("book") || lower.contains("slot") {
-            stage = .awaitingURL(intent: "appointment")
-            return [ChatMessage(
-                role: .steward,
-                text: "I can watch for an open slot and book it the moment it appears. What site should I monitor?"
-            )]
-        }
-
-        if lower.contains("http") || lower.contains(".com") || lower.contains("www") {
-            return handleURLDetected(lower)
-        }
-
-        stage = .awaitingURL(intent: "general")
-        return [ChatMessage(
-            role: .steward,
-            text: "Sure — to get started, share the URL of the page you'd like me to watch. I'll scan it and suggest the best actions."
-        )]
+        return nil
     }
 
-    private func handleURLInput(_ lower: String, intent: String) -> [ChatMessage] {
-        if lower.contains("http") || lower.contains(".com") || lower.contains("www") || lower.contains(".") {
-            return handleURLDetected(lower)
+    /// Tries to extract a price from the HTML using multiple strategies
+    private func extractPrice(from html: String) -> String? {
+        // 1. OG / product meta tags
+        let metaPatterns = [
+            "property=\"(?:og|product):price:amount\"\\s+content=\"([^\"]+)\"",
+            "content=\"([^\"]+)\"\\s+property=\"(?:og|product):price:amount\""
+        ]
+        for pattern in metaPatterns {
+            if let price = firstMatch(pattern: pattern, in: html) {
+                let cleaned = price.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !cleaned.isEmpty, Double(cleaned.replacingOccurrences(of: ",", with: "")) != nil {
+                    return "$\(cleaned)"
+                }
+            }
         }
-        return [ChatMessage(
-            role: .steward,
-            text: "That doesn't look like a URL. Please paste a link like nike.com/product or https://example.com"
-        )]
+
+        // 2. JSON-LD structured data (common on modern e-commerce sites)
+        let jsonLdPattern = "<script[^>]*type=\"application/ld\\+json\"[^>]*>([\\s\\S]*?)</script>"
+        if let regex = try? NSRegularExpression(pattern: jsonLdPattern, options: .caseInsensitive) {
+            let matches = regex.matches(in: html, range: NSRange(html.startIndex..., in: html))
+            for match in matches {
+                if let range = Range(match.range(at: 1), in: html) {
+                    let jsonStr = String(html[range])
+                    if let price = extractPriceFromJSONLD(jsonStr) {
+                        return "$\(String(format: "%.2f", price))"
+                    }
+                }
+            }
+        }
+
+        // 3. Structured HTML price selectors (Amazon, generic e-commerce)
+        let structuredPatterns = [
+            "priceAmount[^>]*>\\s*\\$?\\s*([\\d,]+\\.?\\d{0,2})",
+            "priceToPay[^>]*>.*?\\$?\\s*([\\d,]+\\.?\\d{0,2})",
+            "product[_-]?price[^>]*>\\s*\\$?\\s*([\\d,]+\\.?\\d{0,2})",
+            "sale[_-]?price[^>]*>\\s*\\$?\\s*([\\d,]+\\.?\\d{0,2})",
+            "current[_-]?price[^>]*>\\s*\\$?\\s*([\\d,]+\\.?\\d{0,2})"
+        ]
+        for pattern in structuredPatterns {
+            if let priceStr = firstMatch(pattern: pattern, in: html),
+               let price = Double(priceStr.replacingOccurrences(of: ",", with: "")),
+               price > 0.50, price < 100_000 {
+                return "$\(String(format: "%.2f", price))"
+            }
+        }
+
+        // 4. Dollar amounts near price context words
+        let contextPattern = "(?:price|cost|now|sale|buy|pay)[^$]{0,40}\\$([\\d,]+\\.\\d{2})"
+        if let priceStr = firstMatch(pattern: contextPattern, in: html),
+           let price = Double(priceStr.replacingOccurrences(of: ",", with: "")),
+           price > 0.50, price < 100_000 {
+            return "$\(String(format: "%.2f", price))"
+        }
+
+        // 5. Most frequent $X.XX on page (fallback)
+        let allPricePattern = "\\$([\\d,]+\\.\\d{2})"
+        if let regex = try? NSRegularExpression(pattern: allPricePattern, options: []) {
+            let matches = regex.matches(in: html, range: NSRange(html.startIndex..., in: html))
+            var freq: [Double: Int] = [:]
+            for match in matches {
+                if let range = Range(match.range(at: 1), in: html),
+                   let price = Double(String(html[range]).replacingOccurrences(of: ",", with: "")),
+                   price > 0.50, price < 100_000 {
+                    freq[price, default: 0] += 1
+                }
+            }
+            if let best = freq.max(by: { $0.value < $1.value }), best.value >= 2 {
+                return "$\(String(format: "%.2f", best.key))"
+            }
+        }
+
+        return nil
     }
 
-    private func handleURLDetected(_ lower: String) -> [ChatMessage] {
-        let url = lower.trimmingCharacters(in: .whitespaces)
-        stage = .awaitingConfirmation(url: url, actionType: .notify)
-        return [ChatMessage(
-            role: .steward,
-            text: "I've scanned that page. Here's what I can do for you automatically:",
-            actionCards: [
-                ActionCard(icon: "bell", label: "Notify me when anything changes", type: .notify),
-                ActionCard(icon: "cart", label: "Add to cart when back in stock", type: .cart),
-                ActionCard(icon: "chart.line.downtrend.xyaxis", label: "Alert me if price drops", type: .price),
-                ActionCard(icon: "doc.text", label: "Submit a form on my behalf", type: .form),
+    private func firstMatch(pattern: String, in text: String) -> String? {
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive, .dotMatchesLineSeparators]),
+              let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+              let range = Range(match.range(at: 1), in: text) else { return nil }
+        return String(text[range])
+    }
+
+    private func extractPriceFromJSONLD(_ jsonStr: String) -> Double? {
+        guard let data = jsonStr.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) else { return nil }
+
+        func findPrice(in obj: Any) -> Double? {
+            if let dict = obj as? [String: Any] {
+                // Direct price field
+                if let price = dict["price"] {
+                    if let p = price as? Double, p > 0 { return p }
+                    if let s = price as? String, let p = Double(s.replacingOccurrences(of: ",", with: "")), p > 0 { return p }
+                }
+                // Check offers.price or offers.lowPrice
+                if let offers = dict["offers"] {
+                    if let result = findPrice(in: offers) { return result }
+                }
+                if let lowPrice = dict["lowPrice"] {
+                    if let p = lowPrice as? Double, p > 0 { return p }
+                    if let s = lowPrice as? String, let p = Double(s.replacingOccurrences(of: ",", with: "")), p > 0 { return p }
+                }
+            } else if let arr = obj as? [Any] {
+                for item in arr {
+                    if let result = findPrice(in: item) { return result }
+                }
+            }
+            return nil
+        }
+
+        return findPrice(in: json)
+    }
+
+    // MARK: - Create Watch from AI JSON
+
+    private func createWatchFromJSON(_ json: String) {
+        guard let data = json.data(using: .utf8) else { return }
+
+        struct WatchPayload: Codable {
+            let emoji: String
+            let name: String
+            let url: String
+            let condition: String
+            let actionLabel: String
+            let actionType: String
+            let checkFrequency: String?
+            let imageURL: String?
+        }
+
+        do {
+            let payload = try JSONDecoder().decode(WatchPayload.self, from: data)
+            let actionType = ActionType(rawValue: payload.actionType) ?? .notify
+
+            // Ensure URL has a protocol
+            var url = payload.url
+            if !url.lowercased().hasPrefix("http") {
+                url = "https://\(url)"
+            }
+
+            // Use AI-specified frequency, fall back to user's default, then "Daily"
+            let frequency = payload.checkFrequency
+                ?? UserDefaults.standard.string(forKey: "defaultCheckFrequency")
+                ?? "Daily"
+
+            let watch = Watch(
+                emoji: payload.emoji,
+                name: payload.name,
+                url: url,
+                condition: payload.condition,
+                actionLabel: payload.actionLabel,
+                actionType: actionType,
+                checkFrequency: frequency,
+                imageURL: payload.imageURL
+            )
+
+            // If no image was provided by the AI, try to fetch og:image from the URL
+            if payload.imageURL == nil || payload.imageURL?.isEmpty == true {
+                Task { @MainActor in
+                    if let ogImage = await self.fetchOGImage(from: url) {
+                        watch.imageURL = ogImage
+                    }
+                }
+            }
+
+            // For price watches, create immediately and present detected price
+            if actionType == .price {
+                let detectedPrice = lastDetectedPrice
+                lastDetectedPrice = nil
+
+                // Create the watch (with initial price if detected)
+                pendingWatch = watch
+                pendingWatchInitialPrice = detectedPrice
+                watchReadySignal += 1
+
+                if let detectedPrice {
+                    // Present the detected price with suggestions to confirm or change
+                    let priceStr = String(format: "$%.2f", detectedPrice)
+                    let msg = ChatMessage(
+                        role: .steward,
+                        text: "I detected the current price as \(priceStr). I'll start tracking from this price.",
+                        suggestions: ["Looks good ✓", "Change starting price"]
+                    )
+                    withAnimation(.spring(response: 0.3)) {
+                        messages.append(msg)
+                    }
+                    // Store watch ID in case user wants to change the price
+                    pendingPriceUpdateWatchId = watch.id
+                }
+            } else {
+                pendingWatch = watch
+                pendingWatchInitialPrice = nil
+                watchReadySignal += 1
+            }
+        } catch {
+            #if DEBUG
+            print("[ChatViewModel] Failed to parse watch JSON: \(error)")
+            #endif
+        }
+    }
+
+    // MARK: - Fetch Product Image
+
+    /// Fetches the og:image from a URL to use as the watch hero photo
+    private func fetchOGImage(from urlString: String) async -> String? {
+        guard let url = URL(string: urlString) else { return nil }
+
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 8
+        let session = URLSession(configuration: config)
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1", forHTTPHeaderField: "User-Agent")
+
+        do {
+            let (data, _) = try await session.data(for: request)
+            let html = String(data: data, encoding: .utf8) ?? ""
+
+            // Try og:image patterns
+            let patterns = [
+                "property=\"og:image\"\\s+content=\"([^\"]+)\"",
+                "content=\"([^\"]+)\"\\s+property=\"og:image\"",
+                "property='og:image'\\s+content='([^']+)'",
+                "content='([^']+)'\\s+property='og:image'"
             ]
-        )]
-    }
 
-    private func handleConfirmation(_ lower: String, url: String, actionType: ActionType) -> [ChatMessage] {
-        stage = .complete
-        return [ChatMessage(
-            role: .steward,
-            text: "All set! I'll start monitoring right away and let you know the moment something changes. You can check the status on your home screen."
-        )]
+            for pattern in patterns {
+                if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
+                   let match = regex.firstMatch(in: html, range: NSRange(html.startIndex..., in: html)),
+                   let range = Range(match.range(at: 1), in: html) {
+                    let imageURL = String(html[range]).trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !imageURL.isEmpty, imageURL.hasPrefix("http") {
+                        return imageURL
+                    }
+                }
+            }
+            return nil
+        } catch {
+            #if DEBUG
+            print("[ChatViewModel] Failed to fetch og:image: \(error.localizedDescription)")
+            #endif
+            return nil
+        }
     }
 }
