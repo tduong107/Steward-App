@@ -33,6 +33,26 @@ final class SupabaseService {
     }
 
     func deleteWatch(id: UUID) async throws {
+        // Delete related records first (check_results, activities, shared_watches)
+        _ = try? await SupabaseConfig.client
+            .from("check_results")
+            .delete()
+            .eq("watch_id", value: id.uuidString)
+            .execute()
+
+        _ = try? await SupabaseConfig.client
+            .from("activities")
+            .delete()
+            .eq("watch_id", value: id.uuidString)
+            .execute()
+
+        _ = try? await SupabaseConfig.client
+            .from("shared_watches")
+            .delete()
+            .eq("source_watch_id", value: id.uuidString)
+            .execute()
+
+        // Then delete the watch itself
         try await SupabaseConfig.client
             .from("watches")
             .delete()
