@@ -30,13 +30,18 @@ enum ShareAPIService {
 
     // MARK: - AI Chat
 
-    /// Sends a message to the AI chat edge function and returns the response text
+    /// Sends a single message to the AI chat edge function and returns the response text
     static func chatWithAI(userMessage: String) async throws -> String {
-        let url = URL(string: "\(supabaseURL)/functions/v1/ai-chat")!
-
         let messages: [[String: Any]] = [
             ["role": "user", "content": userMessage]
         ]
+        return try await chatWithAI(messages: messages)
+    }
+
+    /// Sends a full conversation history to the AI chat edge function and returns the response text
+    static func chatWithAI(messages: [[String: Any]]) async throws -> String {
+        let url = URL(string: "\(supabaseURL)/functions/v1/ai-chat")!
+
         let body: [String: Any] = ["messages": messages]
 
         var request = URLRequest(url: url)

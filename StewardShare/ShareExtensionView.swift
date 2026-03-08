@@ -836,13 +836,58 @@ struct ShareExtensionView: View {
             if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
                let match = regex.firstMatch(in: html, range: NSRange(html.startIndex..., in: html)),
                let range = Range(match.range(at: 1), in: html) {
-                let title = String(html[range]).trimmingCharacters(in: .whitespacesAndNewlines)
+                let title = decodeHTMLEntities(String(html[range]).trimmingCharacters(in: .whitespacesAndNewlines))
                 if !title.isEmpty {
                     pageTitle = title
                     return
                 }
             }
         }
+    }
+
+    /// Decodes common HTML entities in a string (e.g. &#x27; → ', &amp; → &)
+    private func decodeHTMLEntities(_ string: String) -> String {
+        var result = string
+        // Named entities
+        let namedEntities: [(String, String)] = [
+            ("&amp;", "&"),
+            ("&lt;", "<"),
+            ("&gt;", ">"),
+            ("&quot;", "\""),
+            ("&apos;", "'"),
+            ("&nbsp;", " "),
+            ("&ndash;", "–"),
+            ("&mdash;", "—"),
+        ]
+        for (entity, replacement) in namedEntities {
+            result = result.replacingOccurrences(of: entity, with: replacement)
+        }
+
+        // Hex entities: &#x27; &#x2F; etc.
+        if let hexRegex = try? NSRegularExpression(pattern: "&#x([0-9A-Fa-f]+);") {
+            let nsResult = result as NSString
+            let matches = hexRegex.matches(in: result, range: NSRange(location: 0, length: nsResult.length))
+            for match in matches.reversed() {
+                let hexStr = nsResult.substring(with: match.range(at: 1))
+                if let code = UInt32(hexStr, radix: 16), let scalar = Unicode.Scalar(code) {
+                    result = (result as NSString).replacingCharacters(in: match.range, with: String(scalar))
+                }
+            }
+        }
+
+        // Decimal entities: &#39; &#8217; etc.
+        if let decRegex = try? NSRegularExpression(pattern: "&#(\\d+);") {
+            let nsResult = result as NSString
+            let matches = decRegex.matches(in: result, range: NSRange(location: 0, length: nsResult.length))
+            for match in matches.reversed() {
+                let decStr = nsResult.substring(with: match.range(at: 1))
+                if let code = UInt32(decStr), let scalar = Unicode.Scalar(code) {
+                    result = (result as NSString).replacingCharacters(in: match.range, with: String(scalar))
+                }
+            }
+        }
+
+        return result
     }
 
     // MARK: - AI Analysis & Watch Creation
@@ -897,13 +942,29 @@ struct ShareExtensionView: View {
         isSendingChat = true
 
         Task {
-            // Build message with rich URL context so the AI knows the page
-            var aiMessage = "I'm sharing a link and want to set up a watch.\n\(fullContext)"
-            aiMessage += "\n\nMy request: \(text)"
-            aiMessage += "\n\nIMPORTANT: Respond in plain conversational text only. Do NOT use any bracket tags like [URL_CONTEXT], [SUGGESTIONS], etc. If you're ready to create the watch, include a [CREATE_WATCH] JSON block. Otherwise, ask me a clarifying question in plain text."
+            // Build full conversation history so the AI has context
+            var messages: [[String: Any]] = []
+
+            // System-level context as the first user message
+            let systemContext = """
+            I'm sharing a link and want to set up a watch.
+            \(fullContext)
+
+            IMPORTANT: Respond in plain conversational text only. Do NOT use any bracket tags like [URL_CONTEXT], [SUGGESTIONS], etc.
+            When the user confirms they want to create a watch, respond with a [CREATE_WATCH] JSON block containing: emoji, name, url, condition, actionLabel, actionType, checkFrequency, imageURL.
+            """
+
+            messages.append(["role": "user", "content": systemContext])
+            messages.append(["role": "assistant", "content": "I understand. I'll help you set up a watch for this page. What would you like to monitor?"])
+
+            // Replay the full chat history
+            for msg in chatMessages {
+                let role = msg.role == .user ? "user" : "assistant"
+                messages.append(["role": role, "content": msg.text])
+            }
 
             do {
-                let response = try await ShareAPIService.chatWithAI(userMessage: aiMessage)
+                let response = try await ShareAPIService.chatWithAI(messages: messages)
 
                 // Try to parse [CREATE_WATCH]
                 if let watchInfo = parseCreateWatch(from: response) {
