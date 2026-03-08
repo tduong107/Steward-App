@@ -8,10 +8,18 @@
 
 /* Begin PBXBuildFile section */
 		F0C58C642F5A703200F8DCE9 /* StoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F0C58C632F5A703200F8DCE9 /* StoreKit.framework */; };
+		F0C58FB02F5D6A0A00F8DCE9 /* StewardShare.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = F0C58FA62F5D6A0A00F8DCE9 /* StewardShare.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		F0F6BD182F596BD500E733CC /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = F0F6BD172F596BD500E733CC /* Supabase */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		F0C58FAE2F5D6A0A00F8DCE9 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = F0F3F8A32F580D560016A83A /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F0C58FA52F5D6A0A00F8DCE9;
+			remoteInfo = StewardShare;
+		};
 		F0F3F8BB2F580D570016A83A /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = F0F3F8A32F580D560016A83A /* Project object */;
@@ -28,15 +36,38 @@
 		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		F0C58FB52F5D6A0A00F8DCE9 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				F0C58FB02F5D6A0A00F8DCE9 /* StewardShare.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		F0C58C632F5A703200F8DCE9 /* StoreKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = StoreKit.framework; path = System/Library/Frameworks/StoreKit.framework; sourceTree = SDKROOT; };
 		F0C58C652F5A705D00F8DCE9 /* StewardProducts.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = StewardProducts.storekit; sourceTree = "<group>"; };
+		F0C58FA62F5D6A0A00F8DCE9 /* StewardShare.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = StewardShare.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		F0F3F8AB2F580D560016A83A /* Steward App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Steward App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		F0F3F8BA2F580D570016A83A /* Steward AppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Steward AppTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		F0F3F8C42F580D570016A83A /* Steward AppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Steward AppUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		F0C58FA72F5D6A0A00F8DCE9 /* StewardShare */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				F0C58FB62F5D6B0A00F8DCE9 /* PBXFileSystemSynchronizedBuildFileExceptionSet */,
+			);
+			path = StewardShare;
+			sourceTree = "<group>";
+		};
 		F0F3F8AD2F580D560016A83A /* Steward App */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = "Steward App";
@@ -54,7 +85,24 @@
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		F0C58FB62F5D6B0A00F8DCE9 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = F0C58FA52F5D6A0A00F8DCE9 /* StewardShare */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFrameworksBuildPhase section */
+		F0C58FA32F5D6A0A00F8DCE9 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F0F3F8A82F580D560016A83A /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -88,6 +136,7 @@
 				F0F3F8AD2F580D560016A83A /* Steward App */,
 				F0F3F8BD2F580D570016A83A /* Steward AppTests */,
 				F0F3F8C72F580D570016A83A /* Steward AppUITests */,
+				F0C58FA72F5D6A0A00F8DCE9 /* StewardShare */,
 				F0F6BD162F596BD500E733CC /* Frameworks */,
 				F0F3F8AC2F580D560016A83A /* Products */,
 			);
@@ -99,6 +148,7 @@
 				F0F3F8AB2F580D560016A83A /* Steward App.app */,
 				F0F3F8BA2F580D570016A83A /* Steward AppTests.xctest */,
 				F0F3F8C42F580D570016A83A /* Steward AppUITests.xctest */,
+				F0C58FA62F5D6A0A00F8DCE9 /* StewardShare.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -114,6 +164,28 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		F0C58FA52F5D6A0A00F8DCE9 /* StewardShare */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F0C58FB22F5D6A0A00F8DCE9 /* Build configuration list for PBXNativeTarget "StewardShare" */;
+			buildPhases = (
+				F0C58FA22F5D6A0A00F8DCE9 /* Sources */,
+				F0C58FA32F5D6A0A00F8DCE9 /* Frameworks */,
+				F0C58FA42F5D6A0A00F8DCE9 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				F0C58FA72F5D6A0A00F8DCE9 /* StewardShare */,
+			);
+			name = StewardShare;
+			packageProductDependencies = (
+			);
+			productName = StewardShare;
+			productReference = F0C58FA62F5D6A0A00F8DCE9 /* StewardShare.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		F0F3F8AA2F580D560016A83A /* Steward App */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = F0F3F8CE2F580D570016A83A /* Build configuration list for PBXNativeTarget "Steward App" */;
@@ -121,10 +193,12 @@
 				F0F3F8A72F580D560016A83A /* Sources */,
 				F0F3F8A82F580D560016A83A /* Frameworks */,
 				F0F3F8A92F580D560016A83A /* Resources */,
+				F0C58FB52F5D6A0A00F8DCE9 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				F0C58FAF2F5D6A0A00F8DCE9 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				F0F3F8AD2F580D560016A83A /* Steward App */,
@@ -193,6 +267,9 @@
 				LastSwiftUpdateCheck = 2630;
 				LastUpgradeCheck = 2630;
 				TargetAttributes = {
+					F0C58FA52F5D6A0A00F8DCE9 = {
+						CreatedOnToolsVersion = 26.3;
+					};
 					F0F3F8AA2F580D560016A83A = {
 						CreatedOnToolsVersion = 26.3;
 					};
@@ -226,11 +303,19 @@
 				F0F3F8AA2F580D560016A83A /* Steward App */,
 				F0F3F8B92F580D570016A83A /* Steward AppTests */,
 				F0F3F8C32F580D570016A83A /* Steward AppUITests */,
+				F0C58FA52F5D6A0A00F8DCE9 /* StewardShare */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		F0C58FA42F5D6A0A00F8DCE9 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F0F3F8A92F580D560016A83A /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -255,6 +340,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		F0C58FA22F5D6A0A00F8DCE9 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F0F3F8A72F580D560016A83A /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -279,6 +371,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		F0C58FAF2F5D6A0A00F8DCE9 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F0C58FA52F5D6A0A00F8DCE9 /* StewardShare */;
+			targetProxy = F0C58FAE2F5D6A0A00F8DCE9 /* PBXContainerItemProxy */;
+		};
 		F0F3F8BC2F580D570016A83A /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = F0F3F8AA2F580D560016A83A /* Steward App */;
@@ -292,6 +389,69 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		F0C58FB32F5D6A0A00F8DCE9 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = StewardShare/StewardShare.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = P3Z25ZSW2N;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = StewardShare/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = StewardShare;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "Steward.Steward-App.StewardShare";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		F0C58FB42F5D6A0A00F8DCE9 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = StewardShare/StewardShare.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = P3Z25ZSW2N;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = StewardShare/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = StewardShare;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "Steward.Steward-App.StewardShare";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 		F0F3F8CC2F580D570016A83A /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -606,6 +766,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		F0C58FB22F5D6A0A00F8DCE9 /* Build configuration list for PBXNativeTarget "StewardShare" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F0C58FB32F5D6A0A00F8DCE9 /* Debug */,
+				F0C58FB42F5D6A0A00F8DCE9 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		F0F3F8A62F580D560016A83A /* Build configuration list for PBXProject "Steward App" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
