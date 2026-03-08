@@ -160,11 +160,22 @@ extension Watch {
         return URL(string: s)
     }
 
-    /// The next check date based on last check + frequency interval, aligned to preferred time if set
+    /// The next watch date based on last check + frequency interval, aligned to preferred time if set
     var nextCheckDate: Date? {
         guard let freq = CheckFrequency.from(string: checkFrequency) else { return nil }
         let baseDate = lastCheckedAt ?? createdAt
         let interval = freq.intervalSeconds
+        let now = Date()
+
+        // For frequent watches (< 6 hours), just use simple interval from last check.
+        // preferredCheckTime alignment only makes sense for daily/12h frequencies.
+        if interval < 21600 {
+            var next = baseDate.addingTimeInterval(interval)
+            while next <= now {
+                next = next.addingTimeInterval(interval)
+            }
+            return next
+        }
 
         // No preferred time — use simple interval
         guard let timeStr = preferredCheckTime,
@@ -173,9 +184,8 @@ extension Watch {
         }
 
         let calendar = Calendar.current
-        let now = Date()
 
-        // For daily: next occurrence of HH:mm
+        // For daily+: next occurrence of HH:mm
         if interval >= 86400 {
             var nextCheck = calendar.nextDate(
                 after: baseDate,
@@ -188,7 +198,7 @@ extension Watch {
             return nextCheck
         }
 
-        // For sub-daily: find the next time slot aligned to preferredCheckTime
+        // For 6h/12h: find the next time slot aligned to preferredCheckTime
         var candidate = calendar.date(bySettingHour: hour, minute: minute, second: 0, of: baseDate) ?? baseDate
         while candidate <= now {
             candidate = candidate.addingTimeInterval(interval)
@@ -204,13 +214,13 @@ extension Watch {
         return (h, m)
     }
 
-    /// Formatted countdown string to next check (e.g. "in 4h 23m", "in 12m")
+    /// Formatted countdown string to next watch (e.g. "in 4h 23m", "in 12m")
     var nextCheckCountdown: String {
         guard let nextDate = nextCheckDate else { return checkFrequency }
 
         let now = Date()
         if nextDate <= now {
-            return "Checking soon…"
+            return "Any moment now…"
         }
 
         let remaining = nextDate.timeIntervalSince(now)

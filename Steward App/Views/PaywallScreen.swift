@@ -105,9 +105,9 @@ struct PaywallScreen: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 comparisonRow("Up to 3 watches", included: true)
-                comparisonRow("Checks once per day", included: true)
+                comparisonRow("Watches once per day", included: true)
                 comparisonRow("Push notifications", included: true)
-                comparisonRow("Faster check frequencies", included: false)
+                comparisonRow("Faster watch frequencies", included: false)
                 comparisonRow("Price insights & deal alerts", included: false)
                 comparisonRow("Unlimited watches", included: false)
             }
@@ -189,7 +189,7 @@ struct PaywallScreen: View {
             badge: nil,
             features: [
                 "Up to 20 watches",
-                "Check frequency up to every 30 minutes",
+                "Watch frequency up to every 30 minutes",
                 "Price insights & deal alerts"
             ],
             product: product,
@@ -213,7 +213,7 @@ struct PaywallScreen: View {
             badge: "BEST VALUE",
             features: [
                 "Unlimited watches",
-                "Check frequency up to every 5 minutes",
+                "Watch frequency up to every 5 minutes",
                 "Everything in Pro included",
                 "Priority support"
             ],

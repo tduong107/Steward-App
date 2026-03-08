@@ -15,11 +15,11 @@ struct FrequencyPickerSheet: View {
                 VStack(alignment: .leading, spacing: 0) {
                     // Header
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Check Frequency")
+                        Text("Watch Frequency")
                             .font(Theme.serif(20, weight: .bold))
                             .foregroundStyle(Theme.ink)
 
-                        Text("How often should Steward check this watch?")
+                        Text("How often should Steward watch this page?")
                             .font(Theme.body(13))
                             .foregroundStyle(Theme.inkLight)
                     }

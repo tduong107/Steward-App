@@ -10,11 +10,11 @@ struct StartTimePickerSheet: View {
             ScrollView {
                 VStack(spacing: 20) {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Check Start Time")
+                        Text("Watch Start Time")
                             .font(Theme.serif(20, weight: .bold))
                             .foregroundStyle(Theme.ink)
 
-                        Text("Set when Steward should start checking. All future checks will align to this time based on your check frequency.")
+                        Text("Set when Steward should start watching. All future watches will align to this time based on your watch frequency.")
                             .font(Theme.body(13))
                             .foregroundStyle(Theme.inkLight)
                             .fixedSize(horizontal: false, vertical: true)

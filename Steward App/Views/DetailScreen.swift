@@ -288,11 +288,11 @@ struct DetailScreen: View {
             DetailRow(icon: "🎯", label: "Watching for", value: watch.condition)
             DetailRow(icon: "⚡", label: "AI will", value: watch.actionLabel, highlight: watch.triggered)
             Button { showFrequencyPicker = true } label: {
-                DetailRow(icon: "⏱", label: "Check frequency", value: watch.checkFrequency, showChevron: true)
+                DetailRow(icon: "⏱", label: "Watch frequency", value: watch.checkFrequency, showChevron: true)
             }
             .buttonStyle(.plain)
             Button { showTimePicker = true } label: {
-                DetailRow(icon: "🕐", label: "Check start time", value: formatPreferredTime(watch.preferredCheckTime), showChevron: true)
+                DetailRow(icon: "🕐", label: "Watch start time", value: formatPreferredTime(watch.preferredCheckTime), showChevron: true)
             }
             .buttonStyle(.plain)
             nextCheckRow
@@ -368,7 +368,7 @@ struct DetailScreen: View {
                     .font(Theme.body(14, weight: .medium))
                     .foregroundStyle(Theme.inkMid)
 
-                Text("Steward will start tracking prices on the next check. Price history will appear here as data is collected.")
+                Text("Steward will start tracking prices on the next watch. Price history will appear here as data is collected.")
                     .font(Theme.body(12))
                     .foregroundStyle(Theme.inkLight)
                     .multilineTextAlignment(.center)
@@ -480,7 +480,7 @@ struct DetailScreen: View {
         return labels.joined(separator: " · ")
     }
 
-    // MARK: - Next Check Countdown
+    // MARK: - Next Watch Countdown
 
     private var nextCheckRow: some View {
         HStack(spacing: 12) {
@@ -489,7 +489,7 @@ struct DetailScreen: View {
                 .frame(width: 28, alignment: .center)
 
             VStack(alignment: .leading, spacing: 1) {
-                Text("Next check")
+                Text("Next watch")
                     .font(Theme.body(12))
                     .foregroundStyle(Theme.inkLight)
                 Text(watch.nextCheckCountdown)
@@ -623,12 +623,12 @@ struct DetailScreen: View {
         .padding(.top, 4)
     }
 
-    // MARK: - Recent Checks (Real Data from Supabase)
+    // MARK: - Watch History (Real Data from Supabase)
 
     private var recentChecks: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Recent Checks")
+                Text("Watch History")
                     .font(Theme.serif(15, weight: .semibold))
                     .foregroundStyle(Theme.ink)
 
@@ -648,7 +648,7 @@ struct DetailScreen: View {
                         .font(.system(size: 14))
                         .foregroundStyle(Theme.inkLight)
 
-                    Text("No checks yet — Steward will start monitoring soon")
+                    Text("No results yet — Steward will start monitoring soon")
                         .font(Theme.body(12))
                         .foregroundStyle(Theme.inkLight)
                 }
