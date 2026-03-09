@@ -10,7 +10,7 @@ actor AIService {
     struct Message {
         let role: String // "user" or "assistant"
         let content: String
-        let imageData: Data? // Optional JPEG image data for vision
+        var imageData: Data? // Optional JPEG image data for vision (var so older entries can be cleared)
 
         init(role: String, content: String, imageData: Data? = nil) {
             self.role = role
@@ -57,8 +57,9 @@ actor AIService {
 
         var request = URLRequest(url: functionURL)
         request.httpMethod = "POST"
-        // Authenticate with Supabase anon key (deployed with --no-verify-jwt)
+        // Authenticate with Supabase anon key — function deployed with verify_jwt = false
         request.setValue(apiKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "content-type")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         request.timeoutInterval = 60 // Longer timeout for vision requests

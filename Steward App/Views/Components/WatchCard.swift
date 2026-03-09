@@ -43,7 +43,15 @@ struct WatchCard: View {
                                 Circle().stroke(Theme.bgCard, lineWidth: 2)
                             )
                             .offset(x: 3, y: -3)
-                            .modifier(PulseModifier())
+                            .modifier(PulseModifier(enabled: true))
+                    } else if watch.needsAttention {
+                        Circle()
+                            .fill(Theme.gold)
+                            .frame(width: 10, height: 10)
+                            .overlay(
+                                Circle().stroke(Theme.bgCard, lineWidth: 2)
+                            )
+                            .offset(x: 3, y: -3)
                     }
                 }
 
@@ -67,17 +75,28 @@ struct WatchCard: View {
                         .foregroundStyle(Theme.inkLight)
                     }
 
-                    Text(watch.url)
+                    if watch.watchMode == "search" {
+                        HStack(spacing: 4) {
+                            Image(systemName: "magnifyingglass")
+                                .font(.system(size: 9))
+                            Text("Tracking across stores")
+                                .lineLimit(1)
+                        }
                         .font(Theme.body(11))
-                        .foregroundStyle(Theme.inkLight)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
+                        .foregroundStyle(Theme.accentMid)
+                    } else {
+                        Text(watch.url)
+                            .font(Theme.body(11))
+                            .foregroundStyle(Theme.inkLight)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
 
                     HStack(spacing: 5) {
                         Circle()
-                            .fill(watch.triggered ? Theme.accent : Theme.borderMid)
+                            .fill(watch.triggered ? Theme.accent : watch.needsAttention ? Theme.gold : Theme.borderMid)
                             .frame(width: 5, height: 5)
-                            .modifier(watch.triggered ? PulseModifier() : PulseModifier(enabled: false))
+                            .modifier(PulseModifier(enabled: watch.triggered))
 
                         if watch.triggered {
                             Image(systemName: "sparkle")
@@ -87,6 +106,15 @@ struct WatchCard: View {
                             Text(watch.changeNote ?? "Change detected!")
                                 .font(Theme.body(11, weight: .semibold))
                                 .foregroundStyle(Theme.accent)
+                                .lineLimit(1)
+                        } else if watch.needsAttention {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.system(size: 9))
+                                .foregroundStyle(Theme.gold)
+
+                            Text(watch.lastError ?? "Needs attention")
+                                .font(Theme.body(11, weight: .medium))
+                                .foregroundStyle(Theme.gold)
                                 .lineLimit(1)
                         } else {
                             Text(watch.condition)
@@ -108,7 +136,7 @@ struct WatchCard: View {
             .clipShape(RoundedRectangle(cornerRadius: Theme.radiusLg))
             .overlay(
                 RoundedRectangle(cornerRadius: Theme.radiusLg)
-                    .stroke(watch.triggered ? Theme.accentMid : Theme.border, lineWidth: 1)
+                    .stroke(watch.triggered ? Theme.accentMid : watch.needsAttention ? Theme.gold.opacity(0.5) : Theme.border, lineWidth: 1)
             )
             .shadow(color: .black.opacity(0.04), radius: 8, y: 4)
         }
@@ -130,6 +158,9 @@ struct PulseModifier: ViewModifier {
             )
             .onAppear {
                 if enabled { isPulsing = true }
+            }
+            .onDisappear {
+                isPulsing = false
             }
     }
 }

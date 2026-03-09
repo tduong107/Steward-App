@@ -5,6 +5,7 @@ import SwiftUI
 @Model
 final class ActivityItem {
     var id: UUID
+    var watchId: UUID?
     var icon: String
     var iconColorName: String
     var label: String
@@ -26,9 +27,11 @@ final class ActivityItem {
         iconColorName: String,
         label: String,
         subtitle: String,
-        time: String
+        time: String,
+        watchId: UUID? = nil
     ) {
         self.id = UUID()
+        self.watchId = watchId
         self.icon = icon
         self.iconColorName = iconColorName
         self.label = label

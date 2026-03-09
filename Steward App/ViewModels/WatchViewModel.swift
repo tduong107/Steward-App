@@ -24,6 +24,7 @@ final class WatchViewModel {
     // Chat
     var isChatOpen = false
     var pendingChatURL: String?  // URL shared via Share Extension
+    var pendingFixContext: String?  // Context for "Ask AI to fix" broken watch
 
     // Action modal
     var actionModalWatch: Watch?
@@ -37,12 +38,18 @@ final class WatchViewModel {
     var savingsCalculation: SavingsCalculation = .empty
     var isLoadingSavings = false
 
+    // Cached filtered collections (updated in fetchLocalWatches to avoid recomputing in every SwiftUI body)
+    var triggeredWatches: [Watch] = []
+
     private var modelContext: ModelContext?
     private var auth: AuthManager?
     private var supabase: SupabaseService?
     private var subscriptionManager: SubscriptionManager?
     private var hasConfigured = false
     private var lastSyncTime: Date?
+
+    // Task handles for cancellation
+    private var backgroundTasks: [Task<Void, Never>] = []
 
     enum Tab: String, CaseIterable {
         case home = "Watches"
@@ -71,6 +78,7 @@ final class WatchViewModel {
 
         // Load local data immediately for fast UI
         fetchLocalWatches()
+        purgeOrphanedActivities()
         fetchLocalActivities()
 
         // Then sync from cloud in background
@@ -85,12 +93,33 @@ final class WatchViewModel {
         guard let context = modelContext else { return }
         let descriptor = FetchDescriptor<Watch>(sortBy: [SortDescriptor(\.createdAt, order: .reverse)])
         watches = (try? context.fetch(descriptor)) ?? []
+        triggeredWatches = watches.filter { $0.triggered }
     }
 
     private func fetchLocalActivities() {
         guard let context = modelContext else { return }
         let descriptor = FetchDescriptor<ActivityItem>(sortBy: [SortDescriptor(\.createdAt, order: .reverse)])
         activities = (try? context.fetch(descriptor)) ?? []
+    }
+
+    /// Permanently deletes local activities whose watch no longer exists or whose watchId is nil (legacy orphans)
+    private func purgeOrphanedActivities() {
+        guard let context = modelContext else { return }
+        let currentWatchIds = Set(watches.map(\.id))
+        let allActivities = (try? context.fetch(FetchDescriptor<ActivityItem>())) ?? []
+        var deleted = 0
+        for activity in allActivities {
+            if activity.watchId == nil || !currentWatchIds.contains(activity.watchId!) {
+                context.delete(activity)
+                deleted += 1
+            }
+        }
+        if deleted > 0 {
+            try? context.save()
+            #if DEBUG
+            print("[WatchViewModel] Purged \(deleted) orphaned activities")
+            #endif
+        }
     }
 
     // MARK: - Cloud Sync
@@ -113,19 +142,80 @@ final class WatchViewModel {
             let remoteDTOs = try await supabase?.fetchWatches() ?? []
             let remoteActivities = try await supabase?.fetchActivities() ?? []
 
-            // Batch all SwiftData updates together to minimise re-renders
-            let existing = (try? context.fetch(FetchDescriptor<Watch>())) ?? []
-            for watch in existing { context.delete(watch) }
-            for dto in remoteDTOs { context.insert(Watch(from: dto)) }
+            // Merge watches: update existing, insert new, delete removed
+            // (preserves SwiftData object identity so live references in DetailScreen stay valid)
+            let existingWatches = (try? context.fetch(FetchDescriptor<Watch>())) ?? []
+            let existingById = Dictionary(uniqueKeysWithValues: existingWatches.map { ($0.id, $0) })
+            let remoteIds = Set(remoteDTOs.map(\.id))
 
+            for dto in remoteDTOs {
+                if let existing = existingById[dto.id] {
+                    // Update in-place — preserves object identity
+                    existing.emoji = dto.emoji
+                    existing.name = dto.name
+                    existing.url = dto.url
+                    existing.condition = dto.condition
+                    existing.actionLabel = dto.actionLabel
+                    existing.actionTypeRaw = dto.actionType
+                    existing.statusRaw = dto.status
+                    existing.triggered = dto.triggered
+                    existing.changeNote = dto.changeNote
+                    existing.checkFrequency = dto.checkFrequency
+                    existing.preferredCheckTime = dto.preferredCheckTime
+                    existing.notifyChannels = dto.notifyChannels ?? "push"
+                    existing.imageURL = dto.imageURL
+                    existing.actionURL = dto.actionURL
+                    existing.lastCheckedAt = dto.lastChecked
+                    existing.lastSeen = dto.lastChecked?.formatted(.relative(presentation: .named)) ?? "Not yet"
+                    existing.watchMode = dto.watchMode
+                    existing.searchQuery = dto.searchQuery
+                    existing.consecutiveFailures = dto.consecutiveFailures
+                    existing.lastError = dto.lastError
+                    existing.needsAttention = dto.needsAttention
+                } else {
+                    // New remote watch — insert
+                    context.insert(Watch(from: dto))
+                }
+            }
+            // Delete local watches that no longer exist on remote
+            for watch in existingWatches where !remoteIds.contains(watch.id) {
+                context.delete(watch)
+            }
+
+            // Build a lookup of remote activities by ID for quick access
+            let remoteActivityById = Dictionary(uniqueKeysWithValues: remoteActivities.map { ($0.id, $0) })
             let existingActivities = (try? context.fetch(FetchDescriptor<ActivityItem>())) ?? []
-            for activity in existingActivities { context.delete(activity) }
-            for dto in remoteActivities { context.insert(ActivityItem(from: dto)) }
+            let existingActivityIds = Set(existingActivities.map(\.id))
+            let remoteActivityIds = Set(remoteActivities.map(\.id))
+
+            for activity in existingActivities {
+                if !remoteActivityIds.contains(activity.id) {
+                    // Deleted on remote — remove locally
+                    context.delete(activity)
+                } else if let dto = remoteActivityById[activity.id] {
+                    // Backfill watchId from server (for activities created before watchId was tracked)
+                    if activity.watchId == nil, let remoteWatchId = dto.watchId {
+                        activity.watchId = remoteWatchId
+                    }
+                    // Delete if the activity's watch no longer exists
+                    if let wid = activity.watchId, !remoteIds.contains(wid) {
+                        context.delete(activity)
+                    }
+                }
+            }
+            // Insert new activities — only if their watch still exists
+            for dto in remoteActivities where !existingActivityIds.contains(dto.id) {
+                guard let wid = dto.watchId, remoteIds.contains(wid) else {
+                    continue // skip orphaned or unlinked activities from server
+                }
+                context.insert(ActivityItem(from: dto))
+            }
 
             try? context.save()
 
             // Single UI update after all data is ready
             fetchLocalWatches()
+            purgeOrphanedActivities()
             fetchLocalActivities()
         } catch {
             syncError = error.localizedDescription
@@ -193,8 +283,9 @@ final class WatchViewModel {
         let watchesMissingImages = watches.filter { $0.imageURL == nil }
         guard !watchesMissingImages.isEmpty else { return }
 
-        Task {
+        let task = Task {
             for watch in watchesMissingImages {
+                guard !Task.isCancelled else { return }
                 if let ogImage = await fetchOGImageURL(for: watch.url) {
                     watch.imageURL = ogImage
                     try? modelContext?.save()
@@ -209,13 +300,10 @@ final class WatchViewModel {
             // Refresh UI once after all backfills complete
             fetchLocalWatches()
         }
+        backgroundTasks.append(task)
     }
 
     // MARK: - Watch Management
-
-    var triggeredWatches: [Watch] {
-        watches.filter { $0.triggered }
-    }
 
     /// Whether the user can add another watch under their current tier
     var canAddWatch: Bool {
@@ -359,9 +447,14 @@ final class WatchViewModel {
 
         // Delete locally first for instant UI
         context.delete(watch)
+
+        // Also delete associated activities locally
+        deleteLocalActivities(forWatchId: watchId)
+
         try? context.save()
         withAnimation(.spring(response: 0.3)) {
             fetchLocalWatches()
+            fetchLocalActivities()
         }
 
         // Then delete from Supabase
@@ -382,9 +475,16 @@ final class WatchViewModel {
         for watch in watchesToDelete {
             context.delete(watch)
         }
+
+        // Also delete associated activities locally
+        for watchId in ids {
+            deleteLocalActivities(forWatchId: watchId)
+        }
+
         try? context.save()
         withAnimation(.spring(response: 0.3)) {
             fetchLocalWatches()
+            fetchLocalActivities()
         }
 
         Task {
@@ -440,10 +540,17 @@ final class WatchViewModel {
         }
     }
 
+    /// Opens the chat drawer pre-loaded with context about a broken watch
+    func askAIToFix(_ watch: Watch) {
+        pendingFixContext = "My watch \"\(watch.name)\" (\(watch.url)) is having trouble: \(watch.lastError ?? "unknown error"). It has failed \(watch.consecutiveFailures) times in a row. Can you help me fix it? Maybe find a working URL for this product or adjust the watch."
+        isChatOpen = true
+    }
+
     // MARK: - Activity Logging
 
     private func logActivity(_ activity: ActivityItem, watchId: UUID? = nil) {
         guard let context = modelContext else { return }
+        activity.watchId = watchId
         context.insert(activity)
         try? context.save()
         fetchLocalActivities()
@@ -454,6 +561,15 @@ final class WatchViewModel {
                 let dto = activity.toDTO(userId: userId, watchId: watchId)
                 try? await supabase?.createActivity(dto)
             }
+        }
+    }
+
+    /// Deletes all local activities associated with a given watch ID
+    private func deleteLocalActivities(forWatchId watchId: UUID) {
+        guard let context = modelContext else { return }
+        let allActivities = (try? context.fetch(FetchDescriptor<ActivityItem>())) ?? []
+        for activity in allActivities where activity.watchId == watchId {
+            context.delete(activity)
         }
     }
 

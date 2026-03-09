@@ -48,8 +48,13 @@ enum ShareAPIService {
         request.httpMethod = "POST"
         request.setValue(anonKey, forHTTPHeaderField: "apikey")
         request.setValue("application/json", forHTTPHeaderField: "content-type")
+        // Include access token if available for authenticated rate-limiting
+        if let token = accessToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        request.timeoutInterval = 45
+        // Share extensions have limited execution time — keep timeout tight
+        request.timeoutInterval = 15
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
@@ -161,4 +166,8 @@ struct ShareWatchDTO: Codable {
     let site_cookies: String?     // JSON-serialized cookie array
     let cookie_domain: String?    // Domain the cookies belong to
     let cookie_status: String?    // "active" or "expired"
+
+    // Multi-source search watch fields
+    let watch_mode: String        // "url" (default) or "search"
+    let search_query: String?     // Product search query for search-mode watches
 }

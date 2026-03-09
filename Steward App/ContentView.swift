@@ -9,7 +9,7 @@ struct ContentView: View {
     @Environment(AuthManager.self) private var authManager
     @Environment(SupabaseService.self) private var supabaseService
     @Environment(SubscriptionManager.self) private var subscriptionManager
-    @AppStorage("isDarkMode") private var isDarkMode = true
+    @AppStorage("isDarkMode") private var isDarkMode = false
 
     // Shared watch deep link
     @State private var sharedWatchData: SharedWatchData?

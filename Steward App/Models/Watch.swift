@@ -64,6 +64,13 @@ enum ActionType: String, Codable, CaseIterable {
 
 @Model
 final class Watch {
+    // Static formatters (DateFormatter is expensive to create — reuse across instances)
+    private static let timeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm"
+        return f
+    }()
+
     var id: UUID
     var emoji: String
     var name: String
@@ -82,6 +89,13 @@ final class Watch {
     var actionURL: String?
     var lastCheckedAt: Date?
     var createdAt: Date
+    var watchMode: String = "url"          // "url" (single-URL) or "search" (multi-source)
+    var searchQuery: String?               // Product search query for search-mode watches
+
+    // Error tracking — populated by check-watch when checks fail
+    var consecutiveFailures: Int = 0
+    var lastError: String?
+    var needsAttention: Bool = false
 
     var actionType: ActionType {
         get { ActionType(rawValue: actionTypeRaw) ?? .notify }
@@ -109,7 +123,12 @@ final class Watch {
         notifyChannels: String = "push",
         imageURL: String? = nil,
         actionURL: String? = nil,
-        lastCheckedAt: Date? = nil
+        lastCheckedAt: Date? = nil,
+        watchMode: String = "url",
+        searchQuery: String? = nil,
+        consecutiveFailures: Int = 0,
+        lastError: String? = nil,
+        needsAttention: Bool = false
     ) {
         self.id = UUID()
         self.emoji = emoji
@@ -127,21 +146,27 @@ final class Watch {
         if let preferredCheckTime {
             self.preferredCheckTime = preferredCheckTime
         } else {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "HH:mm"
-            self.preferredCheckTime = formatter.string(from: Date())
+            self.preferredCheckTime = Self.timeFormatter.string(from: Date())
         }
         self.notifyChannels = notifyChannels
         self.imageURL = imageURL
         self.actionURL = actionURL
         self.lastCheckedAt = lastCheckedAt
         self.createdAt = Date()
+        self.watchMode = watchMode
+        self.searchQuery = searchQuery
+        self.consecutiveFailures = consecutiveFailures
+        self.lastError = lastError
+        self.needsAttention = needsAttention
     }
 }
 
 // MARK: - Computed Helpers
 
 extension Watch {
+    /// Whether this watch has an error that needs user attention
+    var hasError: Bool { needsAttention && lastError != nil }
+
     /// The full URL with https:// prepended if missing
     var fullURL: URL? {
         var urlString = url
@@ -165,6 +190,7 @@ extension Watch {
         guard let freq = CheckFrequency.from(string: checkFrequency) else { return nil }
         let baseDate = lastCheckedAt ?? createdAt
         let interval = freq.intervalSeconds
+        guard interval > 0 else { return nil } // Prevent infinite loop from zero interval
         let now = Date()
 
         // For frequent watches (< 6 hours), just use simple interval from last check.

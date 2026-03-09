@@ -21,6 +21,8 @@ struct DetailScreen: View {
     @State private var showFrequencyPicker = false
     @State private var showTimePicker = false
     @State private var showNotifyPicker = false
+    @State private var showRenameAlert = false
+    @State private var editedName = ""
 
     /// Show price chart for price-related watches
     private var showsPriceChart: Bool {
@@ -65,6 +67,13 @@ struct DetailScreen: View {
                     .accessibilityLabel("Share this watch")
 
                     Menu {
+                        Button {
+                            editedName = watch.name
+                            showRenameAlert = true
+                        } label: {
+                            Label("Rename", systemImage: "pencil")
+                        }
+
                         Button(role: .destructive) {
                             showDeleteConfirm = true
                         } label: {
@@ -87,6 +96,19 @@ struct DetailScreen: View {
             }
         } message: {
             Text("Are you sure you want to delete \"\(watch.name)\"? This action cannot be undone.")
+        }
+        .alert("Rename Watch", isPresented: $showRenameAlert) {
+            TextField("Watch name", text: $editedName)
+            Button("Cancel", role: .cancel) {}
+            Button("Save") {
+                let trimmed = editedName.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty {
+                    watch.name = trimmed
+                    try? viewModel.saveAndSync(watch)
+                }
+            }
+        } message: {
+            Text("Enter a new name for this watch.")
         }
         .sheet(isPresented: $showShareSheet) {
             ShareWatchSheet(watch: watch)
@@ -199,9 +221,21 @@ struct DetailScreen: View {
                 .clipShape(RoundedRectangle(cornerRadius: 16))
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(watch.name)
-                        .font(Theme.serif(18, weight: .bold))
-                        .foregroundStyle(Theme.ink)
+                    Button {
+                        editedName = watch.name
+                        showRenameAlert = true
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(watch.name)
+                                .font(Theme.serif(18, weight: .bold))
+                                .foregroundStyle(Theme.ink)
+
+                            Image(systemName: "pencil")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(Theme.inkLight)
+                        }
+                    }
+                    .buttonStyle(.plain)
 
                     Button {
                         showBrowser = true
@@ -225,21 +259,25 @@ struct DetailScreen: View {
             // Status pill
             HStack(spacing: 6) {
                 Circle()
-                    .fill(watch.triggered ? Theme.accent : Theme.inkLight)
+                    .fill(watch.triggered ? Theme.accent : watch.needsAttention ? Theme.gold : Theme.inkLight)
                     .frame(width: 6, height: 6)
                     .modifier(PulseModifier(enabled: watch.triggered))
 
-                Text(watch.triggered ? "Change detected · Ready to act" : "Watching · \(watch.lastSeen)")
+                Text(watch.triggered
+                     ? "Change detected · Ready to act"
+                     : watch.needsAttention
+                     ? "Needs attention · \(watch.consecutiveFailures) failures"
+                     : "Watching · \(watch.lastSeen)")
                     .font(Theme.body(12, weight: .semibold))
-                    .foregroundStyle(watch.triggered ? Theme.accent : Theme.inkMid)
+                    .foregroundStyle(watch.triggered ? Theme.accent : watch.needsAttention ? Theme.gold : Theme.inkMid)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 6)
-            .background(watch.triggered ? Theme.accentLight : Theme.bgDeep)
+            .background(watch.triggered ? Theme.accentLight : watch.needsAttention ? Theme.goldLight : Theme.bgDeep)
             .clipShape(Capsule())
             .overlay(
                 Capsule()
-                    .stroke(watch.triggered ? Theme.accentMid : Theme.border, lineWidth: 1)
+                    .stroke(watch.triggered ? Theme.accentMid : watch.needsAttention ? Theme.gold.opacity(0.4) : Theme.border, lineWidth: 1)
             )
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -255,6 +293,11 @@ struct DetailScreen: View {
 
     private var detailContent: some View {
         VStack(spacing: 8) {
+            // Error / needs attention banner
+            if watch.needsAttention {
+                warningBanner
+            }
+
             // Change banner
             if watch.triggered {
                 changeBanner
@@ -417,6 +460,58 @@ struct DetailScreen: View {
         .padding(.bottom, 6)
     }
 
+    // MARK: - Warning Banner
+
+    private var warningBanner: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.gold)
+
+                Text("NEEDS ATTENTION")
+                    .font(Theme.body(11, weight: .bold))
+                    .foregroundStyle(Theme.gold)
+                    .tracking(0.5)
+            }
+
+            Text(watch.lastError ?? "This watch is having trouble checking the page.")
+                .font(Theme.body(14, weight: .semibold))
+                .foregroundStyle(Theme.ink)
+
+            Text("Failed \(watch.consecutiveFailures) times in a row. The page may have changed or the URL may no longer work.")
+                .font(Theme.body(12))
+                .foregroundStyle(Theme.inkMid)
+
+            Button {
+                viewModel.askAIToFix(watch)
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 12))
+                    Text("Ask AI to fix")
+                        .font(Theme.body(13, weight: .semibold))
+                }
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .background(Theme.gold)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+            }
+            .buttonStyle(.plain)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .background(Theme.goldLight)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(Theme.gold.opacity(0.3), lineWidth: 1)
+        )
+        .padding(.bottom, 6)
+    }
+
     // MARK: - Action Button
 
     private var actionButton: some View {
@@ -453,6 +548,13 @@ struct DetailScreen: View {
 
     // MARK: - Format Preferred Time
 
+    // Static formatter to avoid creating DateFormatter on every render
+    private static let displayTimeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "h:mm a"
+        return f
+    }()
+
     private func formatPreferredTime(_ time: String?) -> String {
         guard let time else { return "Not set" }
         let parts = time.split(separator: ":")
@@ -461,10 +563,8 @@ struct DetailScreen: View {
         var comps = DateComponents()
         comps.hour = h
         comps.minute = m
-        let formatter = DateFormatter()
-        formatter.dateFormat = "h:mm a"
         if let date = Calendar.current.date(from: comps) {
-            return formatter.string(from: date)
+            return Self.displayTimeFormatter.string(from: date)
         }
         return time
     }
@@ -663,9 +763,13 @@ struct DetailScreen: View {
 
                             Spacer()
 
+                            let isError = result.resultText == "Price not found on page" ||
+                                result.resultText == "Could not reach page" ||
+                                result.resultText.hasPrefix("Error:")
+
                             Text(result.resultText)
                                 .font(Theme.body(12, weight: result.changed ? .semibold : .regular))
-                                .foregroundStyle(result.changed ? Theme.accent : Theme.inkLight)
+                                .foregroundStyle(result.changed ? Theme.accent : isError ? Theme.gold : Theme.inkLight)
                                 .lineLimit(1)
                         }
                         .padding(.vertical, 11)

@@ -28,6 +28,15 @@ struct WatchDTO: Codable, Identifiable, Sendable {
     var cookieDomain: String?
     var cookieStatus: String?
 
+    // Multi-source search watch fields
+    var watchMode: String
+    var searchQuery: String?
+
+    // Error tracking fields
+    var consecutiveFailures: Int
+    var lastError: String?
+    var needsAttention: Bool
+
     enum CodingKeys: String, CodingKey {
         case id
         case userId = "user_id"
@@ -47,6 +56,64 @@ struct WatchDTO: Codable, Identifiable, Sendable {
         case siteCookies = "site_cookies"
         case cookieDomain = "cookie_domain"
         case cookieStatus = "cookie_status"
+        case watchMode = "watch_mode"
+        case searchQuery = "search_query"
+        case consecutiveFailures = "consecutive_failures"
+        case lastError = "last_error"
+        case needsAttention = "needs_attention"
+    }
+
+    // Explicit memberwise init (required because we provide a custom Decodable init)
+    init(id: UUID, userId: UUID, emoji: String, name: String, url: String,
+         condition: String, actionLabel: String, actionType: String, status: String,
+         checkFrequency: String, preferredCheckTime: String? = nil, notifyChannels: String? = nil,
+         lastChecked: Date? = nil, triggered: Bool, changeNote: String? = nil,
+         imageURL: String? = nil, actionURL: String? = nil, createdAt: Date,
+         siteCookies: String? = nil, cookieDomain: String? = nil, cookieStatus: String? = nil,
+         watchMode: String = "url", searchQuery: String? = nil,
+         consecutiveFailures: Int = 0, lastError: String? = nil, needsAttention: Bool = false) {
+        self.id = id; self.userId = userId; self.emoji = emoji; self.name = name
+        self.url = url; self.condition = condition; self.actionLabel = actionLabel
+        self.actionType = actionType; self.status = status; self.checkFrequency = checkFrequency
+        self.preferredCheckTime = preferredCheckTime; self.notifyChannels = notifyChannels
+        self.lastChecked = lastChecked; self.triggered = triggered; self.changeNote = changeNote
+        self.imageURL = imageURL; self.actionURL = actionURL; self.createdAt = createdAt
+        self.siteCookies = siteCookies; self.cookieDomain = cookieDomain
+        self.cookieStatus = cookieStatus; self.watchMode = watchMode
+        self.searchQuery = searchQuery; self.consecutiveFailures = consecutiveFailures
+        self.lastError = lastError; self.needsAttention = needsAttention
+    }
+
+    // Custom decoder: use decodeIfPresent with defaults for new columns
+    // so the app doesn't crash if the DB migration hasn't been deployed yet.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        userId = try c.decode(UUID.self, forKey: .userId)
+        emoji = try c.decode(String.self, forKey: .emoji)
+        name = try c.decode(String.self, forKey: .name)
+        url = try c.decode(String.self, forKey: .url)
+        condition = try c.decode(String.self, forKey: .condition)
+        actionLabel = try c.decode(String.self, forKey: .actionLabel)
+        actionType = try c.decode(String.self, forKey: .actionType)
+        status = try c.decode(String.self, forKey: .status)
+        checkFrequency = try c.decode(String.self, forKey: .checkFrequency)
+        preferredCheckTime = try c.decodeIfPresent(String.self, forKey: .preferredCheckTime)
+        notifyChannels = try c.decodeIfPresent(String.self, forKey: .notifyChannels)
+        lastChecked = try c.decodeIfPresent(Date.self, forKey: .lastChecked)
+        triggered = try c.decode(Bool.self, forKey: .triggered)
+        changeNote = try c.decodeIfPresent(String.self, forKey: .changeNote)
+        imageURL = try c.decodeIfPresent(String.self, forKey: .imageURL)
+        actionURL = try c.decodeIfPresent(String.self, forKey: .actionURL)
+        createdAt = try c.decode(Date.self, forKey: .createdAt)
+        siteCookies = try c.decodeIfPresent(String.self, forKey: .siteCookies)
+        cookieDomain = try c.decodeIfPresent(String.self, forKey: .cookieDomain)
+        cookieStatus = try c.decodeIfPresent(String.self, forKey: .cookieStatus)
+        watchMode = try c.decodeIfPresent(String.self, forKey: .watchMode) ?? "url"
+        searchQuery = try c.decodeIfPresent(String.self, forKey: .searchQuery)
+        consecutiveFailures = try c.decodeIfPresent(Int.self, forKey: .consecutiveFailures) ?? 0
+        lastError = try c.decodeIfPresent(String.self, forKey: .lastError)
+        needsAttention = try c.decodeIfPresent(Bool.self, forKey: .needsAttention) ?? false
     }
 }
 
@@ -84,6 +151,16 @@ struct CheckResultDTO: Codable, Identifiable, Sendable {
 
     struct ResultData: Codable, Sendable {
         var text: String?
+        var sources: [SourcePrice]?   // Multi-source price data for search watches
+    }
+
+    /// A single store's price from a multi-source search result
+    struct SourcePrice: Codable, Sendable {
+        let title: String
+        let url: String
+        let source: String
+        let price: Double
+        let imageURL: String?
     }
 
     enum CodingKeys: String, CodingKey {
@@ -100,10 +177,12 @@ struct ProfileDTO: Codable, Sendable {
     let id: UUID
     var displayName: String?
     var deviceToken: String?
+    var phoneNumber: String?
 
     enum CodingKeys: String, CodingKey {
         case id
         case displayName = "display_name"
         case deviceToken = "device_token"
+        case phoneNumber = "phone_number"
     }
 }

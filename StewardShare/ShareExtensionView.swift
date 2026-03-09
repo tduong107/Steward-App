@@ -27,6 +27,16 @@ struct ShareExtensionView: View {
     @State private var cookieDomain: String?
     @FocusState private var isInputFocused: Bool
 
+    // Watch proposal editing state
+    @State private var proposalFrequency: String = "Daily"
+    @State private var partySize: Int = 2
+    @State private var preferredDate: Date = Date()
+    @State private var preferredTime: Date = {
+        // Default to 7 PM today
+        let cal = Calendar.current
+        return cal.date(bySettingHour: 19, minute: 0, second: 0, of: Date()) ?? Date()
+    }()
+
     enum Phase: Equatable {
         case extracting
         case ready
@@ -140,7 +150,7 @@ struct ShareExtensionView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
 
                 Text("Steward")
-                    .font(.system(size: 18, weight: .semibold, design: .serif))
+                    .font(.custom("Georgia-Bold", size: 18))
                     .foregroundStyle(.white)
             }
 
@@ -265,11 +275,11 @@ struct ShareExtensionView: View {
                     .foregroundStyle(.white.opacity(0.6))
                     .padding(.top, 2)
 
-                // Preset watch types
+                // Context-aware preset watch types
                 VStack(spacing: 8) {
-                    watchTypeButton(icon: "tag.fill", label: "Price Drop", subtitle: "Get notified when price decreases", type: "price")
-                    watchTypeButton(icon: "cart.fill", label: "Back in Stock", subtitle: "Know when it's available again", type: "cart")
-                    watchTypeButton(icon: "bell.fill", label: "Any Changes", subtitle: "Monitor for any page updates", type: "notify")
+                    ForEach(Array(suggestionChips.enumerated()), id: \.offset) { _, chip in
+                        watchTypeButton(icon: chip.icon, label: chip.label, subtitle: chip.subtitle, type: chip.type)
+                    }
                 }
                 .padding(.horizontal, 20)
 
@@ -475,44 +485,93 @@ struct ShareExtensionView: View {
 
     // MARK: - Watch Proposal Content
 
+    /// Whether the current watch is a booking/reservation type (restaurant or ticketing)
+    private var isBookingWatch: Bool {
+        let category = URLRewriter.categorize(sharedURL, rewriteResult: rewriteResult)
+        return category == .restaurant || category == .ticketing
+    }
+
+    /// Builds the final condition string including reservation details for booking watches
+    private func buildFinalCondition(base: String) -> String {
+        guard isBookingWatch else { return base }
+
+        let category = URLRewriter.categorize(sharedURL, rewriteResult: rewriteResult)
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateStyle = .medium
+        let timeFormatter = DateFormatter()
+        timeFormatter.timeStyle = .short
+
+        let dateStr = dateFormatter.string(from: preferredDate)
+        let timeStr = timeFormatter.string(from: preferredTime)
+
+        if category == .restaurant {
+            return "Table for \(partySize) on \(dateStr) around \(timeStr)"
+        } else {
+            return "Tickets available on \(dateStr)"
+        }
+    }
+
+    /// Builds the final WatchInfo with user edits applied
+    private func buildFinalWatch(from info: WatchInfo) -> WatchInfo {
+        WatchInfo(
+            emoji: info.emoji,
+            name: info.name,
+            condition: buildFinalCondition(base: info.condition),
+            actionType: info.actionType,
+            checkFrequency: proposalFrequency,
+            imageURL: info.imageURL
+        )
+    }
+
     private func watchProposalContent(_ info: WatchInfo) -> some View {
-        VStack(spacing: 14) {
-            // Watch preview card
-            VStack(spacing: 8) {
-                Text(info.emoji)
-                    .font(.system(size: 36))
-                Text(info.name)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(2)
-                Text(info.condition)
-                    .font(.system(size: 13))
-                    .foregroundStyle(.gray)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(2)
-
-                HStack(spacing: 4) {
-                    Image(systemName: "clock")
-                        .font(.system(size: 11))
-                    Text("Checks \(info.checkFrequency.lowercased())")
-                        .font(.system(size: 12))
+        ScrollView {
+            VStack(spacing: 16) {
+                // Back button
+                HStack {
+                    Button {
+                        withAnimation(.spring(response: 0.3)) { phase = .ready }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 13, weight: .semibold))
+                            Text("Back")
+                                .font(.system(size: 14, weight: .medium))
+                        }
+                        .foregroundStyle(mintGreen)
+                    }
+                    Spacer()
                 }
-                .foregroundStyle(.gray)
-                .padding(.top, 2)
+                .padding(.horizontal, 20)
+                .padding(.top, 10)
+
+                // Watch preview card
+                VStack(spacing: 6) {
+                    Text(info.emoji)
+                        .font(.system(size: 36))
+                    Text(info.name)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                }
+                .padding(.top, 4)
+                .padding(.horizontal, 20)
+
+                // Reservation details (for restaurant & ticketing watches)
+                if isBookingWatch {
+                    reservationDetailsSection
+                }
+
+                // Frequency picker
+                frequencyPickerSection
+
+                Spacer(minLength: 20)
             }
-            .padding(20)
-            .frame(maxWidth: .infinity)
-            .background(cardBg)
-            .clipShape(RoundedRectangle(cornerRadius: 14))
-            .padding(.horizontal, 20)
-            .padding(.top, 16)
-
-            Spacer()
-
-            // Start Watching button
+        }
+        .safeAreaInset(edge: .bottom) {
+            // Start Watching button pinned to bottom
             Button {
-                Task { await saveWatch(info) }
+                Task { await saveWatch(buildFinalWatch(from: info)) }
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "eye")
@@ -527,8 +586,150 @@ struct ShareExtensionView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 14))
             }
             .padding(.horizontal, 20)
-            .padding(.bottom, 20)
+            .padding(.bottom, 16)
+            .background(darkBg)
         }
+    }
+
+    // MARK: - Reservation Details Section
+
+    private var reservationDetailsSection: some View {
+        let category = URLRewriter.categorize(sharedURL, rewriteResult: rewriteResult)
+
+        return VStack(alignment: .leading, spacing: 12) {
+            Text(category == .restaurant ? "Reservation Details" : "Event Details")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.6))
+                .padding(.horizontal, 4)
+
+            VStack(spacing: 0) {
+                // Party size (restaurant only)
+                if category == .restaurant {
+                    HStack {
+                        Image(systemName: "person.2.fill")
+                            .font(.system(size: 13))
+                            .foregroundStyle(mintGreen)
+                            .frame(width: 24)
+                        Text("Party size")
+                            .font(.system(size: 14))
+                            .foregroundStyle(.white)
+                        Spacer()
+                        HStack(spacing: 12) {
+                            Button {
+                                if partySize > 1 { partySize -= 1 }
+                            } label: {
+                                Image(systemName: "minus.circle.fill")
+                                    .font(.system(size: 22))
+                                    .foregroundStyle(partySize > 1 ? mintGreen : .gray.opacity(0.3))
+                            }
+                            .disabled(partySize <= 1)
+
+                            Text("\(partySize)")
+                                .font(.system(size: 16, weight: .semibold, design: .rounded))
+                                .foregroundStyle(.white)
+                                .frame(minWidth: 24)
+
+                            Button {
+                                if partySize < 20 { partySize += 1 }
+                            } label: {
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.system(size: 22))
+                                    .foregroundStyle(partySize < 20 ? mintGreen : .gray.opacity(0.3))
+                            }
+                            .disabled(partySize >= 20)
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 12)
+
+                    Divider().overlay(Color.white.opacity(0.06))
+                }
+
+                // Preferred date
+                HStack {
+                    Image(systemName: "calendar")
+                        .font(.system(size: 13))
+                        .foregroundStyle(mintGreen)
+                        .frame(width: 24)
+                    Text("Date")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.white)
+                    Spacer()
+                    DatePicker("", selection: $preferredDate, in: Date()..., displayedComponents: .date)
+                        .labelsHidden()
+                        .tint(mintGreen)
+                        .colorScheme(.dark)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+
+                // Preferred time (restaurant only)
+                if category == .restaurant {
+                    Divider().overlay(Color.white.opacity(0.06))
+
+                    HStack {
+                        Image(systemName: "clock.fill")
+                            .font(.system(size: 13))
+                            .foregroundStyle(mintGreen)
+                            .frame(width: 24)
+                        Text("Time")
+                            .font(.system(size: 14))
+                            .foregroundStyle(.white)
+                        Spacer()
+                        DatePicker("", selection: $preferredTime, displayedComponents: .hourAndMinute)
+                            .labelsHidden()
+                            .tint(mintGreen)
+                            .colorScheme(.dark)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                }
+            }
+            .background(cardBg)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .padding(.horizontal, 20)
+    }
+
+    // MARK: - Frequency Picker Section
+
+    private let frequencyOptions: [(label: String, value: String)] = [
+        ("Daily", "Daily"),
+        ("12h", "Every 12 hours"),
+        ("6h", "Every 6 hours"),
+        ("1h", "Every hour"),
+    ]
+
+    private var frequencyPickerSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Check Frequency")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.6))
+                .padding(.horizontal, 4)
+
+            HStack(spacing: 8) {
+                ForEach(frequencyOptions, id: \.value) { option in
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.15)) {
+                            proposalFrequency = option.value
+                        }
+                    } label: {
+                        Text(option.label)
+                            .font(.system(size: 13, weight: proposalFrequency == option.value ? .semibold : .regular))
+                            .foregroundStyle(proposalFrequency == option.value ? .white : .gray)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 9)
+                            .background(proposalFrequency == option.value ? accentGreen : cardBg)
+                            .clipShape(Capsule())
+                            .overlay(
+                                Capsule()
+                                    .stroke(proposalFrequency == option.value ? Color.clear : Color.white.opacity(0.1), lineWidth: 1)
+                            )
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 20)
     }
 
     // MARK: - Loading / Saving / Success / Error States
@@ -643,6 +844,58 @@ struct ShareExtensionView: View {
         // NOTE: resy.com, opentable.com, ticketmaster.com are handled by URLRewriter
         let authDomains = ["yelp.com/reservations"]
         return authDomains.contains(where: { host.contains($0) })
+    }
+
+    /// A single suggestion chip definition for the share extension.
+    private struct SuggestionChip {
+        let icon: String
+        let label: String
+        let subtitle: String
+        let type: String  // maps to watch type: "price", "cart", "book", "notify"
+    }
+
+    /// Context-aware suggestion chips based on the site category.
+    private var suggestionChips: [SuggestionChip] {
+        let category = URLRewriter.categorize(sharedURL, rewriteResult: rewriteResult)
+
+        switch category {
+        case .restaurant:
+            return [
+                SuggestionChip(icon: "calendar", label: "Track Reservations",
+                              subtitle: "Watch for open tables or time slots", type: "book"),
+                SuggestionChip(icon: "tag.fill", label: "Price Changes",
+                              subtitle: "Get notified of menu or price updates", type: "price"),
+                SuggestionChip(icon: "bell.fill", label: "Any Changes",
+                              subtitle: "Monitor for any page updates", type: "notify"),
+            ]
+        case .ticketing:
+            return [
+                SuggestionChip(icon: "ticket.fill", label: "Ticket Availability",
+                              subtitle: "Watch for tickets to become available", type: "book"),
+                SuggestionChip(icon: "tag.fill", label: "Price Drop",
+                              subtitle: "Get notified when price decreases", type: "price"),
+                SuggestionChip(icon: "bell.fill", label: "Any Changes",
+                              subtitle: "Monitor for any page updates", type: "notify"),
+            ]
+        case .ecommerce:
+            return [
+                SuggestionChip(icon: "tag.fill", label: "Price Drop",
+                              subtitle: "Get notified when price decreases", type: "price"),
+                SuggestionChip(icon: "cart.fill", label: "Back in Stock",
+                              subtitle: "Know when it's available again", type: "cart"),
+                SuggestionChip(icon: "bell.fill", label: "Any Changes",
+                              subtitle: "Monitor for any page updates", type: "notify"),
+            ]
+        case .general:
+            return [
+                SuggestionChip(icon: "tag.fill", label: "Price Drop",
+                              subtitle: "Get notified when price decreases", type: "price"),
+                SuggestionChip(icon: "cart.fill", label: "Back in Stock",
+                              subtitle: "Know when it's available again", type: "cart"),
+                SuggestionChip(icon: "bell.fill", label: "Any Changes",
+                              subtitle: "Monitor for any page updates", type: "notify"),
+            ]
+        }
     }
 
     /// A description of the context text + URL for the AI
@@ -760,13 +1013,26 @@ struct ShareExtensionView: View {
                 sharedURL = result.rewrittenURL  // Use the public URL for monitoring
             }
             // Use the rewriter's site name as page title if we don't have one
-            if pageTitle == nil {
-                // Extract name from extraContext (e.g. "Restaurant: Carbone")
-                let lines = result.extraContext.components(separatedBy: "\n")
-                for line in lines {
-                    if line.hasPrefix("Restaurant:") || line.hasPrefix("Event:") {
-                        pageTitle = line.components(separatedBy: ": ").dropFirst().joined(separator: ": ")
-                        break
+            // Also pre-populate reservation details from the URL context
+            let lines = result.extraContext.components(separatedBy: "\n")
+            for line in lines {
+                if pageTitle == nil && (line.hasPrefix("Restaurant:") || line.hasPrefix("Event:")) {
+                    pageTitle = line.components(separatedBy: ": ").dropFirst().joined(separator: ": ")
+                }
+                // Pre-populate party size from URL params
+                if line.hasPrefix("Party size:") {
+                    let value = line.components(separatedBy: ": ").dropFirst().joined()
+                    if let size = Int(value.trimmingCharacters(in: .whitespaces)), size >= 1 && size <= 20 {
+                        partySize = size
+                    }
+                }
+                // Pre-populate date from URL params (format: YYYY-MM-DD)
+                if line.hasPrefix("Requested date:") {
+                    let value = line.components(separatedBy: ": ").dropFirst().joined().trimmingCharacters(in: .whitespaces)
+                    let df = DateFormatter()
+                    df.dateFormat = "yyyy-MM-dd"
+                    if let date = df.date(from: value) {
+                        preferredDate = date
                     }
                 }
             }
@@ -901,6 +1167,8 @@ struct ShareExtensionView: View {
             typeDescription = "Watch for a price drop on this product. Create the watch immediately with actionType \"price\"."
         case "cart":
             typeDescription = "Watch for this product to come back in stock / become available. Create the watch immediately with actionType \"cart\"."
+        case "book":
+            typeDescription = "Watch for reservation availability, open booking slots, or ticket availability on this page. Create the watch immediately with actionType \"book\"."
         default:
             typeDescription = "Watch for any meaningful changes on this page. Create the watch immediately with actionType \"notify\"."
         }
@@ -908,25 +1176,28 @@ struct ShareExtensionView: View {
         // Build enriched message with URL context
         var message = "I want to watch this page.\n\(fullContext)"
         message += "\n\n\(typeDescription)"
-        message += "\n\nIMPORTANT: Respond ONLY with a [CREATE_WATCH] JSON block. Do NOT include [URL_CONTEXT], [SUGGESTIONS], or any other bracket tags."
+        message += "\n\nIMPORTANT: Respond ONLY with a [CREATE_WATCH] JSON block. Do NOT include [URL_CONTEXT], [SUGGESTIONS], [FETCH_PRICE], [PRODUCT_LINKS], or any other bracket tags."
+
+        // Try AI analysis, but always fall back to a locally-built watch if it fails.
+        // Share extensions have limited resources — the AI call can time out or fail
+        // due to memory pressure, network limits, or rate limiting.
+        var watchInfo: WatchInfo?
 
         do {
             let response = try await ShareAPIService.chatWithAI(userMessage: message)
-
-            // Parse [CREATE_WATCH] JSON from response
-            if let watchInfo = parseCreateWatch(from: response) {
-                withAnimation(.spring(response: 0.3)) {
-                    phase = .watchCreated(watchInfo)
-                }
-            } else {
-                // AI didn't return a create block -- create a fallback watch
-                let fallback = createFallbackWatch(type: watchType)
-                withAnimation(.spring(response: 0.3)) {
-                    phase = .watchCreated(fallback)
-                }
-            }
+            watchInfo = parseCreateWatch(from: response)
         } catch {
-            withAnimation { phase = .error(error.localizedDescription) }
+            // AI call failed — that's OK, we'll use the fallback
+            #if DEBUG
+            print("[ShareExtension] AI call failed, using fallback: \(error.localizedDescription)")
+            #endif
+        }
+
+        // Use AI result or fall back to a locally-constructed watch
+        let finalWatch = watchInfo ?? createFallbackWatch(type: watchType)
+        proposalFrequency = finalWatch.checkFrequency
+        withAnimation(.spring(response: 0.3)) {
+            phase = .watchCreated(finalWatch)
         }
     }
 
@@ -969,6 +1240,7 @@ struct ShareExtensionView: View {
                 // Try to parse [CREATE_WATCH]
                 if let watchInfo = parseCreateWatch(from: response) {
                     isSendingChat = false
+                    proposalFrequency = watchInfo.checkFrequency
                     withAnimation(.spring(response: 0.3)) {
                         phase = .watchCreated(watchInfo)
                     }
@@ -1052,22 +1324,57 @@ struct ShareExtensionView: View {
         )
     }
 
-    /// Creates a fallback watch when AI doesn't return proper JSON
+    /// Creates a fallback watch when AI doesn't return proper JSON.
+    /// Uses site category to provide context-appropriate defaults.
     private func createFallbackWatch(type: String) -> WatchInfo {
         let name = pageTitle ?? displayHost
+        let category = URLRewriter.categorize(sharedURL, rewriteResult: rewriteResult)
         let emoji: String
         let condition: String
         let actionType: String
 
-        switch type {
-        case "price":
+        switch (type, category) {
+        // Restaurant-specific fallbacks
+        case ("book", .restaurant):
+            emoji = "🍽️"
+            condition = "Reservation becomes available"
+            actionType = "book"
+        case ("price", .restaurant):
+            emoji = "💰"
+            condition = "Menu or pricing changes"
+            actionType = "price"
+        case ("notify", .restaurant):
+            emoji = "🔔"
+            condition = "Any changes on this restaurant page"
+            actionType = "notify"
+
+        // Ticketing-specific fallbacks
+        case ("book", .ticketing):
+            emoji = "🎫"
+            condition = "Tickets become available"
+            actionType = "book"
+        case ("price", .ticketing):
+            emoji = "💰"
+            condition = "Ticket price drops"
+            actionType = "price"
+        case ("notify", .ticketing):
+            emoji = "🔔"
+            condition = "Any changes on this event page"
+            actionType = "notify"
+
+        // General / ecommerce fallbacks
+        case ("price", _):
             emoji = "💰"
             condition = "Price drops on this product"
             actionType = "price"
-        case "cart":
+        case ("cart", _):
             emoji = "🛒"
             condition = "Product becomes available / back in stock"
             actionType = "cart"
+        case ("book", _):
+            emoji = "📅"
+            condition = "Reservation or ticket becomes available"
+            actionType = "book"
         default:
             emoji = "👀"
             condition = "Any meaningful changes on this page"
@@ -1138,7 +1445,9 @@ struct ShareExtensionView: View {
             created_at: now,
             site_cookies: cookiesJSON,
             cookie_domain: cookieDomain,
-            cookie_status: cookiesJSON != nil ? "active" : nil
+            cookie_status: cookiesJSON != nil ? "active" : nil,
+            watch_mode: "url",
+            search_query: nil
         )
 
         do {

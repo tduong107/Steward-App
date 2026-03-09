@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct SettingsScreen: View {
-    @AppStorage("isDarkMode") private var isDarkMode = true
+    @AppStorage("isDarkMode") private var isDarkMode = false
     @Environment(AuthManager.self) private var authManager
     @Environment(NotificationManager.self) private var notificationManager
     @Environment(SubscriptionManager.self) private var subscriptionManager
@@ -233,9 +233,15 @@ struct SettingsScreen: View {
                     .font(Theme.body(13, weight: .medium))
                     .foregroundStyle(Theme.ink)
 
-                Text("Apple ID account")
-                    .font(Theme.body(11))
-                    .foregroundStyle(Theme.inkLight)
+                if let phone = authManager.phoneNumber, !phone.isEmpty {
+                    Text(phone)
+                        .font(Theme.body(11))
+                        .foregroundStyle(Theme.inkLight)
+                } else {
+                    Text("Apple ID account")
+                        .font(Theme.body(11))
+                        .foregroundStyle(Theme.inkLight)
+                }
             }
 
             Spacer()

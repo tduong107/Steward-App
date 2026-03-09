@@ -31,6 +31,28 @@ final class ChatViewModel {
     /// Full conversation history for the AI (role + content pairs)
     private var conversationHistory: [AIService.Message] = []
 
+    /// Active send task — stored so we can cancel it on reset()
+    private var sendTask: Task<Void, Never>?
+
+    /// Maximum number of conversation history entries to keep (sliding window)
+    private static let maxHistoryCount = 30
+
+    /// Shared URLSession for metadata/OG image fetching (reuses connections)
+    private static let metadataSession: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 10
+        return URLSession(configuration: config)
+    }()
+
+    // MARK: - Pre-compiled Regexes (avoid recompilation on every parseResponse call)
+
+    private static let createWatchRegex = try! NSRegularExpression(pattern: "\\[CREATE_WATCH\\](.*?)\\[/CREATE_WATCH\\]", options: .dotMatchesLineSeparators)
+    private static let proposeWatchRegex = try! NSRegularExpression(pattern: "\\[PROPOSE_WATCH\\].*?\\[/PROPOSE_WATCH\\]", options: .dotMatchesLineSeparators)
+    private static let productLinksRegex = try! NSRegularExpression(pattern: "\\[PRODUCT_LINKS\\](.*?)\\[/PRODUCT_LINKS\\]", options: .dotMatchesLineSeparators)
+    private static let suggestionsRegex = try! NSRegularExpression(pattern: "\\[SUGGESTIONS\\](.*?)\\[/SUGGESTIONS\\]", options: .dotMatchesLineSeparators)
+    private static let leakedWatchJsonRegex = try! NSRegularExpression(pattern: "\\{\"emoji\".*?\\}", options: .dotMatchesLineSeparators)
+    private static let leakedLinkJsonRegex = try! NSRegularExpression(pattern: "\\{\\s*\"title\"\\s*:.*?\"source\"\\s*:.*?\\}", options: .dotMatchesLineSeparators)
+
     // MARK: - Public API
 
     func send(_ text: String? = nil) {
@@ -105,7 +127,10 @@ final class ChatViewModel {
             ? "📸 [Screenshot]"
             : messageText
 
-        let userMsg = ChatMessage(role: .user, text: displayText, image: image)
+        // Create a small thumbnail for display (saves memory vs keeping full UIImage)
+        let thumbnail: UIImage? = image.flatMap { createThumbnail($0, maxDimension: 200) }
+
+        let userMsg = ChatMessage(role: .user, text: displayText, image: thumbnail)
         withAnimation(.spring(response: 0.3)) {
             messages.append(userMsg)
         }
@@ -113,7 +138,7 @@ final class ChatViewModel {
         pendingImage = nil
         isTyping = true
 
-        // Compress image to JPEG for API
+        // Compress image to JPEG for API (from original, not thumbnail)
         var imageData: Data?
         if let image = image {
             imageData = compressImage(image)
@@ -124,7 +149,8 @@ final class ChatViewModel {
             ? "I'm sending you a screenshot. What product/item is this? Help me set up a watch for it."
             : messageText
 
-        Task {
+        sendTask?.cancel()
+        sendTask = Task {
             // Enrich URLs: resolve shortened links and fetch page titles before sending to AI
             if imageData == nil {
                 let enriched = await enrichURLsInText(historyText)
@@ -132,6 +158,7 @@ final class ChatViewModel {
                     historyText = enriched
                 }
             }
+            guard !Task.isCancelled else { return }
 
             // Inject subscription tier context on first message so AI knows which frequencies to offer
             if conversationHistory.isEmpty && subscriptionTier != .free {
@@ -140,6 +167,9 @@ final class ChatViewModel {
 
             // Add to conversation history (with enriched URL context)
             conversationHistory.append(AIService.Message(role: "user", content: historyText, imageData: imageData))
+
+            // Sliding window: keep history bounded and strip image data from older entries
+            trimConversationHistory()
 
             do {
                 let response = try await AIService.shared.chat(messages: conversationHistory)
@@ -197,6 +227,8 @@ final class ChatViewModel {
     // Price update flow is handled inline in send()
 
     func reset() {
+        sendTask?.cancel()
+        sendTask = nil
         messages = [ChatMessage.initial]
         inputText = ""
         isTyping = false
@@ -231,6 +263,33 @@ final class ChatViewModel {
         return resized.jpegData(compressionQuality: 0.7)
     }
 
+    /// Creates a small thumbnail for display in chat bubbles (saves memory vs full UIImage)
+    private func createThumbnail(_ image: UIImage, maxDimension: CGFloat = 200) -> UIImage {
+        let size = image.size
+        let ratio = min(maxDimension / size.width, maxDimension / size.height)
+        if ratio >= 1.0 { return image } // Already small enough
+        let newSize = CGSize(width: size.width * ratio, height: size.height * ratio)
+        let renderer = UIGraphicsImageRenderer(size: newSize)
+        return renderer.image { _ in
+            image.draw(in: CGRect(origin: .zero, size: newSize))
+        }
+    }
+
+    /// Keeps conversation history bounded and strips image data from older entries
+    private func trimConversationHistory() {
+        // Strip imageData from all but the last 2 messages (only current turn needs images)
+        if conversationHistory.count > 2 {
+            for i in 0..<(conversationHistory.count - 2) {
+                conversationHistory[i].imageData = nil
+            }
+        }
+
+        // Sliding window: keep the last N messages
+        if conversationHistory.count > Self.maxHistoryCount {
+            conversationHistory = Array(conversationHistory.suffix(Self.maxHistoryCount))
+        }
+    }
+
     // MARK: - Parse AI Response
 
     struct ParsedResponse {
@@ -248,31 +307,27 @@ final class ChatViewModel {
 
         // 1. Extract [CREATE_WATCH] JSON if present
         var watchJSON: String?
-        if let regex = try? NSRegularExpression(pattern: "\\[CREATE_WATCH\\](.*?)\\[/CREATE_WATCH\\]", options: .dotMatchesLineSeparators),
-           let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+        if let match = Self.createWatchRegex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
            let jsonRange = Range(match.range(at: 1), in: text) {
             watchJSON = String(text[jsonRange])
-            text = text.replacingOccurrences(of: "\\[CREATE_WATCH\\].*?\\[/CREATE_WATCH\\]", with: "", options: .regularExpression)
+            text = Self.createWatchRegex.stringByReplacingMatches(in: text, range: NSRange(text.startIndex..., in: text), withTemplate: "")
         }
 
         // 2. Check for [PROPOSE_WATCH] marker — handle both block and standalone forms
         let isProposal = text.contains("[PROPOSE_WATCH]")
         // Strip block form: [PROPOSE_WATCH]...content...[/PROPOSE_WATCH]
-        if let proposeRegex = try? NSRegularExpression(pattern: "\\[PROPOSE_WATCH\\].*?\\[/PROPOSE_WATCH\\]", options: .dotMatchesLineSeparators) {
-            text = proposeRegex.stringByReplacingMatches(in: text, range: NSRange(text.startIndex..., in: text), withTemplate: "")
-        }
+        text = Self.proposeWatchRegex.stringByReplacingMatches(in: text, range: NSRange(text.startIndex..., in: text), withTemplate: "")
         // Strip standalone markers (in case AI uses them without closing tag)
         text = text.replacingOccurrences(of: "[PROPOSE_WATCH]", with: "")
         text = text.replacingOccurrences(of: "[/PROPOSE_WATCH]", with: "")
 
         // 3. Extract [PRODUCT_LINKS] if present
         var productLinks: [ProductLink]?
-        if let regex = try? NSRegularExpression(pattern: "\\[PRODUCT_LINKS\\](.*?)\\[/PRODUCT_LINKS\\]", options: .dotMatchesLineSeparators),
-           let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+        if let match = Self.productLinksRegex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
            let linkRange = Range(match.range(at: 1), in: text) {
             let raw = String(text[linkRange])
             productLinks = parseProductLinks(raw)
-            text = text.replacingOccurrences(of: "\\[PRODUCT_LINKS\\].*?\\[/PRODUCT_LINKS\\]", with: "", options: .regularExpression)
+            text = Self.productLinksRegex.stringByReplacingMatches(in: text, range: NSRange(text.startIndex..., in: text), withTemplate: "")
         }
         // Strip any remaining standalone PRODUCT_LINKS markers (empty tags, partial tags, etc.)
         text = text.replacingOccurrences(of: "[PRODUCT_LINKS]", with: "")
@@ -280,27 +335,21 @@ final class ChatViewModel {
 
         // 4. Extract [SUGGESTIONS] if present
         var suggestions: [String]?
-        if let regex = try? NSRegularExpression(pattern: "\\[SUGGESTIONS\\](.*?)\\[/SUGGESTIONS\\]", options: .dotMatchesLineSeparators),
-           let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+        if let match = Self.suggestionsRegex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
            let sugRange = Range(match.range(at: 1), in: text) {
             let raw = String(text[sugRange])
             suggestions = raw.components(separatedBy: "|").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
-            text = text.replacingOccurrences(of: "\\[SUGGESTIONS\\].*?\\[/SUGGESTIONS\\]", with: "", options: .regularExpression)
+            text = Self.suggestionsRegex.stringByReplacingMatches(in: text, range: NSRange(text.startIndex..., in: text), withTemplate: "")
         }
 
         // 5. Strip any raw watch JSON objects that leaked into display text
         //    (e.g., {"emoji":"...","name":"...","url":"...","condition":"...",...})
-        if let jsonRegex = try? NSRegularExpression(pattern: "\\{\"emoji\".*?\\}", options: .dotMatchesLineSeparators) {
-            text = jsonRegex.stringByReplacingMatches(in: text, range: NSRange(text.startIndex..., in: text), withTemplate: "")
-        }
+        text = Self.leakedWatchJsonRegex.stringByReplacingMatches(in: text, range: NSRange(text.startIndex..., in: text), withTemplate: "")
 
         // 5b. Strip leaked product-link JSON objects from display text
         //     (AI sometimes outputs {"title":"...","url":"...","source":"..."} without wrapping in [PRODUCT_LINKS])
-        if let linkJsonRegex = try? NSRegularExpression(
-            pattern: "\\{\\s*\"title\"\\s*:.*?\"source\"\\s*:.*?\\}",
-            options: .dotMatchesLineSeparators
-        ) {
-            let linkMatches = linkJsonRegex.matches(in: text, range: NSRange(text.startIndex..., in: text))
+        do {
+            let linkMatches = Self.leakedLinkJsonRegex.matches(in: text, range: NSRange(text.startIndex..., in: text))
             if !linkMatches.isEmpty {
                 // If we didn't already find product links from the tagged block, try parsing these
                 if productLinks == nil || productLinks!.isEmpty {
@@ -316,9 +365,9 @@ final class ChatViewModel {
                     }
                 }
                 // Strip the raw JSON from display text regardless
-                text = linkJsonRegex.stringByReplacingMatches(in: text, range: NSRange(text.startIndex..., in: text), withTemplate: "")
+                text = Self.leakedLinkJsonRegex.stringByReplacingMatches(in: text, range: NSRange(text.startIndex..., in: text), withTemplate: "")
             }
-        }
+        }  // end leaked link cleanup
 
         // 6. If product links are present, strip bare URLs from the display text
         //    (safety net in case the AI still writes URLs in its conversational text)
@@ -425,18 +474,13 @@ final class ChatViewModel {
 
     /// Resolves a URL (follows redirects) and fetches the page title + price info
     private func resolveAndFetchMetadata(url: URL) async -> String? {
-        // Use a custom session that follows redirects so we can capture the final URL
-        let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 10
-        let session = URLSession(configuration: config)
-
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         // Mimic a real browser to avoid blocks
         request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1", forHTTPHeaderField: "User-Agent")
 
         do {
-            let (data, response) = try await session.data(for: request)
+            let (data, response) = try await Self.metadataSession.data(for: request)
 
             let finalURL = response.url ?? url
             let html = String(data: data, encoding: .utf8) ?? ""
@@ -634,6 +678,8 @@ final class ChatViewModel {
             let actionType: String
             let checkFrequency: String?
             let imageURL: String?
+            let watchMode: String?
+            let searchQuery: String?
         }
 
         do {
@@ -659,7 +705,9 @@ final class ChatViewModel {
                 actionLabel: payload.actionLabel,
                 actionType: actionType,
                 checkFrequency: frequency,
-                imageURL: payload.imageURL
+                imageURL: payload.imageURL,
+                watchMode: payload.watchMode ?? "url",
+                searchQuery: payload.searchQuery
             )
 
             // If no image was provided by the AI, try to fetch og:image from the URL
@@ -713,16 +761,12 @@ final class ChatViewModel {
     private func fetchOGImage(from urlString: String) async -> String? {
         guard let url = URL(string: urlString) else { return nil }
 
-        let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 8
-        let session = URLSession(configuration: config)
-
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1", forHTTPHeaderField: "User-Agent")
 
         do {
-            let (data, _) = try await session.data(for: request)
+            let (data, _) = try await Self.metadataSession.data(for: request)
             let html = String(data: data, encoding: .utf8) ?? ""
 
             // Try og:image patterns

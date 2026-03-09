@@ -10,6 +10,7 @@ final class AuthManager {
     var isLoading = true
     var currentUserId: UUID?
     var displayName: String?
+    var phoneNumber: String?
     var errorMessage: String?
 
     // Shared App Group suite for communicating with the Share Extension
@@ -26,7 +27,7 @@ final class AuthManager {
             // Sync auth token to App Group so Share Extension can use it
             Self.syncTokenToAppGroup(accessToken: session.accessToken, userId: session.user.id)
 
-            // Fetch display name from profile
+            // Fetch display name and phone from profile
             if let profile: ProfileDTO = try? await SupabaseConfig.client
                 .from("profiles")
                 .select()
@@ -35,6 +36,7 @@ final class AuthManager {
                 .execute()
                 .value {
                 self.displayName = profile.displayName
+                self.phoneNumber = profile.phoneNumber
             }
         } catch {
             self.isAuthenticated = false
@@ -43,7 +45,83 @@ final class AuthManager {
         self.isLoading = false
     }
 
-    // MARK: - Apple Sign-In
+    // MARK: - Phone + Password Sign Up
+
+    /// Creates a new account with phone number and password.
+    /// After sign-up, an OTP code is sent to the phone for verification.
+    func signUp(phone: String, password: String, name: String) async throws {
+        errorMessage = nil
+
+        let response = try await SupabaseConfig.client.auth.signUp(
+            phone: phone,
+            password: password
+        )
+
+        // If we got a session immediately (auto-confirm enabled), finalize
+        if let session = response.session {
+            self.currentUserId = session.user.id
+            self.isAuthenticated = true
+            Self.syncTokenToAppGroup(accessToken: session.accessToken, userId: session.user.id)
+
+            // Save profile data
+            await saveProfile(userId: session.user.id, name: name, phone: phone)
+        }
+        // Otherwise, user needs to verify OTP first
+    }
+
+    // MARK: - Phone OTP Verification
+
+    /// Verifies the OTP code sent to the phone during sign-up
+    func verifyOTP(phone: String, code: String, name: String) async throws {
+        errorMessage = nil
+
+        let response = try await SupabaseConfig.client.auth.verifyOTP(
+            phone: phone,
+            token: code,
+            type: .sms
+        )
+
+        guard let session = response.session else {
+            throw AuthError.missingToken
+        }
+
+        self.currentUserId = session.user.id
+        self.isAuthenticated = true
+        Self.syncTokenToAppGroup(accessToken: session.accessToken, userId: session.user.id)
+
+        // Save profile data after verification
+        await saveProfile(userId: session.user.id, name: name, phone: phone)
+    }
+
+    // MARK: - Phone + Password Sign In
+
+    /// Signs in an existing user with phone number and password
+    func signIn(phone: String, password: String) async throws {
+        errorMessage = nil
+
+        let session = try await SupabaseConfig.client.auth.signIn(
+            phone: phone,
+            password: password
+        )
+
+        self.currentUserId = session.user.id
+        self.isAuthenticated = true
+        Self.syncTokenToAppGroup(accessToken: session.accessToken, userId: session.user.id)
+
+        // Fetch profile
+        if let profile: ProfileDTO = try? await SupabaseConfig.client
+            .from("profiles")
+            .select()
+            .eq("id", value: session.user.id.uuidString)
+            .single()
+            .execute()
+            .value {
+            self.displayName = profile.displayName
+            self.phoneNumber = profile.phoneNumber
+        }
+    }
+
+    // MARK: - Apple Sign-In (secondary option)
 
     func signInWithApple(credential: ASAuthorizationAppleIDCredential) async throws {
         guard let identityToken = credential.identityToken,
@@ -93,7 +171,25 @@ final class AuthManager {
         self.isAuthenticated = false
         self.currentUserId = nil
         self.displayName = nil
+        self.phoneNumber = nil
         Self.clearTokenFromAppGroup()
+    }
+
+    // MARK: - Profile Helpers
+
+    /// Saves or updates the user's profile with name and phone number
+    private func saveProfile(userId: UUID, name: String, phone: String) async {
+        self.displayName = name
+        self.phoneNumber = phone
+
+        _ = try? await SupabaseConfig.client
+            .from("profiles")
+            .upsert([
+                "id": userId.uuidString,
+                "display_name": name,
+                "phone_number": phone
+            ])
+            .execute()
     }
 
     // MARK: - App Group Token Sync (for Share Extension)
@@ -116,11 +212,17 @@ final class AuthManager {
 
     enum AuthError: LocalizedError {
         case missingToken
+        case invalidPhone
+        case invalidOTP
 
         var errorDescription: String? {
             switch self {
             case .missingToken:
-                return "Could not retrieve Apple ID token. Please try again."
+                return "Could not complete sign-in. Please try again."
+            case .invalidPhone:
+                return "Please enter a valid phone number."
+            case .invalidOTP:
+                return "Invalid verification code. Please try again."
             }
         }
     }

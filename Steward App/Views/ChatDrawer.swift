@@ -126,6 +126,12 @@ struct ChatDrawer: View {
                 watchVM.pendingChatURL = nil
                 chatVM.send("I want to watch this: \(pendingURL)")
             }
+
+            // If there's a fix context from a broken watch, auto-send it to the AI
+            if let fixContext = watchVM.pendingFixContext {
+                watchVM.pendingFixContext = nil
+                chatVM.send(fixContext)
+            }
         }
     }
 

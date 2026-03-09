@@ -9,9 +9,64 @@ struct RewriteResult {
     let wasRewritten: Bool      // Whether the URL was actually changed
 }
 
+/// Categories of websites, used to show contextually-relevant suggestion chips in the share extension.
+enum SiteCategory: String {
+    case restaurant   // Resy, OpenTable, Yelp, Tock, SevenRooms
+    case ticketing    // Ticketmaster, Eventbrite, StubHub, SeatGeek
+    case ecommerce    // Amazon, eBay, Walmart, Target, etc.
+    case general      // Everything else
+}
+
 /// Rewrites auth-walled or app-deep-link URLs to their public equivalents
 /// and extracts rich context (venue name, date, party size, event name) for the AI.
 enum URLRewriter {
+
+    /// Determines the site category from a URL, used for context-aware share extension suggestions.
+    /// Uses `siteName` from `RewriteResult` when available, otherwise falls back to host-based matching.
+    static func categorize(_ urlString: String, rewriteResult: RewriteResult?) -> SiteCategory {
+        // If URLRewriter already identified the site, use that
+        if let siteName = rewriteResult?.siteName.lowercased() {
+            switch siteName {
+            case "resy", "opentable":
+                return .restaurant
+            case "ticketmaster":
+                return .ticketing
+            default:
+                break
+            }
+        }
+
+        guard let url = URL(string: urlString),
+              let host = url.host?.lowercased() else {
+            return .general
+        }
+
+        // Restaurant / Booking platforms
+        let restaurantDomains = ["resy.com", "opentable.com", "exploretock.com",
+                                 "sevenrooms.com", "yelp.com/reservations"]
+        if restaurantDomains.contains(where: { host.contains($0) || urlString.lowercased().contains($0) }) {
+            return .restaurant
+        }
+
+        // Ticketing / Events
+        let ticketingDomains = ["ticketmaster.com", "eventbrite.com", "axs.com",
+                                "stubhub.com", "seatgeek.com", "vividseats.com",
+                                "dice.fm", "livenation.com"]
+        if ticketingDomains.contains(where: { host.contains($0) }) {
+            return .ticketing
+        }
+
+        // E-commerce
+        let ecommerceDomains = ["amazon.", "ebay.com", "walmart.com", "target.com",
+                                "bestbuy.com", "nike.com", "adidas.com", "apple.com/shop",
+                                "newegg.com", "bhphotovideo.com", "costco.com",
+                                "etsy.com", "nordstrom.com", "macys.com", "zappos.com"]
+        if ecommerceDomains.contains(where: { host.contains($0) || urlString.lowercased().contains($0) }) {
+            return .ecommerce
+        }
+
+        return .general
+    }
 
     /// Attempts to rewrite a URL to its public equivalent.
     /// Returns nil if the site is not recognized or doesn't need rewriting.

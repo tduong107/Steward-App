@@ -33,7 +33,7 @@ struct ChatMessage: Identifiable {
     var suggestions: [String]?
     var actionCards: [ActionCard]?
     var productLinks: [ProductLink]?
-    var image: UIImage? // Optional attached screenshot/photo
+    var image: UIImage? // Thumbnail for display (compressed from original)
 
     init(
         id: UUID = UUID(),
