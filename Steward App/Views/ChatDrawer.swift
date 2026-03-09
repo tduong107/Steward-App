@@ -1,8 +1,17 @@
 import SwiftUI
+import PhotosUI
 
 struct ChatDrawer: View {
     @State private var chatVM = ChatViewModel()
     @Binding var isPresented: Bool
+    @Environment(WatchViewModel.self) private var watchVM
+    @Environment(SubscriptionManager.self) private var subscriptionManager
+
+    @FocusState private var isInputFocused: Bool
+    @State private var selectedPhotoItem: PhotosPickerItem?
+    @State private var showImageSourcePicker = false
+    @State private var browserItem: BrowserItem?
+    @State private var dragOffset: CGFloat = 0
 
     var body: some View {
         GeometryReader { geo in
@@ -10,22 +19,119 @@ struct ChatDrawer: View {
                 // Backdrop
                 Color.black.opacity(0.4)
                     .ignoresSafeArea()
-                    .onTapGesture { isPresented = false }
+                    .onTapGesture {
+                        isInputFocused = false
+                        isPresented = false
+                    }
 
-                // Sheet
+                // Sheet — respects keyboard safe area
                 VStack(spacing: 0) {
                     dragHandle
                     chatHeader
                     messageList
+                    imagePreview
                     inputBar
                 }
                 .frame(maxHeight: geo.size.height * 0.82)
                 .background(Theme.bgCard)
                 .clipShape(RoundedRectangle(cornerRadius: Theme.radiusXL))
                 .shadow(color: .black.opacity(0.15), radius: 24, y: -4)
+                .offset(y: dragOffset)
+                .gesture(
+                    DragGesture()
+                        .onChanged { value in
+                            // Only allow dragging down (positive translation)
+                            if value.translation.height > 0 {
+                                dragOffset = value.translation.height
+                            }
+                        }
+                        .onEnded { value in
+                            // Dismiss if dragged down past threshold or with enough velocity
+                            if value.translation.height > 80 || value.predictedEndTranslation.height > 200 {
+                                withAnimation(.easeOut(duration: 0.25)) {
+                                    dragOffset = 600
+                                }
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                                    isPresented = false
+                                    dragOffset = 0
+                                }
+                            } else {
+                                // Snap back
+                                withAnimation(.spring(response: 0.3)) {
+                                    dragOffset = 0
+                                }
+                            }
+                        }
+                )
                 .transition(.move(edge: .bottom))
             }
-            .ignoresSafeArea(edges: .bottom)
+        }
+        .onChange(of: chatVM.watchReadySignal) {
+            // Bridge single watch creation (with optional initial price)
+            if let watch = chatVM.pendingWatch {
+                if let price = chatVM.pendingWatchInitialPrice {
+                    watchVM.addWatchWithPrice(watch, initialPrice: price)
+                } else {
+                    watchVM.addWatch(watch)
+                }
+                chatVM.pendingWatch = nil
+                chatVM.pendingWatchInitialPrice = nil
+            }
+        }
+        .onChange(of: chatVM.pendingWishlistWatches.count) {
+            // Bridge wishlist bulk import
+            if !chatVM.pendingWishlistWatches.isEmpty {
+                for watch in chatVM.pendingWishlistWatches {
+                    watchVM.addWatch(watch)
+                }
+                chatVM.pendingWishlistWatches = []
+            }
+        }
+        .onChange(of: chatVM.priceUpdateSignal) {
+            // Bridge price update for an already-created watch
+            if let update = chatVM.pendingPriceUpdateData {
+                watchVM.updateWatchPrice(watchId: update.watchId, price: update.price)
+                chatVM.pendingPriceUpdateData = nil
+            }
+        }
+        .onChange(of: selectedPhotoItem) {
+            Task {
+                if let item = selectedPhotoItem,
+                   let data = try? await item.loadTransferable(type: Data.self),
+                   let uiImage = UIImage(data: data) {
+                    chatVM.pendingImage = uiImage
+                }
+                selectedPhotoItem = nil
+            }
+        }
+        .onChange(of: chatVM.shouldDismiss) {
+            if chatVM.shouldDismiss {
+                withAnimation(.easeOut(duration: 0.3)) {
+                    isPresented = false
+                }
+                chatVM.shouldDismiss = false
+            }
+        }
+        .sheet(item: $browserItem) { item in
+            InAppBrowser(initialURL: item.url) { capturedURL in
+                // Send the captured URL back into chat
+                chatVM.send("I found it! Here's the URL: \(capturedURL)")
+            }
+        }
+        .onAppear {
+            chatVM.subscriptionTier = subscriptionManager.currentTier
+
+            // If there's a shared URL from the Share Extension, auto-send it to the AI
+            if let pendingURL = watchVM.pendingChatURL {
+                watchVM.pendingChatURL = nil
+                chatVM.send("I want to watch this: \(pendingURL)")
+            }
+
+            // If there's a fix context from a broken watch, auto-send it to the AI
+            if let fixContext = watchVM.pendingFixContext {
+                watchVM.pendingFixContext = nil
+                chatVM.send(fixContext)
+            }
         }
     }
 
@@ -40,12 +146,7 @@ struct ChatDrawer: View {
 
             HStack {
                 HStack(spacing: 10) {
-                    Image(systemName: "sparkle")
-                        .font(.system(size: 16))
-                        .foregroundStyle(.white)
-                        .frame(width: 34, height: 34)
-                        .background(Theme.accent)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                    StewardLogo(size: 34)
 
                     VStack(alignment: .leading, spacing: 1) {
                         Text("Steward AI")
@@ -92,11 +193,19 @@ struct ChatDrawer: View {
     private var messageList: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(spacing: 14) {
+                VStack(spacing: 14) {
                     ForEach(chatVM.messages) { msg in
-                        ChatMessageView(message: msg, onSuggestion: { text in
-                            chatVM.send(text)
-                        })
+                        ChatMessageView(
+                            message: msg,
+                            onSuggestion: { text in
+                                chatVM.send(text)
+                            },
+                            onProductLinkTap: { link in
+                                if let url = URL(string: link.url) {
+                                    browserItem = BrowserItem(url: url)
+                                }
+                            }
+                        )
                         .id(msg.id)
                     }
 
@@ -104,23 +213,77 @@ struct ChatDrawer: View {
                         TypingIndicator()
                             .id("typing")
                     }
+
+                    // Invisible anchor at the very bottom for reliable scrolling
+                    Color.clear
+                        .frame(height: 1)
+                        .id("bottomAnchor")
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 16)
             }
             .onChange(of: chatVM.messages.count) {
-                withAnimation {
-                    if let last = chatVM.messages.last {
-                        proxy.scrollTo(last.id, anchor: .bottom)
-                    }
-                }
+                scrollToBottom(proxy: proxy)
             }
             .onChange(of: chatVM.isTyping) {
                 if chatVM.isTyping {
-                    withAnimation {
-                        proxy.scrollTo("typing", anchor: .bottom)
+                    scrollToBottom(proxy: proxy)
+                }
+            }
+        }
+    }
+
+    /// Scrolls to the bottom anchor with a small delay to let layout settle
+    private func scrollToBottom(proxy: ScrollViewProxy) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            withAnimation(.easeOut(duration: 0.3)) {
+                proxy.scrollTo("bottomAnchor", anchor: .bottom)
+            }
+        }
+    }
+
+    // MARK: - Image Preview (staged image before sending)
+
+    private var imagePreview: some View {
+        Group {
+            if let image = chatVM.pendingImage {
+                HStack(spacing: 10) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 60, height: 60)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(Theme.border, lineWidth: 1)
+                        )
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Screenshot attached")
+                            .font(Theme.body(12, weight: .medium))
+                            .foregroundStyle(Theme.ink)
+
+                        Text("Send to analyze")
+                            .font(Theme.body(11))
+                            .foregroundStyle(Theme.inkLight)
+                    }
+
+                    Spacer()
+
+                    Button {
+                        withAnimation(.spring(response: 0.3)) {
+                            chatVM.clearPendingImage()
+                        }
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 20))
+                            .foregroundStyle(Theme.inkLight)
                     }
                 }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(Theme.bgDeep)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
     }
@@ -128,7 +291,16 @@ struct ChatDrawer: View {
     // MARK: - Input Bar
 
     private var inputBar: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
+            // Photo picker button
+            PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+                Image(systemName: "photo.on.rectangle.angled")
+                    .font(.system(size: 18))
+                    .foregroundStyle(Theme.inkLight)
+                    .frame(width: 36, height: 42)
+            }
+            .accessibilityLabel("Attach screenshot")
+
             TextField("Tell Steward what to watch…", text: $chatVM.inputText)
                 .font(Theme.body(13))
                 .padding(.horizontal, 14)
@@ -139,6 +311,7 @@ struct ChatDrawer: View {
                     RoundedRectangle(cornerRadius: 14)
                         .stroke(Theme.border, lineWidth: 1)
                 )
+                .focused($isInputFocused)
                 .submitLabel(.send)
                 .onSubmit {
                     chatVM.send()
@@ -149,12 +322,12 @@ struct ChatDrawer: View {
             } label: {
                 Image(systemName: "arrow.up")
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(chatVM.inputText.trimmingCharacters(in: .whitespaces).isEmpty ? Theme.inkLight : .white)
+                    .foregroundStyle(canSend ? .white : Theme.inkLight)
                     .frame(width: 42, height: 42)
-                    .background(chatVM.inputText.trimmingCharacters(in: .whitespaces).isEmpty ? Theme.bgDeep : Theme.accent)
+                    .background(canSend ? Theme.accent : Theme.bgDeep)
                     .clipShape(RoundedRectangle(cornerRadius: 13))
             }
-            .disabled(chatVM.inputText.trimmingCharacters(in: .whitespaces).isEmpty)
+            .disabled(!canSend)
             .accessibilityLabel("Send message")
         }
         .padding(.horizontal, 16)
@@ -164,6 +337,11 @@ struct ChatDrawer: View {
             Divider().foregroundStyle(Theme.border)
         }
     }
+
+    /// Send button is enabled when there's text OR a pending image
+    private var canSend: Bool {
+        !chatVM.inputText.trimmingCharacters(in: .whitespaces).isEmpty || chatVM.pendingImage != nil
+    }
 }
 
 // MARK: - Chat Message View
@@ -171,6 +349,7 @@ struct ChatDrawer: View {
 struct ChatMessageView: View {
     let message: ChatMessage
     let onSuggestion: (String) -> Void
+    var onProductLinkTap: ((ProductLink) -> Void)?
 
     var body: some View {
         HStack(alignment: .top) {
@@ -180,12 +359,7 @@ struct ChatMessageView: View {
                 // Steward avatar
                 if message.role == .steward {
                     HStack(spacing: 6) {
-                        Image(systemName: "sparkle")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.white)
-                            .frame(width: 22, height: 22)
-                            .background(Theme.accent)
-                            .clipShape(RoundedRectangle(cornerRadius: 7))
+                        StewardLogo(size: 22)
 
                         Text("Steward")
                             .font(Theme.body(11))
@@ -193,15 +367,42 @@ struct ChatMessageView: View {
                     }
                 }
 
-                // Bubble
-                Text(message.text)
-                    .font(Theme.body(13))
-                    .foregroundStyle(message.role == .user ? .white : Theme.ink)
-                    .lineSpacing(4)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 11)
-                    .background(message.role == .user ? Theme.accent : Theme.bgDeep)
-                    .clipShape(ChatBubbleShape(isUser: message.role == .user))
+                // Image attachment (if present)
+                if let image = message.image {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(maxWidth: 200, maxHeight: 200)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14)
+                                .stroke(message.role == .user ? Color.white.opacity(0.2) : Theme.border, lineWidth: 1)
+                        )
+                }
+
+                // Bubble (hide if text is just the screenshot placeholder and image exists)
+                if message.image == nil || message.text != "📸 [Screenshot]" {
+                    Text(message.text)
+                        .font(Theme.body(13))
+                        .foregroundStyle(message.role == .user ? .white : Theme.ink)
+                        .lineSpacing(4)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 11)
+                        .background(message.role == .user ? Theme.accent : Theme.bgDeep)
+                        .clipShape(ChatBubbleShape(isUser: message.role == .user))
+                }
+
+                // Product link cards
+                if let links = message.productLinks, !links.isEmpty {
+                    VStack(spacing: 6) {
+                        ForEach(links) { link in
+                            ProductLinkCard(link: link) {
+                                onProductLinkTap?(link)
+                            }
+                        }
+                    }
+                    .padding(.top, 4)
+                }
 
                 // Suggestions
                 if let suggestions = message.suggestions {
@@ -272,6 +473,98 @@ struct ChatMessageView: View {
     }
 }
 
+// MARK: - Product Link Card
+
+struct ProductLinkCard: View {
+    let link: ProductLink
+    let onTap: () -> Void
+
+    private var sourceIcon: String {
+        switch link.source.lowercased() {
+        case let s where s.contains("amazon"): return "cart"
+        case let s where s.contains("google"): return "magnifyingglass"
+        case let s where s.contains("ebay"): return "tag"
+        case let s where s.contains("walmart"): return "storefront"
+        case let s where s.contains("target"): return "target"
+        case let s where s.contains("best buy"): return "desktopcomputer"
+        default: return "globe"
+        }
+    }
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 10) {
+                // Product image or source icon fallback
+                if let imageURLString = link.imageURL, let imgURL = URL(string: imageURLString) {
+                    AsyncImage(url: imgURL) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .scaledToFill()
+                        case .failure:
+                            sourceIconView
+                        default:
+                            ProgressView()
+                                .controlSize(.small)
+                                .frame(width: 40, height: 40)
+                        }
+                    }
+                    .frame(width: 40, height: 40)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                } else {
+                    sourceIconView
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(link.title)
+                        .font(Theme.body(12, weight: .semibold))
+                        .foregroundStyle(Theme.ink)
+                        .lineLimit(1)
+
+                    HStack(spacing: 4) {
+                        Text(link.source)
+                            .font(Theme.body(10, weight: .medium))
+                            .foregroundStyle(Theme.accent)
+
+                        if let price = link.price {
+                            Text("·")
+                                .foregroundStyle(Theme.inkLight)
+                            Text(price)
+                                .font(Theme.body(10))
+                                .foregroundStyle(Theme.inkMid)
+                        }
+                    }
+                }
+
+                Spacer()
+
+                Image(systemName: "arrow.up.right.square")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Theme.accent)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(Theme.bgCard)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Theme.accentMid, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var sourceIconView: some View {
+        Image(systemName: sourceIcon)
+            .font(.system(size: 14))
+            .foregroundStyle(Theme.accent)
+            .frame(width: 40, height: 40)
+            .background(Theme.accentLight)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+}
+
 // MARK: - Chat Bubble Shape
 
 struct ChatBubbleShape: Shape {
@@ -317,12 +610,7 @@ struct TypingIndicator: View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 6) {
-                    Image(systemName: "sparkle")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.white)
-                        .frame(width: 22, height: 22)
-                        .background(Theme.accent)
-                        .clipShape(RoundedRectangle(cornerRadius: 7))
+                    StewardLogo(size: 22)
 
                     Text("Steward")
                         .font(Theme.body(11))
@@ -358,6 +646,14 @@ struct TypingIndicator: View {
         return 0.3 + 0.7 * abs(sin(adjusted * .pi))
     }
 }
+
+// MARK: - Browser Item (for .sheet(item:))
+
+struct BrowserItem: Identifiable {
+    let id = UUID()
+    let url: URL
+}
+
 
 // MARK: - Flow Layout
 

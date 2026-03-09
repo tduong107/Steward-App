@@ -5,6 +5,7 @@ struct DetailRow: View {
     let label: String
     let value: String
     var highlight: Bool = false
+    var showChevron: Bool = false
 
     var body: some View {
         HStack(spacing: 12) {
@@ -22,6 +23,12 @@ struct DetailRow: View {
             }
 
             Spacer()
+
+            if showChevron {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Theme.borderMid)
+            }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
