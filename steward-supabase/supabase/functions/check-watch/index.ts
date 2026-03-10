@@ -30,6 +30,173 @@ function generateActionURL(watch: any): string | null {
   return url;
 }
 
+// ─── Multi-Source Search Watch ───────────────────────────────────────
+
+/** Parses a price string like "$149.99" or "149.99" to a number. */
+function parseShoppingPrice(priceStr: string | null | undefined): number | null {
+  if (!priceStr) return null;
+  const match = priceStr.match(/[\d,]+\.?\d*/);
+  if (!match) return null;
+  const price = parseFloat(match[0].replace(/,/g, ""));
+  return isNaN(price) || price <= 0 ? null : price;
+}
+
+/** Checks a search-mode watch by querying Serper Shopping API for multi-source prices. */
+async function checkSearchWatch(
+  watch: any,
+  supabase: any
+): Promise<Record<string, unknown>> {
+  const SERPER_API_KEY = Deno.env.get("SERPER_API_KEY") ?? "";
+  if (!SERPER_API_KEY) {
+    console.error(`[check-watch] SERPER_API_KEY not set for search watch ${watch.id}`);
+    return { watch_id: watch.id, changed: false, result_text: "Search API unavailable" };
+  }
+
+  try {
+    const res = await fetch("https://google.serper.dev/shopping", {
+      method: "POST",
+      headers: {
+        "X-API-KEY": SERPER_API_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ q: watch.search_query, num: 10 }),
+    });
+
+    if (!res.ok) {
+      console.error(`[check-watch] Serper API error ${res.status} for ${watch.id}`);
+      return { watch_id: watch.id, changed: false, result_text: "Search failed" };
+    }
+
+    const searchData = await res.json();
+    const results = (searchData.shopping || []).slice(0, 10);
+
+    if (results.length === 0) {
+      return { watch_id: watch.id, changed: false, result_text: "No results found" };
+    }
+
+    // Parse prices from results and sort by price ascending
+    const priced = results
+      .map((r: any) => ({
+        title: (r.title || "Product").substring(0, 80),
+        url: r.link,
+        source: (r.source || "Store").replace(/\.com$/i, ""),
+        price: parseShoppingPrice(r.price),
+        imageURL: r.imageUrl || null,
+      }))
+      .filter((r: any) => r.price !== null)
+      .sort((a: any, b: any) => a.price - b.price);
+
+    if (priced.length === 0) {
+      return { watch_id: watch.id, changed: false, result_text: "No prices found in search results" };
+    }
+
+    const bestResult = priced[0];
+    const currentBestPrice = bestResult.price;
+
+    // Get last known best price from previous check
+    let lastBestPrice: number | null = null;
+    try {
+      const { data: lastCheck } = await supabase
+        .from("check_results")
+        .select("price")
+        .eq("watch_id", watch.id)
+        .order("checked_at", { ascending: false })
+        .limit(1)
+        .single();
+      if (lastCheck?.price != null) {
+        lastBestPrice = parseFloat(lastCheck.price);
+        if (isNaN(lastBestPrice)) lastBestPrice = null;
+      }
+    } catch {
+      // First check — no previous data
+    }
+
+    // Determine if condition is met
+    const condLower = (watch.condition || "").toLowerCase();
+    let changed = false;
+    let resultText = `Best: $${currentBestPrice.toFixed(2)} at ${bestResult.source}`;
+
+    // Check against explicit target price in condition (e.g., "below $150")
+    const targetMatch = condLower.match(
+      /(?:below|under|less\s+than|drops?\s+(?:below|under|to))\s+\$?([\d,]+\.?\d*)/
+    );
+
+    if (targetMatch) {
+      const target = parseFloat(targetMatch[1].replace(/,/g, ""));
+      if (currentBestPrice <= target) {
+        changed = true;
+        resultText = `Price dropped to $${currentBestPrice.toFixed(2)} at ${bestResult.source} (target: $${target.toFixed(2)})`;
+      }
+    } else if (lastBestPrice !== null && currentBestPrice < lastBestPrice * 0.97) {
+      // No explicit target: trigger if price dropped 3%+ from last check
+      changed = true;
+      resultText = `Price dropped to $${currentBestPrice.toFixed(2)} at ${bestResult.source} (was $${lastBestPrice.toFixed(2)})`;
+    }
+
+    const now = new Date().toISOString();
+
+    // Store check result with multi-source data
+    await supabase.from("check_results").insert({
+      id: crypto.randomUUID(),
+      watch_id: watch.id,
+      result_data: {
+        text: resultText,
+        sources: priced.slice(0, 5).map((r: any) => ({
+          title: r.title,
+          url: r.url,
+          source: r.source,
+          price: r.price,
+          imageURL: r.imageURL,
+        })),
+      },
+      changed,
+      price: currentBestPrice,
+      checked_at: now,
+    });
+
+    // Update the watch
+    const updateData: Record<string, unknown> = { last_checked: now };
+    if (changed) {
+      updateData.triggered = true;
+      updateData.status = "triggered";
+      updateData.change_note = resultText;
+      updateData.action_url = bestResult.url;
+      if (bestResult.imageURL) {
+        updateData.image_url = bestResult.imageURL;
+      }
+    }
+
+    await supabase.from("watches").update(updateData).eq("id", watch.id);
+
+    // Send push notification if triggered
+    if (changed) {
+      try {
+        await supabase.functions.invoke("notify-user", {
+          body: { watch_id: watch.id, user_id: watch.user_id, action_url: bestResult.url },
+        });
+      } catch (notifyErr: any) {
+        console.error(`[check-watch] notify-user error for ${watch.id}: ${notifyErr.message}`);
+      }
+    }
+
+    console.log(
+      `[check-watch] Search watch ${watch.id}: best=$${currentBestPrice.toFixed(2)} at ${bestResult.source}, changed=${changed}, sources=${priced.length}`
+    );
+
+    return {
+      watch_id: watch.id,
+      changed,
+      result_text: resultText,
+      price: currentBestPrice,
+      checked_at: now,
+      sources_count: priced.length,
+    };
+  } catch (err: any) {
+    console.error(`[check-watch] Search watch error for ${watch.id}: ${err.message}`);
+    return { watch_id: watch.id, changed: false, result_text: `Search error: ${err.message}` };
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -78,6 +245,15 @@ serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
+    }
+
+    // ─── Search-mode watches: use Serper Shopping API for multi-source price tracking ───
+    if (watch.watch_mode === "search" && watch.search_query) {
+      const searchResult = await checkSearchWatch(watch, supabase);
+      return new Response(JSON.stringify(searchResult), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Ensure URL has protocol
@@ -188,7 +364,7 @@ serve(async (req) => {
     }
 
     // Extract current price from raw HTML (structured selectors work best on raw HTML)
-    const currentPrice = fetchSuccess ? extractPrice(pageText) : null;
+    let currentPrice = fetchSuccess ? extractPrice(pageText) : null;
 
     // Strip HTML for condition evaluation (AI and regex work better on plain text)
     const plainText = fetchSuccess ? stripHtml(pageText) : pageText;
@@ -254,13 +430,107 @@ serve(async (req) => {
     }
 
     // Evaluate the condition against the page content
-    const { changed, resultText } = await evaluateConditionAsync(
+    let { changed, resultText } = await evaluateConditionAsync(
       watch.condition,
       plainText,
       fetchSuccess,
       lastKnownPrice,
       watch.action_type
     );
+
+    // ─── Failure Detection & Auto-Fix Attempt ────────────────────────
+    const isCheckFailure =
+      resultText === "Price not found on page" ||
+      resultText === "Could not reach page" ||
+      resultText.startsWith("Error:");
+
+    let autoFixed = false;
+
+    if (isCheckFailure && !changed) {
+      // Auto-fix attempt: use Serper Shopping API to find a price for the product
+      if (resultText === "Price not found on page" && watch.name) {
+        try {
+          const SERPER_KEY = Deno.env.get("SERPER_API_KEY") ?? "";
+          if (SERPER_KEY) {
+            const serperRes = await fetch("https://google.serper.dev/shopping", {
+              method: "POST",
+              headers: { "X-API-KEY": SERPER_KEY, "Content-Type": "application/json" },
+              body: JSON.stringify({ q: watch.name, num: 5 }),
+              signal: AbortSignal.timeout(5000),
+            });
+            if (serperRes.ok) {
+              const serperData = await serperRes.json();
+              const watchHost = new URL(fetchUrl).hostname.replace("www.", "");
+              const items = serperData.shopping ?? [];
+              // Look for a result from the same domain
+              for (const item of items) {
+                try {
+                  const itemHost = new URL(item.link ?? "").hostname.replace("www.", "");
+                  if (itemHost.includes(watchHost) || watchHost.includes(itemHost)) {
+                    const serperPrice = parseShoppingPrice(item.price);
+                    if (serperPrice !== null) {
+                      currentPrice = serperPrice;
+                      resultText = `$${serperPrice.toFixed(2)} (via product search)`;
+                      autoFixed = true;
+                      console.log(`[check-watch] Auto-fix: found price $${serperPrice} via Serper for ${watch.id}`);
+                      // Re-evaluate condition with the found price
+                      const condLower = watch.condition.toLowerCase();
+                      const priceThresholdMatch = condLower.match(
+                        /price\s+(?:drops?\s+)?(?:below|under|less\s+than)\s+\$?([\d,]+\.?\d*)/
+                      );
+                      if (priceThresholdMatch) {
+                        const threshold = parseFloat(priceThresholdMatch[1].replace(/,/g, ""));
+                        if (serperPrice < threshold) {
+                          changed = true;
+                          resultText = `Price dropped to $${serperPrice.toFixed(2)} (below $${threshold})`;
+                        }
+                      }
+                      break;
+                    }
+                  }
+                } catch { /* skip bad items */ }
+              }
+            }
+          }
+        } catch (serperErr) {
+          console.log(`[check-watch] Serper auto-fix failed (non-critical): ${serperErr.message}`);
+        }
+      }
+
+      // Auto-fix attempt: retry with desktop User-Agent for unreachable pages
+      if (resultText === "Could not reach page" && !autoFixed) {
+        try {
+          const retryRes = await fetch(fetchUrl, {
+            headers: {
+              ...fetchHeaders,
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            },
+            redirect: "follow",
+            signal: AbortSignal.timeout(10000),
+          });
+          if (retryRes.ok) {
+            const retryText = await retryRes.text();
+            const retryPlain = stripHtml(retryText);
+            const retryPrice = extractPrice(retryText);
+            const retryEval = await evaluateConditionAsync(
+              watch.condition, retryPlain, true, lastKnownPrice, watch.action_type
+            );
+            changed = retryEval.changed;
+            resultText = retryEval.resultText;
+            currentPrice = retryPrice;
+            autoFixed = true;
+            console.log(`[check-watch] Auto-fix: desktop UA retry succeeded for ${watch.id}`);
+          }
+        } catch (retryErr) {
+          console.log(`[check-watch] Desktop UA retry failed (non-critical): ${retryErr.message}`);
+        }
+      }
+    }
+
+    // ─── Track consecutive failures & notify on threshold ────────────
+    const stillFailing = !autoFixed && isCheckFailure && !changed;
+    const prevFailures = watch.consecutive_failures ?? 0;
+    const FAILURE_THRESHOLD = 2;
 
     // Store the check result (with content hash for future change detection)
     const now = new Date().toISOString();
@@ -293,6 +563,35 @@ serve(async (req) => {
       if (actionUrl) {
         updateData.action_url = actionUrl;
       }
+    }
+
+    // Failure tracking: increment or reset
+    if (stillFailing) {
+      const newFailures = prevFailures + 1;
+      updateData.consecutive_failures = newFailures;
+      updateData.last_error = resultText;
+
+      // Notify exactly once when crossing the threshold
+      if (newFailures >= FAILURE_THRESHOLD && !watch.needs_attention) {
+        updateData.needs_attention = true;
+        console.log(`[check-watch] Watch ${watch.id} needs attention after ${newFailures} failures`);
+        try {
+          await supabase.functions.invoke("notify-user", {
+            body: {
+              watch_id: watch.id,
+              user_id: watch.user_id,
+              notification_type: "needs_attention",
+            },
+          });
+        } catch {
+          console.error("[check-watch] Failed to send needs_attention notification");
+        }
+      }
+    } else if (prevFailures > 0 || watch.needs_attention) {
+      // Success (or auto-fixed) — reset error tracking
+      updateData.consecutive_failures = 0;
+      updateData.last_error = null;
+      updateData.needs_attention = false;
     }
 
     const { error: updateError } = await supabase
@@ -334,6 +633,8 @@ serve(async (req) => {
         result_text: resultText,
         price: currentPrice,
         checked_at: now,
+        auto_fixed: autoFixed,
+        consecutive_failures: stillFailing ? (prevFailures + 1) : 0,
         insert_error: insertError ? insertError.message : null,
       }),
       {

@@ -542,8 +542,40 @@ final class WatchViewModel {
 
     /// Opens the chat drawer pre-loaded with context about a broken watch
     func askAIToFix(_ watch: Watch) {
-        pendingFixContext = "My watch \"\(watch.name)\" (\(watch.url)) is having trouble: \(watch.lastError ?? "unknown error"). It has failed \(watch.consecutiveFailures) times in a row. Can you help me fix it? Maybe find a working URL for this product or adjust the watch."
+        pendingFixContext = "[FIX_WATCH] My watch \"\(watch.name)\" (URL: \(watch.url)) is broken. Error: \(watch.lastError ?? "unknown error"). Failed \(watch.consecutiveFailures) times. Existing settings — condition: \(watch.condition), action type: \(watch.actionType.displayName). IMPORTANT: First try to find a working version of the ORIGINAL URL (\(watch.url)) — it may have moved or changed format. Only if the original domain/URL is completely dead, then search for \"\(watch.name)\" to find an alternative product page. Once you find a working URL, use [UPDATE_WATCH]{\"name\":\"\(watch.name)\",\"url\":\"THE_NEW_URL\"}[/UPDATE_WATCH] to fix it. Do NOT ask me what to watch for — keep the existing settings."
         isChatOpen = true
+    }
+
+    /// Updates a broken watch with a new URL and resets error state
+    func fixBrokenWatch(name: String, newURL: String) {
+        guard let context = modelContext else {
+            print("[WatchVM] fixBrokenWatch: no modelContext")
+            return
+        }
+        print("[WatchVM] fixBrokenWatch: searching for '\(name)' in \(watches.count) watches: \(watches.map { $0.name })")
+
+        // Find the watch by name (case-insensitive partial match)
+        let match = watches.first { $0.name.localizedCaseInsensitiveContains(name) }
+            ?? watches.first { name.localizedCaseInsensitiveContains($0.name) }
+        guard let watch = match else {
+            print("[WatchVM] fixBrokenWatch: no watch found matching '\(name)'")
+            return
+        }
+
+        print("[WatchVM] fixBrokenWatch: FOUND '\(watch.name)' — updating URL to \(newURL)")
+        watch.url = newURL
+        watch.consecutiveFailures = 0
+        watch.lastError = nil
+        watch.needsAttention = false
+        try? context.save()
+        fetchLocalWatches()
+
+        // Sync the fix to Supabase
+        Task {
+            guard let supabase = self.supabase, let auth = self.auth, let userId = auth.currentUserId else { return }
+            let dto = watch.toDTO(userId: userId)
+            try? await supabase.updateWatch(dto)
+        }
     }
 
     // MARK: - Activity Logging

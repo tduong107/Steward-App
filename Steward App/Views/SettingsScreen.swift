@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsScreen: View {
     @AppStorage("isDarkMode") private var isDarkMode = false
+    @AppStorage("hasSeenOnboardingB") private var hasSeenOnboardingB = true
     @Environment(AuthManager.self) private var authManager
     @Environment(NotificationManager.self) private var notificationManager
     @Environment(SubscriptionManager.self) private var subscriptionManager
@@ -47,6 +48,8 @@ struct SettingsScreen: View {
                     planRow
                     Divider().foregroundStyle(Theme.border).padding(.leading, 52)
                     restorePurchasesRow
+                    Divider().foregroundStyle(Theme.border).padding(.leading, 52)
+                    replayTourRow
                     Divider().foregroundStyle(Theme.border).padding(.leading, 52)
                     privacyPolicyRow
                     Divider().foregroundStyle(Theme.border).padding(.leading, 52)
@@ -167,6 +170,34 @@ struct SettingsScreen: View {
         }
         .buttonStyle(.plain)
         .disabled(subscriptionManager.isPurchasing)
+    }
+
+    // MARK: - Replay Tour Row
+
+    private var replayTourRow: some View {
+        Button {
+            hasSeenOnboardingB = false
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "arrow.counterclockwise.circle")
+                    .font(.system(size: 16))
+                    .foregroundStyle(Theme.ink)
+                    .frame(width: 24)
+
+                Text("Replay welcome tour")
+                    .font(Theme.body(13))
+                    .foregroundStyle(Theme.ink)
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Theme.borderMid)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Privacy Policy Row

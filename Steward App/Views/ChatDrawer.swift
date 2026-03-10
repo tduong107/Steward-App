@@ -121,6 +121,12 @@ struct ChatDrawer: View {
         .onAppear {
             chatVM.subscriptionTier = subscriptionManager.currentTier
 
+            // Set up direct callback for watch URL updates (from "Ask AI to fix")
+            chatVM.onWatchUpdate = { [watchVM] name, url in
+                print("[ChatDrawer] onWatchUpdate callback: name=\(name), url=\(url)")
+                watchVM.fixBrokenWatch(name: name, newURL: url)
+            }
+
             // If there's a shared URL from the Share Extension, auto-send it to the AI
             if let pendingURL = watchVM.pendingChatURL {
                 watchVM.pendingChatURL = nil
@@ -198,6 +204,16 @@ struct ChatDrawer: View {
                         ChatMessageView(
                             message: msg,
                             onSuggestion: { text in
+                                // "Find the link myself" opens in-app browser
+                                if text.lowercased().contains("find the link myself") || text.lowercased().contains("find it myself") {
+                                    // Search Google for the product using the watch name from fix context
+                                    let query = watchVM.selectedWatch?.name ?? "product"
+                                    let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
+                                    if let url = URL(string: "https://www.google.com/search?q=\(encoded)") {
+                                        browserItem = BrowserItem(url: url)
+                                    }
+                                    return
+                                }
                                 chatVM.send(text)
                             },
                             onProductLinkTap: { link in

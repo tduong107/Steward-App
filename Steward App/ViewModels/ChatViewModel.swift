@@ -28,6 +28,15 @@ final class ChatViewModel {
     /// Watch ID awaiting a price update from the user (after "Change starting price" suggestion)
     var pendingPriceUpdateWatchId: UUID?
 
+    /// Direct callback for updating an existing watch (set by ChatDrawer)
+    var onWatchUpdate: ((String, String) -> Void)?  // (watchName, newURL)
+
+    /// Tracks the watch name when in a fix-watch conversation (for fallback URL extraction)
+    private var fixWatchName: String?
+
+    /// Proposed fix awaiting user confirmation (watchName, url)
+    private var pendingFix: (watchName: String, url: String)?
+
     /// Full conversation history for the AI (role + content pairs)
     private var conversationHistory: [AIService.Message] = []
 
@@ -52,6 +61,9 @@ final class ChatViewModel {
     private static let suggestionsRegex = try! NSRegularExpression(pattern: "\\[SUGGESTIONS\\](.*?)\\[/SUGGESTIONS\\]", options: .dotMatchesLineSeparators)
     private static let leakedWatchJsonRegex = try! NSRegularExpression(pattern: "\\{\"emoji\".*?\\}", options: .dotMatchesLineSeparators)
     private static let leakedLinkJsonRegex = try! NSRegularExpression(pattern: "\\{\\s*\"title\"\\s*:.*?\"source\"\\s*:.*?\\}", options: .dotMatchesLineSeparators)
+    private static let functionCallsRegex = try! NSRegularExpression(pattern: "<(?:antml:)?function_calls>[\\s\\S]*?</(?:antml:)?function_calls>", options: [])
+    private static let invokeTagRegex = try! NSRegularExpression(pattern: "<(?:antml:)?invoke[^>]*>[\\s\\S]*?</(?:antml:)?invoke>", options: [])
+    private static let xmlTagRegex = try! NSRegularExpression(pattern: "</?(?:antml:)?(?:function_calls|invoke|parameter)[^>]*>", options: [])
 
     // MARK: - Public API
 
@@ -123,9 +135,53 @@ final class ChatViewModel {
             }
         }
 
-        let displayText = messageText.trimmingCharacters(in: .whitespaces).isEmpty
-            ? "📸 [Screenshot]"
-            : messageText
+        // Handle fix-watch confirmation suggestions locally
+        if pendingFix != nil {
+            let trimmed = messageText.trimmingCharacters(in: .whitespaces)
+
+            if trimmed == "Yes, update it ✅" {
+                let userMsg = ChatMessage(role: .user, text: trimmed)
+                withAnimation(.spring(response: 0.3)) {
+                    messages.append(userMsg)
+                }
+                inputText = ""
+
+                let fix = pendingFix!
+                onWatchUpdate?(fix.watchName, fix.url)
+                pendingFix = nil
+                fixWatchName = nil
+
+                withAnimation(.spring(response: 0.3)) {
+                    messages.append(ChatMessage(
+                        role: .steward,
+                        text: "✅ Watch URL has been updated and the warning has been cleared! Go back to check it out.",
+                        suggestions: ["That's all for now"]
+                    ))
+                }
+                return
+            }
+
+            // "No, find a different one" or other response — clear pending fix
+            // and let the message flow through to the AI for alternatives
+            pendingFix = nil
+        }
+
+        // For fix-watch prompts, show a friendly message instead of the raw technical prompt
+        let isFixWatchPrompt = messageText.contains("[FIX_WATCH]")
+        let displayText: String
+        if messageText.trimmingCharacters(in: .whitespaces).isEmpty {
+            displayText = "📸 [Screenshot]"
+        } else if isFixWatchPrompt {
+            // Extract the watch name for a friendly display
+            let nameMatch = messageText.range(of: "\"", range: messageText.startIndex..<messageText.endIndex)
+                .flatMap { start in
+                    messageText.range(of: "\"", range: messageText.index(after: start.lowerBound)..<messageText.endIndex)
+                        .map { end in String(messageText[messageText.index(after: start.lowerBound)..<end.lowerBound]) }
+                }
+            displayText = "Can you help fix my \(nameMatch ?? "broken") watch? 🔧"
+        } else {
+            displayText = messageText
+        }
 
         // Create a small thumbnail for display (saves memory vs keeping full UIImage)
         let thumbnail: UIImage? = image.flatMap { createThumbnail($0, maxDimension: 200) }
@@ -144,6 +200,16 @@ final class ChatViewModel {
             imageData = compressImage(image)
         }
 
+        // Track fix-watch context for fallback URL extraction
+        if isFixWatchPrompt {
+            // Extract the watch name from the prompt (between first pair of quotes)
+            if let firstQuote = messageText.range(of: "\""),
+               let secondQuote = messageText.range(of: "\"", range: messageText.index(after: firstQuote.lowerBound)..<messageText.endIndex) {
+                fixWatchName = String(messageText[messageText.index(after: firstQuote.lowerBound)..<secondQuote.lowerBound])
+                print("[ChatViewModel] Fix-watch mode: tracking name '\(fixWatchName!)'")
+            }
+        }
+
         // Build the text for conversation history
         var historyText = messageText.trimmingCharacters(in: .whitespaces).isEmpty
             ? "I'm sending you a screenshot. What product/item is this? Help me set up a watch for it."
@@ -158,6 +224,21 @@ final class ChatViewModel {
                     historyText = enriched
                 }
             }
+
+            // In fix-watch mode, adjust URL context to help AI prioritize correctly
+            if isFixWatchPrompt {
+                if historyText.contains("[URL_CONTEXT") && historyText.contains("resolves to:") {
+                    // URL resolved — tell AI to use the resolved URL directly
+                    historyText = historyText.replacingOccurrences(
+                        of: "Use this info to understand what the user is referring to. Use the ORIGINAL URL the user provided for the watch, not the resolved one.]",
+                        with: "IMPORTANT: The original URL resolved successfully! Use the RESOLVED URL (after '→ resolves to:') in your [UPDATE_WATCH] tag to fix the watch. Do NOT search by product name — the URL works.]"
+                    )
+                } else if !historyText.contains("[URL_CONTEXT") {
+                    // URL didn't resolve — tell AI to search by name
+                    historyText += "\n\n[NOTE: The original URL could not be resolved — it appears to be dead. Search for the product by name to find a working alternative.]"
+                }
+            }
+
             guard !Task.isCancelled else { return }
 
             // Inject subscription tier context on first message so AI knows which frequencies to offer
@@ -174,20 +255,62 @@ final class ChatViewModel {
             do {
                 let response = try await AIService.shared.chat(messages: conversationHistory)
 
+                // Extract [UPDATE_WATCH] from raw response — store as pending fix (don't auto-apply)
+                var proposedFix: (watchName: String, url: String)?
+                if let startTag = response.range(of: "[UPDATE_WATCH]"),
+                   let endTag = response.range(of: "[/UPDATE_WATCH]"),
+                   startTag.upperBound < endTag.lowerBound {
+                    let rawJSON = String(response[startTag.upperBound..<endTag.lowerBound])
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                    print("[ChatViewModel] Found [UPDATE_WATCH] in response: \(rawJSON)")
+                    proposedFix = parseUpdateWatchPayload(rawJSON)
+                }
+
+                // Fallback: if we're in fix-watch mode and the AI mentioned a URL but didn't use [UPDATE_WATCH]
+                if proposedFix == nil, let watchName = fixWatchName {
+                    let urlPattern = try? NSRegularExpression(pattern: "https?://[^\\s\\)\\]>\"]+", options: [])
+                    let matches = urlPattern?.matches(in: response, range: NSRange(response.startIndex..., in: response)) ?? []
+                    for match in matches {
+                        if let range = Range(match.range, in: response) {
+                            let url = String(response[range])
+                            let lower = url.lowercased()
+                            if lower.contains("google.com/search") || lower.contains("serper.dev") ||
+                               lower.contains("google.com/shopping") { continue }
+                            print("[ChatViewModel] Fallback fix: found URL '\(url)' for watch '\(watchName)'")
+                            proposedFix = (watchName: watchName, url: url)
+                            break
+                        }
+                    }
+                }
+
                 // Parse AI response for display text, watch JSON, suggestions, and proposal flag
                 let parsed = parseResponse(response)
 
                 // Add full response (with markers) to history so AI has context
                 conversationHistory.append(AIService.Message(role: "assistant", content: response))
 
-                withAnimation(.spring(response: 0.3)) {
-                    isTyping = false
-                    messages.append(ChatMessage(
-                        role: .steward,
-                        text: parsed.displayText,
-                        suggestions: parsed.suggestions,
-                        productLinks: parsed.productLinks
-                    ))
+                // If a fix URL was proposed, store it and show AI's message with confirmation buttons
+                if let fix = proposedFix {
+                    pendingFix = fix
+                    withAnimation(.spring(response: 0.3)) {
+                        isTyping = false
+                        messages.append(ChatMessage(
+                            role: .steward,
+                            text: parsed.displayText,
+                            suggestions: ["Yes, update it ✅", "No, find a different one"],
+                            productLinks: parsed.productLinks
+                        ))
+                    }
+                } else {
+                    withAnimation(.spring(response: 0.3)) {
+                        isTyping = false
+                        messages.append(ChatMessage(
+                            role: .steward,
+                            text: parsed.displayText,
+                            suggestions: parsed.suggestions,
+                            productLinks: parsed.productLinks
+                        ))
+                    }
                 }
 
                 // Create watch if AI included the marker
@@ -224,6 +347,32 @@ final class ChatViewModel {
         pendingImage = nil
     }
 
+    // MARK: - Parse Update Watch Payload
+
+    /// Parses [UPDATE_WATCH] JSON and returns (name, url) if valid — does NOT apply the update
+    private func parseUpdateWatchPayload(_ json: String) -> (watchName: String, url: String)? {
+        let trimmed = json.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let data = trimmed.data(using: .utf8) else {
+            print("[ChatViewModel] parseUpdateWatchPayload: invalid UTF-8")
+            return nil
+        }
+
+        struct UpdatePayload: Codable {
+            let name: String
+            let url: String
+        }
+
+        do {
+            let payload = try JSONDecoder().decode(UpdatePayload.self, from: data)
+            var url = payload.url
+            if !url.lowercased().hasPrefix("http") { url = "https://\(url)" }
+            return (watchName: payload.name, url: url)
+        } catch {
+            print("[ChatViewModel] Failed to parse update watch JSON: \(error)")
+            return nil
+        }
+    }
+
     // Price update flow is handled inline in send()
 
     func reset() {
@@ -239,6 +388,8 @@ final class ChatViewModel {
         lastDetectedPrice = nil
         pendingPriceUpdateWatchId = nil
         pendingPriceUpdateData = nil
+        fixWatchName = nil
+        pendingFix = nil
         conversationHistory = []
     }
 
@@ -304,6 +455,22 @@ final class ChatViewModel {
     /// Extracts display text, optional watch JSON, suggestions, product links, and proposal flag from AI response
     private func parseResponse(_ response: String) -> ParsedResponse {
         var text = response
+
+        // 0. Strip AI model artifacts (<function_calls>, <invoke>, etc.)
+        text = Self.functionCallsRegex.stringByReplacingMatches(in: text, range: NSRange(text.startIndex..., in: text), withTemplate: "")
+        text = Self.invokeTagRegex.stringByReplacingMatches(in: text, range: NSRange(text.startIndex..., in: text), withTemplate: "")
+        text = Self.xmlTagRegex.stringByReplacingMatches(in: text, range: NSRange(text.startIndex..., in: text), withTemplate: "")
+
+        // 0b. Strip [UPDATE_WATCH]...[/UPDATE_WATCH] tags if present
+        if let startTag = text.range(of: "[UPDATE_WATCH]"),
+           let endTag = text.range(of: "[/UPDATE_WATCH]"),
+           startTag.upperBound <= endTag.lowerBound {
+            text = String(text[text.startIndex..<startTag.lowerBound]) + String(text[endTag.upperBound...])
+        }
+        text = text.replacingOccurrences(of: "[UPDATE_WATCH]", with: "")
+        text = text.replacingOccurrences(of: "[/UPDATE_WATCH]", with: "")
+        text = text.replacingOccurrences(of: "[FIX_WATCH]", with: "")
+        text = text.replacingOccurrences(of: "[/FIX_WATCH]", with: "")
 
         // 1. Extract [CREATE_WATCH] JSON if present
         var watchJSON: String?

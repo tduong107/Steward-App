@@ -115,7 +115,12 @@ struct DetailScreen: View {
         }
         .sheet(isPresented: $showBrowser) {
             if let url = watch.fullURL {
-                InAppBrowser(initialURL: url) { _ in }
+                InAppBrowser(initialURL: url) { capturedURL in
+                    // If the watch needs attention, use captured URL to fix it
+                    if watch.needsAttention {
+                        viewModel.fixBrokenWatch(name: watch.name, newURL: capturedURL)
+                    }
+                }
             }
         }
         .sheet(isPresented: $showFrequencyPicker) {
@@ -483,22 +488,45 @@ struct DetailScreen: View {
                 .font(Theme.body(12))
                 .foregroundStyle(Theme.inkMid)
 
-            Button {
-                viewModel.askAIToFix(watch)
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 12))
-                    Text("Ask AI to fix")
-                        .font(Theme.body(13, weight: .semibold))
+            HStack(spacing: 8) {
+                Button {
+                    viewModel.askAIToFix(watch)
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 12))
+                        Text("Ask AI to fix")
+                            .font(Theme.body(13, weight: .semibold))
+                    }
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(Theme.gold)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 10)
-                .background(Theme.gold)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .buttonStyle(.plain)
+
+                Button {
+                    showBrowser = true
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "safari")
+                            .font(.system(size: 12))
+                        Text("Find link")
+                            .font(Theme.body(13, weight: .semibold))
+                    }
+                    .foregroundStyle(Theme.gold)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(Theme.goldLight)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Theme.gold.opacity(0.4), lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 16)
