@@ -85,7 +85,7 @@ struct PaywallScreen: View {
                 .font(Theme.serif(24, weight: .bold))
                 .foregroundStyle(Theme.ink)
 
-            Text("Monitor smarter with faster checks,\nunlimited watches & price insights")
+            Text("Monitor smarter with faster checks,\nmore watches & price insights")
                 .font(Theme.body(14))
                 .foregroundStyle(Theme.inkMid)
                 .multilineTextAlignment(.center)
@@ -109,7 +109,7 @@ struct PaywallScreen: View {
                 comparisonRow("Push notifications", included: true)
                 comparisonRow("Faster watch frequencies", included: false)
                 comparisonRow("Price insights & deal alerts", included: false)
-                comparisonRow("Unlimited watches", included: false)
+                comparisonRow("More watches", included: false)
             }
         }
         .padding(16)
@@ -188,8 +188,8 @@ struct PaywallScreen: View {
             tier: .pro,
             badge: nil,
             features: [
-                "Up to 20 watches",
-                "Watch frequency up to every 30 minutes",
+                "Up to 10 watches",
+                "Watch frequency up to every hour",
                 "Price insights & deal alerts"
             ],
             product: product,
@@ -212,7 +212,7 @@ struct PaywallScreen: View {
             tier: .premium,
             badge: "BEST VALUE",
             features: [
-                "Unlimited watches",
+                "Up to 25 watches",
                 "Watch frequency up to every 5 minutes",
                 "Everything in Pro included",
                 "Priority support"

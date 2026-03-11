@@ -1,4 +1,5 @@
 import Foundation
+import Security
 
 /// Lightweight network client for the Share Extension.
 /// Uses URLSession directly (no Supabase SDK dependency) to call AI chat
@@ -11,11 +12,27 @@ enum ShareAPIService {
     private static let anonKey = "sb_publishable_p1md1ejTmoPsoJnhrBm9nA_HfVPRd4q"
     private static let sharedDefaults = UserDefaults(suiteName: "group.Steward.Steward-App")
 
+    // Keychain config (must match AuthManager)
+    private static let keychainService = "com.steward.shared-auth"
+    private static let keychainAccessGroup = "group.Steward.Steward-App"
+    private static let keychainAccountKey = "accessToken"
+
     // MARK: - Auth Helpers
 
-    /// Reads the current access token from shared App Group storage
+    /// Reads the current access token from shared Keychain (secure)
     static var accessToken: String? {
-        sharedDefaults?.string(forKey: "accessToken")
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecAttrAccount as String: keychainAccountKey,
+            kSecAttrAccessGroup as String: keychainAccessGroup,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ]
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        guard status == errSecSuccess, let data = result as? Data else { return nil }
+        return String(data: data, encoding: .utf8)
     }
 
     /// Reads the current user ID from shared App Group storage

@@ -193,18 +193,66 @@ final class AuthManager {
     }
 
     // MARK: - App Group Token Sync (for Share Extension)
+    // Uses Keychain with shared access group for secure storage.
+    // Falls back to App Group UserDefaults for userId (non-sensitive).
 
-    /// Writes the current auth token to shared App Group storage
+    private static let keychainService = "com.steward.shared-auth"
+    private static let keychainAccessGroup = "group.Steward.Steward-App"
+    private static let keychainAccountKey = "accessToken"
+
+    /// Writes the current auth token to shared Keychain + userId to App Group
     static func syncTokenToAppGroup(accessToken: String, userId: UUID) {
+        // Store access token in Keychain (encrypted, hardware-backed)
+        let tokenData = Data(accessToken.utf8)
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecAttrAccount as String: keychainAccountKey,
+            kSecAttrAccessGroup as String: keychainAccessGroup,
+        ]
+        // Delete any existing item first
+        SecItemDelete(query as CFDictionary)
+        // Add new item
+        var addQuery = query
+        addQuery[kSecValueData as String] = tokenData
+        addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
+        SecItemAdd(addQuery as CFDictionary, nil)
+
+        // Store userId in App Group UserDefaults (non-sensitive)
         guard let defaults = sharedDefaults else { return }
-        defaults.set(accessToken, forKey: "accessToken")
         defaults.set(userId.uuidString, forKey: "userId")
     }
 
-    /// Removes auth token from App Group on sign-out
+    /// Reads the access token from shared Keychain
+    static func readTokenFromKeychain() -> String? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecAttrAccount as String: keychainAccountKey,
+            kSecAttrAccessGroup as String: keychainAccessGroup,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ]
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        guard status == errSecSuccess, let data = result as? Data else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    /// Removes auth token from Keychain and userId from App Group on sign-out
     static func clearTokenFromAppGroup() {
+        // Remove from Keychain
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecAttrAccount as String: keychainAccountKey,
+            kSecAttrAccessGroup as String: keychainAccessGroup,
+        ]
+        SecItemDelete(query as CFDictionary)
+
+        // Remove userId from App Group
         guard let defaults = sharedDefaults else { return }
-        defaults.removeObject(forKey: "accessToken")
+        defaults.removeObject(forKey: "accessToken") // Clean up old UserDefaults token if present
         defaults.removeObject(forKey: "userId")
     }
 

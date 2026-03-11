@@ -123,7 +123,9 @@ struct ChatDrawer: View {
 
             // Set up direct callback for watch URL updates (from "Ask AI to fix")
             chatVM.onWatchUpdate = { [watchVM] name, url in
+                #if DEBUG
                 print("[ChatDrawer] onWatchUpdate callback: name=\(name), url=\(url)")
+                #endif
                 watchVM.fixBrokenWatch(name: name, newURL: url)
             }
 

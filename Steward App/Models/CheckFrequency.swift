@@ -45,8 +45,8 @@ enum SubscriptionTier: String, Codable, CaseIterable {
     var maxWatches: Int {
         switch self {
         case .free: return 3
-        case .pro: return 20
-        case .premium: return Int.max
+        case .pro: return 10
+        case .premium: return 25
         }
     }
 
@@ -112,9 +112,9 @@ enum CheckFrequency: String, CaseIterable {
         switch self {
         case .daily:
             return .free
-        case .every12h, .every6h, .every1h, .every30m:
+        case .every12h, .every6h, .every1h:
             return .pro
-        case .every15m, .every5m:
+        case .every30m, .every15m, .every5m:
             return .premium
         }
     }
@@ -148,6 +148,6 @@ enum CheckFrequency: String, CaseIterable {
 
     /// Grouped by tier for display
     static var freeTier: [CheckFrequency] { [.daily] }
-    static var proTier: [CheckFrequency] { [.every12h, .every6h, .every1h, .every30m] }
-    static var premiumTier: [CheckFrequency] { [.every15m, .every5m] }
+    static var proTier: [CheckFrequency] { [.every12h, .every6h, .every1h] }
+    static var premiumTier: [CheckFrequency] { [.every30m, .every15m, .every5m] }
 }

@@ -159,7 +159,7 @@ struct FrequencyPickerSheet: View {
                     .foregroundStyle(Theme.ink)
             }
 
-            Text("Pro checks every 30 min for just $1.99/mo. Premium checks every 5 min for $3.99/mo. Never miss a price drop or restock again!")
+            Text("Pro checks every hour for just $1.99/mo. Premium checks every 5 min for $3.99/mo. Never miss a price drop or restock again!")
                 .font(Theme.body(12))
                 .foregroundStyle(Theme.inkMid)
                 .lineSpacing(3)

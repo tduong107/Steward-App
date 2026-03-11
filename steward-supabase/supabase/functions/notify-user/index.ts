@@ -49,6 +49,17 @@ async function getAPNsJWT(): Promise<string> {
   return token;
 }
 
+// ─── HTML Escaping (prevent XSS/injection in emails) ─────────────
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 // ─── Email Sending (Resend) ───────────────────────────────────────
 
 function getEmailButtonLabel(actionType: string): string {
@@ -78,14 +89,19 @@ async function sendEmailNotification(
     return { sent: false, error: "Resend not configured" };
   }
 
-  const subject = `${watchEmoji} ${watchName} — Watch Triggered!`;
+  const safeEmoji = escapeHtml(watchEmoji);
+  const safeName = escapeHtml(watchName);
+  const safeNote = escapeHtml(changeNote);
+  const safeActionUrl = actionUrl ? escapeHtml(actionUrl) : null;
+
+  const subject = `${safeEmoji} ${safeName} — Watch Triggered!`;
   const htmlBody = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
       <div style="text-align: center; margin-bottom: 24px;">
-        <span style="font-size: 48px;">${watchEmoji}</span>
+        <span style="font-size: 48px;">${safeEmoji}</span>
       </div>
       <h2 style="color: #1a1a1a; font-size: 20px; margin-bottom: 8px; text-align: center;">
-        ${watchName}
+        ${safeName}
       </h2>
       <p style="color: #666; font-size: 15px; text-align: center; margin-bottom: 24px;">
         Your watch condition has been met!
@@ -93,11 +109,11 @@ async function sendEmailNotification(
       <div style="background: #f8f7f5; border-radius: 12px; padding: 16px; margin-bottom: 24px;">
         <p style="color: #333; font-size: 14px; margin: 0;">
           <strong>What changed:</strong><br/>
-          ${changeNote}
+          ${safeNote}
         </p>
       </div>
-      ${actionUrl ? `
-      <a href="${actionUrl}" style="display: block; text-align: center; background: #2A5C45; color: white; padding: 14px 24px; border-radius: 12px; text-decoration: none; font-weight: bold; font-size: 15px; margin-bottom: 24px;">
+      ${safeActionUrl ? `
+      <a href="${safeActionUrl}" style="display: block; text-align: center; background: #2A5C45; color: white; padding: 14px 24px; border-radius: 12px; text-decoration: none; font-weight: bold; font-size: 15px; margin-bottom: 24px;">
         ${getEmailButtonLabel(actionType)} &rarr;
       </a>
       ` : ''}
@@ -123,7 +139,7 @@ async function sendEmailNotification(
     });
 
     if (response.ok) {
-      console.log(`[notify-user] Email sent to ${email}: ${watchEmoji} ${watchName}`);
+      console.log(`[notify-user] Email sent to ${email.replace(/(.{2}).*@/, "$1***@")}: ${watchEmoji} ${watchName}`);
       return { sent: true };
     } else {
       const errBody = await response.text();
@@ -152,21 +168,25 @@ async function sendNeedsAttentionEmail(
     return { sent: false, error: "Resend not configured" };
   }
 
-  const subject = `⚠️ ${watchName} — Watch Needs Attention`;
+  const safeEmoji = escapeHtml(watchEmoji);
+  const safeName = escapeHtml(watchName);
+  const safeError = escapeHtml(lastError);
+
+  const subject = `⚠️ ${safeName} — Watch Needs Attention`;
   const htmlBody = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
       <div style="text-align: center; margin-bottom: 24px;">
         <span style="font-size: 48px;">⚠️</span>
       </div>
       <h2 style="color: #1a1a1a; font-size: 20px; margin-bottom: 8px; text-align: center;">
-        ${watchEmoji} ${watchName}
+        ${safeEmoji} ${safeName}
       </h2>
       <p style="color: #666; font-size: 15px; text-align: center; margin-bottom: 24px;">
         Your watch has failed ${failures} times in a row.
       </p>
       <div style="background: #FEF3C7; border-radius: 12px; padding: 16px; margin-bottom: 24px; border: 1px solid #F59E0B40;">
         <p style="color: #92400E; font-size: 14px; margin: 0;">
-          <strong>Error:</strong> ${lastError}
+          <strong>Error:</strong> ${safeError}
         </p>
         <p style="color: #92400E; font-size: 13px; margin: 8px 0 0 0;">
           The page may have changed or the URL may no longer work. Open the Steward app to review and fix this watch.
@@ -189,7 +209,7 @@ async function sendNeedsAttentionEmail(
     });
 
     if (response.ok) {
-      console.log(`[notify-user] Needs-attention email sent to ${email}: ${watchName}`);
+      console.log(`[notify-user] Needs-attention email sent to ${email.replace(/(.{2}).*@/, "$1***@")}: ${watchName}`);
       return { sent: true };
     } else {
       const errBody = await response.text();
@@ -246,7 +266,7 @@ async function sendSMSNotification(
     });
 
     if (response.ok) {
-      console.log(`[notify-user] SMS sent to ${phone}: ${watchEmoji} ${watchName}`);
+      console.log(`[notify-user] SMS sent to ***${phone.slice(-4)}: ${watchEmoji} ${watchName}`);
       return { sent: true };
     } else {
       const errBody = await response.text();

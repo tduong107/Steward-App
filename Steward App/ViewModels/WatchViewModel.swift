@@ -229,6 +229,9 @@ final class WatchViewModel {
 
         // Backfill product images for watches missing them
         backfillMissingImages()
+
+        // Resolve placeholder watch names (created via Share Extension with just a domain)
+        await resolveWatchNames()
     }
 
     // MARK: - Savings
@@ -303,6 +306,207 @@ final class WatchViewModel {
         backgroundTasks.append(task)
     }
 
+    // MARK: - Watch Name Resolution
+
+    /// Resolves placeholder watch names created by the Share Extension.
+    /// The Share Extension saves watches with just the domain name (e.g. "rei.com")
+    /// because mobile app URLs are unreliable for name extraction. This method
+    /// fetches the actual page, extracts the real product name, and updates the watch.
+    private func resolveWatchNames() async {
+        let watchesNeedingNames = watches.filter { watch in
+            guard let host = URL(string: watch.url)?.host?.replacingOccurrences(of: "www.", with: "") else { return false }
+            // Watch name matches the domain — it's a placeholder from Share Extension
+            return watch.name.lowercased() == host.lowercased()
+                || watch.name.lowercased() == "www.\(host.lowercased())"
+        }
+        guard !watchesNeedingNames.isEmpty else { return }
+
+        #if DEBUG
+        print("[WatchViewModel] Resolving names for \(watchesNeedingNames.count) watch(es)")
+        #endif
+
+        for watch in watchesNeedingNames {
+            guard let result = await resolveWatchURL(for: watch.url) else { continue }
+
+            var didChange = false
+
+            // Update URL if it resolved to a different (better) URL
+            if let resolvedURL = result.resolvedURL, resolvedURL != watch.url {
+                watch.url = resolvedURL
+                didChange = true
+                #if DEBUG
+                print("[WatchViewModel] Resolved watch URL: \(resolvedURL)")
+                #endif
+            }
+
+            // Update name if we extracted one
+            if let resolvedName = result.name {
+                watch.name = resolvedName
+                didChange = true
+                #if DEBUG
+                print("[WatchViewModel] Resolved watch name: \(resolvedName)")
+                #endif
+            }
+
+            if didChange {
+                try? modelContext?.save()
+
+                // Push update to Supabase
+                if let userId = auth?.currentUserId {
+                    let dto = watch.toDTO(userId: userId)
+                    try? await supabase?.updateWatch(dto)
+                }
+            }
+        }
+
+        // Refresh UI after updates
+        if !watchesNeedingNames.isEmpty {
+            fetchLocalWatches()
+        }
+    }
+
+    /// Result of resolving a watch URL — contains the final resolved URL and extracted product name.
+    private struct ResolvedWatch {
+        let resolvedURL: String?
+        let name: String?
+    }
+
+    /// Fetches a URL (with desktop User-Agent, following redirects) and returns
+    /// both the final resolved URL and the extracted product name.
+    /// Tries the original URL first to follow short-link redirects, then falls back
+    /// to the desktop-normalized URL if the original fails.
+    private func resolveWatchURL(for urlString: String) async -> ResolvedWatch? {
+        guard let originalURL = URL(string: urlString) else { return nil }
+
+        let desktopUA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
+        // Step 1: Fetch the ORIGINAL URL first.
+        // Mobile short links (e.g. mobile.rei.com/AkCd/xyz) only resolve on their original domain.
+        // Changing the subdomain before fetching would break the short link path.
+        var request = URLRequest(url: originalURL)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 10
+        request.setValue(desktopUA, forHTTPHeaderField: "User-Agent")
+
+        var html: String?
+        var resolvedURL: String?
+
+        if let (data, response) = try? await URLSession.shared.data(for: request) {
+            html = String(data: data, encoding: .utf8)
+            if let finalURL = response.url?.absoluteString, finalURL != urlString {
+                // Don't use the resolved URL if it's just a homepage redirect
+                // (app deep links like mobile.rei.com/AkCd/xyz → www.rei.com/ are useless)
+                if !Self.isHomepageRedirect(resolved: finalURL, original: urlString) {
+                    resolvedURL = finalURL
+                } else {
+                    // Homepage redirect means the HTML is the homepage too — discard it
+                    html = nil
+                    #if DEBUG
+                    print("[WatchViewModel] Detected homepage redirect: \(urlString) → \(finalURL) — keeping original URL")
+                    #endif
+                }
+            }
+        }
+
+        // Step 2: If the original failed, try the desktop-normalized URL as fallback
+        if html == nil || html?.count ?? 0 < 200 {
+            let desktopURLString = Self.normalizeToDesktopURL(urlString)
+            if desktopURLString != urlString, let desktopURL = URL(string: desktopURLString) {
+                var fallbackRequest = URLRequest(url: desktopURL)
+                fallbackRequest.httpMethod = "GET"
+                fallbackRequest.timeoutInterval = 10
+                fallbackRequest.setValue(desktopUA, forHTTPHeaderField: "User-Agent")
+
+                if let (data, response) = try? await URLSession.shared.data(for: fallbackRequest) {
+                    html = String(data: data, encoding: .utf8)
+                    if let finalURL = response.url?.absoluteString, finalURL != urlString {
+                        if !Self.isHomepageRedirect(resolved: finalURL, original: urlString) {
+                            resolvedURL = finalURL
+                        } else {
+                            html = nil
+                        }
+                    }
+                }
+            }
+        }
+
+        guard let pageHTML = html else { return nil }
+
+        // Extract og:title or <title>
+        var resolvedName: String?
+        let patterns = [
+            "property=\"og:title\"\\s+content=\"([^\"]+)\"",
+            "content=\"([^\"]+)\"\\s+property=\"og:title\"",
+            "<title[^>]*>([^<]+)</title>"
+        ]
+        for pattern in patterns {
+            if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
+               let match = regex.firstMatch(in: pageHTML, range: NSRange(pageHTML.startIndex..., in: pageHTML)),
+               let range = Range(match.range(at: 1), in: pageHTML) {
+                let title = String(pageHTML[range]).trimmingCharacters(in: .whitespacesAndNewlines)
+                if !title.isEmpty && !Self.isGenericTitle(title) {
+                    resolvedName = title
+                    break
+                }
+            }
+        }
+
+        // Only return if we found at least something useful
+        guard resolvedURL != nil || resolvedName != nil else { return nil }
+        return ResolvedWatch(resolvedURL: resolvedURL, name: resolvedName)
+    }
+
+    /// Converts mobile URLs to desktop for better page fetching.
+    private static func normalizeToDesktopURL(_ urlString: String) -> String {
+        guard var components = URLComponents(string: urlString),
+              let host = components.host?.lowercased() else { return urlString }
+        if host.hasPrefix("mobile.") {
+            components.host = "www." + host.dropFirst("mobile.".count)
+        } else if host.hasPrefix("m.") {
+            components.host = "www." + host.dropFirst("m.".count)
+        } else if host.hasPrefix("amp.") {
+            components.host = "www." + host.dropFirst("amp.".count)
+        }
+        return components.url?.absoluteString ?? urlString
+    }
+
+    /// Returns true if the redirect lost all path specificity — i.e. the original
+    /// URL had a meaningful path but the resolved URL is just a homepage ("/").
+    /// This happens with app deep links (e.g. mobile.rei.com/AkCd/xyz → www.rei.com/).
+    private static func isHomepageRedirect(resolved: String, original: String) -> Bool {
+        guard let resolvedURL = URL(string: resolved),
+              let originalURL = URL(string: original) else { return false }
+        let resolvedPath = resolvedURL.path
+        let originalPath = originalURL.path
+        let resolvedIsHomepage = resolvedPath.isEmpty || resolvedPath == "/"
+        let originalHadPath = !originalPath.isEmpty && originalPath != "/"
+        return resolvedIsHomepage && originalHadPath
+    }
+
+    /// Checks if a page title is generic (site tagline, redirect page, etc.)
+    private static func isGenericTitle(_ title: String) -> Bool {
+        let lower = title.lowercased()
+        // Redirect / loading pages
+        let bad = ["launching app", "loading", "redirect", "please wait",
+                   "checking your browser", "page not found", "404",
+                   "access denied", "sign in", "log in", "captcha",
+                   "download the app", "open in app"]
+        if bad.contains(where: { lower.contains($0) }) { return true }
+        // Site-wide taglines: "Brand – Long marketing tagline..."
+        for sep in [" – ", " | ", " - ", ": "] {
+            if let r = lower.range(of: sep) {
+                let after = lower[r.upperBound...].trimmingCharacters(in: .whitespaces)
+                if after.count > 30 { return true }
+            }
+        }
+        // Marketing keywords
+        let marketing = ["official site", "online shopping", "free shipping",
+                         "top-brand", "top brand", "for all your", "best deals"]
+        if marketing.contains(where: { lower.contains($0) }) { return true }
+        if lower.count <= 2 { return true }
+        return false
+    }
+
     // MARK: - Watch Management
 
     /// Whether the user can add another watch under their current tier
@@ -317,9 +521,11 @@ final class WatchViewModel {
         // Check watch limit — show paywall if over the tier's max
         let maxWatches = subscriptionManager?.currentTier.maxWatches ?? 3
         if !canAddWatch {
+            let currentTier = subscriptionManager?.currentTier ?? .free
+            let highlightTier: SubscriptionTier = currentTier == .free ? .pro : .premium
             subscriptionManager?.presentPaywall(
-                highlighting: .pro,
-                reason: "You've reached the \(maxWatches)-watch limit on your Free plan. Upgrade to add more watches."
+                highlighting: highlightTier,
+                reason: "You've reached the \(maxWatches)-watch limit on your \(currentTier.displayName) plan. Upgrade to add more watches."
             )
             return
         }
@@ -549,20 +755,28 @@ final class WatchViewModel {
     /// Updates a broken watch with a new URL and resets error state
     func fixBrokenWatch(name: String, newURL: String) {
         guard let context = modelContext else {
+            #if DEBUG
             print("[WatchVM] fixBrokenWatch: no modelContext")
+            #endif
             return
         }
+        #if DEBUG
         print("[WatchVM] fixBrokenWatch: searching for '\(name)' in \(watches.count) watches: \(watches.map { $0.name })")
+        #endif
 
         // Find the watch by name (case-insensitive partial match)
         let match = watches.first { $0.name.localizedCaseInsensitiveContains(name) }
             ?? watches.first { name.localizedCaseInsensitiveContains($0.name) }
         guard let watch = match else {
+            #if DEBUG
             print("[WatchVM] fixBrokenWatch: no watch found matching '\(name)'")
+            #endif
             return
         }
 
+        #if DEBUG
         print("[WatchVM] fixBrokenWatch: FOUND '\(watch.name)' — updating URL to \(newURL)")
+        #endif
         watch.url = newURL
         watch.consecutiveFailures = 0
         watch.lastError = nil

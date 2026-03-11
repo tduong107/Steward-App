@@ -174,8 +174,10 @@ final class SubscriptionManager {
 
     // MARK: - AppStorage Sync
 
-    /// Keep @AppStorage("subscriptionTier") in sync for backwards compat
+    /// Keep @AppStorage("subscriptionTier") in sync for backwards compat + App Group for Share Extension
     private func syncToAppStorage() {
         UserDefaults.standard.set(currentTier.rawValue, forKey: "subscriptionTier")
+        // Also sync to App Group so Share Extension can read the tier
+        UserDefaults(suiteName: "group.Steward.Steward-App")?.set(currentTier.rawValue, forKey: "subscriptionTier")
     }
 }

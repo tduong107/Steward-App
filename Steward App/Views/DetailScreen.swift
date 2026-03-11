@@ -357,10 +357,10 @@ struct DetailScreen: View {
             // Share card
             shareCard
 
-            recentChecks
-
             // Delete watch
             deleteWatchButton
+
+            recentChecks
         }
         .padding(.horizontal, 24)
         .padding(.top, 16)

@@ -70,15 +70,16 @@ WHEN A USER PASTES A URL (not a screenshot):
 - Your [SUGGESTIONS] after a URL should look like: [SUGGESTIONS]Watch for price drop|Alert when restocked|Track any changes|Something else[/SUGGESTIONS]
 
 FREQUENCY AWARENESS:
-- The user's subscription tier may be provided in a [USER_TIER] tag in their first message (e.g. [USER_TIER]Pro[/USER_TIER])
-- Free users: only "Daily" check frequency is available — do NOT ask about frequency, it will default to Daily
-- Pro users: can use "Daily", "Every 12 hours", "Every 6 hours", "Every hour", "Every 30 min" — after confirming the watch details, ask what check frequency they'd like
-- Premium users: can also use "Every 15 min", "Every 5 min" — after confirming the watch details, ask what check frequency they'd like
+- The user's subscription tier is provided in a [USER_TIER] tag in their first message (e.g. [USER_TIER]Free[/USER_TIER] or [USER_TIER]Pro[/USER_TIER])
+- Free tier ([USER_TIER]Free[/USER_TIER]): only "Daily" is available — NEVER ask about frequency, NEVER include frequency suggestions, just omit checkFrequency entirely and the app will default to Daily
+- Pro tier: can use "Daily", "Every 12 hours", "Every 6 hours", "Every hour" — after confirming the watch details, ask what check frequency they'd like
+- Premium tier: can also use "Every 30 min", "Every 15 min", "Every 5 min" — after confirming the watch details, ask what check frequency they'd like
+- IMPORTANT: Only ask about or suggest check frequency if the user is on Pro or Premium tier. Free users should never see frequency options.
 - When asking about frequency, offer options as [SUGGESTIONS] based on their tier
-- For Pro: [SUGGESTIONS]Every hour|Every 30 min|Every 6 hours|Daily[/SUGGESTIONS]
-- For Premium: [SUGGESTIONS]Every 5 min|Every 15 min|Every hour|Daily[/SUGGESTIONS]
+- For Pro: [SUGGESTIONS]Every hour|Every 6 hours|Every 12 hours|Daily[/SUGGESTIONS]
+- For Premium: [SUGGESTIONS]Every 5 min|Every 15 min|Every 30 min|Every hour[/SUGGESTIONS]
 - Include the chosen frequency as "checkFrequency" in the [CREATE_WATCH] JSON
-- If the user doesn't specify or you don't know their tier, omit checkFrequency and the app will use their default
+- If the user doesn't specify or you don't know their tier, assume Free — omit checkFrequency and do NOT ask about frequency
 
 CONVERSATION FLOW:
 1. User describes what they want (or pastes a URL, or sends a screenshot)
@@ -234,6 +235,32 @@ serve(async (req) => {
       );
     }
 
+    // --- Security: Sanitize messages ---
+    // 1. Limit conversation length to prevent cost abuse
+    const MAX_MESSAGES = 30;
+    const sanitizedMessages = messages.slice(-MAX_MESSAGES);
+
+    // 2. Validate message roles (only "user" and "assistant" allowed)
+    for (const msg of sanitizedMessages) {
+      if (msg.role !== "user" && msg.role !== "assistant") {
+        return new Response(
+          JSON.stringify({ error: "Invalid message role" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    // 3. Strip bracket markers from user messages to prevent spoofing
+    // (e.g., user injecting [USER_TIER]Premium[/USER_TIER] or fake [CREATE_WATCH])
+    const BRACKET_MARKERS = /\[(USER_TIER|CREATE_WATCH|UPDATE_WATCH|FIX_WATCH|PROPOSE_WATCH|DISMISS|URL_CONTEXT|PRODUCT_LINKS|FETCH_PRICE)\]/gi;
+    for (const msg of sanitizedMessages) {
+      if (msg.role === "user" && typeof msg.content === "string") {
+        // Strip closing tags too
+        msg.content = msg.content.replace(BRACKET_MARKERS, "");
+        msg.content = msg.content.replace(/\[\/(USER_TIER|CREATE_WATCH|UPDATE_WATCH|FIX_WATCH|PROPOSE_WATCH|DISMISS|URL_CONTEXT|PRODUCT_LINKS|FETCH_PRICE)\]/gi, "");
+      }
+    }
+
     if (!ANTHROPIC_API_KEY) {
       return new Response(
         JSON.stringify({ error: "ANTHROPIC_API_KEY not configured" }),
@@ -269,7 +296,7 @@ serve(async (req) => {
                 cache_control: { type: "ephemeral" },
               },
             ],
-            messages,
+            messages: sanitizedMessages,
           }),
         }
       );
@@ -513,6 +540,34 @@ async function enrichPriceCheck(responseText: string): Promise<string> {
   let url = match[1].trim();
   if (!url.match(/^https?:\/\//i)) {
     url = `https://${url}`;
+  }
+
+  // SSRF protection: block private/internal URLs
+  try {
+    const parsed = new URL(url);
+    const hostname = parsed.hostname.toLowerCase();
+    if (
+      hostname === "localhost" ||
+      hostname.startsWith("127.") ||
+      hostname.startsWith("10.") ||
+      hostname.startsWith("192.168.") ||
+      hostname.startsWith("172.") ||
+      hostname === "0.0.0.0" ||
+      hostname.endsWith(".local") ||
+      hostname.startsWith("169.254.") ||
+      hostname.includes("metadata.google") ||
+      hostname.includes("169.254.169.254")
+    ) {
+      return responseText.replace(
+        /\[FETCH_PRICE\][\s\S]*?\[\/FETCH_PRICE\]/,
+        "*(Cannot fetch prices from internal addresses)*"
+      );
+    }
+  } catch {
+    return responseText.replace(
+      /\[FETCH_PRICE\][\s\S]*?\[\/FETCH_PRICE\]/,
+      "*(Invalid URL)*"
+    );
   }
 
   try {

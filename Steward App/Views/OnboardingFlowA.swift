@@ -321,8 +321,8 @@ struct OnboardingFlowA: View {
                 // Tier cards (vertical layout)
                 VStack(spacing: 6) {
                     tierCard(icon: "🌱", label: "Free", value: "3 watches · checks once a day", perks: "AI chat setup, price history, activity feed, cashback", highlighted: false)
-                    tierCard(icon: "⚡", label: "Pro", value: "15 watches · checks every 30 min", perks: "Everything in Free, plus faster checks and more watches", highlighted: false)
-                    tierCard(icon: "✦", label: "Premium", value: "Unlimited watches · every 5 min", perks: "Everything in Pro, plus near real-time checks and unlimited watches", highlighted: true)
+                    tierCard(icon: "⚡", label: "Pro", value: "10 watches · checks every hour", perks: "Everything in Free, plus faster checks and more watches", highlighted: false)
+                    tierCard(icon: "✦", label: "Premium", value: "25 watches · every 5 min", perks: "Everything in Pro, plus near real-time checks and more watches", highlighted: true)
                 }
                 .padding(.horizontal, 32)
 
@@ -412,30 +412,16 @@ struct OnboardingFlowA: View {
 
     private func stepRow(number: Int, title: String, body: String, isLast: Bool) -> some View {
         HStack(alignment: .top, spacing: 20) {
-            // Number + connector
-            VStack(spacing: 6) {
-                Text("\(number)")
-                    .font(Theme.serif(13, weight: .semibold))
-                    .foregroundStyle(mint)
-                    .frame(width: 32, height: 32)
-                    .background(stewardGreen)
-                    .overlay(
-                        Circle().stroke(mint.opacity(0.3), lineWidth: 1)
-                    )
-                    .clipShape(Circle())
-
-                if !isLast {
-                    Rectangle()
-                        .fill(
-                            LinearGradient(
-                                colors: [mint.opacity(0.2), .clear],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                        .frame(width: 1, height: 28)
-                }
-            }
+            // Number circle only (connector is an overlay to avoid layout differences)
+            Text("\(number)")
+                .font(Theme.serif(13, weight: .semibold))
+                .foregroundStyle(mint)
+                .frame(width: 32, height: 32)
+                .background(stewardGreen)
+                .overlay(
+                    Circle().stroke(mint.opacity(0.3), lineWidth: 1)
+                )
+                .clipShape(Circle())
 
             // Text
             VStack(alignment: .leading, spacing: 5) {
@@ -450,6 +436,21 @@ struct OnboardingFlowA: View {
             }
             .padding(.top, 4)
         }
+        .overlay(alignment: .topLeading) {
+            // Connector line as overlay — doesn't affect layout
+            if !isLast {
+                Rectangle()
+                    .fill(
+                        LinearGradient(
+                            colors: [mint.opacity(0.2), .clear],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .frame(width: 1, height: 28)
+                    .offset(x: 16, y: 38)
+            }
+        }
         .padding(.bottom, isLast ? 0 : 8)
     }
 
@@ -457,6 +458,7 @@ struct OnboardingFlowA: View {
         HStack(alignment: .top, spacing: 10) {
             Text(icon)
                 .font(.system(size: 16))
+                .frame(width: 24, alignment: .center)
                 .padding(.top, 1)
 
             VStack(alignment: .leading, spacing: 1) {

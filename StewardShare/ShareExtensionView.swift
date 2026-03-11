@@ -27,6 +27,13 @@ struct ShareExtensionView: View {
     @State private var cookieDomain: String?
     @FocusState private var isInputFocused: Bool
 
+    // Subscription tier (read from App Group — raw string to avoid cross-target dependency)
+    private var userTierRaw: String {
+        UserDefaults(suiteName: "group.Steward.Steward-App")?.string(forKey: "subscriptionTier") ?? "Free"
+    }
+    private var isPaidUser: Bool { userTierRaw == "Pro" || userTierRaw == "Premium" }
+    private var isPremiumUser: Bool { userTierRaw == "Premium" }
+
     // Watch proposal editing state
     @State private var proposalFrequency: String = "Daily"
     @State private var partySize: Int = 2
@@ -185,7 +192,7 @@ struct ShareExtensionView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 7))
 
                 VStack(alignment: .leading, spacing: 2) {
-                    // Show shared text as title if it's more descriptive than the host
+                    // Show page title or shared text as title, falling back to host
                     Text(pageTitle ?? (sharedText.isEmpty ? displayHost : sharedText))
                         .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(.white)
@@ -544,26 +551,42 @@ struct ShareExtensionView: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 10)
 
-                // Watch preview card
-                VStack(spacing: 6) {
+                // URL card
+                urlCard
+
+                // Watch type badge
+                HStack(spacing: 8) {
                     Text(info.emoji)
-                        .font(.system(size: 36))
-                    Text(info.name)
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.system(size: 20))
+                    Text(watchTypeLabel(for: info.actionType))
+                        .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(.white)
-                        .multilineTextAlignment(.center)
-                        .lineLimit(2)
                 }
-                .padding(.top, 4)
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(accentGreen.opacity(0.2))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(mintGreen.opacity(0.3), lineWidth: 1)
+                )
+
+                // Note about AI name resolution
+                Text("Steward will analyze the page and name this watch automatically")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.gray)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
 
                 // Reservation details (for restaurant & ticketing watches)
                 if isBookingWatch {
                     reservationDetailsSection
                 }
 
-                // Frequency picker
-                frequencyPickerSection
+                // Frequency picker (only show for paid tiers — Free users default to Daily)
+                if isPaidUser {
+                    frequencyPickerSection
+                }
 
                 Spacer(minLength: 20)
             }
@@ -588,6 +611,16 @@ struct ShareExtensionView: View {
             .padding(.horizontal, 20)
             .padding(.bottom, 16)
             .background(darkBg)
+        }
+    }
+
+    /// Human-readable label for the watch action type
+    private func watchTypeLabel(for actionType: String) -> String {
+        switch actionType {
+        case "price": return "Price Drop Alert"
+        case "cart": return "Back in Stock Alert"
+        case "book": return "Availability Alert"
+        default: return "Change Alert"
         }
     }
 
@@ -693,12 +726,24 @@ struct ShareExtensionView: View {
 
     // MARK: - Frequency Picker Section
 
-    private let frequencyOptions: [(label: String, value: String)] = [
-        ("Daily", "Daily"),
-        ("12h", "Every 12 hours"),
-        ("6h", "Every 6 hours"),
-        ("1h", "Every hour"),
-    ]
+    private var frequencyOptions: [(label: String, value: String)] {
+        var options: [(label: String, value: String)] = [(label: "Daily", value: "Daily")]
+        if isPaidUser {
+            options += [
+                (label: "12h", value: "Every 12 hours"),
+                (label: "6h", value: "Every 6 hours"),
+                (label: "1h", value: "Every hour"),
+            ]
+        }
+        if isPremiumUser {
+            options += [
+                (label: "30m", value: "Every 30 min"),
+                (label: "15m", value: "Every 15 min"),
+                (label: "5m", value: "Every 5 min"),
+            ]
+        }
+        return options
+    }
 
     private var frequencyPickerSection: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -903,13 +948,13 @@ struct ShareExtensionView: View {
         var parts: [String] = []
         parts.append("URL: \(sharedURL)")
         parts.append("Website: \(displayHost)")
-        if let title = pageTitle {
+        if let title = pageTitle, !isGenericPageTitle(title) {
             parts.append("Page title: \(title)")
         }
         if let pathName = urlPathName {
             parts.append("Name from URL: \(pathName)")
         }
-        if !sharedText.isEmpty {
+        if !sharedText.isEmpty && !isGenericPageTitle(sharedText) {
             parts.append("Shared text: \(sharedText)")
         }
         // Include rich context from URL rewriter (restaurant name, date, event, etc.)
@@ -931,7 +976,12 @@ struct ShareExtensionView: View {
         guard let url = URL(string: sharedURL) else { return nil }
         let pathComponents = url.pathComponents.filter { $0 != "/" }
         // Skip common structural segments
-        let skipWords: Set<String> = ["cities", "venues", "products", "items", "pages", "p", "dp", "gp", "www"]
+        let skipWords: Set<String> = [
+            "cities", "venues", "products", "product", "items", "item",
+            "pages", "page", "p", "dp", "gp", "www", "shop", "store",
+            "category", "categories", "collections", "collection",
+            "detail", "details", "view", "en", "us", "en-us",
+        ]
 
         // Scan all path segments from last to first, find the best human-readable one
         for segment in pathComponents.reversed() {
@@ -993,7 +1043,8 @@ struct ShareExtensionView: View {
                         let contextText = trimmed
                             .replacingOccurrences(of: sharedURL, with: "")
                             .trimmingCharacters(in: .whitespacesAndNewlines)
-                        if !contextText.isEmpty && contextText.count > 2 {
+                        // Only keep context text if it's meaningful — discard generic app transition strings
+                        if !contextText.isEmpty && contextText.count > 2 && !isGenericPageTitle(contextText) {
                             sharedText = contextText
                         }
                     }
@@ -1079,18 +1130,68 @@ struct ShareExtensionView: View {
 
     /// Fetches the page title for display in the URL card
     private func fetchPageTitle() async {
-        guard let url = URL(string: sharedURL) else { return }
+        guard let originalURL = URL(string: sharedURL) else { return }
 
         let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 5
+        config.timeoutIntervalForRequest = 10
         let session = URLSession(configuration: config)
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)", forHTTPHeaderField: "User-Agent")
+        let desktopUA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
-        guard let (data, _) = try? await session.data(for: request),
-              let html = String(data: data, encoding: .utf8) else { return }
+        // Step 1: Fetch the ORIGINAL URL first (with desktop User-Agent).
+        // Mobile short links (e.g. mobile.rei.com/AkCd/xyz) only resolve on their original domain.
+        // Changing the subdomain first would break the short link path.
+        var request = URLRequest(url: originalURL)
+        request.httpMethod = "GET"
+        request.setValue(desktopUA, forHTTPHeaderField: "User-Agent")
+
+        var html: String?
+        var resolvedURL: String?
+
+        let originalSharedURL = sharedURL  // Save for homepage redirect comparison
+
+        if let (data, response) = try? await session.data(for: request) {
+            html = String(data: data, encoding: .utf8)
+            // Capture the final URL after following redirect chain
+            if let finalURL = response.url?.absoluteString, finalURL != sharedURL {
+                // Don't use the resolved URL if it's just a homepage redirect
+                // (app deep links like mobile.rei.com/AkCd/xyz → www.rei.com/ are useless)
+                if !isHomepageRedirect(resolved: finalURL, original: sharedURL) {
+                    resolvedURL = finalURL
+                } else {
+                    // Homepage redirect means the HTML is the homepage too — discard it
+                    html = nil
+                }
+            }
+        }
+
+        // Step 2: If the original URL failed or returned garbage, try the desktop-normalized URL
+        if html == nil || html?.count ?? 0 < 200 {
+            let desktopURLString = normalizeToDesktopURL(sharedURL)
+            if desktopURLString != sharedURL, let desktopURL = URL(string: desktopURLString) {
+                var fallbackRequest = URLRequest(url: desktopURL)
+                fallbackRequest.httpMethod = "GET"
+                fallbackRequest.setValue(desktopUA, forHTTPHeaderField: "User-Agent")
+
+                if let (data, response) = try? await session.data(for: fallbackRequest) {
+                    html = String(data: data, encoding: .utf8)
+                    if let finalURL = response.url?.absoluteString, finalURL != originalSharedURL {
+                        if !isHomepageRedirect(resolved: finalURL, original: originalSharedURL) {
+                            resolvedURL = finalURL
+                        } else {
+                            html = nil
+                        }
+                    }
+                }
+            }
+        }
+
+        guard let pageHTML = html else { return }
+
+        // Update shared URL to the resolved desktop URL (only if it's a real product page, not a homepage)
+        if let resolvedURL {
+            sharedURL = resolvedURL
+        }
 
         // Extract og:title or <title>
         let patterns = [
@@ -1100,15 +1201,122 @@ struct ShareExtensionView: View {
         ]
         for pattern in patterns {
             if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
-               let match = regex.firstMatch(in: html, range: NSRange(html.startIndex..., in: html)),
-               let range = Range(match.range(at: 1), in: html) {
-                let title = decodeHTMLEntities(String(html[range]).trimmingCharacters(in: .whitespacesAndNewlines))
-                if !title.isEmpty {
+               let match = regex.firstMatch(in: pageHTML, range: NSRange(pageHTML.startIndex..., in: pageHTML)),
+               let range = Range(match.range(at: 1), in: pageHTML) {
+                let title = decodeHTMLEntities(String(pageHTML[range]).trimmingCharacters(in: .whitespacesAndNewlines))
+                if !title.isEmpty && !isGenericPageTitle(title) {
                     pageTitle = title
                     return
                 }
             }
         }
+    }
+
+    /// Converts mobile URLs to their desktop equivalents for better page title extraction.
+    /// e.g. "https://mobile.rei.com/..." → "https://www.rei.com/..."
+    private func normalizeToDesktopURL(_ urlString: String) -> String {
+        guard var components = URLComponents(string: urlString),
+              let host = components.host?.lowercased() else { return urlString }
+
+        // Replace common mobile subdomains with www
+        if host.hasPrefix("mobile.") {
+            components.host = "www." + host.dropFirst("mobile.".count)
+        } else if host.hasPrefix("m.") {
+            components.host = "www." + host.dropFirst("m.".count)
+        } else if host.hasPrefix("amp.") {
+            components.host = "www." + host.dropFirst("amp.".count)
+        }
+
+        return components.url?.absoluteString ?? urlString
+    }
+
+    /// Returns true if the redirect lost all path specificity — i.e. the original
+    /// URL had a meaningful path but the resolved URL is just a homepage ("/").
+    /// This happens with app deep links (e.g. mobile.rei.com/AkCd/xyz → www.rei.com/).
+    private func isHomepageRedirect(resolved: String, original: String) -> Bool {
+        guard let resolvedURL = URL(string: resolved),
+              let originalURL = URL(string: original) else { return false }
+        let resolvedPath = resolvedURL.path
+        let originalPath = originalURL.path
+        let resolvedIsHomepage = resolvedPath.isEmpty || resolvedPath == "/"
+        let originalHadPath = !originalPath.isEmpty && originalPath != "/"
+        return resolvedIsHomepage && originalHadPath
+    }
+
+    /// Returns true if the title is a generic/redirect page title that shouldn't be used as a watch name
+    private func isGenericPageTitle(_ title: String) -> Bool {
+        let lower = title.lowercased().trimmingCharacters(in: .punctuationCharacters)
+
+        // App transition / redirect pages
+        let genericPatterns = [
+            "launching app", "launch app", "loading", "redirect", "please wait",
+            "just a moment", "checking your browser", "one moment",
+            "opening app", "continue to app", "open in app", "open app",
+            "you are being redirected", "page not found", "404",
+            "access denied", "error", "sign in", "log in", "login",
+            "verify you are human", "are you a robot", "captcha",
+            "forbidden", "not available", "unavailable",
+            "download the app", "get the app", "install the app",
+            "app store", "play store",
+        ]
+
+        // Generic share phrases that apps use as link text (not real product names)
+        let genericSharePhrases = [
+            "check it out", "check this out", "look at this", "take a look",
+            "shared with you", "sent via", "shared via", "via the app",
+            "i found this", "thought you", "you might like",
+            "see this", "see what i found", "have a look",
+        ]
+
+        // Reject very short titles (≤2 chars) as meaningless
+        if lower.count <= 2 { return true }
+
+        // Reject exact matches of super-generic phrases
+        let trimmedLower = lower.trimmingCharacters(in: .whitespaces)
+        if genericSharePhrases.contains(where: { trimmedLower == $0 || trimmedLower.hasPrefix($0) }) {
+            return true
+        }
+
+        if genericPatterns.contains(where: { lower.contains($0) }) {
+            return true
+        }
+
+        // Detect site-wide tagline titles like "REI – Top-Brand Clothing, Gear..." or
+        // "Amazon.com: Online Shopping for Electronics, Apparel..."
+        // These are homepage titles, not product titles.
+        if isSiteWideTagline(lower) {
+            return true
+        }
+
+        return false
+    }
+
+    /// Detects site-wide homepage/tagline titles that aren't specific to a product.
+    /// e.g. "REI – Top-Brand Clothing, Gear, Footwear and Expert Advice..."
+    private func isSiteWideTagline(_ lower: String) -> Bool {
+        // Site taglines typically use separators (–, |, :, -) to join brand + tagline
+        let separators: [String] = [" – ", " | ", " - ", ": "]
+        for sep in separators {
+            if let sepRange = lower.range(of: sep) {
+                let afterSep = String(lower[sepRange.upperBound...]).trimmingCharacters(in: .whitespaces)
+                // If the part after the separator is long (>30 chars), it's likely a site tagline
+                if afterSep.count > 30 { return true }
+            }
+        }
+
+        // Marketing keywords that indicate a site-wide description rather than a product name
+        let marketingKeywords = [
+            "official site", "online shopping", "shop online", "free shipping",
+            "top-brand", "top brand", "expert advice", "best deals",
+            "save money", "live better", "expect more", "pay less",
+            "everything you need", "your one-stop", "for all your",
+            "buy online", "best prices", "lowest prices",
+        ]
+        if marketingKeywords.contains(where: { lower.contains($0) }) {
+            return true
+        }
+
+        return false
     }
 
     /// Decodes common HTML entities in a string (e.g. &#x27; → ', &amp; → &)
@@ -1159,45 +1367,12 @@ struct ShareExtensionView: View {
     // MARK: - AI Analysis & Watch Creation
 
     private func analyzeAndCreateWatch(watchType: String) async {
-        withAnimation { phase = .analyzing }
-
-        let typeDescription: String
-        switch watchType {
-        case "price":
-            typeDescription = "Watch for a price drop on this product. Create the watch immediately with actionType \"price\"."
-        case "cart":
-            typeDescription = "Watch for this product to come back in stock / become available. Create the watch immediately with actionType \"cart\"."
-        case "book":
-            typeDescription = "Watch for reservation availability, open booking slots, or ticket availability on this page. Create the watch immediately with actionType \"book\"."
-        default:
-            typeDescription = "Watch for any meaningful changes on this page. Create the watch immediately with actionType \"notify\"."
-        }
-
-        // Build enriched message with URL context
-        var message = "I want to watch this page.\n\(fullContext)"
-        message += "\n\n\(typeDescription)"
-        message += "\n\nIMPORTANT: Respond ONLY with a [CREATE_WATCH] JSON block. Do NOT include [URL_CONTEXT], [SUGGESTIONS], [FETCH_PRICE], [PRODUCT_LINKS], or any other bracket tags."
-
-        // Try AI analysis, but always fall back to a locally-built watch if it fails.
-        // Share extensions have limited resources — the AI call can time out or fail
-        // due to memory pressure, network limits, or rate limiting.
-        var watchInfo: WatchInfo?
-
-        do {
-            let response = try await ShareAPIService.chatWithAI(userMessage: message)
-            watchInfo = parseCreateWatch(from: response)
-        } catch {
-            // AI call failed — that's OK, we'll use the fallback
-            #if DEBUG
-            print("[ShareExtension] AI call failed, using fallback: \(error.localizedDescription)")
-            #endif
-        }
-
-        // Use AI result or fall back to a locally-constructed watch
-        let finalWatch = watchInfo ?? createFallbackWatch(type: watchType)
-        proposalFrequency = finalWatch.checkFrequency
+        // Skip AI analysis — mobile app URLs are unreliable for server-side fetching.
+        // Create watch instantly; the main app's AI will resolve the product name in the background.
+        let fallbackWatch = createFallbackWatch(type: watchType)
+        proposalFrequency = fallbackWatch.checkFrequency
         withAnimation(.spring(response: 0.3)) {
-            phase = .watchCreated(finalWatch)
+            phase = .watchCreated(fallbackWatch)
         }
     }
 
@@ -1314,9 +1489,17 @@ struct ShareExtensionView: View {
             return nil
         }
 
+        // Sanitize the name — if the AI echoed a generic page title, use a better fallback
+        let safeName: String
+        if isGenericPageTitle(payload.name) {
+            safeName = urlPathName ?? displayHost
+        } else {
+            safeName = payload.name
+        }
+
         return WatchInfo(
             emoji: payload.emoji,
-            name: payload.name,
+            name: safeName,
             condition: payload.condition,
             actionType: payload.actionType,
             checkFrequency: payload.checkFrequency ?? "Daily",
@@ -1327,7 +1510,9 @@ struct ShareExtensionView: View {
     /// Creates a fallback watch when AI doesn't return proper JSON.
     /// Uses site category to provide context-appropriate defaults.
     private func createFallbackWatch(type: String) -> WatchInfo {
-        let name = pageTitle ?? displayHost
+        // Use a simple domain name — the main app's AI will resolve the real product name later.
+        // Mobile app URLs are unreliable for name extraction (redirects, short links, garbage path segments).
+        let name = displayHost
         let category = URLRewriter.categorize(sharedURL, rewriteResult: rewriteResult)
         let emoji: String
         let condition: String

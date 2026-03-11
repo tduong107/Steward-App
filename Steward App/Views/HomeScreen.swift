@@ -3,6 +3,7 @@ import SwiftUI
 struct HomeScreen: View {
     @Environment(WatchViewModel.self) private var viewModel
     @Environment(SubscriptionManager.self) private var subscriptionManager
+    @Environment(NotificationManager.self) private var notificationManager
 
     // Default frequency
     @AppStorage("defaultCheckFrequency") private var defaultCheckFrequency = "Daily"
@@ -21,12 +22,21 @@ struct HomeScreen: View {
     @State private var showCelebration = false
     @State private var celebrationMilestone: SavingsMilestone?
 
+    // Tutorial
+    @AppStorage("hasSeenOnboardingB") private var hasSeenOnboardingB = false
+    @AppStorage("hasCompletedTutorialWatch") private var hasCompletedTutorialWatch = false
+    @AppStorage("hasCompletedTutorialNotifs") private var hasCompletedTutorialNotifs = false
+    @AppStorage("hasDismissedTutorial") private var hasDismissedTutorial = false
+    @State private var showTutorialCongrats = false
+    @State private var tutorialCongratsStep: TutorialStep?
+
     var body: some View {
         ZStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     headerSection
                     chatPromptBar
+                    tutorialCard
                     triggeredAlerts
                     priceInsightsCard
                     savingsMilestoneSection
@@ -62,9 +72,56 @@ struct HomeScreen: View {
                 .transition(.opacity)
                 .zIndex(999)
             }
+
+            // Tutorial congrats overlay
+            if showTutorialCongrats, let step = tutorialCongratsStep {
+                TutorialCongratsOverlay(
+                    step: step,
+                    isFinalStep: hasCompletedTutorialWatch && hasCompletedTutorialNotifs,
+                    onDismiss: {
+                        withAnimation {
+                            showTutorialCongrats = false
+                            tutorialCongratsStep = nil
+                        }
+                        // Auto-dismiss tutorial card after allComplete or when both done
+                        if step == .allComplete || (hasCompletedTutorialWatch && hasCompletedTutorialNotifs) {
+                            withAnimation(.easeOut(duration: 0.3)) {
+                                hasDismissedTutorial = true
+                            }
+                        }
+                    }
+                )
+                .transition(.opacity)
+                .zIndex(1000)
+            }
         }
         .onChange(of: viewModel.savingsCalculation.totalSavings) { _, _ in
             checkForNewMilestone()
+        }
+        .onChange(of: viewModel.watches.count) { oldCount, newCount in
+            // Detect first watch creation (0 → 1+)
+            if oldCount == 0 && newCount > 0 && !hasCompletedTutorialWatch && shouldShowTutorial {
+                hasCompletedTutorialWatch = true
+                tutorialCongratsStep = hasCompletedTutorialNotifs ? .allComplete : .firstWatch
+                withAnimation(.spring(response: 0.4)) {
+                    showTutorialCongrats = true
+                }
+            }
+        }
+        .onAppear {
+            // Auto-complete steps if user already has watches or notifications
+            if shouldShowTutorial {
+                if !hasCompletedTutorialWatch && !viewModel.watches.isEmpty {
+                    hasCompletedTutorialWatch = true
+                }
+                if !hasCompletedTutorialNotifs && notificationManager.isPermissionGranted {
+                    hasCompletedTutorialNotifs = true
+                }
+                // Auto-dismiss if both already done
+                if hasCompletedTutorialWatch && hasCompletedTutorialNotifs {
+                    hasDismissedTutorial = true
+                }
+            }
         }
         .sheet(isPresented: $showFrequencyPicker) {
             FrequencyPickerSheet(selectedFrequency: $defaultCheckFrequency)
@@ -94,6 +151,37 @@ struct HomeScreen: View {
             withAnimation(.spring(response: 0.4)) {
                 showCelebration = true
             }
+        }
+    }
+
+    // MARK: - Tutorial
+
+    private var shouldShowTutorial: Bool {
+        hasSeenOnboardingB && !hasDismissedTutorial
+    }
+
+    @ViewBuilder
+    private var tutorialCard: some View {
+        if shouldShowTutorial && !(hasCompletedTutorialWatch && hasCompletedTutorialNotifs) {
+            TutorialChecklist(
+                onOpenChat: {
+                    viewModel.isChatOpen = true
+                },
+                onShowCongrats: { step in
+                    tutorialCongratsStep = step
+                    withAnimation(.spring(response: 0.4)) {
+                        showTutorialCongrats = true
+                    }
+                },
+                onDismiss: {
+                    withAnimation(.easeOut(duration: 0.3)) {
+                        hasDismissedTutorial = true
+                    }
+                }
+            )
+            .padding(.horizontal, 24)
+            .padding(.bottom, 16)
+            .transition(.move(edge: .top).combined(with: .opacity))
         }
     }
 
@@ -507,12 +595,8 @@ struct HomeScreen: View {
                         Text("\(filteredWatches.count) of \(viewModel.watches.count)")
                             .font(Theme.body(12))
                             .foregroundStyle(Theme.inkLight)
-                    } else if subscriptionManager.currentTier.maxWatches < Int.max {
-                        Text("\(viewModel.watches.count)/\(subscriptionManager.currentTier.maxWatches) watches")
-                            .font(Theme.body(12))
-                            .foregroundStyle(Theme.inkLight)
                     } else {
-                        Text("\(viewModel.watches.count) watching")
+                        Text("\(viewModel.watches.count)/\(subscriptionManager.currentTier.maxWatches) watches")
                             .font(Theme.body(12))
                             .foregroundStyle(Theme.inkLight)
                     }
