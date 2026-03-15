@@ -308,6 +308,9 @@ struct DetailScreen: View {
                 changeBanner
             }
 
+            // Action / trigger button (above chart for prominence)
+            actionButton
+
             // Price History Chart (only for price-related watches)
             if showsPriceChart {
                 if isLoadingPrices {
@@ -349,10 +352,11 @@ struct DetailScreen: View {
             }
             .buttonStyle(.plain)
 
+            // Auto-Act preferences (Premium feature)
+            autoActSection
+
             // Visit website button
             visitWebsiteCard
-
-            actionButton
 
             // Share card
             shareCard
@@ -635,6 +639,126 @@ struct DetailScreen: View {
             RoundedRectangle(cornerRadius: 14)
                 .stroke(Theme.border, lineWidth: 1)
         )
+    }
+
+    // MARK: - Auto-Act Section
+
+    @ViewBuilder
+    private var autoActSection: some View {
+        if watch.actionType.isActionable {
+            let isPremium = subscriptionManager.currentTier.hasAutoAct
+
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 8) {
+                    Image(systemName: "bolt.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(isPremium ? Theme.accent : Theme.inkLight)
+                        .frame(width: 28, height: 28)
+                        .background(isPremium ? Theme.accentLight : Theme.bgDeep)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                    Text("Auto-Act")
+                        .font(Theme.body(14, weight: .semibold))
+                        .foregroundStyle(Theme.ink)
+
+                    Spacer()
+
+                    if !isPremium {
+                        Text("Premium")
+                            .font(Theme.body(10, weight: .bold))
+                            .foregroundStyle(Theme.gold)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Theme.gold.opacity(0.12))
+                            .clipShape(Capsule())
+                    }
+                }
+
+                if isPremium {
+                    Toggle(isOn: Binding(
+                        get: { watch.autoActEnabled },
+                        set: { newValue in
+                            watch.autoActEnabled = newValue
+                            try? viewModel.saveAndSync(watch)
+                        }
+                    )) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Auto-act when condition met")
+                                .font(Theme.body(13, weight: .medium))
+                                .foregroundStyle(Theme.ink)
+                            Text("Steward will add to cart or take action automatically")
+                                .font(Theme.body(11))
+                                .foregroundStyle(Theme.inkLight)
+                        }
+                    }
+                    .tint(Theme.accent)
+
+                    if watch.autoActEnabled {
+                        HStack(spacing: 8) {
+                            Text("Only under")
+                                .font(Theme.body(12))
+                                .foregroundStyle(Theme.inkMid)
+
+                            Text("$")
+                                .font(Theme.body(13, weight: .semibold))
+                                .foregroundStyle(Theme.ink)
+
+                            TextField("No limit", text: Binding(
+                                get: {
+                                    if let limit = watch.spendingLimit {
+                                        return String(format: "%.0f", limit)
+                                    }
+                                    return ""
+                                },
+                                set: { newValue in
+                                    let trimmed = newValue.trimmingCharacters(in: .whitespaces)
+                                    if trimmed.isEmpty {
+                                        watch.spendingLimit = nil
+                                    } else if let parsed = Double(trimmed), parsed > 0 {
+                                        watch.spendingLimit = parsed
+                                    }
+                                }
+                            ))
+                            .font(Theme.body(13, weight: .semibold))
+                            .foregroundStyle(Theme.ink)
+                            .keyboardType(.decimalPad)
+                            .frame(width: 80)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 6)
+                            .background(Theme.bgDeep)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .onSubmit {
+                                try? viewModel.saveAndSync(watch)
+                            }
+
+                            Spacer()
+                        }
+                    }
+                } else {
+                    Text("Upgrade to Premium to have Steward automatically take action when your condition is met.")
+                        .font(Theme.body(12))
+                        .foregroundStyle(Theme.inkLight)
+
+                    Button {
+                        subscriptionManager.presentPaywall(
+                            highlighting: .premium,
+                            reason: "Auto-Act is a Premium feature"
+                        )
+                    } label: {
+                        Text("Upgrade to Premium")
+                            .font(Theme.body(12, weight: .semibold))
+                            .foregroundStyle(Theme.gold)
+                    }
+                }
+            }
+            .padding(16)
+            .background(Theme.bgCard)
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(Theme.border, lineWidth: 1)
+            )
+        }
     }
 
     // MARK: - Visit Website

@@ -78,8 +78,8 @@ final class ChatViewModel {
         if pendingPriceUpdateWatchId != nil {
             let trimmed = messageText.trimmingCharacters(in: .whitespaces)
 
-            if trimmed == "Looks good ✓" {
-                // User confirmed — dismiss and clear
+            if trimmed == "Looks good ✓" || trimmed == "Skip for now" {
+                // User confirmed or skipped — dismiss and clear
                 let userMsg = ChatMessage(role: .user, text: trimmed)
                 withAnimation(.spring(response: 0.3)) {
                     messages.append(userMsg)
@@ -974,6 +974,18 @@ final class ChatViewModel {
                         messages.append(msg)
                     }
                     // Store watch ID in case user wants to change the price
+                    pendingPriceUpdateWatchId = watch.id
+                } else {
+                    // No price detected (JS-heavy site, ticket marketplace, etc.)
+                    // Ask the user to provide the price they're currently seeing
+                    let msg = ChatMessage(
+                        role: .steward,
+                        text: "I couldn't detect the current price from this page. What price are you seeing right now? This helps me track changes more accurately.",
+                        suggestions: ["Skip for now"]
+                    )
+                    withAnimation(.spring(response: 0.3)) {
+                        messages.append(msg)
+                    }
                     pendingPriceUpdateWatchId = watch.id
                 }
             } else {

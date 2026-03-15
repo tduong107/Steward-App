@@ -16,6 +16,11 @@ struct PriceHistoryChart: View {
     private var currentPrice: Double {
         points.last?.price ?? 0
     }
+    /// Whether the most recent price has low or no confidence (e.g. from ticket sites, JS-heavy pages)
+    private var isEstimatedPrice: Bool {
+        guard let latest = points.last, let conf = latest.confidence else { return false }
+        return conf == "low" || conf == "none"
+    }
     private var lowestPoint: PricePoint? {
         PricePoint.lowestPrice(in: points)
     }
@@ -88,6 +93,17 @@ struct PriceHistoryChart: View {
                     Text("First data point")
                         .font(Theme.body(12))
                         .foregroundStyle(Theme.inkLight)
+                }
+
+                // "Estimated" badge for low-confidence prices (ticket sites, JS-heavy pages)
+                if isEstimatedPrice && selectedPoint == nil {
+                    Text("Estimated")
+                        .font(Theme.body(10, weight: .medium))
+                        .foregroundStyle(.orange)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .background(.orange.opacity(0.12))
+                        .clipShape(Capsule())
                 }
             }
 

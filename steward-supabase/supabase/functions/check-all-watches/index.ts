@@ -34,12 +34,12 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // Fetch all active (watching) watches with their frequency and last check time
+    // Fetch all active watches (watching + triggered) with their frequency and last check time
+    // Triggered watches are re-checked at reduced frequency for self-healing
     const { data: watches, error } = await supabase
       .from("watches")
-      .select("id, check_frequency, last_checked, preferred_check_time")
-      .eq("status", "watching")
-      .eq("triggered", false);
+      .select("id, check_frequency, last_checked, preferred_check_time, triggered, status")
+      .in("status", ["watching", "triggered"]);
 
     if (error) {
       console.error(`[check-all] Query error: ${JSON.stringify(error)}`);
@@ -63,14 +63,30 @@ serve(async (req) => {
       );
     }
 
+    // Build case-insensitive frequency lookup as safety net
+    const FREQ_LOWER: Record<string, number> = {};
+    for (const [k, v] of Object.entries(FREQUENCY_SECONDS)) {
+      FREQ_LOWER[k.toLowerCase()] = v;
+    }
+
     // Filter to only watches that are "due" based on their frequency
     const now = Date.now();
     const dueWatches = watches.filter((w) => {
       // Never checked → always due
       if (!w.last_checked) return true;
 
-      const intervalMs =
-        (FREQUENCY_SECONDS[w.check_frequency] ?? 86400) * 1000;
+      const rawInterval = FREQUENCY_SECONDS[w.check_frequency]
+        ?? FREQ_LOWER[(w.check_frequency || "").toLowerCase()];
+      if (rawInterval === undefined) {
+        console.warn(`[check-all] Unknown frequency "${w.check_frequency}" for watch ${w.id}, defaulting to Daily`);
+      }
+      let intervalMs = (rawInterval ?? 86400) * 1000;
+
+      // Triggered watches check at 2× their normal interval (reduced frequency)
+      if (w.triggered) {
+        intervalMs *= 2;
+      }
+
       const lastCheckedMs = new Date(w.last_checked).getTime();
       return now - lastCheckedMs >= intervalMs;
     });

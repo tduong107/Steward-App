@@ -31,6 +31,9 @@ extension Watch {
         // Preserve the UUID and timestamp from Supabase
         self.id = dto.id
         self.createdAt = dto.createdAt
+        self.couponCode = dto.couponCode
+        self.autoActEnabled = dto.autoAct
+        self.spendingLimit = dto.spendingLimit
     }
 
     /// Convert to DTO for uploading to Supabase
@@ -58,7 +61,10 @@ extension Watch {
             searchQuery: self.searchQuery,
             consecutiveFailures: self.consecutiveFailures,
             lastError: self.lastError,
-            needsAttention: self.needsAttention
+            needsAttention: self.needsAttention,
+            couponCode: self.couponCode,
+            autoAct: self.autoActEnabled,
+            spendingLimit: self.spendingLimit
         )
     }
 }

@@ -1,9 +1,11 @@
 import SwiftUI
+import UIKit
 
 struct ActionModal: View {
     let watch: Watch
     @Environment(WatchViewModel.self) private var viewModel
     @State private var showActionBrowser = false
+    @State private var couponCopied = false
 
     // MARK: - Type-Aware Text
 
@@ -116,6 +118,74 @@ struct ActionModal: View {
             )
             .padding(.horizontal, 24)
 
+            // Fare hold badge (if the change note contains fare hold / cancellation policy info)
+            if let note = watch.changeNote, fareHoldNote(from: note) != nil {
+                let holdText = fareHoldNote(from: note)!
+                HStack(spacing: 8) {
+                    Image(systemName: "clock.badge.checkmark")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Theme.accent)
+
+                    Text(holdText)
+                        .font(Theme.body(12, weight: .medium))
+                        .foregroundStyle(Theme.ink)
+
+                    Spacer()
+                }
+                .padding(10)
+                .background(Theme.accent.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(Theme.accent.opacity(0.15), lineWidth: 1)
+                )
+                .padding(.horizontal, 24)
+            }
+
+            // Coupon code banner (if detected on the page)
+            if let code = watch.couponCode, !code.isEmpty {
+                HStack(spacing: 10) {
+                    Image(systemName: "ticket.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(Theme.accent)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(couponCopied ? "Copied!" : "Promo code detected")
+                            .font(Theme.body(11, weight: .medium))
+                            .foregroundStyle(couponCopied ? Theme.accent : Theme.inkLight)
+
+                        Text(code)
+                            .font(.system(size: 15, weight: .bold, design: .monospaced))
+                            .foregroundStyle(Theme.ink)
+                    }
+
+                    Spacer()
+
+                    Button {
+                        UIPasteboard.general.string = code
+                        withAnimation(.spring(response: 0.3)) { couponCopied = true }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                            withAnimation { couponCopied = false }
+                        }
+                    } label: {
+                        Image(systemName: couponCopied ? "checkmark" : "doc.on.doc")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Theme.accent)
+                            .frame(width: 32, height: 32)
+                            .background(Theme.accentLight)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                }
+                .padding(12)
+                .background(Theme.accentLight.opacity(0.5))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Theme.accent.opacity(0.2), lineWidth: 1)
+                )
+                .padding(.horizontal, 24)
+            }
+
             // Buttons
             HStack(spacing: 10) {
                 Button {
@@ -136,6 +206,10 @@ struct ActionModal: View {
 
                 Button {
                     if watch.actionType.isActionable {
+                        // Auto-copy coupon to clipboard before opening the browser
+                        if let code = watch.couponCode, !code.isEmpty {
+                            UIPasteboard.general.string = code
+                        }
                         showActionBrowser = true
                     } else {
                         viewModel.runAction()
@@ -412,6 +486,30 @@ struct ActionModal: View {
             }
         }
     }
+}
+
+// MARK: - Fare Hold Helper
+
+/// Extracts a fare hold note from a change note string.
+/// Returns nil if no fare hold info is present (avoids false positives like "household").
+private func fareHoldNote(from changeNote: String) -> String? {
+    // Fare hold notes are appended after " · " by the backend
+    let parts = changeNote.components(separatedBy: " · ")
+    guard parts.count >= 2, let holdPart = parts.last else { return nil }
+
+    // Match specific fare hold keywords (not substrings like "household")
+    let holdKeywords = [
+        "fare hold", "fare lock", "24hr", "24-hour",
+        "free cancellation", "risk-free cancellation",
+        "cancel for free", "fully refundable",
+    ]
+    let lower = holdPart.lowercased()
+    for keyword in holdKeywords {
+        if lower.contains(keyword) {
+            return holdPart
+        }
+    }
+    return nil
 }
 
 // MARK: - Rewatch Suggestion Model

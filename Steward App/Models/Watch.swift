@@ -97,6 +97,13 @@ final class Watch {
     var lastError: String?
     var needsAttention: Bool = false
 
+    // Action enhancement — coupon code detected on the page when triggered
+    var couponCode: String?
+
+    // Auto-act: execute action server-side when condition is met (Premium feature)
+    var autoActEnabled: Bool = false
+    var spendingLimit: Double?
+
     var actionType: ActionType {
         get { ActionType(rawValue: actionTypeRaw) ?? .notify }
         set { actionTypeRaw = newValue.rawValue }

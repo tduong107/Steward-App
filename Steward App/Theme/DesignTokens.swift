@@ -25,6 +25,8 @@ enum Theme {
     static var accentMid: Color   { isDark ? Color(hex: "2A4A38") : Color(hex: "C4DDD0") }
     static var gold: Color        { isDark ? Color(hex: "F5AE2B") : Color(hex: "F59E0B") }
     static var goldLight: Color   { isDark ? Color(hex: "2A2418") : Color(hex: "FEF3C7") }
+    static var green: Color       { isDark ? Color(hex: "3AAA6A") : Color(hex: "27AE60") }
+    static var greenLight: Color  { isDark ? Color(hex: "142A1A") : Color(hex: "EAFAEF") }
     static var red: Color         { isDark ? Color(hex: "D04939") : Color(hex: "C0392B") }
     static var redLight: Color    { isDark ? Color(hex: "2A1814") : Color(hex: "FDECEA") }
     static var blue: Color        { isDark ? Color(hex: "3A6AAA") : Color(hex: "1E4A8A") }

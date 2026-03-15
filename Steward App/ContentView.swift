@@ -26,6 +26,8 @@ struct ContentView: View {
                         switch viewModel.selectedTab {
                         case .home:
                             HomeScreen()
+                        case .savings:
+                            SavingsScreen()
                         case .activity:
                             ActivityScreen()
                         case .settings:
@@ -117,6 +119,27 @@ struct ContentView: View {
                     viewModel.openDetail(for: watch)
                 } else {
                     // Watch not in local cache yet — sync from cloud, then navigate
+                    Task {
+                        await viewModel.syncFromCloud()
+                        if let watch = viewModel.watches.first(where: { $0.id == watchId }) {
+                            viewModel.openDetail(for: watch)
+                        }
+                    }
+                }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .didTapActionURL)) { notification in
+            // User tapped "Open & Act" on a push notification — open the action URL directly
+            if let urlString = notification.userInfo?["action_url"] as? String,
+               let url = URL(string: urlString) {
+                UIApplication.shared.open(url)
+            }
+            // Also navigate to the watch detail for context
+            if let watchId = notification.userInfo?["watch_id"] as? UUID {
+                viewModel.selectedTab = .home
+                if let watch = viewModel.watches.first(where: { $0.id == watchId }) {
+                    viewModel.openDetail(for: watch)
+                } else {
                     Task {
                         await viewModel.syncFromCloud()
                         if let watch = viewModel.watches.first(where: { $0.id == watchId }) {

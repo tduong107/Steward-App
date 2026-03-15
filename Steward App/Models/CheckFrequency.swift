@@ -61,6 +61,11 @@ enum SubscriptionTier: String, Codable, CaseIterable {
         }
     }
 
+    /// Whether this tier supports auto-act (server-side action execution)
+    var hasAutoAct: Bool {
+        self == .premium
+    }
+
     // MARK: - StoreKit Product IDs
 
     var monthlyProductId: String? {

@@ -39,7 +39,6 @@ struct HomeScreen: View {
                     tutorialCard
                     triggeredAlerts
                     priceInsightsCard
-                    savingsMilestoneSection
                     categoryFilterBar
 
                     if viewModel.watches.isEmpty {
@@ -204,34 +203,6 @@ struct HomeScreen: View {
             }
 
             Spacer()
-
-            // Compact frequency pill
-            Button { showFrequencyPicker = true } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: "clock.arrow.circlepath")
-                        .font(.system(size: 10))
-
-                    Text(compactFrequencyLabel)
-                        .font(Theme.body(11, weight: .semibold))
-
-                    if let freq = CheckFrequency.from(string: defaultCheckFrequency),
-                       freq.requiredTier != .free {
-                        Text(freq.requiredTier.displayName.uppercased())
-                            .font(Theme.body(8, weight: .bold))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 1)
-                            .background(freq.requiredTier == .premium ? Theme.gold : Theme.accent)
-                            .clipShape(Capsule())
-                    }
-                }
-                .foregroundStyle(Theme.accent)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(Theme.accentLight)
-                .clipShape(Capsule())
-            }
-            .buttonStyle(.plain)
 
             Button(action: { viewModel.selectedTab = .activity }) {
                 ZStack(alignment: .topTrailing) {
@@ -426,18 +397,6 @@ struct HomeScreen: View {
                 .padding(.horizontal, 24)
                 .padding(.bottom, 16)
             }
-        }
-    }
-
-    // MARK: - Savings Milestone Section
-
-    @ViewBuilder
-    private var savingsMilestoneSection: some View {
-        if viewModel.savingsCalculation.totalSavings > 0 {
-            SavingsMilestoneCard(calculation: viewModel.savingsCalculation)
-                .padding(.horizontal, 24)
-                .padding(.bottom, 16)
-                .transition(.move(edge: .top).combined(with: .opacity))
         }
     }
 

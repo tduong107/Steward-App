@@ -4,6 +4,13 @@ struct PricePoint: Identifiable, Sendable {
     let id = UUID()
     let date: Date
     let price: Double
+    let confidence: String?  // "high", "medium", "low", "none" — nil for user-confirmed prices
+
+    init(date: Date, price: Double, confidence: String? = nil) {
+        self.date = date
+        self.price = price
+        self.confidence = confidence
+    }
 }
 
 #if DEBUG
@@ -49,7 +56,7 @@ extension PricePoint {
     static func fromCheckResults(_ results: [CheckResultDTO]) -> [PricePoint] {
         results
             .filter { $0.price != nil }
-            .map { PricePoint(date: $0.checkedAt, price: $0.price!) }
+            .map { PricePoint(date: $0.checkedAt, price: $0.price!, confidence: $0.resultData?.priceConfidence) }
             .sorted { $0.date < $1.date }
     }
 

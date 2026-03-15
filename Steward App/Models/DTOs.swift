@@ -37,6 +37,11 @@ struct WatchDTO: Codable, Identifiable, Sendable {
     var lastError: String?
     var needsAttention: Bool
 
+    // Action enhancement fields
+    var couponCode: String?
+    var autoAct: Bool
+    var spendingLimit: Double?
+
     enum CodingKeys: String, CodingKey {
         case id
         case userId = "user_id"
@@ -61,6 +66,9 @@ struct WatchDTO: Codable, Identifiable, Sendable {
         case consecutiveFailures = "consecutive_failures"
         case lastError = "last_error"
         case needsAttention = "needs_attention"
+        case couponCode = "coupon_code"
+        case autoAct = "auto_act"
+        case spendingLimit = "spending_limit"
     }
 
     // Explicit memberwise init (required because we provide a custom Decodable init)
@@ -71,7 +79,8 @@ struct WatchDTO: Codable, Identifiable, Sendable {
          imageURL: String? = nil, actionURL: String? = nil, createdAt: Date,
          siteCookies: String? = nil, cookieDomain: String? = nil, cookieStatus: String? = nil,
          watchMode: String = "url", searchQuery: String? = nil,
-         consecutiveFailures: Int = 0, lastError: String? = nil, needsAttention: Bool = false) {
+         consecutiveFailures: Int = 0, lastError: String? = nil, needsAttention: Bool = false,
+         couponCode: String? = nil, autoAct: Bool = false, spendingLimit: Double? = nil) {
         self.id = id; self.userId = userId; self.emoji = emoji; self.name = name
         self.url = url; self.condition = condition; self.actionLabel = actionLabel
         self.actionType = actionType; self.status = status; self.checkFrequency = checkFrequency
@@ -82,6 +91,8 @@ struct WatchDTO: Codable, Identifiable, Sendable {
         self.cookieStatus = cookieStatus; self.watchMode = watchMode
         self.searchQuery = searchQuery; self.consecutiveFailures = consecutiveFailures
         self.lastError = lastError; self.needsAttention = needsAttention
+        self.couponCode = couponCode; self.autoAct = autoAct
+        self.spendingLimit = spendingLimit
     }
 
     // Custom decoder: use decodeIfPresent with defaults for new columns
@@ -114,6 +125,9 @@ struct WatchDTO: Codable, Identifiable, Sendable {
         consecutiveFailures = try c.decodeIfPresent(Int.self, forKey: .consecutiveFailures) ?? 0
         lastError = try c.decodeIfPresent(String.self, forKey: .lastError)
         needsAttention = try c.decodeIfPresent(Bool.self, forKey: .needsAttention) ?? false
+        couponCode = try c.decodeIfPresent(String.self, forKey: .couponCode)
+        autoAct = try c.decodeIfPresent(Bool.self, forKey: .autoAct) ?? false
+        spendingLimit = try c.decodeIfPresent(Double.self, forKey: .spendingLimit)
     }
 }
 
@@ -152,6 +166,18 @@ struct CheckResultDTO: Codable, Identifiable, Sendable {
     struct ResultData: Codable, Sendable {
         var text: String?
         var sources: [SourcePrice]?   // Multi-source price data for search watches
+        var priceConfidence: String?  // "high", "medium", "low", or "none"
+        var couponCodes: [String]?    // Detected promo/coupon codes on the page
+        var holdAvailable: Bool?      // Whether fare/hotel hold is available
+        var holdNote: String?         // Human-readable hold info (e.g., "Delta offers 24hr fare holds")
+
+        enum CodingKeys: String, CodingKey {
+            case text, sources
+            case priceConfidence = "price_confidence"
+            case couponCodes = "coupon_codes"
+            case holdAvailable = "hold_available"
+            case holdNote = "hold_note"
+        }
     }
 
     /// A single store's price from a multi-source search result
@@ -178,11 +204,15 @@ struct ProfileDTO: Codable, Sendable {
     var displayName: String?
     var deviceToken: String?
     var phoneNumber: String?
+    var spendingLimit: Double?
+    var autoActDefault: Bool?
 
     enum CodingKeys: String, CodingKey {
         case id
         case displayName = "display_name"
         case deviceToken = "device_token"
         case phoneNumber = "phone_number"
+        case spendingLimit = "spending_limit"
+        case autoActDefault = "auto_act_default"
     }
 }

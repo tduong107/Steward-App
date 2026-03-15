@@ -37,6 +37,7 @@ final class WatchViewModel {
     // Savings milestones
     var savingsCalculation: SavingsCalculation = .empty
     var isLoadingSavings = false
+    var allPriceHistories: [UUID: [PricePoint]] = [:]
 
     // Cached filtered collections (updated in fetchLocalWatches to avoid recomputing in every SwiftUI body)
     var triggeredWatches: [Watch] = []
@@ -53,12 +54,14 @@ final class WatchViewModel {
 
     enum Tab: String, CaseIterable {
         case home = "Watches"
+        case savings = "Savings"
         case activity = "Activity"
         case settings = "Settings"
 
         var icon: String {
             switch self {
             case .home: return "square.grid.2x2"
+            case .savings: return "chart.line.uptrend.xyaxis"
             case .activity: return "bolt"
             case .settings: return "gearshape"
             }
@@ -270,6 +273,9 @@ final class WatchViewModel {
         }
 
         let watchTuples = priceWatches.map { (id: $0.id, name: $0.name, emoji: $0.emoji) }
+        // Store for SavingsScreen
+        allPriceHistories = priceHistories
+
         savingsCalculation = SavingsCalculator.calculate(
             watches: watchTuples,
             priceHistories: priceHistories
@@ -527,6 +533,25 @@ final class WatchViewModel {
                 highlighting: highlightTier,
                 reason: "You've reached the \(maxWatches)-watch limit on your \(currentTier.displayName) plan. Upgrade to add more watches."
             )
+            return
+        }
+
+        // Check for duplicate URL (normalized: strip protocol, www, trailing slash)
+        let normalizedURL = watch.url.lowercased()
+            .replacingOccurrences(of: "https://", with: "")
+            .replacingOccurrences(of: "http://", with: "")
+            .replacingOccurrences(of: "www.", with: "")
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let isDuplicate = watches.contains { existing in
+            let n = existing.url.lowercased()
+                .replacingOccurrences(of: "https://", with: "")
+                .replacingOccurrences(of: "http://", with: "")
+                .replacingOccurrences(of: "www.", with: "")
+                .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            return n == normalizedURL
+        }
+        if isDuplicate {
+            syncError = "You're already watching this URL"
             return
         }
 
@@ -838,6 +863,7 @@ final class WatchViewModel {
             watch.triggered = false
             watch.status = .watching
             watch.actionURL = nil  // Clear the action URL after acting
+            watch.couponCode = nil // Clear coupon code after use
             try? modelContext?.save()
 
             // Sync the change to Supabase

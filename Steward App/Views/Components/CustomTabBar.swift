@@ -10,8 +10,8 @@ struct CustomTabBar: View {
             // Home tab
             tabButton(for: .home)
 
-            // Activity tab
-            tabButton(for: .activity)
+            // Savings tab
+            tabButton(for: .savings)
 
             // AI Chat center button
             Button(action: onChatTap) {
@@ -25,6 +25,9 @@ struct CustomTabBar: View {
             }
             .offset(y: -12)
             .accessibilityLabel("Open Steward AI chat")
+
+            // Activity tab
+            tabButton(for: .activity)
 
             // Settings tab
             tabButton(for: .settings)
