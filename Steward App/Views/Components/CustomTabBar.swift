@@ -3,11 +3,15 @@ import SwiftUI
 struct CustomTabBar: View {
     @Binding var selectedTab: WatchViewModel.Tab
     let onChatTap: () -> Void
+    var onHomeReselect: (() -> Void)? = nil
 
     var body: some View {
         HStack(spacing: 0) {
             // Home tab
             tabButton(for: .home)
+
+            // Savings tab
+            tabButton(for: .savings)
 
             // AI Chat center button
             Button(action: onChatTap) {
@@ -22,8 +26,11 @@ struct CustomTabBar: View {
             .offset(y: -12)
             .accessibilityLabel("Open Steward AI chat")
 
-            // Activity tab (skip settings, put it after chat)
+            // Activity tab
             tabButton(for: .activity)
+
+            // Settings tab
+            tabButton(for: .settings)
         }
         .padding(.horizontal, 24)
         .padding(.top, 10)
@@ -39,6 +46,9 @@ struct CustomTabBar: View {
 
     private func tabButton(for tab: WatchViewModel.Tab) -> some View {
         Button {
+            if selectedTab == tab && tab == .home {
+                onHomeReselect?()
+            }
             withAnimation(.spring(response: 0.3)) {
                 selectedTab = tab
             }

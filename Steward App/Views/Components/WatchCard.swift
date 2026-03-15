@@ -7,13 +7,33 @@ struct WatchCard: View {
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 12) {
-                // Emoji icon
+                // Product image or emoji fallback
                 ZStack(alignment: .topTrailing) {
-                    Text(watch.emoji)
-                        .font(.system(size: 20))
+                    if let imageURL = watch.imageURL, let url = URL(string: imageURL) {
+                        AsyncImage(url: url) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .scaledToFill()
+                            case .failure:
+                                Text(watch.emoji)
+                                    .font(.system(size: 20))
+                            default:
+                                ProgressView()
+                                    .controlSize(.small)
+                            }
+                        }
                         .frame(width: 44, height: 44)
                         .background(Theme.bgDeep)
                         .clipShape(RoundedRectangle(cornerRadius: Theme.radiusMd))
+                    } else {
+                        Text(watch.emoji)
+                            .font(.system(size: 20))
+                            .frame(width: 44, height: 44)
+                            .background(Theme.bgDeep)
+                            .clipShape(RoundedRectangle(cornerRadius: Theme.radiusMd))
+                    }
 
                     if watch.triggered {
                         Circle()
@@ -23,7 +43,15 @@ struct WatchCard: View {
                                 Circle().stroke(Theme.bgCard, lineWidth: 2)
                             )
                             .offset(x: 3, y: -3)
-                            .modifier(PulseModifier())
+                            .modifier(PulseModifier(enabled: true))
+                    } else if watch.needsAttention {
+                        Circle()
+                            .fill(Theme.gold)
+                            .frame(width: 10, height: 10)
+                            .overlay(
+                                Circle().stroke(Theme.bgCard, lineWidth: 2)
+                            )
+                            .offset(x: 3, y: -3)
                     }
                 }
 
@@ -37,27 +65,63 @@ struct WatchCard: View {
 
                         Spacer()
 
-                        Text(watch.lastSeen)
-                            .font(Theme.body(11))
-                            .foregroundStyle(Theme.inkLight)
+                        // Next check countdown
+                        HStack(spacing: 3) {
+                            Image(systemName: "clock")
+                                .font(.system(size: 9))
+                            Text(watch.nextCheckCountdown)
+                                .font(Theme.body(10))
+                        }
+                        .foregroundStyle(Theme.inkLight)
                     }
 
-                    Text(watch.url)
+                    if watch.watchMode == "search" {
+                        HStack(spacing: 4) {
+                            Image(systemName: "magnifyingglass")
+                                .font(.system(size: 9))
+                            Text("Tracking across stores")
+                                .lineLimit(1)
+                        }
                         .font(Theme.body(11))
-                        .foregroundStyle(Theme.inkLight)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
+                        .foregroundStyle(Theme.accentMid)
+                    } else {
+                        Text(watch.url)
+                            .font(Theme.body(11))
+                            .foregroundStyle(Theme.inkLight)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
 
                     HStack(spacing: 5) {
                         Circle()
-                            .fill(watch.triggered ? Theme.accent : Theme.borderMid)
+                            .fill(watch.triggered ? Theme.accent : watch.needsAttention ? Theme.gold : Theme.borderMid)
                             .frame(width: 5, height: 5)
-                            .modifier(watch.triggered ? PulseModifier() : PulseModifier(enabled: false))
+                            .modifier(PulseModifier(enabled: watch.triggered))
 
-                        Text(watch.triggered ? (watch.changeNote ?? "") : watch.condition)
-                            .font(Theme.body(11, weight: watch.triggered ? .semibold : .regular))
-                            .foregroundStyle(watch.triggered ? Theme.accent : Theme.inkLight)
-                            .lineLimit(1)
+                        if watch.triggered {
+                            Image(systemName: "sparkle")
+                                .font(.system(size: 9))
+                                .foregroundStyle(Theme.accent)
+
+                            Text(watch.changeNote ?? "Change detected!")
+                                .font(Theme.body(11, weight: .semibold))
+                                .foregroundStyle(Theme.accent)
+                                .lineLimit(1)
+                        } else if watch.needsAttention {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.system(size: 9))
+                                .foregroundStyle(Theme.gold)
+
+                            Text(watch.lastError ?? "Needs attention")
+                                .font(Theme.body(11, weight: .medium))
+                                .foregroundStyle(Theme.gold)
+                                .lineLimit(1)
+                        } else {
+                            Text(watch.condition)
+                                .font(Theme.body(11))
+                                .foregroundStyle(Theme.inkLight)
+                                .lineLimit(1)
+                        }
                     }
                     .padding(.top, 4)
                 }
@@ -72,7 +136,7 @@ struct WatchCard: View {
             .clipShape(RoundedRectangle(cornerRadius: Theme.radiusLg))
             .overlay(
                 RoundedRectangle(cornerRadius: Theme.radiusLg)
-                    .stroke(watch.triggered ? Theme.accentMid : Theme.border, lineWidth: 1)
+                    .stroke(watch.triggered ? Theme.accentMid : watch.needsAttention ? Theme.gold.opacity(0.5) : Theme.border, lineWidth: 1)
             )
             .shadow(color: .black.opacity(0.04), radius: 8, y: 4)
         }
@@ -94,6 +158,9 @@ struct PulseModifier: ViewModifier {
             )
             .onAppear {
                 if enabled { isPulsing = true }
+            }
+            .onDisappear {
+                isPulsing = false
             }
     }
 }

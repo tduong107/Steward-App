@@ -2,36 +2,195 @@ import SwiftUI
 
 struct HomeScreen: View {
     @Environment(WatchViewModel.self) private var viewModel
+    @Environment(SubscriptionManager.self) private var subscriptionManager
+    @Environment(NotificationManager.self) private var notificationManager
+
+    // Default frequency
+    @AppStorage("defaultCheckFrequency") private var defaultCheckFrequency = "Daily"
+    @State private var showFrequencyPicker = false
+
+    // Category filter
+    @State private var selectedCategory: ActionType? = nil
+
+    // Bulk delete
+    @State private var isEditMode = false
+    @State private var selectedWatchIds: Set<UUID> = []
+    @State private var showBulkDeleteConfirm = false
+
+    // Savings milestone celebration
+    @AppStorage("achievedMilestoneAmount") private var achievedMilestoneAmount: Double = 0
+    @State private var showCelebration = false
+    @State private var celebrationMilestone: SavingsMilestone?
+
+    // Tutorial
+    @AppStorage("hasSeenOnboardingB") private var hasSeenOnboardingB = false
+    @AppStorage("hasCompletedTutorialWatch") private var hasCompletedTutorialWatch = false
+    @AppStorage("hasCompletedTutorialNotifs") private var hasCompletedTutorialNotifs = false
+    @AppStorage("hasDismissedTutorial") private var hasDismissedTutorial = false
+    @State private var showTutorialCongrats = false
+    @State private var tutorialCongratsStep: TutorialStep?
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                headerSection
-                chatPromptBar
-                triggeredAlerts
-                watchList
-                addWatchCard
+        ZStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    headerSection
+                    chatPromptBar
+                    tutorialCard
+                    triggeredAlerts
+                    priceInsightsCard
+                    categoryFilterBar
+
+                    if viewModel.watches.isEmpty {
+                        emptyState
+                    } else {
+                        watchList
+                    }
+
+                    addWatchCard
+                }
+                .padding(.bottom, 24)
             }
-            .padding(.bottom, 24)
+            .refreshable {
+                await viewModel.syncFromCloud(force: true)
+            }
+            .background(Theme.bg)
+
+            // Celebration overlay
+            if showCelebration, let milestone = celebrationMilestone {
+                CelebrationOverlay(
+                    milestone: milestone,
+                    totalSavings: viewModel.savingsCalculation.totalSavings,
+                    onDismiss: {
+                        withAnimation {
+                            showCelebration = false
+                            celebrationMilestone = nil
+                        }
+                    }
+                )
+                .transition(.opacity)
+                .zIndex(999)
+            }
+
+            // Tutorial congrats overlay
+            if showTutorialCongrats, let step = tutorialCongratsStep {
+                TutorialCongratsOverlay(
+                    step: step,
+                    isFinalStep: hasCompletedTutorialWatch && hasCompletedTutorialNotifs,
+                    onDismiss: {
+                        withAnimation {
+                            showTutorialCongrats = false
+                            tutorialCongratsStep = nil
+                        }
+                        // Auto-dismiss tutorial card after allComplete or when both done
+                        if step == .allComplete || (hasCompletedTutorialWatch && hasCompletedTutorialNotifs) {
+                            withAnimation(.easeOut(duration: 0.3)) {
+                                hasDismissedTutorial = true
+                            }
+                        }
+                    }
+                )
+                .transition(.opacity)
+                .zIndex(1000)
+            }
         }
-        .background(Theme.bg)
+        .onChange(of: viewModel.savingsCalculation.totalSavings) { _, _ in
+            checkForNewMilestone()
+        }
+        .onChange(of: viewModel.watches.count) { oldCount, newCount in
+            // Detect first watch creation (0 → 1+)
+            if oldCount == 0 && newCount > 0 && !hasCompletedTutorialWatch && shouldShowTutorial {
+                hasCompletedTutorialWatch = true
+                tutorialCongratsStep = hasCompletedTutorialNotifs ? .allComplete : .firstWatch
+                withAnimation(.spring(response: 0.4)) {
+                    showTutorialCongrats = true
+                }
+            }
+        }
+        .onAppear {
+            // Auto-complete steps if user already has watches or notifications
+            if shouldShowTutorial {
+                if !hasCompletedTutorialWatch && !viewModel.watches.isEmpty {
+                    hasCompletedTutorialWatch = true
+                }
+                if !hasCompletedTutorialNotifs && notificationManager.isPermissionGranted {
+                    hasCompletedTutorialNotifs = true
+                }
+                // Auto-dismiss if both already done
+                if hasCompletedTutorialWatch && hasCompletedTutorialNotifs {
+                    hasDismissedTutorial = true
+                }
+            }
+        }
+        .sheet(isPresented: $showFrequencyPicker) {
+            FrequencyPickerSheet(selectedFrequency: $defaultCheckFrequency)
+        }
+        .alert("Delete \(selectedWatchIds.count) watches?", isPresented: $showBulkDeleteConfirm) {
+            Button("Delete", role: .destructive) {
+                let idsToDelete = selectedWatchIds
+                withAnimation(.spring(response: 0.3)) {
+                    viewModel.removeWatches(ids: idsToDelete)
+                }
+                selectedWatchIds.removeAll()
+                isEditMode = false
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This action cannot be undone.")
+        }
+    }
+
+    // MARK: - Milestone Detection
+
+    private func checkForNewMilestone() {
+        guard let current = viewModel.savingsCalculation.currentMilestone else { return }
+        if current.amount > achievedMilestoneAmount {
+            achievedMilestoneAmount = current.amount
+            celebrationMilestone = current
+            withAnimation(.spring(response: 0.4)) {
+                showCelebration = true
+            }
+        }
+    }
+
+    // MARK: - Tutorial
+
+    private var shouldShowTutorial: Bool {
+        hasSeenOnboardingB && !hasDismissedTutorial
+    }
+
+    @ViewBuilder
+    private var tutorialCard: some View {
+        if shouldShowTutorial && !(hasCompletedTutorialWatch && hasCompletedTutorialNotifs) {
+            TutorialChecklist(
+                onOpenChat: {
+                    viewModel.isChatOpen = true
+                },
+                onShowCongrats: { step in
+                    tutorialCongratsStep = step
+                    withAnimation(.spring(response: 0.4)) {
+                        showTutorialCongrats = true
+                    }
+                },
+                onDismiss: {
+                    withAnimation(.easeOut(duration: 0.3)) {
+                        hasDismissedTutorial = true
+                    }
+                }
+            )
+            .padding(.horizontal, 24)
+            .padding(.bottom, 16)
+            .transition(.move(edge: .top).combined(with: .opacity))
+        }
     }
 
     // MARK: - Header
 
     private var headerSection: some View {
-        HStack {
+        HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 8) {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Theme.accent)
-                        .frame(width: 26, height: 26)
-                        .overlay(
-                            Text("S")
-                                .font(.system(size: 14, weight: .bold, design: .serif))
-                                .italic()
-                                .foregroundStyle(.white)
-                        )
+                    StewardLogo(size: 30)
 
                     Text("Steward")
                         .font(Theme.serif(22, weight: .bold))
@@ -45,18 +204,31 @@ struct HomeScreen: View {
 
             Spacer()
 
-            Button(action: {}) {
-                Image(systemName: "bell")
-                    .font(.system(size: 16))
-                    .foregroundStyle(Theme.ink)
-                    .frame(width: 38, height: 38)
-                    .background(Theme.bgCard)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Theme.border, lineWidth: 1)
-                    )
-                    .shadow(color: .black.opacity(0.04), radius: 8, y: 4)
+            Button(action: { viewModel.selectedTab = .activity }) {
+                ZStack(alignment: .topTrailing) {
+                    Image(systemName: "bell")
+                        .font(.system(size: 16))
+                        .foregroundStyle(Theme.ink)
+                        .frame(width: 38, height: 38)
+                        .background(Theme.bgCard)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Theme.border, lineWidth: 1)
+                        )
+                        .shadow(color: .black.opacity(0.04), radius: 8, y: 4)
+
+                    // Badge for triggered watches
+                    if !viewModel.triggeredWatches.isEmpty {
+                        Text("\(viewModel.triggeredWatches.count)")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 18, height: 18)
+                            .background(Theme.red)
+                            .clipShape(Circle())
+                            .offset(x: 4, y: -4)
+                    }
+                }
             }
             .accessibilityLabel("Notifications")
         }
@@ -71,16 +243,7 @@ struct HomeScreen: View {
             viewModel.isChatOpen = true
         } label: {
             HStack(spacing: 10) {
-                Image(systemName: "sparkle")
-                    .font(.system(size: 14))
-                    .foregroundStyle(Theme.accent)
-                    .frame(width: 30, height: 30)
-                    .background(Theme.accentLight)
-                    .clipShape(RoundedRectangle(cornerRadius: 9))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 9)
-                            .stroke(Theme.accentMid, lineWidth: 1)
-                    )
+                StewardLogo(size: 30)
 
                 Text("Ask Steward to watch something…")
                     .font(Theme.body(13))
@@ -125,6 +288,256 @@ struct HomeScreen: View {
         }
     }
 
+    // MARK: - Price Insights Card
+
+    /// Price-related watches for the insights card
+    private var priceWatches: [Watch] {
+        viewModel.watches.filter { watch in
+            watch.actionType == .price ||
+            watch.condition.lowercased().contains("price") ||
+            watch.actionLabel.lowercased().contains("price")
+        }
+    }
+
+    @ViewBuilder
+    private var priceInsightsCard: some View {
+        if !priceWatches.isEmpty {
+            if subscriptionManager.currentTier.hasPriceInsights {
+                // Unlocked — full access
+                Button {
+                    viewModel.showPriceInsights = true
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "chart.line.downtrend.xyaxis")
+                            .font(.system(size: 16))
+                            .foregroundStyle(Theme.accent)
+                            .frame(width: 36, height: 36)
+                            .background(Theme.accentLight)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Price Insights")
+                                .font(Theme.body(13, weight: .semibold))
+                                .foregroundStyle(Theme.ink)
+
+                            Text("Tracking \(priceWatches.count) price\(priceWatches.count == 1 ? "" : "s") · Tap to see deals")
+                                .font(Theme.body(11))
+                                .foregroundStyle(Theme.inkLight)
+                        }
+
+                        Spacer()
+
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(Theme.accentMid)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(Theme.bgCard)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14)
+                            .stroke(Theme.accentMid, lineWidth: 1)
+                    )
+                    .shadow(color: .black.opacity(0.04), radius: 8, y: 4)
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 24)
+                .padding(.bottom, 16)
+            } else {
+                // Locked — teaser card
+                Button {
+                    subscriptionManager.presentPaywall(highlighting: .pro)
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "chart.line.downtrend.xyaxis")
+                            .font(.system(size: 16))
+                            .foregroundStyle(Theme.inkLight)
+                            .frame(width: 36, height: 36)
+                            .background(Theme.bgDeep)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack(spacing: 6) {
+                                Text("Price Insights")
+                                    .font(Theme.body(13, weight: .semibold))
+                                    .foregroundStyle(Theme.inkMid)
+
+                                Image(systemName: "lock.fill")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(Theme.inkLight)
+                            }
+
+                            Text("Upgrade to Pro to see deals & price trends")
+                                .font(Theme.body(11))
+                                .foregroundStyle(Theme.inkLight)
+                        }
+
+                        Spacer()
+
+                        Text("PRO")
+                            .font(Theme.body(10, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Theme.accent)
+                            .clipShape(Capsule())
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(Theme.bgCard)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14)
+                            .stroke(Theme.border, lineWidth: 1)
+                    )
+                    .shadow(color: .black.opacity(0.04), radius: 8, y: 4)
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 24)
+                .padding(.bottom, 16)
+            }
+        }
+    }
+
+    // MARK: - Compact Frequency Label
+
+    private var compactFrequencyLabel: String {
+        switch defaultCheckFrequency {
+        case "Every 5 minutes": return "5m"
+        case "Every 15 minutes": return "15m"
+        case "Every 30 minutes": return "30m"
+        case "Every hour": return "1h"
+        case "Every 6 hours": return "6h"
+        case "Every 12 hours": return "12h"
+        default: return defaultCheckFrequency // "Daily" stays as-is
+        }
+    }
+
+    // MARK: - Bulk Delete
+
+    private func toggleSelection(_ id: UUID) {
+        if selectedWatchIds.contains(id) {
+            selectedWatchIds.remove(id)
+        } else {
+            selectedWatchIds.insert(id)
+        }
+    }
+
+    private var bulkDeleteBar: some View {
+        HStack {
+            Button {
+                if selectedWatchIds.count == filteredWatches.count {
+                    selectedWatchIds.removeAll()
+                } else {
+                    selectedWatchIds = Set(filteredWatches.map(\.id))
+                }
+            } label: {
+                Text(selectedWatchIds.count == filteredWatches.count ? "Deselect All" : "Select All")
+                    .font(Theme.body(13, weight: .medium))
+                    .foregroundStyle(Theme.accent)
+            }
+            .buttonStyle(.plain)
+
+            Spacer()
+
+            Button(role: .destructive) {
+                showBulkDeleteConfirm = true
+            } label: {
+                Label("Delete (\(selectedWatchIds.count))", systemImage: "trash")
+                    .font(Theme.body(13, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(Color.red)
+                    .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.vertical, 8)
+    }
+
+    // MARK: - Category Filter Bar
+
+    private var availableCategories: [ActionType] {
+        let types = Set(viewModel.watches.map { $0.actionType })
+        return ActionType.allCases.filter { types.contains($0) }
+    }
+
+    private var filteredWatches: [Watch] {
+        guard let category = selectedCategory else { return viewModel.watches }
+        return viewModel.watches.filter { $0.actionType == category }
+    }
+
+    @ViewBuilder
+    private var categoryFilterBar: some View {
+        if availableCategories.count >= 2 {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    // "All" pill
+                    filterPill(label: "All", icon: "square.grid.2x2", isSelected: selectedCategory == nil) {
+                        withAnimation(.spring(response: 0.3)) {
+                            selectedCategory = nil
+                        }
+                    }
+
+                    // Category pills
+                    ForEach(availableCategories, id: \.self) { category in
+                        filterPill(label: category.displayName, icon: category.iconName, isSelected: selectedCategory == category) {
+                            withAnimation(.spring(response: 0.3)) {
+                                selectedCategory = category
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, 24)
+            }
+            .padding(.bottom, 12)
+        }
+    }
+
+    private func filterPill(label: String, icon: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                Image(systemName: icon)
+                    .font(.system(size: 10))
+
+                Text(label)
+                    .font(Theme.body(11, weight: .semibold))
+            }
+            .foregroundStyle(isSelected ? .white : Theme.inkMid)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(isSelected ? Theme.accent : Theme.bgDeep)
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Empty State
+
+    private var emptyState: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "eye.slash")
+                .font(.system(size: 36))
+                .foregroundStyle(Theme.inkLight)
+
+            VStack(spacing: 6) {
+                Text("No watches yet")
+                    .font(Theme.serif(17, weight: .semibold))
+                    .foregroundStyle(Theme.ink)
+
+                Text("Tell Steward what to monitor and it'll\nwatch the web for you around the clock.")
+                    .font(Theme.body(13))
+                    .foregroundStyle(Theme.inkLight)
+                    .multilineTextAlignment(.center)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 40)
+        .padding(.horizontal, 24)
+    }
+
     // MARK: - Watch List
 
     private var watchList: some View {
@@ -136,21 +549,72 @@ struct HomeScreen: View {
 
                 Spacer()
 
-                Text("\(viewModel.watches.count) watching")
-                    .font(Theme.body(12))
-                    .foregroundStyle(Theme.inkLight)
+                if !isEditMode {
+                    if selectedCategory != nil {
+                        Text("\(filteredWatches.count) of \(viewModel.watches.count)")
+                            .font(Theme.body(12))
+                            .foregroundStyle(Theme.inkLight)
+                    } else {
+                        Text("\(viewModel.watches.count)/\(subscriptionManager.currentTier.maxWatches) watches")
+                            .font(Theme.body(12))
+                            .foregroundStyle(Theme.inkLight)
+                    }
+                }
+
+                if viewModel.watches.count > 1 {
+                    Button {
+                        withAnimation(.spring(response: 0.3)) {
+                            isEditMode.toggle()
+                            if !isEditMode { selectedWatchIds.removeAll() }
+                        }
+                    } label: {
+                        Text(isEditMode ? "Done" : "Edit")
+                            .font(Theme.body(13, weight: .medium))
+                            .foregroundStyle(Theme.accent)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
 
             VStack(spacing: 10) {
-                ForEach(viewModel.watches) { watch in
-                    WatchCard(watch: watch) {
-                        viewModel.openDetail(for: watch)
+                ForEach(filteredWatches) { watch in
+                    HStack(spacing: 12) {
+                        if isEditMode {
+                            Image(systemName: selectedWatchIds.contains(watch.id) ? "checkmark.circle.fill" : "circle")
+                                .font(.system(size: 22))
+                                .foregroundStyle(selectedWatchIds.contains(watch.id) ? Theme.accent : Theme.inkLight)
+                                .onTapGesture { toggleSelection(watch.id) }
+                        }
+
+                        WatchCard(watch: watch) {
+                            if isEditMode {
+                                toggleSelection(watch.id)
+                            } else {
+                                viewModel.openDetail(for: watch)
+                            }
+                        }
+                    }
+                    .contextMenu {
+                        if !isEditMode {
+                            Button(role: .destructive) {
+                                withAnimation(.spring(response: 0.3)) {
+                                    viewModel.removeWatch(watch)
+                                }
+                            } label: {
+                                Label("Delete Watch", systemImage: "trash")
+                            }
+                        }
                     }
                     .transition(.asymmetric(
                         insertion: .move(edge: .bottom).combined(with: .opacity),
                         removal: .opacity
                     ))
                 }
+            }
+
+            // Bulk delete bar
+            if isEditMode && !selectedWatchIds.isEmpty {
+                bulkDeleteBar
             }
         }
         .padding(.horizontal, 24)
@@ -206,7 +670,15 @@ private struct TriggeredAlertCard: View {
                         .frame(width: 5, height: 5)
                         .modifier(PulseModifier())
 
-                    Text("STEWARD READY TO ACT")
+                    Text({
+                        switch watch.actionType {
+                        case .cart:  return "READY TO ADD TO CART"
+                        case .book:  return "READY TO BOOK"
+                        case .price: return "PRICE TARGET HIT"
+                        case .form:  return "READY TO SUBMIT"
+                        case .notify: return "CHANGE DETECTED"
+                        }
+                    }())
                         .font(Theme.body(11, weight: .semibold))
                         .foregroundStyle(.white)
                         .tracking(0.3)
@@ -230,7 +702,9 @@ private struct TriggeredAlertCard: View {
 
                     Spacer()
 
-                    Text("Review →")
+                    Text(watch.actionType.isActionable
+                        ? "\(watch.actionType.actionButtonLabel) →"
+                        : "Review →")
                         .font(Theme.body(12, weight: .bold))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 14)

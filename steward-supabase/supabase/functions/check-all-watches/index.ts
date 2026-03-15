@@ -34,12 +34,12 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // Fetch all active (watching) watches with their frequency and last check time
+    // Fetch all active watches (watching + triggered) with their frequency and last check time
+    // Triggered watches are re-checked at reduced frequency for self-healing
     const { data: watches, error } = await supabase
       .from("watches")
-      .select("id, check_frequency, last_checked")
-      .eq("status", "watching")
-      .eq("triggered", false);
+      .select("id, check_frequency, last_checked, preferred_check_time, triggered, status")
+      .in("status", ["watching", "triggered"]);
 
     if (error) {
       console.error(`[check-all] Query error: ${JSON.stringify(error)}`);
@@ -63,14 +63,30 @@ serve(async (req) => {
       );
     }
 
+    // Build case-insensitive frequency lookup as safety net
+    const FREQ_LOWER: Record<string, number> = {};
+    for (const [k, v] of Object.entries(FREQUENCY_SECONDS)) {
+      FREQ_LOWER[k.toLowerCase()] = v;
+    }
+
     // Filter to only watches that are "due" based on their frequency
     const now = Date.now();
     const dueWatches = watches.filter((w) => {
       // Never checked → always due
       if (!w.last_checked) return true;
 
-      const intervalMs =
-        (FREQUENCY_SECONDS[w.check_frequency] ?? 86400) * 1000;
+      const rawInterval = FREQUENCY_SECONDS[w.check_frequency]
+        ?? FREQ_LOWER[(w.check_frequency || "").toLowerCase()];
+      if (rawInterval === undefined) {
+        console.warn(`[check-all] Unknown frequency "${w.check_frequency}" for watch ${w.id}, defaulting to Daily`);
+      }
+      let intervalMs = (rawInterval ?? 86400) * 1000;
+
+      // Triggered watches check at 2× their normal interval (reduced frequency)
+      if (w.triggered) {
+        intervalMs *= 2;
+      }
+
       const lastCheckedMs = new Date(w.last_checked).getTime();
       return now - lastCheckedMs >= intervalMs;
     });
@@ -95,9 +111,16 @@ serve(async (req) => {
       );
     }
 
-    // Invoke check-watch for each due watch (in parallel)
-    const results = await Promise.allSettled(
-      dueWatches.map(async (watch) => {
+    // Invoke check-watch for each due watch (staggered to avoid API rate limits)
+    // Process sequentially with a small delay between each to spread out Anthropic API calls
+    const DELAY_BETWEEN_CHECKS_MS = 1500; // 1.5 seconds between each check
+    const details: any[] = [];
+    let succeeded = 0;
+
+    for (let i = 0; i < dueWatches.length; i++) {
+      const watch = dueWatches[i];
+
+      try {
         const { data, error: invokeError } = await supabase.functions.invoke(
           "check-watch",
           { body: { watch_id: watch.id } }
@@ -107,21 +130,21 @@ serve(async (req) => {
           console.error(
             `[check-all] check-watch invoke error for ${watch.id}: ${invokeError.message}`
           );
-          return { watch_id: watch.id, error: invokeError.message };
+          details.push({ watch_id: watch.id, error: invokeError.message });
+        } else {
+          details.push({ watch_id: watch.id, result: data });
+          succeeded++;
         }
+      } catch (err) {
+        details.push({ watch_id: watch.id, error: err.message ?? "Unknown error" });
+      }
 
-        return { watch_id: watch.id, result: data };
-      })
-    );
+      // Delay between checks to avoid rate limit bursts (skip after last one)
+      if (i < dueWatches.length - 1) {
+        await new Promise((r) => setTimeout(r, DELAY_BETWEEN_CHECKS_MS));
+      }
+    }
 
-    const details = results.map((r) => {
-      if (r.status === "fulfilled") return r.value;
-      return { error: r.reason?.message ?? "Unknown error" };
-    });
-
-    const succeeded = results.filter(
-      (r) => r.status === "fulfilled" && !(r.value as any)?.error
-    ).length;
     const failed = dueWatches.length - succeeded;
 
     return new Response(

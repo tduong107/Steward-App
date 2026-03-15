@@ -20,57 +20,91 @@ struct ActivityScreen: View {
                 .padding(.top, 20)
                 .padding(.bottom, 24)
 
-                // Timeline
-                VStack(spacing: 0) {
-                    ForEach(Array(viewModel.activities.enumerated()), id: \.element.id) { index, activity in
-                        HStack(alignment: .top, spacing: 14) {
-                            // Icon + line
-                            VStack(spacing: 0) {
-                                activityIcon(for: activity)
-
-                                if index < viewModel.activities.count - 1 {
-                                    Rectangle()
-                                        .fill(Theme.border)
-                                        .frame(width: 1)
-                                        .frame(maxHeight: .infinity)
-                                        .padding(.top, 8)
-                                }
-                            }
-                            .frame(width: 34)
-
-                            // Content
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(activity.label)
-                                    .font(Theme.body(13, weight: .semibold))
-                                    .foregroundStyle(Theme.ink)
-
-                                Text(activity.subtitle)
-                                    .font(Theme.body(11))
-                                    .foregroundStyle(Theme.inkLight)
-
-                                Text(activity.time)
-                                    .font(Theme.body(11))
-                                    .foregroundStyle(Theme.inkLight)
-                                    .padding(.top, 2)
-                            }
-                            .padding(.top, 6)
-                            .padding(.bottom, 20)
-
-                            Spacer()
-                        }
-                    }
+                if viewModel.activities.isEmpty {
+                    emptyState
+                } else {
+                    timeline
                 }
-                .padding(.horizontal, 24)
             }
         }
         .background(Theme.bg)
     }
 
+    // MARK: - Empty State
+
+    private var emptyState: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "bolt.slash")
+                .font(.system(size: 36))
+                .foregroundStyle(Theme.inkLight)
+
+            VStack(spacing: 6) {
+                Text("No activity yet")
+                    .font(Theme.serif(17, weight: .semibold))
+                    .foregroundStyle(Theme.ink)
+
+                Text("When Steward acts on your behalf,\nyou'll see a timeline of everything here.")
+                    .font(Theme.body(13))
+                    .foregroundStyle(Theme.inkLight)
+                    .multilineTextAlignment(.center)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 40)
+    }
+
+    // MARK: - Timeline
+
+    private var timeline: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(viewModel.activities.enumerated()), id: \.element.id) { index, activity in
+                HStack(alignment: .top, spacing: 14) {
+                    // Icon + line
+                    VStack(spacing: 0) {
+                        activityIcon(for: activity)
+
+                        if index < viewModel.activities.count - 1 {
+                            Rectangle()
+                                .fill(Theme.border)
+                                .frame(width: 1)
+                                .frame(maxHeight: .infinity)
+                                .padding(.top, 8)
+                        }
+                    }
+                    .frame(width: 34)
+
+                    // Content
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(activity.label)
+                            .font(Theme.body(13, weight: .semibold))
+                            .foregroundStyle(Theme.ink)
+
+                        Text(activity.subtitle)
+                            .font(Theme.body(11))
+                            .foregroundStyle(Theme.inkLight)
+
+                        Text(activity.time)
+                            .font(Theme.body(11))
+                            .foregroundStyle(Theme.inkLight)
+                            .padding(.top, 2)
+                    }
+                    .padding(.top, 6)
+                    .padding(.bottom, 20)
+
+                    Spacer()
+                }
+            }
+        }
+        .padding(.horizontal, 24)
+    }
+
     private func activityIcon(for activity: ActivityItem) -> some View {
         let bgColor: Color = {
-            if activity.iconColor == Theme.accent { return Theme.accentLight }
-            if activity.iconColor == Theme.blue { return Theme.blueLight }
-            return Theme.bgDeep
+            switch activity.iconColorName {
+            case "accent": return Theme.accentLight
+            case "blue": return Theme.blueLight
+            default: return Theme.bgDeep
+            }
         }()
 
         return Image(systemName: activity.icon)

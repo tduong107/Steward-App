@@ -70,15 +70,16 @@ WHEN A USER PASTES A URL (not a screenshot):
 - Your [SUGGESTIONS] after a URL should look like: [SUGGESTIONS]Watch for price drop|Alert when restocked|Track any changes|Something else[/SUGGESTIONS]
 
 FREQUENCY AWARENESS:
-- The user's subscription tier may be provided in a [USER_TIER] tag in their first message (e.g. [USER_TIER]Pro[/USER_TIER])
-- Free users: only "Daily" check frequency is available — do NOT ask about frequency, it will default to Daily
-- Pro users: can use "Daily", "Every 12 hours", "Every 6 hours", "Every hour", "Every 30 min" — after confirming the watch details, ask what check frequency they'd like
-- Premium users: can also use "Every 15 min", "Every 5 min" — after confirming the watch details, ask what check frequency they'd like
+- The user's subscription tier is provided in a [USER_TIER] tag in their first message (e.g. [USER_TIER]Free[/USER_TIER] or [USER_TIER]Pro[/USER_TIER])
+- Free tier ([USER_TIER]Free[/USER_TIER]): only "Daily" is available — NEVER ask about frequency, NEVER include frequency suggestions, just omit checkFrequency entirely and the app will default to Daily
+- Pro tier: can use "Daily", "Every 12 hours", "Every 6 hours", "Every hour" — after confirming the watch details, ask what check frequency they'd like
+- Premium tier: can also use "Every 30 min", "Every 15 min", "Every 5 min" — after confirming the watch details, ask what check frequency they'd like
+- IMPORTANT: Only ask about or suggest check frequency if the user is on Pro or Premium tier. Free users should never see frequency options.
 - When asking about frequency, offer options as [SUGGESTIONS] based on their tier
-- For Pro: [SUGGESTIONS]Every hour|Every 30 min|Every 6 hours|Daily[/SUGGESTIONS]
-- For Premium: [SUGGESTIONS]Every 5 min|Every 15 min|Every hour|Daily[/SUGGESTIONS]
+- For Pro: [SUGGESTIONS]Every hour|Every 6 hours|Every 12 hours|Daily[/SUGGESTIONS]
+- For Premium: [SUGGESTIONS]Every 5 min|Every 15 min|Every 30 min|Every hour[/SUGGESTIONS]
 - Include the chosen frequency as "checkFrequency" in the [CREATE_WATCH] JSON
-- If the user doesn't specify or you don't know their tier, omit checkFrequency and the app will use their default
+- If the user doesn't specify or you don't know their tier, assume Free — omit checkFrequency and do NOT ask about frequency
 
 CONVERSATION FLOW:
 1. User describes what they want (or pastes a URL, or sends a screenshot)
@@ -139,6 +140,21 @@ Match actionLabel to the action type:
 - form: "Open form when available"
 - notify: "Notify when changed"
 
+FIXING A BROKEN WATCH:
+When the user's message starts with [FIX_WATCH], they are asking you to fix a broken watch. Follow these steps:
+1. The message contains the watch name, original URL, error details, and existing settings
+2. CRITICAL — Check [URL_CONTEXT] FIRST:
+   - If [URL_CONTEXT] shows the URL resolved successfully (has a page title and "resolves to:" a new URL), USE THAT RESOLVED URL directly
+   - Include [UPDATE_WATCH] with the resolved URL — do NOT search by product name when the URL works
+   - Example: if URL_CONTEXT says "URL: https://short.link → resolves to: https://store.com/product | Page title: Cool Product", use "https://store.com/product"
+3. Only if there is NO [URL_CONTEXT] or the message says the URL could not be resolved, search for the product by name using [PRODUCT_LINKS]
+4. When you find a working URL, present it naturally in your message and include:
+   [UPDATE_WATCH]{"name":"exact watch name","url":"https://working-url.com/product"}[/UPDATE_WATCH]
+5. The app will ask the user to confirm before applying — just present the URL you found
+6. Do NOT ask what to watch for — keep the existing condition and action type
+7. Do NOT use [CREATE_WATCH] — use [UPDATE_WATCH] to fix the existing watch
+8. Always include [SUGGESTIONS] with options like: [SUGGESTIONS]Check another watch|That's all for now[/SUGGESTIONS]
+
 ENDING A CONVERSATION:
 When the user says something like "that's all", "I'm done", "thanks", "no more", "nothing else", or selects a suggestion like "That's all for now":
 - Give a brief friendly closing message (e.g., "You're all set! I'll keep watching for you 👋")
@@ -154,7 +170,8 @@ RULES:
 - Pick an appropriate emoji for the watch
 - If a URL doesn't start with http, add https:// to it
 - ALWAYS include either [SUGGESTIONS] or [PROPOSE_WATCH] at the end of every response (never both), unless you're ending the conversation with [DISMISS]
-- When you include [PRODUCT_LINKS], also include [SUGGESTIONS] after it (product links + suggestions is OK)`;
+- When you include [PRODUCT_LINKS], also include [SUGGESTIONS] after it (product links + suggestions is OK)
+- NEVER output XML tags like <function_calls>, <invoke>, <parameter>, or any XML/HTML-like markup. Only use the square bracket markers described above (like [CREATE_WATCH], [SUGGESTIONS], etc.). Your response should be plain text with bracket markers only.`;
 
 // Simple in-memory rate limiter: max 20 requests per minute per IP
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
@@ -218,6 +235,32 @@ serve(async (req) => {
       );
     }
 
+    // --- Security: Sanitize messages ---
+    // 1. Limit conversation length to prevent cost abuse
+    const MAX_MESSAGES = 30;
+    const sanitizedMessages = messages.slice(-MAX_MESSAGES);
+
+    // 2. Validate message roles (only "user" and "assistant" allowed)
+    for (const msg of sanitizedMessages) {
+      if (msg.role !== "user" && msg.role !== "assistant") {
+        return new Response(
+          JSON.stringify({ error: "Invalid message role" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    // 3. Strip bracket markers from user messages to prevent spoofing
+    // (e.g., user injecting [USER_TIER]Premium[/USER_TIER] or fake [CREATE_WATCH])
+    const BRACKET_MARKERS = /\[(USER_TIER|CREATE_WATCH|UPDATE_WATCH|FIX_WATCH|PROPOSE_WATCH|DISMISS|URL_CONTEXT|PRODUCT_LINKS|FETCH_PRICE)\]/gi;
+    for (const msg of sanitizedMessages) {
+      if (msg.role === "user" && typeof msg.content === "string") {
+        // Strip closing tags too
+        msg.content = msg.content.replace(BRACKET_MARKERS, "");
+        msg.content = msg.content.replace(/\[\/(USER_TIER|CREATE_WATCH|UPDATE_WATCH|FIX_WATCH|PROPOSE_WATCH|DISMISS|URL_CONTEXT|PRODUCT_LINKS|FETCH_PRICE)\]/gi, "");
+      }
+    }
+
     if (!ANTHROPIC_API_KEY) {
       return new Response(
         JSON.stringify({ error: "ANTHROPIC_API_KEY not configured" }),
@@ -253,7 +296,7 @@ serve(async (req) => {
                 cache_control: { type: "ephemeral" },
               },
             ],
-            messages,
+            messages: sanitizedMessages,
           }),
         }
       );
@@ -286,6 +329,10 @@ serve(async (req) => {
 
     const data = await anthropicResponse.json();
     let text = data.content?.[0]?.text ?? "";
+
+    // Post-process: strip AI model artifacts (function_calls, invoke, etc.)
+    text = text.replace(new RegExp("<\\/?(?:antml:)?(?:function_calls|invoke|parameter)[^>]*>", "g"), "");
+    text = text.replace(/\n{3,}/g, "\n\n"); // clean up excess newlines from stripped tags
 
     // Post-process: replace [PRODUCT_LINKS] search queries with real shopping results
     if (text.includes("[PRODUCT_LINKS]")) {
@@ -353,25 +400,62 @@ async function enrichProductLinks(responseText: string): Promise<string> {
   }
 
   let links: string[];
+  const encoded = encodeURIComponent(query);
 
   if (SERPER_API_KEY) {
-    // Use Serper.dev Shopping API for real product results
+    // Use Serper.dev Search API for direct product page links
     try {
-      const res = await fetch("https://google.serper.dev/shopping", {
+      const res = await fetch("https://google.serper.dev/search", {
         method: "POST",
         headers: {
           "X-API-KEY": SERPER_API_KEY,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ q: query, num: 5 }),
+        body: JSON.stringify({ q: query, num: 8 }),
       });
 
       if (res.ok) {
         const searchData = await res.json();
-        const results = (searchData.shopping || []).slice(0, 4);
+        const organic = searchData.organic || [];
+        const shopping = searchData.shopping || [];
 
-        if (results.length > 0) {
-          links = results.map((r: any) =>
+        // Filter organic results: skip non-shopping sites
+        const skipDomains = [
+          "google.com", "youtube.com", "wikipedia.org", "reddit.com",
+          "quora.com", "pinterest.com", "twitter.com", "facebook.com",
+          "tiktok.com", "instagram.com",
+        ];
+        const productResults = organic.filter((r: any) => {
+          const url = (r.link || "").toLowerCase();
+          return !skipDomains.some((d) => url.includes(d));
+        }).slice(0, 4);
+
+        if (productResults.length > 0) {
+          links = productResults.map((r: any) => {
+            // Try to match with a shopping result for image/price
+            let host = "";
+            try { host = new URL(r.link).hostname.replace("www.", "").toLowerCase(); } catch { /* skip */ }
+            const shopMatch = shopping.find((s: any) => {
+              const src = (s.source || "").toLowerCase().replace(/\.com$/i, "");
+              return host.includes(src) || src.includes(host.replace(/\.com$|\.org$|\.net$/i, ""));
+            });
+
+            // Pretty-print the source from hostname
+            const sourceName = host
+              .replace(/\.com$|\.org$|\.net$|\.co\.\w+$/i, "")
+              .split(".").pop() || "Store";
+
+            return JSON.stringify({
+              title: (r.title || "Product").substring(0, 60),
+              url: r.link,
+              source: sourceName.charAt(0).toUpperCase() + sourceName.slice(1),
+              price: shopMatch?.price || null,
+              imageURL: shopMatch?.imageUrl || null,
+            });
+          });
+        } else if (shopping.length > 0) {
+          // Fallback to shopping results if no good organic results
+          links = shopping.slice(0, 4).map((r: any) =>
             JSON.stringify({
               title: (r.title || "Product").substring(0, 60),
               url: r.link,
@@ -397,6 +481,17 @@ async function enrichProductLinks(responseText: string): Promise<string> {
     // No Serper key — fall back to search-engine URLs
     links = generateFallbackLinks(query);
   }
+
+  // Add "See all AI recommended options" link to Google Shopping
+  links.push(
+    JSON.stringify({
+      title: "See all AI recommended options",
+      url: `https://www.google.com/search?tbm=shop&q=${encoded}`,
+      source: "Google Shopping",
+      price: null,
+      imageURL: null,
+    })
+  );
 
   const replacement = `[PRODUCT_LINKS]\n${links.join("\n")}\n[/PRODUCT_LINKS]`;
   return responseText.replace(
@@ -445,6 +540,34 @@ async function enrichPriceCheck(responseText: string): Promise<string> {
   let url = match[1].trim();
   if (!url.match(/^https?:\/\//i)) {
     url = `https://${url}`;
+  }
+
+  // SSRF protection: block private/internal URLs
+  try {
+    const parsed = new URL(url);
+    const hostname = parsed.hostname.toLowerCase();
+    if (
+      hostname === "localhost" ||
+      hostname.startsWith("127.") ||
+      hostname.startsWith("10.") ||
+      hostname.startsWith("192.168.") ||
+      hostname.startsWith("172.") ||
+      hostname === "0.0.0.0" ||
+      hostname.endsWith(".local") ||
+      hostname.startsWith("169.254.") ||
+      hostname.includes("metadata.google") ||
+      hostname.includes("169.254.169.254")
+    ) {
+      return responseText.replace(
+        /\[FETCH_PRICE\][\s\S]*?\[\/FETCH_PRICE\]/,
+        "*(Cannot fetch prices from internal addresses)*"
+      );
+    }
+  } catch {
+    return responseText.replace(
+      /\[FETCH_PRICE\][\s\S]*?\[\/FETCH_PRICE\]/,
+      "*(Invalid URL)*"
+    );
   }
 
   try {

@@ -1,6 +1,16 @@
 import SwiftUI
 
 struct SettingsScreen: View {
+    @AppStorage("isDarkMode") private var isDarkMode = false
+    @AppStorage("hasSeenOnboardingB") private var hasSeenOnboardingB = true
+    @Environment(AuthManager.self) private var authManager
+    @Environment(NotificationManager.self) private var notificationManager
+    @Environment(SubscriptionManager.self) private var subscriptionManager
+
+    private var currentTier: SubscriptionTier {
+        subscriptionManager.currentTier
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
@@ -18,62 +28,285 @@ struct SettingsScreen: View {
                 .padding(.top, 20)
                 .padding(.bottom, 24)
 
-                // Sections
-                ForEach(sections, id: \.title) { section in
-                    settingsSection(section)
+                // Appearance
+                sectionHeader("Appearance")
+                settingsCard {
+                    toggleRow(icon: "moon.fill", label: "Dark mode", isOn: $isDarkMode)
                 }
+
+                // Notifications
+                sectionHeader("Notifications")
+                settingsCard {
+                    notificationToggle
+                }
+
+                // Account
+                sectionHeader("Account")
+                settingsCard {
+                    accountRow
+                    Divider().foregroundStyle(Theme.border).padding(.leading, 52)
+                    planRow
+                    Divider().foregroundStyle(Theme.border).padding(.leading, 52)
+                    restorePurchasesRow
+                    Divider().foregroundStyle(Theme.border).padding(.leading, 52)
+                    replayTourRow
+                    Divider().foregroundStyle(Theme.border).padding(.leading, 52)
+                    privacyPolicyRow
+                    Divider().foregroundStyle(Theme.border).padding(.leading, 52)
+                    termsOfServiceRow
+                }
+
+                // Sign Out
+                signOutButton
             }
         }
         .background(Theme.bg)
     }
 
-    // MARK: - Section View
+    // MARK: - Notification Toggle (real permission request)
 
-    private func settingsSection(_ section: SettingsSection) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(section.title.uppercased())
-                .font(Theme.body(11, weight: .bold))
-                .foregroundStyle(Theme.inkLight)
-                .tracking(0.8)
-                .padding(.horizontal, 24)
+    private var notificationToggle: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "bell")
+                .font(.system(size: 16))
+                .foregroundStyle(Theme.ink)
+                .frame(width: 24)
 
-            VStack(spacing: 0) {
-                ForEach(Array(section.items.enumerated()), id: \.element.label) { index, item in
-                    Button(action: {}) {
-                        HStack(spacing: 12) {
-                            Image(systemName: item.icon)
-                                .font(.system(size: 16))
-                                .foregroundStyle(Theme.ink)
-                                .frame(width: 24)
+            Text("Push notifications")
+                .font(Theme.body(13))
+                .foregroundStyle(Theme.ink)
 
-                            Text(item.label)
-                                .font(Theme.body(13))
-                                .foregroundStyle(Theme.ink)
+            Spacer()
 
-                            Spacer()
-
-                            if !item.value.isEmpty {
-                                Text(item.value)
-                                    .font(Theme.body(12, weight: item.highlight ? .semibold : .regular))
-                                    .foregroundStyle(item.highlight ? Theme.accent : Theme.inkLight)
-                            }
-
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundStyle(Theme.borderMid)
+            Toggle("", isOn: Binding(
+                get: { notificationManager.isPermissionGranted },
+                set: { newValue in
+                    if newValue {
+                        Task {
+                            await notificationManager.requestPermission()
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 14)
-                    }
-                    .buttonStyle(.plain)
-
-                    if index < section.items.count - 1 {
-                        Divider()
-                            .foregroundStyle(Theme.border)
-                            .padding(.leading, 52)
+                    } else {
+                        // Can't programmatically disable — guide user to Settings
+                        openAppSettings()
                     }
                 }
+            ))
+            .labelsHidden()
+            .tint(Theme.accent)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+    }
+
+    private func openAppSettings() {
+        if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
+            UIApplication.shared.open(settingsURL)
+        }
+    }
+
+    // MARK: - Plan Row
+
+    private var planRow: some View {
+        Button {
+            subscriptionManager.presentPaywall()
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "sparkle")
+                    .font(.system(size: 16))
+                    .foregroundStyle(Theme.ink)
+                    .frame(width: 24)
+
+                Text("Plan")
+                    .font(Theme.body(13))
+                    .foregroundStyle(Theme.ink)
+
+                Spacer()
+
+                Text("Steward \(currentTier.displayName) · \(currentTier.price)")
+                    .font(Theme.body(12, weight: .semibold))
+                    .foregroundStyle(Theme.accent)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Theme.borderMid)
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Restore Purchases Row
+
+    private var restorePurchasesRow: some View {
+        Button {
+            Task {
+                await subscriptionManager.restorePurchases()
+            }
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 16))
+                    .foregroundStyle(Theme.ink)
+                    .frame(width: 24)
+
+                Text("Restore purchases")
+                    .font(Theme.body(13))
+                    .foregroundStyle(Theme.ink)
+
+                Spacer()
+
+                if subscriptionManager.isPurchasing {
+                    ProgressView()
+                        .controlSize(.small)
+                } else {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Theme.borderMid)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+        }
+        .buttonStyle(.plain)
+        .disabled(subscriptionManager.isPurchasing)
+    }
+
+    // MARK: - Replay Tour Row
+
+    private var replayTourRow: some View {
+        Button {
+            hasSeenOnboardingB = false
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "arrow.counterclockwise.circle")
+                    .font(.system(size: 16))
+                    .foregroundStyle(Theme.ink)
+                    .frame(width: 24)
+
+                Text("Replay welcome tour")
+                    .font(Theme.body(13))
+                    .foregroundStyle(Theme.ink)
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Theme.borderMid)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Privacy Policy Row
+
+    private var privacyPolicyRow: some View {
+        Link(destination: URL(string: "https://steward.app/privacy")!) {
+            HStack(spacing: 12) {
+                Image(systemName: "lock")
+                    .font(.system(size: 16))
+                    .foregroundStyle(Theme.ink)
+                    .frame(width: 24)
+
+                Text("Privacy Policy")
+                    .font(Theme.body(13))
+                    .foregroundStyle(Theme.ink)
+
+                Spacer()
+
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Theme.borderMid)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+        }
+    }
+
+    // MARK: - Terms of Service Row
+
+    private var termsOfServiceRow: some View {
+        Link(destination: URL(string: "https://steward.app/terms")!) {
+            HStack(spacing: 12) {
+                Image(systemName: "doc.text")
+                    .font(.system(size: 16))
+                    .foregroundStyle(Theme.ink)
+                    .frame(width: 24)
+
+                Text("Terms of Service")
+                    .font(Theme.body(13))
+                    .foregroundStyle(Theme.ink)
+
+                Spacer()
+
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Theme.borderMid)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+        }
+    }
+
+    // MARK: - Account Row
+
+    private var accountRow: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "person.crop.circle.fill")
+                .font(.system(size: 16))
+                .foregroundStyle(Theme.accent)
+                .frame(width: 24)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(authManager.displayName ?? "Steward User")
+                    .font(Theme.body(13, weight: .medium))
+                    .foregroundStyle(Theme.ink)
+
+                if let phone = authManager.phoneNumber, !phone.isEmpty {
+                    Text(phone)
+                        .font(Theme.body(11))
+                        .foregroundStyle(Theme.inkLight)
+                } else {
+                    Text("Apple ID account")
+                        .font(Theme.body(11))
+                        .foregroundStyle(Theme.inkLight)
+                }
+            }
+
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Theme.borderMid)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+    }
+
+    // MARK: - Sign Out Button
+
+    private var signOutButton: some View {
+        Button {
+            Task {
+                await authManager.signOut()
+            }
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "rectangle.portrait.and.arrow.right")
+                    .font(.system(size: 16))
+                    .foregroundStyle(Theme.red)
+                    .frame(width: 24)
+
+                Text("Sign Out")
+                    .font(Theme.body(13, weight: .medium))
+                    .foregroundStyle(Theme.red)
+
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
             .background(Theme.bgCard)
             .clipShape(RoundedRectangle(cornerRadius: 16))
             .overlay(
@@ -81,44 +314,86 @@ struct SettingsScreen: View {
                     .stroke(Theme.border, lineWidth: 1)
             )
             .shadow(color: .black.opacity(0.04), radius: 8, y: 4)
-            .padding(.horizontal, 24)
         }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 24)
+        .padding(.bottom, 40)
+    }
+
+    // MARK: - Components
+
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title.uppercased())
+            .font(Theme.body(11, weight: .bold))
+            .foregroundStyle(Theme.inkLight)
+            .tracking(0.8)
+            .padding(.horizontal, 24)
+            .padding(.bottom, 8)
+    }
+
+    private func settingsCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        VStack(spacing: 0) {
+            content()
+        }
+        .background(Theme.bgCard)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Theme.border, lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.04), radius: 8, y: 4)
+        .padding(.horizontal, 24)
         .padding(.bottom, 22)
     }
 
-    // MARK: - Data
+    private func toggleRow(icon: String, label: String, isOn: Binding<Bool>) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 16))
+                .foregroundStyle(Theme.ink)
+                .frame(width: 24)
 
-    private var sections: [SettingsSection] {
-        [
-            SettingsSection(title: "AI Behaviour", items: [
-                SettingsItem(icon: "sparkle", label: "Always confirm before acting", value: "On", highlight: true),
-                SettingsItem(icon: "bolt", label: "AI confidence threshold", value: "High"),
-                SettingsItem(icon: "brain", label: "Learning from my preferences", value: "On", highlight: true),
-            ]),
-            SettingsSection(title: "Notifications", items: [
-                SettingsItem(icon: "bell", label: "Push notifications", value: "On"),
-                SettingsItem(icon: "envelope", label: "Email digests", value: "Daily"),
-                SettingsItem(icon: "moon", label: "Quiet hours", value: "11 pm – 7 am"),
-            ]),
-            SettingsSection(title: "Account", items: [
-                SettingsItem(icon: "person", label: "Profile", value: "Alex Johnson"),
-                SettingsItem(icon: "sparkle", label: "Plan", value: "Steward Pro", highlight: true),
-                SettingsItem(icon: "lock", label: "Privacy & data", value: ""),
-            ]),
-        ]
+            Text(label)
+                .font(Theme.body(13))
+                .foregroundStyle(Theme.ink)
+
+            Spacer()
+
+            Toggle("", isOn: isOn)
+                .labelsHidden()
+                .tint(Theme.accent)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
     }
-}
 
-// MARK: - Supporting Types
+    private func valueRow(icon: String, label: String, value: String, highlight: Bool = false) -> some View {
+        Button(action: {}) {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.system(size: 16))
+                    .foregroundStyle(Theme.ink)
+                    .frame(width: 24)
 
-private struct SettingsSection {
-    let title: String
-    let items: [SettingsItem]
-}
+                Text(label)
+                    .font(Theme.body(13))
+                    .foregroundStyle(Theme.ink)
 
-private struct SettingsItem {
-    let icon: String
-    let label: String
-    let value: String
-    var highlight: Bool = false
+                Spacer()
+
+                if !value.isEmpty {
+                    Text(value)
+                        .font(Theme.body(12, weight: highlight ? .semibold : .regular))
+                        .foregroundStyle(highlight ? Theme.accent : Theme.inkLight)
+                }
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Theme.borderMid)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+        }
+        .buttonStyle(.plain)
+    }
 }
