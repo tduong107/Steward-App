@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X, SendHorizontal, RotateCcw } from 'lucide-react'
@@ -17,10 +18,20 @@ interface ChatDrawerProps {
 function TypingIndicator() {
   return (
     <div className="flex justify-start">
-      <div className="flex items-center gap-1 rounded-2xl rounded-bl-md bg-[var(--color-bg-deep)] px-4 py-3">
-        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--color-ink-light)] [animation-delay:0ms]" />
-        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--color-ink-light)] [animation-delay:150ms]" />
-        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--color-ink-light)] [animation-delay:300ms]" />
+      <div className="flex items-start gap-2">
+        {/* Avatar */}
+        <Image
+          src="/steward-logo.png"
+          alt=""
+          width={22}
+          height={22}
+          className="mt-2.5 rounded-[5px] shrink-0"
+        />
+        <div className="flex items-center gap-1 rounded-2xl rounded-bl-md bg-[var(--color-bg-deep)] px-4 py-3">
+          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--color-ink-light)] [animation-delay:0ms]" />
+          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--color-ink-light)] [animation-delay:150ms]" />
+          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--color-ink-light)] [animation-delay:300ms]" />
+        </div>
       </div>
     </div>
   )
@@ -150,11 +161,26 @@ export function ChatDrawer({ open, onClose }: ChatDrawerProps) {
           visible ? 'max-md:translate-y-0' : 'max-md:translate-y-full',
         )}
       >
-        {/* Header */}
+        {/* Header — matches iOS: StewardLogo + "Steward AI" + Online dot */}
         <div className="flex shrink-0 items-center justify-between border-b border-[var(--color-border)] px-5 py-4">
-          <h2 className="text-lg font-semibold font-[var(--font-serif)] text-[var(--color-ink)]">
-            Ask Steward
-          </h2>
+          <div className="flex items-center gap-2.5">
+            <Image
+              src="/steward-logo.png"
+              alt="Steward"
+              width={34}
+              height={34}
+              className="rounded-lg"
+            />
+            <div>
+              <h2 className="text-[15px] font-semibold font-[var(--font-serif)] text-[var(--color-ink)]">
+                Steward AI
+              </h2>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                <span className="text-[11px] text-[var(--color-ink-light)]">Online</span>
+              </div>
+            </div>
+          </div>
           <div className="flex items-center gap-1">
             {messages.length > 0 && (
               <button
@@ -182,14 +208,20 @@ export function ChatDrawer({ open, onClose }: ChatDrawerProps) {
           {messages.length === 0 && (
             <div className="flex h-full items-center justify-center">
               <div className="text-center max-w-xs">
-                <p className="text-3xl">🏠</p>
-                <p className="mt-3 text-base font-semibold text-[var(--color-ink)]">
+                <Image
+                  src="/steward-logo.png"
+                  alt="Steward"
+                  width={56}
+                  height={56}
+                  className="mx-auto rounded-2xl"
+                />
+                <p className="mt-4 text-base font-semibold text-[var(--color-ink)]">
                   Hi, I&apos;m Steward
                 </p>
                 <p className="mt-1 text-sm text-[var(--color-ink-mid)]">
                   Tell me what you want to watch and I&apos;ll set it up for you.
                 </p>
-                <div className="mt-5 flex flex-col gap-2">
+                <div className="mt-5 flex flex-wrap justify-center gap-2">
                   {[
                     'Watch a product price for me',
                     'Alert me when tickets go on sale',
@@ -200,7 +232,7 @@ export function ChatDrawer({ open, onClose }: ChatDrawerProps) {
                       key={suggestion}
                       type="button"
                       onClick={() => handleSuggestionClick(suggestion)}
-                      className="rounded-full border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-2 text-sm text-[var(--color-ink-mid)] transition-colors hover:bg-[var(--color-accent-light)] hover:text-[var(--color-accent)] hover:border-[var(--color-accent)]"
+                      className="rounded-full border border-[var(--color-accent-mid)] bg-[var(--color-bg-card)] px-3.5 py-1.5 text-xs font-medium text-[var(--color-accent)] transition-colors hover:bg-[var(--color-accent-light)]"
                     >
                       {suggestion}
                     </button>

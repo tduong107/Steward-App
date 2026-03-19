@@ -1,5 +1,6 @@
 export const dynamic = 'force-dynamic'
 
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import type { SharedWatch, ActionType } from '@/lib/types'
@@ -72,7 +73,7 @@ export default async function SharedWatchPage({
     <div className="min-h-dvh flex flex-col items-center bg-[var(--color-bg)] px-6 py-12">
       {/* Branding */}
       <div className="text-center mb-10">
-        <span className="text-4xl mb-2 block">🏠</span>
+        <Image src="/steward-logo.png" alt="Steward" width={56} height={56} className="mx-auto mb-2 rounded-2xl" />
         <h1 className="text-2xl font-bold font-[var(--font-serif)] text-[var(--color-ink)]">
           Steward
         </h1>

@@ -1,5 +1,6 @@
 export const dynamic = 'force-dynamic'
 
+import Image from 'next/image'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
@@ -18,7 +19,7 @@ export default async function LandingPage() {
       <nav className="sticky top-0 z-50 border-b border-[var(--color-border)] bg-[var(--color-bg)]/80 backdrop-blur-lg">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-2">
-            <span className="text-2xl">🏠</span>
+            <Image src="/steward-logo.png" alt="Steward" width={32} height={32} className="rounded-lg" />
             <span className="text-xl font-semibold font-[var(--font-serif)] text-[var(--color-accent)]">
               Steward
             </span>
@@ -344,7 +345,7 @@ export default async function LandingPage() {
       <footer className="border-t border-[var(--color-border)] bg-[var(--color-bg-card)]">
         <div className="mx-auto max-w-5xl px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <span className="text-lg">🏠</span>
+            <Image src="/steward-logo.png" alt="Steward" width={24} height={24} className="rounded-md" />
             <span className="text-sm font-semibold font-[var(--font-serif)] text-[var(--color-accent)]">
               Steward
             </span>

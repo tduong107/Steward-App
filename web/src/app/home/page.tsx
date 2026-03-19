@@ -7,7 +7,7 @@ import { useWatches } from '@/hooks/use-watches'
 import { useSub } from '@/hooks/use-subscription'
 import { useChatDrawer } from '@/providers/chat-provider'
 import { WatchCard } from '@/components/watch-card'
-import { CategoryFilter } from '@/components/category-filter'
+import { CategoryFilter, watchCategory } from '@/components/category-filter'
 import { Skeleton } from '@/components/ui/skeleton'
 import { watchLimit } from '@/lib/utils'
 
@@ -22,7 +22,7 @@ export default function DashboardPage() {
   const activeWatches = watches.filter((w) => w.status !== 'deleted')
   const triggeredWatches = activeWatches.filter((w) => w.triggered)
   const filteredWatches = category
-    ? activeWatches.filter((w) => w.action_type === category)
+    ? activeWatches.filter((w) => watchCategory(w) === category)
     : activeWatches
 
   return (
@@ -33,7 +33,7 @@ export default function DashboardPage() {
       </h2>
 
       {/* Category filter */}
-      <CategoryFilter selected={category} onChange={setCategory} />
+      <CategoryFilter selected={category} onChange={setCategory} watches={activeWatches} />
 
       {/* Loading state */}
       {loading && (
