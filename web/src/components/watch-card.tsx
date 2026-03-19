@@ -19,7 +19,7 @@ export function WatchCard({ watch, onClick }: WatchCardProps) {
       type="button"
       onClick={onClick}
       className={cn(
-        'flex w-full items-center gap-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-bg-card)] p-3 text-left transition-all duration-150 hover:shadow-sm hover:bg-[var(--color-bg-deep)] cursor-pointer',
+        'group flex w-full items-center gap-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-bg-card)] p-3 text-left transition-all duration-200 hover:shadow-md hover:bg-[var(--color-bg-deep)] hover:-translate-y-[1px] active:translate-y-0 active:shadow-sm cursor-pointer',
         isTriggered && 'border-l-[3px] border-l-[var(--color-accent)]',
         needsAttention && !isTriggered && 'border-l-[3px] border-l-[var(--color-gold)]',
       )}
@@ -71,7 +71,7 @@ export function WatchCard({ watch, onClick }: WatchCardProps) {
       </div>
 
       {/* Right: Chevron */}
-      <ChevronRight className="h-4 w-4 shrink-0 text-[var(--color-ink-light)]" />
+      <ChevronRight className="h-4 w-4 shrink-0 text-[var(--color-ink-light)] transition-transform duration-200 group-hover:translate-x-0.5" />
     </button>
   )
 }

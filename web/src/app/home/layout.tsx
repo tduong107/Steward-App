@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useEffect, useState, type ReactNode } from 'react'
+import { Suspense, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Sidebar } from '@/components/sidebar'
 import { Header } from '@/components/header'
@@ -13,8 +13,13 @@ function DashboardLayoutInner({ children }: { children: ReactNode }) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const [showAnimation, setShowAnimation] = useState(false)
+  const checkedRef = useRef(false)
 
   useEffect(() => {
+    // Only check once on initial mount — not on every navigation
+    if (checkedRef.current) return
+    checkedRef.current = true
+
     // Check sessionStorage flag (email/password login & signup)
     const fromLogin = sessionStorage.getItem('steward_just_signed_in')
     // Check URL param (OAuth callback)
