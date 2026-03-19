@@ -40,7 +40,7 @@ export function Sidebar({ onChatOpen }: SidebarProps) {
       {/* ── Desktop sidebar ── */}
       <aside className="hidden md:flex w-60 shrink-0 flex-col bg-[var(--color-bg-card)] border-r border-[var(--color-border)]">
         {/* Logo */}
-        <div className="flex items-center gap-2.5 px-5 pt-6 pb-4">
+        <Link href="/" className="flex items-center gap-2.5 px-5 pt-6 pb-4 transition-opacity hover:opacity-80">
           <Image
             src="/steward-logo.png"
             alt="Steward"
@@ -51,7 +51,7 @@ export function Sidebar({ onChatOpen }: SidebarProps) {
           <span className="text-xl font-semibold font-[var(--font-serif)] text-[var(--color-accent)]">
             Steward
           </span>
-        </div>
+        </Link>
 
         {/* Ask Steward button — matches iOS chat prompt bar */}
         <div className="px-3 mt-1">
