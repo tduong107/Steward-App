@@ -8,10 +8,12 @@ export default async function HomePage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
+  // Authenticated users go to /home (dashboard)
   if (user) {
-    redirect('/dashboard')
+    redirect('/home')
   }
 
+  // Landing page for unauthenticated users
   return (
     <div className="min-h-dvh flex flex-col items-center justify-center bg-[var(--color-bg)] px-6">
       <div className="text-center max-w-md">

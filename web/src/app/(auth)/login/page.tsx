@@ -30,7 +30,7 @@ export default function LoginPage() {
       }
 
       router.refresh()
-      router.push('/dashboard')
+      router.push('/home')
     } catch {
       setError('An unexpected error occurred. Please try again.')
     } finally {

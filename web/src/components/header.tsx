@@ -8,10 +8,10 @@ interface HeaderProps {
 }
 
 const titleMap: Record<string, string> = {
-  '/dashboard': 'Home',
-  '/dashboard/activity': 'Activity',
-  '/dashboard/savings': 'Savings',
-  '/dashboard/settings': 'Settings',
+  '/home': 'Home',
+  '/home/activity': 'Activity',
+  '/home/savings': 'Savings',
+  '/home/settings': 'Settings',
 }
 
 function getPageTitle(pathname: string): string {
@@ -20,7 +20,7 @@ function getPageTitle(pathname: string): string {
 
   // Prefix match for nested routes
   const match = Object.entries(titleMap).find(
-    ([path]) => path !== '/dashboard' && pathname.startsWith(path)
+    ([path]) => path !== '/home' && pathname.startsWith(path)
   )
   return match ? match[1] : 'Steward'
 }

@@ -38,8 +38,8 @@ export async function POST(request: NextRequest) {
       mode: 'subscription',
       customer_email: user.email,
       line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${origin}/dashboard/settings?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/dashboard/settings`,
+      success_url: `${origin}/home/settings?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/home/settings`,
       metadata: {
         user_id: user.id,
         tier,

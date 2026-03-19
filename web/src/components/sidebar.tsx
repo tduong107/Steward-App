@@ -17,10 +17,10 @@ interface SidebarProps {
 }
 
 const navItems = [
-  { label: 'Home', icon: Home, href: '/dashboard' },
-  { label: 'Activity', icon: Activity, href: '/dashboard/activity' },
-  { label: 'Savings', icon: PiggyBank, href: '/dashboard/savings' },
-  { label: 'Settings', icon: Settings, href: '/dashboard/settings' },
+  { label: 'Home', icon: Home, href: '/home' },
+  { label: 'Activity', icon: Activity, href: '/home/activity' },
+  { label: 'Savings', icon: PiggyBank, href: '/home/savings' },
+  { label: 'Settings', icon: Settings, href: '/home/settings' },
 ] as const
 
 export function Sidebar({ onChatOpen }: SidebarProps) {
@@ -28,8 +28,8 @@ export function Sidebar({ onChatOpen }: SidebarProps) {
   const { profile, signOut } = useAuth()
 
   const isActive = (href: string) =>
-    href === '/dashboard'
-      ? pathname === '/dashboard'
+    href === '/home'
+      ? pathname === '/home'
       : pathname.startsWith(href)
 
   return (

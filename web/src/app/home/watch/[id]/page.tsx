@@ -153,7 +153,7 @@ export default function WatchDetailPage() {
         .from('watches')
         .update({ status: 'deleted' as const })
         .eq('id', watch.id)
-      router.push('/dashboard')
+      router.push('/home')
     } catch (err) {
       console.error('Delete failed:', err)
     } finally {
@@ -242,7 +242,7 @@ export default function WatchDetailPage() {
           variant="secondary"
           size="sm"
           className="mt-4"
-          onClick={() => router.push('/dashboard')}
+          onClick={() => router.push('/home')}
         >
           Go back
         </Button>
@@ -261,7 +261,7 @@ export default function WatchDetailPage() {
       {/* Back button */}
       <button
         type="button"
-        onClick={() => router.push('/dashboard')}
+        onClick={() => router.push('/home')}
         className="inline-flex items-center gap-1.5 text-sm text-[var(--color-ink-mid)] hover:text-[var(--color-ink)] transition-colors"
       >
         <ArrowLeft className="h-4 w-4" />

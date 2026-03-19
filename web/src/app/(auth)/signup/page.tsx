@@ -12,6 +12,7 @@ export default function SignupPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [success, setSuccess] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -29,6 +30,9 @@ export default function SignupPage() {
       const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: { display_name: displayName },
+        },
       })
 
       if (signUpError) {
@@ -36,23 +40,54 @@ export default function SignupPage() {
         return
       }
 
+      // If email confirmation is required, user.identities will be empty
+      // or the session will be null
+      if (data.user && !data.session) {
+        // Email confirmation is enabled — show success message
+        setSuccess(true)
+        return
+      }
+
       if (data.user) {
+        // Create profile (auto-confirmed, session exists)
         const { error: profileError } = await supabase
           .from('profiles')
-          .insert({ id: data.user.id, display_name: displayName })
+          .upsert({ id: data.user.id, display_name: displayName })
 
         if (profileError) {
           console.error('Failed to create profile:', profileError.message)
         }
-      }
 
-      router.refresh()
-      router.push('/dashboard')
+        router.refresh()
+        router.push('/home')
+      }
     } catch {
       setError('An unexpected error occurred. Please try again.')
     } finally {
       setLoading(false)
     }
+  }
+
+  if (success) {
+    return (
+      <div className="w-full max-w-sm">
+        <div className="bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-[var(--radius-lg)] p-8 text-center">
+          <div className="text-4xl mb-4">📬</div>
+          <h1 className="text-2xl font-bold font-[var(--font-serif)] text-[var(--color-ink)] mb-3">
+            Check your email
+          </h1>
+          <p className="text-sm text-[var(--color-ink-mid)] mb-6">
+            We sent a confirmation link to <strong className="text-[var(--color-ink)]">{email}</strong>. Click the link to activate your account, then come back and sign in.
+          </p>
+          <Link
+            href="/login"
+            className="inline-block w-full rounded-[var(--radius-sm)] bg-[var(--color-accent)] text-white font-medium px-4 py-2.5 text-sm transition-opacity hover:opacity-90 text-center"
+          >
+            Go to Sign In
+          </Link>
+        </div>
+      </div>
+    )
   }
 
   return (
