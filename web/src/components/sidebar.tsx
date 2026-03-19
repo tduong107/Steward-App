@@ -46,8 +46,19 @@ export function Sidebar({ onChatOpen }: SidebarProps) {
           </span>
         </div>
 
+        {/* Ask Steward button */}
+        <div className="px-3 mt-2">
+          <button
+            onClick={onChatOpen}
+            className="flex w-full items-center gap-3 rounded-[var(--radius-lg)] bg-[var(--color-accent)] px-3 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
+          >
+            <MessageCircle size={20} />
+            Ask Steward
+          </button>
+        </div>
+
         {/* Navigation */}
-        <nav className="flex-1 flex flex-col gap-1 px-3 mt-2">
+        <nav className="flex-1 flex flex-col gap-1 px-3 mt-3">
           {navItems.map(({ label, icon: Icon, href }) => {
             const active = isActive(href)
             return (

@@ -1,16 +1,32 @@
 'use client'
 
 import { useCallback, useState } from 'react'
+import { createClient } from '@/lib/supabase/client'
 import type { ChatMessage, ProductLink, Watch } from '@/lib/types'
 
 function parseWatchData(text: string): Partial<Watch> | undefined {
   const match = text.match(/\[CREATE_WATCH\]([\s\S]*?)\[\/CREATE_WATCH\]/)
   if (!match) return undefined
   try {
-    return JSON.parse(match[1]) as Partial<Watch>
+    const raw = JSON.parse(match[1])
+    // Map camelCase keys from the edge function to snake_case for the database
+    return {
+      emoji: raw.emoji,
+      name: raw.name,
+      url: raw.url,
+      condition: raw.condition,
+      action_label: raw.actionLabel || raw.action_label,
+      action_type: raw.actionType || raw.action_type || 'notify',
+      check_frequency: raw.checkFrequency || raw.check_frequency || 'Daily',
+      image_url: raw.imageURL || raw.image_url || null,
+    } as Partial<Watch>
   } catch {
     return undefined
   }
+}
+
+function parseProposedWatch(text: string): boolean {
+  return /\[PROPOSE_WATCH\]/.test(text)
 }
 
 function parseSuggestions(text: string): string[] | undefined {
@@ -23,12 +39,19 @@ function parseSuggestions(text: string): string[] | undefined {
 function parseProductLinks(text: string): ProductLink[] | undefined {
   const match = text.match(/\[PRODUCT_LINKS\]([\s\S]*?)\[\/PRODUCT_LINKS\]/)
   if (!match) return undefined
+  const content = match[1].trim()
+
+  // The edge function enriches product links into JSON array format
+  // Try parsing as JSON first (enriched format from the server)
   try {
-    const parsed = JSON.parse(match[1])
-    return Array.isArray(parsed) ? (parsed as ProductLink[]) : undefined
+    const parsed = JSON.parse(content)
+    if (Array.isArray(parsed)) return parsed as ProductLink[]
   } catch {
-    return undefined
+    // Not JSON — it might be the raw "search:query" format
+    // which means the server didn't enrich it; skip rendering
   }
+
+  return undefined
 }
 
 function stripTags(text: string): string {
@@ -36,6 +59,13 @@ function stripTags(text: string): string {
     .replace(/\[CREATE_WATCH\][\s\S]*?\[\/CREATE_WATCH\]/g, '')
     .replace(/\[SUGGESTIONS\][\s\S]*?\[\/SUGGESTIONS\]/g, '')
     .replace(/\[PRODUCT_LINKS\][\s\S]*?\[\/PRODUCT_LINKS\]/g, '')
+    .replace(/\[PROPOSE_WATCH\]/g, '')
+    .replace(/\[FETCH_PRICE\][\s\S]*?\[\/FETCH_PRICE\]/g, '')
+    .replace(/\[DISMISS\]/g, '')
+    .replace(/\[SUGGEST_WATCH\][\s\S]*?\[\/SUGGEST_WATCH\]/g, '')
+    .replace(/\[UPDATE_WATCH\][\s\S]*?\[\/UPDATE_WATCH\]/g, '')
+    .replace(/\[FIX_WATCH\][\s\S]*?\[\/FIX_WATCH\]/g, '')
+    .replace(/\n{3,}/g, '\n\n')
     .trim()
 }
 
@@ -55,8 +85,13 @@ export function useChat() {
       setIsLoading(true)
 
       try {
+        const supabase = createClient()
         const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
         const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
+        // Get the user's session token for authenticated requests
+        const { data: { session } } = await supabase.auth.getSession()
+        const accessToken = session?.access_token
 
         // Build conversation history for the API
         const history = [...messages, userMessage].map((m) => ({
@@ -64,12 +99,18 @@ export function useChat() {
           content: m.text,
         }))
 
+        const headers: Record<string, string> = {
+          apikey: anonKey,
+          'Content-Type': 'application/json',
+        }
+
+        if (accessToken) {
+          headers['Authorization'] = `Bearer ${accessToken}`
+        }
+
         const response = await fetch(`${supabaseUrl}/functions/v1/ai-chat`, {
           method: 'POST',
-          headers: {
-            apikey: anonKey,
-            'Content-Type': 'application/json',
-          },
+          headers,
           body: JSON.stringify({ messages: history }),
         })
 
@@ -78,14 +119,23 @@ export function useChat() {
         }
 
         const data = await response.json()
-        const rawText: string = data.reply ?? data.content ?? ''
+        const rawText: string = data.text ?? data.reply ?? data.content ?? ''
+
+        const watchData = parseWatchData(rawText)
+        const isProposal = parseProposedWatch(rawText)
+        const suggestions = parseSuggestions(rawText)
+
+        // If it's a proposal (not yet confirmed), add confirm/deny suggestions
+        const finalSuggestions = isProposal && !suggestions
+          ? ['Yes, create it!', 'Change something', 'Cancel']
+          : suggestions
 
         const stewardMessage: ChatMessage = {
           id: crypto.randomUUID(),
           role: 'steward',
           text: stripTags(rawText),
-          watchData: parseWatchData(rawText),
-          suggestions: parseSuggestions(rawText),
+          watchData,
+          suggestions: finalSuggestions,
           productLinks: parseProductLinks(rawText),
         }
 
@@ -105,9 +155,13 @@ export function useChat() {
     [messages]
   )
 
+  const addMessage = useCallback((msg: ChatMessage) => {
+    setMessages((prev) => [...prev, msg])
+  }, [])
+
   const clearMessages = useCallback(() => {
     setMessages([])
   }, [])
 
-  return { messages, sendMessage, isLoading, clearMessages }
+  return { messages, sendMessage, isLoading, clearMessages, addMessage }
 }

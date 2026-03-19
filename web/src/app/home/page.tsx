@@ -2,9 +2,10 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Eye } from 'lucide-react'
+import { Eye, MessageCircle } from 'lucide-react'
 import { useWatches } from '@/hooks/use-watches'
 import { useSub } from '@/hooks/use-subscription'
+import { useChatDrawer } from '@/providers/chat-provider'
 import { WatchCard } from '@/components/watch-card'
 import { CategoryFilter } from '@/components/category-filter'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -14,6 +15,7 @@ export default function DashboardPage() {
   const router = useRouter()
   const { watches, loading } = useWatches()
   const { tier } = useSub()
+  const { openChat } = useChatDrawer()
   const [category, setCategory] = useState('')
 
   const limit = watchLimit(tier)
@@ -44,16 +46,23 @@ export default function DashboardPage() {
 
       {/* Empty state */}
       {!loading && activeWatches.length === 0 && (
-        <div className="flex flex-col items-center justify-center rounded-[var(--radius-lg)] border border-dashed border-[var(--color-border)] bg-[var(--color-bg-card)] py-16">
+        <div className="flex flex-col items-center justify-center rounded-[var(--radius-lg)] border border-dashed border-[var(--color-border)] bg-[var(--color-bg-card)] py-16 px-6">
           <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--color-bg-deep)]">
             <Eye className="h-6 w-6 text-[var(--color-ink-light)]" />
           </div>
           <p className="mt-4 text-base font-semibold text-[var(--color-ink)]">
             No watches yet
           </p>
-          <p className="mt-1 text-sm text-[var(--color-ink-mid)]">
-            Ask Steward to watch something for you
+          <p className="mt-1 text-sm text-[var(--color-ink-mid)] text-center">
+            Tell Steward what you want to watch — prices, restocks, tickets, and more.
           </p>
+          <button
+            onClick={openChat}
+            className="mt-5 flex items-center gap-2 rounded-full bg-[var(--color-accent)] px-5 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
+          >
+            <MessageCircle size={18} />
+            Ask Steward
+          </button>
         </div>
       )}
 
@@ -73,7 +82,7 @@ export default function DashboardPage() {
               <WatchCard
                 key={watch.id}
                 watch={watch}
-                onClick={() => router.push(`/watch/${watch.id}`)}
+                onClick={() => router.push(`/home/watch/${watch.id}`)}
               />
             ))}
           </div>
@@ -93,7 +102,7 @@ export default function DashboardPage() {
               <WatchCard
                 key={watch.id}
                 watch={watch}
-                onClick={() => router.push(`/watch/${watch.id}`)}
+                onClick={() => router.push(`/home/watch/${watch.id}`)}
               />
             ))}
           </div>

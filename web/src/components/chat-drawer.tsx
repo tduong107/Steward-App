@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { X, SendHorizontal } from 'lucide-react'
+import { X, SendHorizontal, RotateCcw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useChat } from '@/hooks/use-chat'
 import { useWatches } from '@/hooks/use-watches'
@@ -27,7 +27,7 @@ function TypingIndicator() {
 }
 
 export function ChatDrawer({ open, onClose }: ChatDrawerProps) {
-  const { messages, sendMessage, isLoading, clearMessages } = useChat()
+  const { messages, sendMessage, isLoading, clearMessages, addMessage } = useChat()
   const { createWatch } = useWatches()
   const [input, setInput] = useState('')
   const [mounted, setMounted] = useState(false)
@@ -99,12 +99,23 @@ export function ChatDrawer({ open, onClose }: ChatDrawerProps) {
   const handleCreateWatch = useCallback(
     async (data: Partial<Watch>) => {
       try {
-        await createWatch(data)
+        const created = await createWatch(data)
+        addMessage({
+          id: crypto.randomUUID(),
+          role: 'steward',
+          text: `Done! I created "${created.name || data.name || 'your watch'}". I'll start monitoring it right away and notify you when conditions are met.`,
+          suggestions: ['Create another watch', 'Show my watches'],
+        })
       } catch (err) {
         console.error('Failed to create watch from chat:', err)
+        addMessage({
+          id: crypto.randomUUID(),
+          role: 'steward',
+          text: 'Sorry, I had trouble creating that watch. Please try again.',
+        })
       }
     },
-    [createWatch],
+    [createWatch, addMessage],
   )
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -144,28 +155,57 @@ export function ChatDrawer({ open, onClose }: ChatDrawerProps) {
           <h2 className="text-lg font-semibold font-[var(--font-serif)] text-[var(--color-ink)]">
             Ask Steward
           </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-md)] text-[var(--color-ink-light)] hover:bg-[var(--color-bg-deep)] hover:text-[var(--color-ink)] transition-colors"
-            aria-label="Close chat"
-          >
-            <X className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-1">
+            {messages.length > 0 && (
+              <button
+                type="button"
+                onClick={clearMessages}
+                className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-md)] text-[var(--color-ink-light)] hover:bg-[var(--color-bg-deep)] hover:text-[var(--color-ink)] transition-colors"
+                aria-label="New chat"
+              >
+                <RotateCcw className="h-4 w-4" />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-md)] text-[var(--color-ink-light)] hover:bg-[var(--color-bg-deep)] hover:text-[var(--color-ink)] transition-colors"
+              aria-label="Close chat"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
         </div>
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
           {messages.length === 0 && (
             <div className="flex h-full items-center justify-center">
-              <div className="text-center">
-                <p className="text-2xl">🧑‍🍳</p>
-                <p className="mt-2 text-sm font-medium text-[var(--color-ink-mid)]">
-                  Ask me anything about your watches
+              <div className="text-center max-w-xs">
+                <p className="text-3xl">🏠</p>
+                <p className="mt-3 text-base font-semibold text-[var(--color-ink)]">
+                  Hi, I&apos;m Steward
                 </p>
-                <p className="mt-1 text-xs text-[var(--color-ink-light)]">
-                  I can help you track prices, find deals, and set up watches.
+                <p className="mt-1 text-sm text-[var(--color-ink-mid)]">
+                  Tell me what you want to watch and I&apos;ll set it up for you.
                 </p>
+                <div className="mt-5 flex flex-col gap-2">
+                  {[
+                    'Watch a product price for me',
+                    'Alert me when tickets go on sale',
+                    'Track a flight price',
+                    'Monitor a website for changes',
+                  ].map((suggestion) => (
+                    <button
+                      key={suggestion}
+                      type="button"
+                      onClick={() => handleSuggestionClick(suggestion)}
+                      className="rounded-full border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-2 text-sm text-[var(--color-ink-mid)] transition-colors hover:bg-[var(--color-accent-light)] hover:text-[var(--color-accent)] hover:border-[var(--color-accent)]"
+                    >
+                      {suggestion}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           )}
