@@ -31,7 +31,10 @@ export async function GET(request: NextRequest) {
         })
       }
 
-      return NextResponse.redirect(`${origin}${next}`)
+      // Add welcome param so dashboard shows launch animation
+      const redirectUrl = new URL(next, origin)
+      redirectUrl.searchParams.set('welcome', '1')
+      return NextResponse.redirect(redirectUrl)
     }
   }
 

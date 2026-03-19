@@ -30,6 +30,7 @@ export default function LoginPage() {
         return
       }
 
+      sessionStorage.setItem('steward_just_signed_in', '1')
       router.refresh()
       router.push('/home')
     } catch {

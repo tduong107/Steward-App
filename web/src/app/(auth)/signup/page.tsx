@@ -56,6 +56,7 @@ export default function SignupPage() {
           console.error('Failed to create profile:', profileError.message)
         }
 
+        sessionStorage.setItem('steward_just_signed_in', '1')
         router.refresh()
         router.push('/home')
       }
