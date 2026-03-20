@@ -111,24 +111,26 @@ export default async function LandingPage() {
           Free forever · No credit card required · Set up in 30 seconds
         </p>
 
-        {/* Hero visual — branded marketing asset */}
-        <div className="landing-reveal [animation-delay:500ms] mt-20 mx-auto max-w-4xl">
-          <Image
-            src="/assets/hero-dark.svg"
-            alt="Steward watches prices, restocks, reservations and more"
-            width={1200}
-            height={600}
-            className="w-full h-auto rounded-2xl hidden dark:block"
-            priority
-          />
-          <Image
-            src="/assets/hero-light.svg"
-            alt="Steward watches prices, restocks, reservations and more"
-            width={1200}
-            height={600}
-            className="w-full h-auto rounded-2xl dark:hidden"
-            priority
-          />
+        {/* Hero visual — branded marketing asset (cropped to hide baked-in button + stats) */}
+        <div className="landing-reveal [animation-delay:500ms] mt-20 mx-auto max-w-4xl overflow-hidden rounded-2xl" style={{ maxHeight: '82%' }}>
+          <div className="relative" style={{ marginBottom: '-18%' }}>
+            <Image
+              src="/assets/hero-dark.svg"
+              alt="Steward watches prices, restocks, reservations and more"
+              width={1200}
+              height={600}
+              className="w-full h-auto hidden dark:block"
+              priority
+            />
+            <Image
+              src="/assets/hero-light.svg"
+              alt="Steward watches prices, restocks, reservations and more"
+              width={1200}
+              height={600}
+              className="w-full h-auto dark:hidden"
+              priority
+            />
+          </div>
         </div>
       </section>
 
