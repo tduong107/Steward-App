@@ -344,7 +344,7 @@ export default async function LandingPage() {
             <div className="landing-reveal rounded-2xl overflow-hidden">
               <Image
                 src="/assets/callout-price-dark.svg"
-                alt="Set your price. We'll watch. Steward checks daily across any retailer."
+                alt="Set your price. We'll watch. Steward checks daily across major retailers."
                 width={600}
                 height={400}
                 className="w-full h-auto"
@@ -364,7 +364,7 @@ export default async function LandingPage() {
           {/* Use cases bottom CTA */}
           <div className="landing-reveal mt-16 text-center">
             <p className="text-[var(--landing-text-mid)] mb-6">
-              And that&apos;s just the beginning. Steward can watch <strong className="text-[var(--landing-text)]">any webpage</strong> for <strong className="text-[var(--landing-text)]">any change</strong>.
+              And that&apos;s just the beginning. Steward can watch <strong className="text-[var(--landing-text)]">most webpages</strong> for <strong className="text-[var(--landing-text)]">most changes</strong>.
             </p>
             <Link
               href="/signup"
