@@ -110,7 +110,7 @@ export default async function LandingPage() {
         </p>
 
         {/* Hero visual — mock dashboard card */}
-        <div className="landing-reveal [animation-delay:500ms] mt-20 mx-auto max-w-3xl rounded-2xl border border-white/[0.08] bg-white/[0.03] p-1 backdrop-blur-sm shadow-2xl shadow-black/50">
+        <div className="landing-reveal [animation-delay:500ms] mt-20 mx-auto max-w-3xl rounded-2xl border border-white/[0.08] bg-white/[0.03] p-1 backdrop-blur-sm shadow-2xl shadow-black/50 text-left">
           <div className="rounded-xl bg-gradient-to-b from-white/[0.06] to-transparent p-6 md:p-8">
             <div className="flex items-center gap-3 mb-6">
               <Image src="/steward-logo.png" alt="" width={28} height={28} className="rounded-md" />
