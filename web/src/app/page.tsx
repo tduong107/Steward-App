@@ -292,10 +292,18 @@ export default async function LandingPage() {
                 <span className="text-4xl font-bold text-white">$0</span>
                 <span className="text-sm text-white/30 ml-1">/ forever</span>
               </div>
-              <ul className="space-y-3.5 text-sm text-white/50 flex-1">
-                {['Up to 3 watches', 'Daily check frequency', 'Push & email notifications', 'AI watch setup assistant'].map(f => (
-                  <li key={f} className="flex items-start gap-2.5">
-                    <span className="text-[#6EE7B7] mt-0.5">✓</span>{f}
+              <ul className="space-y-3.5 text-sm flex-1">
+                {[
+                  { text: 'Up to 3 watches', included: true },
+                  { text: 'Watches once per day', included: true },
+                  { text: 'Push notifications (Notify Me)', included: true },
+                  { text: 'Notify + Quick Link', included: false },
+                  { text: 'Steward Acts (auto-execute)', included: false },
+                  { text: 'Faster watch frequencies', included: false },
+                  { text: 'Price insights & deal alerts', included: false },
+                ].map(f => (
+                  <li key={f.text} className={`flex items-start gap-2.5 ${f.included ? 'text-white/50' : 'text-white/25'}`}>
+                    <span className={`mt-0.5 ${f.included ? 'text-[#6EE7B7]' : 'text-white/20'}`}>{f.included ? '✓' : '✗'}</span>{f.text}
                   </li>
                 ))}
               </ul>
@@ -306,20 +314,25 @@ export default async function LandingPage() {
 
             {/* Pro */}
             <div className="landing-reveal [animation-delay:100ms] rounded-2xl border border-white/[0.08] bg-white/[0.02] p-7 flex flex-col transition-all duration-300 hover:border-white/[0.15]">
-              <h3 className="text-lg font-semibold font-[var(--font-serif)] text-white">Pro</h3>
+              <h3 className="text-lg font-semibold font-[var(--font-serif)] text-white">Steward Pro</h3>
               <div className="mt-4 mb-6">
                 <span className="text-4xl font-bold text-white">$4.99</span>
                 <span className="text-sm text-white/30 ml-1">/ month</span>
               </div>
               <ul className="space-y-3.5 text-sm text-white/50 flex-1">
-                {['Up to 7 watches', 'Check every 12 hours', 'Quick Link actions', 'Price insights & deal alerts', 'SMS notifications'].map(f => (
+                {[
+                  'Up to 7 watches',
+                  'Watch frequency up to every 12 hours',
+                  'Notify + Quick Link response mode',
+                  'Price insights & deal alerts',
+                ].map(f => (
                   <li key={f} className="flex items-start gap-2.5">
                     <span className="text-[#6EE7B7] mt-0.5">✓</span>{f}
                   </li>
                 ))}
               </ul>
               <Link href="/signup" className="mt-8 block text-center rounded-full bg-[#2A5C45] px-4 py-3 text-sm font-semibold text-white transition-all duration-300 hover:bg-[#3A7C5A] hover:shadow-lg hover:shadow-[#2A5C45]/25">
-                Start Pro
+                Subscribe for $4.99
               </Link>
               <p className="mt-3 text-center text-xs text-white/30">or $29.99/year (save 50%)</p>
             </div>
@@ -329,29 +342,26 @@ export default async function LandingPage() {
               <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-gradient-to-r from-[#F59E0B] to-[#F5C842] px-4 py-1 text-[10px] font-bold text-[#0A0C0B] tracking-wider">
                 BEST VALUE
               </div>
-              <h3 className="text-lg font-semibold font-[var(--font-serif)] text-white">Premium</h3>
+              <h3 className="text-lg font-semibold font-[var(--font-serif)] text-white">Steward Premium</h3>
               <div className="mt-4 mb-6">
                 <span className="text-4xl font-bold text-white">$9.99</span>
                 <span className="text-sm text-white/30 ml-1">/ month</span>
               </div>
               <ul className="space-y-3.5 text-sm text-white/50 flex-1">
                 {[
-                  { text: 'Up to 15 watches', special: false },
-                  { text: 'Check every 2 hours', special: false },
-                  { text: 'Steward Acts: auto add to cart', special: true },
-                  { text: 'Everything in Pro', special: false },
-                  { text: 'Priority support', special: false },
+                  'Up to 15 watches',
+                  'Watch frequency up to every 2 hours',
+                  'Steward Acts (auto-execute actions)',
+                  'Everything in Pro included',
+                  'Priority support',
                 ].map(f => (
-                  <li key={f.text} className="flex items-start gap-2.5">
-                    <span className={`mt-0.5 ${f.special ? 'text-[#F59E0B] font-bold' : 'text-[#6EE7B7]'}`}>
-                      {f.special ? '✦' : '✓'}
-                    </span>
-                    <span className={f.special ? 'text-white/80' : ''}>{f.text}</span>
+                  <li key={f} className="flex items-start gap-2.5">
+                    <span className="text-[#6EE7B7] mt-0.5">✓</span>{f}
                   </li>
                 ))}
               </ul>
-              <Link href="/signup" className="mt-8 block text-center rounded-full bg-[#2A5C45] px-4 py-3 text-sm font-semibold text-white transition-all duration-300 hover:bg-[#3A7C5A] hover:shadow-lg hover:shadow-[#2A5C45]/25">
-                Start Premium
+              <Link href="/signup" className="mt-8 block text-center rounded-full bg-[#F59E0B] px-4 py-3 text-sm font-semibold text-[#0A0C0B] transition-all duration-300 hover:bg-[#F5C842] hover:shadow-lg hover:shadow-[#F59E0B]/25">
+                Subscribe for $9.99
               </Link>
               <p className="mt-3 text-center text-xs text-white/30">or $59.99/year (save 50%)</p>
             </div>
