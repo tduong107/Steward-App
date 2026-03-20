@@ -139,9 +139,9 @@ export default async function LandingPage() {
         <div className="mx-auto max-w-6xl px-6 py-16">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             {[
-              { value: '$2,400+', label: 'Avg. yearly savings per user' },
+              { value: 'All in One', label: 'Watch most things' },
               { value: '24/7', label: 'Always-on monitoring' },
-              { value: '<2min', label: 'Time to get alerted' },
+              { value: 'Up to 2hr', label: 'Check frequency' },
               { value: '30sec', label: 'To set up your first watch' },
             ].map((stat, i) => (
               <div key={stat.label} className="landing-reveal" style={{ animationDelay: `${i * 100}ms` }}>
