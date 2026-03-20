@@ -20,6 +20,12 @@ interface TierConfig {
   features: string[]
 }
 
+function tierRank(key: string): number {
+  if (key === 'premium') return 2
+  if (key === 'pro') return 1
+  return 0
+}
+
 const tiers: TierConfig[] = [
   {
     name: 'Free',
@@ -165,7 +171,13 @@ export function PaywallDialog({ open, onClose }: PaywallDialogProps) {
                     className="mt-4 w-full"
                     onClick={() => handleSubscribe(t.key)}
                   >
-                    {isCurrent ? 'Current Plan' : isLoadingThis ? 'Loading...' : 'Subscribe'}
+                    {isCurrent
+                      ? 'Current Plan'
+                      : isLoadingThis
+                        ? 'Loading...'
+                        : tierRank(t.key) < tierRank(currentTier)
+                          ? 'Downgrade'
+                          : 'Subscribe'}
                   </Button>
                 )}
               </div>
