@@ -162,14 +162,14 @@ export default async function LandingPage() {
             <div>
               <span className="landing-reveal inline-block text-xs font-semibold tracking-[0.2em] uppercase text-[var(--landing-gold-label)] mb-4">Price Drops</span>
               <h2 className="landing-reveal [animation-delay:100ms] text-3xl md:text-5xl font-bold font-[var(--font-serif)] text-[var(--landing-text)] leading-tight">
-                Your target price.{' '}
-                <span className="italic text-[var(--landing-accent)]">Nailed.</span>
+                Save on every{' '}
+                <span className="italic text-[var(--landing-accent)]">purchase.</span>
               </h2>
               <p className="landing-reveal [animation-delay:200ms] mt-6 text-[var(--landing-text-mid)] leading-relaxed">
-                Set a price target on any product from Amazon, Nike, Best Buy, Target, Walmart, and thousands more. Steward checks daily and sends you a push the second your target is hit.
+                Works across Amazon, Nike, Best Buy, Target, Walmart, and thousands of other retailers. Users save an average of <strong className="text-[var(--landing-text)]">$41 per watched item</strong>.
               </p>
               <p className="landing-reveal [animation-delay:300ms] mt-4 text-[var(--landing-text-mid)] leading-relaxed">
-                Users save an average of <strong className="text-[var(--landing-text)]">$41 per watched item</strong>. With the cost of living climbing, every dollar counts.
+                With the cost of living climbing every year, Steward makes sure you never pay full price when you don&apos;t have to.
               </p>
               <Link
                 href="/signup"
@@ -222,14 +222,14 @@ export default async function LandingPage() {
             <div className="order-1 md:order-2">
               <span className="landing-reveal inline-block text-xs font-semibold tracking-[0.2em] uppercase text-[var(--landing-accent-muted)] mb-4">AI Concierge</span>
               <h2 className="landing-reveal [animation-delay:100ms] text-3xl md:text-5xl font-bold font-[var(--font-serif)] text-[var(--landing-text)] leading-tight">
-                Just say what you{' '}
-                <span className="italic text-[var(--landing-accent)]">want</span>
+                No forms. No{' '}
+                <span className="italic text-[var(--landing-accent)]">menus.</span>
               </h2>
               <p className="landing-reveal [animation-delay:200ms] mt-6 text-[var(--landing-text-mid)] leading-relaxed">
-                No forms. No menus. Describe what you&apos;re looking for in plain English. &quot;Find the Dyson V15, alert me under $500.&quot; Steward finds it and sets the watch in seconds.
+                Skip the dropdowns and filters. Steward&apos;s AI understands plain English, finds the product, and creates the watch for you in seconds.
               </p>
               <p className="landing-reveal [animation-delay:300ms] mt-4 text-[var(--landing-text-mid)] leading-relaxed">
-                Built for convenience. Your time is worth more than refreshing pages.
+                Built for busy people. Your time is worth more than refreshing pages and filling out forms.
               </p>
               <Link
                 href="/signup"
