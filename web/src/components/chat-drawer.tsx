@@ -3,7 +3,7 @@
 import Image from 'next/image'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { X, SendHorizontal, RotateCcw } from 'lucide-react'
+import { X, SendHorizontal, RotateCcw, ImagePlus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useChat } from '@/hooks/use-chat'
 import { useWatches } from '@/hooks/use-watches'
@@ -16,11 +16,22 @@ interface ChatDrawerProps {
   onClose: () => void
 }
 
+// ── Category chips matching iOS ChatMessage.categoryChips ──
+const categoryChips = [
+  'Product',
+  'Travel',
+  'Reservation',
+  'Events',
+  'Camping',
+  'Screenshot',
+  'General',
+]
+const betaInitialChips = new Set(['General'])
+
 function TypingIndicator() {
   return (
     <div className="flex justify-start">
       <div className="flex items-start gap-2">
-        {/* Avatar */}
         <Image
           src="/steward-logo.png"
           alt=""
@@ -46,8 +57,10 @@ export function ChatDrawer({ open, onClose }: ChatDrawerProps) {
   const [isCreating, setIsCreating] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [visible, setVisible] = useState(false)
+  const [pendingImage, setPendingImage] = useState<{ file: File; preview: string } | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Mount/unmount with animation
   useEffect(() => {
@@ -95,12 +108,36 @@ export function ChatDrawer({ open, onClose }: ChatDrawerProps) {
     return () => document.removeEventListener('keydown', handleKey)
   }, [open, onClose])
 
+  // Cleanup image preview URL on unmount
+  useEffect(() => {
+    return () => {
+      if (pendingImage) URL.revokeObjectURL(pendingImage.preview)
+    }
+  }, [pendingImage])
+
   const handleSend = useCallback(() => {
     const text = input.trim()
-    if (!text || isLoading) return
+    if ((!text && !pendingImage) || isLoading) return
     setInput('')
-    sendMessage(text)
-  }, [input, isLoading, sendMessage])
+    if (pendingImage) {
+      // Convert image to base64 and send
+      const reader = new FileReader()
+      const imageToSend = pendingImage
+      reader.onload = () => {
+        const dataUrl = reader.result as string
+        const commaIdx = dataUrl.indexOf(',')
+        const base64 = commaIdx >= 0 ? dataUrl.substring(commaIdx + 1) : dataUrl
+        const mediaType = imageToSend.file.type || 'image/jpeg'
+        sendMessage(text || 'What is this?', { base64, mediaType })
+      }
+      reader.readAsDataURL(imageToSend.file)
+      // Revoke the old preview URL and clear pending image immediately
+      URL.revokeObjectURL(pendingImage.preview)
+      setPendingImage(null)
+    } else {
+      sendMessage(text)
+    }
+  }, [input, isLoading, sendMessage, pendingImage])
 
   const handleSuggestionClick = useCallback(
     (text: string) => {
@@ -112,7 +149,6 @@ export function ChatDrawer({ open, onClose }: ChatDrawerProps) {
 
   const handleCreateWatch = useCallback(
     async (data: Partial<Watch>) => {
-      // Prevent duplicate creation from rapid clicks
       if (isCreating) return
       setIsCreating(true)
       try {
@@ -137,6 +173,25 @@ export function ChatDrawer({ open, onClose }: ChatDrawerProps) {
     [createWatch, addMessage, isCreating],
   )
 
+  const handleImageSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    // Validate file type and size (max 5MB)
+    if (!file.type.startsWith('image/')) return
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Image must be under 5MB')
+      return
+    }
+    const preview = URL.createObjectURL(file)
+    // Revoke any existing preview URL to prevent memory leak
+    setPendingImage((prev) => {
+      if (prev) URL.revokeObjectURL(prev.preview)
+      return { file, preview }
+    })
+    // Reset file input so re-selecting same file works
+    e.target.value = ''
+  }, [])
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
@@ -145,6 +200,8 @@ export function ChatDrawer({ open, onClose }: ChatDrawerProps) {
   }
 
   if (!mounted) return null
+
+  const hasContent = input.trim() || pendingImage
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex">
@@ -161,15 +218,13 @@ export function ChatDrawer({ open, onClose }: ChatDrawerProps) {
       <div
         className={cn(
           'absolute flex flex-col bg-[var(--color-bg)] transition-transform duration-300 ease-out',
-          // Desktop: slide from right
           'md:right-0 md:top-0 md:h-full md:w-96 md:border-l md:border-[var(--color-border)]',
           visible ? 'md:translate-x-0' : 'md:translate-x-full',
-          // Mobile: slide from bottom
           'max-md:inset-x-0 max-md:bottom-0 max-md:h-[85vh] max-md:rounded-t-[var(--radius-xl)]',
           visible ? 'max-md:translate-y-0' : 'max-md:translate-y-full',
         )}
       >
-        {/* Header — matches iOS: StewardLogo + "Steward AI" + Online dot */}
+        {/* Header */}
         <div className="flex shrink-0 items-center justify-between border-b border-[var(--color-border)] px-5 py-4">
           <div className="flex items-center gap-2.5">
             <Image
@@ -213,38 +268,43 @@ export function ChatDrawer({ open, onClose }: ChatDrawerProps) {
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+          {/* ── Welcome state (matches iOS ChatDrawer initial view) ── */}
           {messages.length === 0 && (
-            <div className="flex h-full items-center justify-center">
-              <div className="text-center max-w-xs">
-                <Image
-                  src="/steward-logo.png"
-                  alt="Steward"
-                  width={56}
-                  height={56}
-                  className="mx-auto rounded-2xl"
-                />
-                <p className="mt-4 text-base font-semibold text-[var(--color-ink)]">
-                  Hi, I&apos;m Steward
-                </p>
-                <p className="mt-1 text-sm text-[var(--color-ink-mid)]">
-                  Tell me what you want to watch and I&apos;ll set it up for you.
-                </p>
-                <div className="mt-5 flex flex-wrap justify-center gap-2">
-                  {[
-                    'Watch a product price for me',
-                    'Alert me when tickets go on sale',
-                    'Track a flight price',
-                    'Monitor a website for changes',
-                  ].map((suggestion) => (
-                    <button
-                      key={suggestion}
-                      type="button"
-                      onClick={() => handleSuggestionClick(suggestion)}
-                      className="rounded-full border border-[var(--color-accent-mid)] bg-[var(--color-bg-card)] px-3.5 py-1.5 text-xs font-medium text-[var(--color-accent)] transition-colors hover:bg-[var(--color-accent-light)]"
-                    >
-                      {suggestion}
-                    </button>
-                  ))}
+            <div className="flex justify-start">
+              <div className="flex items-start gap-2 max-w-[85%]">
+                <div className="shrink-0 mt-2">
+                  <Image
+                    src="/steward-logo.png"
+                    alt=""
+                    width={22}
+                    height={22}
+                    className="rounded-[5px]"
+                  />
+                </div>
+                <div className="space-y-2 min-w-0">
+                  <span className="text-[11px] text-[var(--color-ink-light)]">Steward</span>
+                  <div className="rounded-2xl rounded-bl-md bg-[var(--color-bg-deep)] px-4 py-2.5 text-sm leading-relaxed text-[var(--color-ink)]">
+                    <p>Hey there! 👋 I&apos;m Steward. I watch websites so you don&apos;t have to, and I&apos;ll let you know when something changes.</p>
+                    <p className="mt-1.5">What can I help you keep an eye on?</p>
+                  </div>
+                  {/* Category chips — matches iOS exactly */}
+                  <div className="flex flex-wrap gap-[7px] pt-1">
+                    {categoryChips.map((chip) => (
+                      <button
+                        key={chip}
+                        type="button"
+                        onClick={() => handleSuggestionClick(chip)}
+                        className="flex items-center gap-[5px] rounded-full border border-[var(--color-accent-mid)] bg-[var(--color-bg-card)] px-3.5 py-[7px] text-xs font-medium text-[var(--color-accent)] transition-colors hover:bg-[var(--color-accent-light)]"
+                      >
+                        {chip}
+                        {betaInitialChips.has(chip) && (
+                          <span className="rounded-full bg-orange-500 px-[5px] py-[2px] text-[9px] font-bold leading-none text-white">
+                            Beta
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
@@ -264,25 +324,71 @@ export function ChatDrawer({ open, onClose }: ChatDrawerProps) {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input area */}
+        {/* ── Image preview (when screenshot is attached) ── */}
+        {pendingImage && (
+          <div className="shrink-0 border-t border-[var(--color-border)] px-4 pt-3 pb-1">
+            <div className="flex items-center gap-3 rounded-[var(--radius-md)] bg-[var(--color-bg-deep)] p-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={pendingImage.preview}
+                alt="Screenshot preview"
+                className="h-[60px] w-[60px] rounded-[var(--radius-sm)] object-cover"
+              />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-[var(--color-ink)]">Screenshot attached</p>
+                <p className="text-xs text-[var(--color-ink-light)]">Send to analyze</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  URL.revokeObjectURL(pendingImage.preview)
+                  setPendingImage(null)
+                }}
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--color-bg)] text-[var(--color-ink-light)] hover:text-[var(--color-ink)] transition-colors"
+                aria-label="Remove image"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Input area (matches iOS: image button + text field + send) ── */}
         <div className="shrink-0 border-t border-[var(--color-border)] px-4 py-3">
           <div className="flex items-center gap-2">
+            {/* Image upload button */}
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[var(--color-ink-light)] hover:bg-[var(--color-bg-deep)] hover:text-[var(--color-ink)] transition-colors"
+              aria-label="Attach screenshot"
+            >
+              <ImagePlus className="h-5 w-5" />
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageSelect}
+              className="hidden"
+            />
+
             <input
               ref={inputRef}
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Ask Steward..."
+              placeholder="Describe what to watch..."
               className="flex-1 rounded-full bg-[var(--color-bg-deep)] px-4 py-2.5 text-sm text-[var(--color-ink)] placeholder:text-[var(--color-ink-light)] outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
             />
             <button
               type="button"
               onClick={handleSend}
-              disabled={!input.trim() || isLoading}
+              disabled={!hasContent || isLoading}
               className={cn(
                 'flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors',
-                input.trim() && !isLoading
+                hasContent && !isLoading
                   ? 'bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-mid)]'
                   : 'bg-[var(--color-bg-deep)] text-[var(--color-ink-light)]',
               )}

@@ -44,6 +44,16 @@ function parseSuggestions(text: string): string[] | undefined {
   return items.length > 0 ? items : undefined
 }
 
+// Validate URL is safe (http/https only, no javascript: or data: URIs)
+function isSafeUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url)
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
 function parseProductLinks(text: string): ProductLink[] | undefined {
   const match = text.match(/\[PRODUCT_LINKS\]([\s\S]*?)\[\/PRODUCT_LINKS\]/)
   if (!match) return undefined
@@ -52,7 +62,10 @@ function parseProductLinks(text: string): ProductLink[] | undefined {
   // Try parsing as a JSON array first (if the whole block is a valid array)
   try {
     const parsed = JSON.parse(content)
-    if (Array.isArray(parsed)) return parsed as ProductLink[]
+    if (Array.isArray(parsed)) {
+      const safe = (parsed as ProductLink[]).filter((p) => p.url && isSafeUrl(p.url))
+      return safe.length > 0 ? safe : undefined
+    }
   } catch {
     // Not a single JSON array — try newline-separated JSON objects
     // (this is the format the edge function actually returns)
@@ -64,7 +77,7 @@ function parseProductLinks(text: string): ProductLink[] | undefined {
   for (const line of lines) {
     try {
       const obj = JSON.parse(line.trim())
-      if (obj && obj.title && obj.url) {
+      if (obj && obj.title && obj.url && isSafeUrl(obj.url)) {
         links.push({
           title: obj.title,
           url: obj.url,
@@ -96,10 +109,17 @@ function stripTags(text: string): string {
     .trim()
 }
 
+// Image data for screenshot analysis
+interface ImageData {
+  base64: string
+  mediaType: string
+}
+
 // Separate type for internal conversation history (includes enriched context)
 interface HistoryEntry {
   role: 'user' | 'assistant'
-  content: string
+  // Content can be a string or Anthropic-style content array (for images)
+  content: string | Array<{ type: string; [key: string]: unknown }>
 }
 
 export function useChat(tier: string = 'free') {
@@ -110,11 +130,12 @@ export function useChat(tier: string = 'free') {
   const conversationHistoryRef = useRef<HistoryEntry[]>([])
 
   const sendMessage = useCallback(
-    async (text: string) => {
+    async (text: string, image?: ImageData) => {
+      const displayText = image ? `📸 ${text}` : text
       const userMessage: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'user',
-        text,
+        text: displayText,
       }
 
       setMessages((prev) => [...prev, userMessage])
@@ -168,10 +189,28 @@ export function useChat(tier: string = 'free') {
           }
         }
 
+        // Build content for this message (text or text+image for Anthropic multimodal)
+        let messageContent: string | Array<{ type: string; [key: string]: unknown }>
+        if (image) {
+          messageContent = [
+            {
+              type: 'image',
+              source: {
+                type: 'base64',
+                media_type: image.mediaType,
+                data: image.base64,
+              },
+            },
+            { type: 'text', text: enrichedText },
+          ]
+        } else {
+          messageContent = enrichedText
+        }
+
         // Add to conversation history (preserves enriched context like iOS)
         conversationHistoryRef.current.push({
           role: 'user',
-          content: enrichedText,
+          content: messageContent,
         })
 
         // Build message list from our enriched history (capped at 30 like the edge function)
@@ -210,7 +249,7 @@ export function useChat(tier: string = 'free') {
         const suggestions = parseSuggestions(rawText)
 
         // If it's a proposal (not yet confirmed), add confirm/deny suggestions
-        const finalSuggestions = isProposal && !suggestions
+        const finalSuggestions = isProposal && (!suggestions || suggestions.length === 0)
           ? ['Yes, create it!', 'Change something', 'Cancel']
           : suggestions
 

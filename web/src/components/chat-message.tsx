@@ -12,8 +12,22 @@ interface ChatMessageProps {
   onCreateWatch: (data: Partial<Watch>) => void
 }
 
-/** Suggestions that show a "Beta" badge — mirrors iOS ChatMessage.betaCategories */
+/** Initial category chips that show a "Beta" badge — mirrors iOS ChatMessage.betaCategories */
 const betaCategories = new Set(['General'])
+
+/** Check if a suggestion should show a Beta badge (matches iOS logic) */
+function isBetaSuggestion(text: string): boolean {
+  // Initial category chips
+  if (betaCategories.has(text)) return true
+  // Follow-up suggestions that end with "(Beta)"
+  if (text.endsWith('(Beta)')) return true
+  return false
+}
+
+/** Strip "(Beta)" suffix from display text since we show a badge instead */
+function displayText(text: string): string {
+  return text.replace(/\s*\(Beta\)$/, '')
+}
 
 export function ChatMessage({ message, onSuggestionClick, onCreateWatch }: ChatMessageProps) {
   const isUser = message.role === 'user'
@@ -66,9 +80,9 @@ export function ChatMessage({ message, onSuggestionClick, onCreateWatch }: ChatM
                   onClick={() => onSuggestionClick(suggestion)}
                   className="flex items-center gap-[5px] rounded-full border border-[var(--color-accent-mid)] bg-[var(--color-bg-card)] px-3.5 py-[7px] text-xs font-medium text-[var(--color-accent)] transition-colors hover:bg-[var(--color-accent-light)]"
                 >
-                  {suggestion}
+                  {displayText(suggestion)}
                   {/* Beta badge — matches iOS orange capsule */}
-                  {betaCategories.has(suggestion) && (
+                  {isBetaSuggestion(suggestion) && (
                     <span className="rounded-full bg-orange-500 px-[5px] py-[2px] text-[9px] font-bold leading-none text-white">
                       Beta
                     </span>
@@ -135,9 +149,11 @@ export function ChatMessage({ message, onSuggestionClick, onCreateWatch }: ChatM
                       {product.title}
                     </p>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-[var(--color-accent)]">
-                        {product.price}
-                      </span>
+                      {product.price && (
+                        <span className="text-sm font-semibold text-[var(--color-accent)]">
+                          {product.price}
+                        </span>
+                      )}
                       {product.store && (
                         <span className="text-xs text-[var(--color-ink-light)]">
                           {product.store}
