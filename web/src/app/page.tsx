@@ -122,29 +122,29 @@ export default async function LandingPage() {
             </div>
             <div className="space-y-3">
               {[
-                { emoji: '👟', name: 'Nike Air Max 90', status: 'Price dropped to $89', accent: true },
-                { emoji: '🏕️', name: 'Yosemite Camp IV', status: 'Checking daily', accent: false },
-                { emoji: '🍽️', name: 'Resy — Carbone NYC', status: 'Watching for openings', accent: false },
+                { emoji: '👟', name: 'Nike Air Max 90', status: 'Price dropped to $89', accent: true, badge: '↓ $41 saved' },
+                { emoji: '🏕️', name: 'Yosemite Camp IV', status: 'Checking daily', accent: false, badge: '' },
+                { emoji: '🍽️', name: 'Resy — Carbone NYC', status: 'Watching for openings', accent: false, badge: '' },
               ].map((item, i) => (
                 <div
                   key={item.name}
-                  className={`flex items-center gap-3 rounded-xl px-4 py-3 transition-all duration-500 ${
+                  className={`grid grid-cols-[40px_1fr_auto] items-center gap-3 rounded-xl px-4 py-3 transition-all duration-500 ${
                     item.accent
                       ? 'bg-[#2A5C45]/20 border border-[#2A5C45]/30'
                       : 'bg-white/[0.03] border border-white/[0.06]'
                   } animate-fade-in-up`}
                   style={{ animationDelay: `${700 + i * 150}ms` }}
                 >
-                  <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/[0.06] text-xl shrink-0">{item.emoji}</span>
-                  <div className="flex-1 min-w-0 text-left">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/[0.06] text-xl">{item.emoji}</span>
+                  <div className="min-w-0">
                     <p className="text-sm font-medium text-white/90 truncate">{item.name}</p>
                     <p className={`text-xs ${item.accent ? 'text-[#6EE7B7]' : 'text-white/40'}`}>{item.status}</p>
                   </div>
-                  {item.accent && (
-                    <span className="shrink-0 text-xs font-semibold text-[#6EE7B7] bg-[#6EE7B7]/10 px-2.5 py-1 rounded-full">
-                      ↓ $41 saved
+                  {item.badge ? (
+                    <span className="text-xs font-semibold text-[#6EE7B7] bg-[#6EE7B7]/10 px-2.5 py-1 rounded-full whitespace-nowrap">
+                      {item.badge}
                     </span>
-                  )}
+                  ) : <span />}
                 </div>
               ))}
             </div>
