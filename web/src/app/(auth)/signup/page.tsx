@@ -209,7 +209,7 @@ export default function SignupPage() {
         <div className="flex rounded-xl bg-[#0F2018] p-1 mb-6">
           <button
             type="button"
-            onClick={() => { setAuthMethod('phone'); setError(null); setOtpSent(false) }}
+            onClick={() => { setAuthMethod('phone'); setError(null); setOtpSent(false); setSmsAlerts(true); setEmailAlerts(false) }}
             className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
               authMethod === 'phone' ? 'bg-[#2A5C45] text-[#6EE7B7]' : 'text-[#F7F6F3]/40'
             }`}
@@ -219,7 +219,7 @@ export default function SignupPage() {
           </button>
           <button
             type="button"
-            onClick={() => { setAuthMethod('email'); setError(null); setOtpSent(false) }}
+            onClick={() => { setAuthMethod('email'); setError(null); setOtpSent(false); setSmsAlerts(false); setEmailAlerts(true) }}
             className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
               authMethod === 'email' ? 'bg-[#2A5C45] text-[#6EE7B7]' : 'text-[#F7F6F3]/40'
             }`}
