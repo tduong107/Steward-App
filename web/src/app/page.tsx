@@ -412,9 +412,11 @@ export default async function LandingPage() {
             <Link href="/login" className="hover:text-[var(--landing-text)] transition-colors duration-300">Sign In</Link>
             <Link href="/signup" className="hover:text-[var(--landing-text)] transition-colors duration-300">Sign Up</Link>
           </div>
-          <p className="text-xs text-[var(--landing-text-faint)]">
-            &copy; {new Date().getFullYear()} Steward. All rights reserved.
-          </p>
+          <div className="flex items-center gap-6 text-xs text-[var(--landing-text-faint)]">
+            <Link href="/privacy" className="hover:text-[var(--landing-text)] transition-colors duration-300">Privacy Policy</Link>
+            <Link href="/terms" className="hover:text-[var(--landing-text)] transition-colors duration-300">Terms of Service</Link>
+            <span>&copy; {new Date().getFullYear()} Steward</span>
+          </div>
         </div>
       </footer>
     </div>
