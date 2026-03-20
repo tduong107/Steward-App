@@ -142,21 +142,25 @@ export function Sidebar({ onChatOpen }: SidebarProps) {
           </div>
         )}
 
-        {/* Tier badge for paid users */}
+        {/* Tier badge for paid users — click to see plan benefits */}
         {!showUpgrade && (
           <div className="px-3 mb-2">
-            <div className={`flex items-center gap-2 rounded-[var(--radius-lg)] px-3 py-2 ${
-              tier === 'premium'
-                ? 'bg-amber-500/10 border border-amber-500/30'
-                : 'bg-[var(--color-accent-light)] border border-[var(--color-accent)]/20'
-            }`}>
+            <button
+              type="button"
+              onClick={() => setShowPaywall(true)}
+              className={`flex w-full items-center gap-2 rounded-[var(--radius-lg)] px-3 py-2 transition-all hover:opacity-80 cursor-pointer ${
+                tier === 'premium'
+                  ? 'bg-amber-500/10 border border-amber-500/30'
+                  : 'bg-[var(--color-accent-light)] border border-[var(--color-accent)]/20'
+              }`}
+            >
               <Crown size={14} className={tier === 'premium' ? 'text-amber-500' : 'text-[var(--color-accent)]'} />
               <span className={`text-xs font-semibold uppercase tracking-wide ${
                 tier === 'premium' ? 'text-amber-500' : 'text-[var(--color-accent)]'
               }`}>
                 {tier} Plan
               </span>
-            </div>
+            </button>
           </div>
         )}
 
