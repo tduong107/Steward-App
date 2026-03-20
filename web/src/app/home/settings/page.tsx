@@ -23,7 +23,7 @@ const themeOptions: { label: string; value: Theme; icon: typeof Sun }[] = [
 ]
 
 export default function SettingsPage() {
-  const { user, profile, signOut } = useAuth()
+  const { user, profile, signOut, refreshProfile } = useAuth()
   const { tier } = useSub()
   const { theme, setTheme } = useTheme()
   const supabaseRef = useRef(createClient())
@@ -42,10 +42,11 @@ export default function SettingsPage() {
     if (!user) return
     setProfileSaving(true)
     try {
-      await supabaseRef.current
+      const { error } = await supabaseRef.current
         .from('profiles')
-        .update({ display_name: displayName })
-        .eq('id', user.id)
+        .upsert({ id: user.id, display_name: displayName })
+      if (error) throw error
+      await refreshProfile()
       setProfileSaved(true)
       setTimeout(() => setProfileSaved(false), 2000)
     } catch (err) {
