@@ -137,7 +137,7 @@ export default async function LandingPage() {
         <div className="mx-auto max-w-6xl px-6 py-16">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             {[
-              { value: 'Watch Most Things', label: 'More than just a price tracker', small: true },
+              { value: 'Watch Most Things', label: 'Beyond price tracking', small: true },
               { value: '24/7', label: 'Always-on monitoring', small: false },
               { value: 'Up to 2hr', label: 'Check frequency', small: false },
               { value: '30sec', label: 'To set up your first watch', small: false },
