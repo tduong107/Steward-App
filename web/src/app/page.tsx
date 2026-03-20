@@ -26,7 +26,7 @@ export default async function LandingPage() {
       </div>
 
       {/* ── Nav ── */}
-      <nav className="sticky top-0 z-50 border-b border-[var(--landing-border)] bg-[var(--landing-bg)]/80 backdrop-blur-xl transition-colors duration-300">
+      <nav className="sticky top-0 z-50 border-b border-[var(--landing-border)] bg-[var(--landing-nav-bg)] backdrop-blur-xl transition-colors duration-300">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <Link href="/" className="flex items-center gap-2.5 group">
             <Image
@@ -57,7 +57,7 @@ export default async function LandingPage() {
             </Link>
             <Link
               href="/signup"
-              className="rounded-full bg-[var(--landing-accent-solid)] px-5 py-2 text-sm font-semibold text-white transition-all duration-300 hover:bg-[var(--landing-accent-hover)] hover:shadow-lg hover:shadow-[var(--landing-accent-solid)]/25"
+              className="rounded-full bg-[var(--landing-accent-solid)] px-5 py-2 text-sm font-semibold text-white transition-all duration-300 hover:bg-[var(--landing-accent-hover)] hover:shadow-lg hover:shadow-[var(--landing-card-shadow)]"
             >
               Get Started
             </Link>
@@ -70,8 +70,8 @@ export default async function LandingPage() {
         {/* Status badge */}
         <div className="landing-reveal inline-flex items-center gap-2.5 rounded-full border border-[var(--landing-border)] bg-[var(--landing-surface)] px-5 py-2 text-xs font-medium text-[var(--landing-text-mid)] mb-8 backdrop-blur-sm">
           <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#6EE7B7] opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-[#6EE7B7]"></span>
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--landing-green)] opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-[var(--landing-green)]"></span>
           </span>
           Now monitoring the web for thousands of users
         </div>
@@ -79,7 +79,7 @@ export default async function LandingPage() {
         <h1 className="landing-reveal [animation-delay:100ms] text-5xl md:text-7xl lg:text-8xl font-bold font-[var(--font-serif)] text-[var(--landing-text)] leading-[1.05] max-w-4xl mx-auto tracking-tight">
           Your AI concierge that{' '}
           <span className="relative">
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#6EE7B7] via-[#3A7C5A] to-[#6EE7B7] bg-[length:200%_auto] animate-shimmer">
+            <span className="text-transparent bg-clip-text bg-[length:200%_auto] animate-shimmer" style={{ backgroundImage: 'linear-gradient(to right, var(--landing-shimmer-from), var(--landing-shimmer-via), var(--landing-shimmer-to))' }}>
               watches the web
             </span>
           </span>
@@ -92,7 +92,7 @@ export default async function LandingPage() {
         <div className="landing-reveal [animation-delay:300ms] mt-12 flex flex-col sm:flex-row items-center justify-center gap-4">
           <Link
             href="/signup"
-            className="group relative w-full sm:w-auto rounded-full bg-gradient-to-r from-[#2A5C45] to-[#3A7C5A] px-8 py-4 text-base font-semibold text-white transition-all duration-300 hover:shadow-xl hover:shadow-[#2A5C45]/30 hover:scale-[1.02] active:scale-[0.98]"
+            className="group relative w-full sm:w-auto rounded-full bg-gradient-to-r from-[#2A5C45] to-[#3A7C5A] px-8 py-4 text-base font-semibold text-white transition-all duration-300 hover:shadow-xl hover:shadow-[var(--landing-card-shadow)] hover:scale-[1.02] active:scale-[0.98]"
           >
             <span className="relative z-10 flex items-center justify-center gap-2">
               Start Watching for Free
@@ -112,13 +112,13 @@ export default async function LandingPage() {
         </p>
 
         {/* Hero visual — mock dashboard card */}
-        <div className="landing-reveal [animation-delay:500ms] mt-20 mx-auto max-w-3xl rounded-2xl border border-[var(--landing-border)] bg-[var(--landing-card)] p-1 backdrop-blur-sm shadow-2xl shadow-black/20 text-left">
+        <div className="landing-reveal [animation-delay:500ms] mt-20 mx-auto max-w-3xl rounded-2xl border border-[var(--landing-border)] bg-[var(--landing-card)] p-1 backdrop-blur-sm shadow-2xl text-left" style={{ boxShadow: '0 25px 50px -12px var(--landing-card-shadow)' }}>
           <div className="rounded-xl bg-[var(--landing-mock-card-bg)] p-6 md:p-8">
             <div className="flex items-center gap-3 mb-6">
               <Image src="/steward-logo.png" alt="" width={28} height={28} className="rounded-md" />
               <span className="text-sm font-medium text-[var(--landing-text-mid)]">Steward Dashboard</span>
-              <span className="ml-auto flex items-center gap-1.5 text-xs text-[#27AE60] dark:text-[#6EE7B7]">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#27AE60] dark:bg-[#6EE7B7] animate-pulse" />
+              <span className="ml-auto flex items-center gap-1.5 text-xs text-[var(--landing-green)]">
+                <span className="h-1.5 w-1.5 rounded-full bg-[var(--landing-green)] animate-pulse" />
                 3 watches active
               </span>
             </div>
@@ -132,7 +132,7 @@ export default async function LandingPage() {
                   key={item.name}
                   className={`grid grid-cols-[40px_1fr_90px] items-center gap-3 rounded-xl px-4 py-3.5 transition-all duration-500 ${
                     item.accent
-                      ? 'bg-[#2A5C45]/15 border border-[#2A5C45]/25'
+                      ? 'bg-[var(--landing-accent-solid)]/15 border border-[var(--landing-accent-solid)]/25'
                       : 'bg-[var(--landing-mock-item-bg)] border border-[var(--landing-mock-item-border)]'
                   } animate-fade-in-up`}
                   style={{ animationDelay: `${700 + i * 150}ms` }}
@@ -140,11 +140,11 @@ export default async function LandingPage() {
                   <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--landing-surface)] text-xl">{item.emoji}</span>
                   <div className="text-center">
                     <p className="text-sm font-medium text-[var(--landing-text)]">{item.name}</p>
-                    <p className={`text-xs ${item.accent ? 'text-[#27AE60] dark:text-[#6EE7B7]' : 'text-[var(--landing-text-dim)]'}`}>{item.status}</p>
+                    <p className={`text-xs ${item.accent ? 'text-[var(--landing-green)]' : 'text-[var(--landing-text-dim)]'}`}>{item.status}</p>
                   </div>
                   <div className="flex justify-end">
                     {item.badge && (
-                      <span className="text-xs font-semibold text-[#27AE60] dark:text-[#6EE7B7] bg-[#27AE60]/10 dark:bg-[#6EE7B7]/10 px-2.5 py-1 rounded-full whitespace-nowrap">
+                      <span className="text-xs font-semibold text-[var(--landing-green)] bg-[var(--landing-green)]/10 px-2.5 py-1 rounded-full whitespace-nowrap">
                         {item.badge}
                       </span>
                     )}
@@ -181,7 +181,7 @@ export default async function LandingPage() {
       <section id="how-it-works" className="relative z-10 border-t border-[var(--landing-border)]">
         <div className="mx-auto max-w-6xl px-6 py-24 md:py-32">
           <div className="text-center mb-20">
-            <span className="landing-reveal inline-block text-xs font-semibold tracking-[0.2em] uppercase text-[var(--landing-accent)]/60 mb-4">How it Works</span>
+            <span className="landing-reveal inline-block text-xs font-semibold tracking-[0.2em] uppercase text-[var(--landing-accent-muted)] mb-4">How it Works</span>
             <h2 className="landing-reveal [animation-delay:100ms] text-3xl md:text-5xl font-bold font-[var(--font-serif)] text-[var(--landing-text)]">
               Three steps to savings
             </h2>
@@ -210,10 +210,10 @@ export default async function LandingPage() {
             ].map((item, i) => (
               <div
                 key={item.step}
-                className="landing-reveal group relative rounded-2xl border border-[var(--landing-border)] bg-[var(--landing-card)] p-8 transition-all duration-500 hover:bg-[var(--landing-card-hover)] hover:border-[var(--landing-border-hover)] hover:shadow-xl hover:shadow-[#2A5C45]/5"
+                className="landing-reveal group relative rounded-2xl border border-[var(--landing-border)] bg-[var(--landing-card)] p-8 transition-all duration-500 hover:bg-[var(--landing-card-hover)] hover:border-[var(--landing-border-hover)] hover:shadow-xl hover:shadow-[var(--landing-card-shadow)]"
                 style={{ animationDelay: `${i * 120}ms` }}
               >
-                <span className="text-xs font-mono font-bold text-[var(--landing-accent)]/40 tracking-wider">{item.step}</span>
+                <span className="text-xs font-mono font-bold text-[var(--landing-accent-faint)] tracking-wider">{item.step}</span>
                 <div className="mt-4 mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--landing-surface)] border border-[var(--landing-border)] text-3xl transition-transform duration-300 group-hover:scale-110">
                   {item.icon}
                 </div>
@@ -233,7 +233,7 @@ export default async function LandingPage() {
       <section id="use-cases" className="relative z-10 border-t border-[var(--landing-border)]">
         <div className="mx-auto max-w-6xl px-6 py-24 md:py-32">
           <div className="text-center mb-20">
-            <span className="landing-reveal inline-block text-xs font-semibold tracking-[0.2em] uppercase text-[#F59E0B]/60 mb-4">Use Cases</span>
+            <span className="landing-reveal inline-block text-xs font-semibold tracking-[0.2em] uppercase text-[var(--landing-gold-label)] mb-4">Use Cases</span>
             <h2 className="landing-reveal [animation-delay:100ms] text-3xl md:text-5xl font-bold font-[var(--font-serif)] text-[var(--landing-text)]">
               What can Steward watch?
             </h2>
@@ -277,7 +277,7 @@ export default async function LandingPage() {
       <section id="pricing" className="relative z-10 border-t border-[var(--landing-border)]">
         <div className="mx-auto max-w-6xl px-6 py-24 md:py-32">
           <div className="text-center mb-20">
-            <span className="landing-reveal inline-block text-xs font-semibold tracking-[0.2em] uppercase text-[var(--landing-accent)]/60 mb-4">Pricing</span>
+            <span className="landing-reveal inline-block text-xs font-semibold tracking-[0.2em] uppercase text-[var(--landing-accent-muted)] mb-4">Pricing</span>
             <h2 className="landing-reveal [animation-delay:100ms] text-3xl md:text-5xl font-bold font-[var(--font-serif)] text-[var(--landing-text)]">
               Simple, transparent pricing
             </h2>
@@ -305,7 +305,7 @@ export default async function LandingPage() {
                   { text: 'Price insights & deal alerts', included: false },
                 ].map(f => (
                   <li key={f.text} className={`flex items-start gap-2.5 ${f.included ? 'text-[var(--landing-text-mid)]' : 'text-[var(--landing-text-faint)]'}`}>
-                    <span className={`mt-0.5 ${f.included ? 'text-[#27AE60]' : 'text-[var(--landing-text-faint)]'}`}>{f.included ? '✓' : '✗'}</span>{f.text}
+                    <span className={`mt-0.5 ${f.included ? 'text-[var(--landing-green)]' : 'text-[var(--landing-text-faint)]'}`}>{f.included ? '✓' : '✗'}</span>{f.text}
                   </li>
                 ))}
               </ul>
@@ -329,18 +329,18 @@ export default async function LandingPage() {
                   'Price insights & deal alerts',
                 ].map(f => (
                   <li key={f} className="flex items-start gap-2.5">
-                    <span className="text-[#27AE60] mt-0.5">✓</span>{f}
+                    <span className="text-[var(--landing-green)] mt-0.5">✓</span>{f}
                   </li>
                 ))}
               </ul>
-              <Link href="/signup" className="mt-8 block text-center rounded-full bg-[var(--landing-accent-solid)] px-4 py-3 text-sm font-semibold text-white transition-all duration-300 hover:bg-[var(--landing-accent-hover)] hover:shadow-lg hover:shadow-[var(--landing-accent-solid)]/25">
+              <Link href="/signup" className="mt-8 block text-center rounded-full bg-[var(--landing-accent-solid)] px-4 py-3 text-sm font-semibold text-white transition-all duration-300 hover:bg-[var(--landing-accent-hover)] hover:shadow-lg hover:shadow-[var(--landing-card-shadow)]">
                 Subscribe for $4.99
               </Link>
               <p className="mt-3 text-center text-xs text-[var(--landing-text-faint)]">or $29.99/year (save 50%)</p>
             </div>
 
             {/* Premium */}
-            <div className="landing-reveal [animation-delay:200ms] relative rounded-2xl border-2 border-[var(--landing-accent-solid)] bg-[var(--landing-card)] p-7 flex flex-col transition-all duration-300 hover:shadow-xl hover:shadow-[var(--landing-accent-solid)]/10">
+            <div className="landing-reveal [animation-delay:200ms] relative rounded-2xl border-2 border-[var(--landing-accent-solid)] bg-[var(--landing-card)] p-7 flex flex-col transition-all duration-300 hover:shadow-xl hover:shadow-[var(--landing-card-shadow)]">
               <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-gradient-to-r from-[#F59E0B] to-[#F5C842] px-4 py-1 text-[10px] font-bold text-[#0A0C0B] tracking-wider">
                 BEST VALUE
               </div>
@@ -358,11 +358,11 @@ export default async function LandingPage() {
                   'Priority support',
                 ].map(f => (
                   <li key={f} className="flex items-start gap-2.5">
-                    <span className="text-[#27AE60] mt-0.5">✓</span>{f}
+                    <span className="text-[var(--landing-green)] mt-0.5">✓</span>{f}
                   </li>
                 ))}
               </ul>
-              <Link href="/signup" className="mt-8 block text-center rounded-full bg-[#F59E0B] px-4 py-3 text-sm font-semibold text-[#0A0C0B] transition-all duration-300 hover:bg-[#F5C842] hover:shadow-lg hover:shadow-[#F59E0B]/25">
+              <Link href="/signup" className="mt-8 block text-center rounded-full bg-[#F59E0B] px-4 py-3 text-sm font-semibold text-[#0A0C0B] transition-all duration-300 hover:bg-[#F5C842] hover:shadow-lg hover:shadow-[var(--landing-card-shadow)]">
                 Subscribe for $9.99
               </Link>
               <p className="mt-3 text-center text-xs text-[var(--landing-text-faint)]">or $59.99/year (save 50%)</p>
@@ -388,7 +388,7 @@ export default async function LandingPage() {
             </p>
             <Link
               href="/signup"
-              className="landing-reveal [animation-delay:200ms] inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#6EE7B7] to-[#3A7C5A] px-10 py-4 text-base font-semibold text-[#0A0C0B] transition-all duration-300 hover:shadow-xl hover:shadow-[#6EE7B7]/20 hover:scale-[1.02] active:scale-[0.98]"
+              className="landing-reveal [animation-delay:200ms] inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[var(--landing-accent-solid)] to-[var(--landing-accent-hover)] px-10 py-4 text-base font-semibold text-white transition-all duration-300 hover:shadow-xl hover:shadow-[var(--landing-card-shadow)] hover:scale-[1.02] active:scale-[0.98]"
             >
               Create Your Free Account
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>

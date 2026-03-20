@@ -80,30 +80,60 @@
   --landing-mock-card-bg: rgba(255,255,255,0.06);
   --landing-mock-item-bg: rgba(255,255,255,0.03);
   --landing-mock-item-border: rgba(255,255,255,0.06);
+  /* Dark-mode shimmer gradient — bright mint for contrast on dark */
+  --landing-shimmer-from: #6EE7B7;
+  --landing-shimmer-via: #3A7C5A;
+  --landing-shimmer-to: #6EE7B7;
+  /* Green indicator */
+  --landing-green: #6EE7B7;
+  /* Step number / faded accent */
+  --landing-accent-faint: rgba(110,231,183,0.35);
+  --landing-accent-muted: rgba(110,231,183,0.55);
+  /* Gold label */
+  --landing-gold-label: rgba(245,158,11,0.60);
+  /* Nav background with transparency */
+  --landing-nav-bg: rgba(10,12,11,0.80);
+  /* Card shadow */
+  --landing-card-shadow: rgba(0,0,0,0.30);
 }
 
 /* Landing light mode overrides — only when NOT .dark */
 html:not(.dark) {
   --landing-bg: #F7F6F3;
   --landing-text: #1A1814;
-  --landing-text-mid: rgba(26,24,20,0.55);
-  --landing-text-dim: rgba(26,24,20,0.45);
-  --landing-text-faint: rgba(26,24,20,0.15);
-  --landing-border: rgba(26,24,20,0.08);
-  --landing-border-hover: rgba(26,24,20,0.15);
-  --landing-card: rgba(0,0,0,0.02);
-  --landing-card-hover: rgba(0,0,0,0.04);
-  --landing-surface: rgba(0,0,0,0.03);
-  --landing-surface-hover: rgba(0,0,0,0.06);
-  --landing-glow-green: rgba(42,92,69,0.08);
-  --landing-glow-mint: rgba(110,231,183,0.06);
-  --landing-glow-gold: rgba(245,158,11,0.04);
-  --landing-accent: #2A5C45;
+  --landing-text-mid: rgba(26,24,20,0.70);
+  --landing-text-dim: rgba(26,24,20,0.60);
+  --landing-text-faint: rgba(26,24,20,0.38);
+  --landing-border: rgba(26,24,20,0.12);
+  --landing-border-hover: rgba(26,24,20,0.22);
+  --landing-card: rgba(255,255,255,0.70);
+  --landing-card-hover: rgba(255,255,255,0.85);
+  --landing-surface: rgba(0,0,0,0.05);
+  --landing-surface-hover: rgba(0,0,0,0.09);
+  --landing-glow-green: rgba(42,92,69,0.10);
+  --landing-glow-mint: rgba(110,231,183,0.08);
+  --landing-glow-gold: rgba(245,158,11,0.06);
+  --landing-accent: #1E4A35;
   --landing-accent-solid: #2A5C45;
-  --landing-accent-hover: #3A7C5A;
-  --landing-mock-card-bg: rgba(0,0,0,0.04);
-  --landing-mock-item-bg: rgba(0,0,0,0.02);
-  --landing-mock-item-border: rgba(0,0,0,0.06);
+  --landing-accent-hover: #1E4A35;
+  --landing-mock-card-bg: rgba(255,255,255,0.80);
+  --landing-mock-item-bg: rgba(255,255,255,0.60);
+  --landing-mock-item-border: rgba(26,24,20,0.10);
+  /* Light-mode shimmer gradient uses deeper greens for contrast */
+  --landing-shimmer-from: #1E4A35;
+  --landing-shimmer-via: #2A5C45;
+  --landing-shimmer-to: #1E4A35;
+  /* Green indicator — darker for light backgrounds */
+  --landing-green: #1B8A48;
+  /* Step number / faded accent */
+  --landing-accent-faint: rgba(42,92,69,0.50);
+  --landing-accent-muted: rgba(42,92,69,0.65);
+  /* Gold label */
+  --landing-gold-label: rgba(180,120,0,0.80);
+  /* Nav background with transparency */
+  --landing-nav-bg: rgba(247,246,243,0.85);
+  /* Card shadow for depth on light backgrounds */
+  --landing-card-shadow: rgba(0,0,0,0.06);
 }
 
 html {
