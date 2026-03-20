@@ -530,7 +530,7 @@ export default async function LandingPage() {
               <Link href="/signup" className="mt-8 block text-center rounded-full bg-[var(--landing-accent-solid)] px-4 py-3 text-sm font-semibold text-white transition-all duration-300 hover:bg-[var(--landing-accent-hover)] hover:shadow-lg hover:shadow-[var(--landing-card-shadow)]">
                 Subscribe for $4.99
               </Link>
-              <p className="mt-3 text-center text-xs text-[var(--landing-text-faint)]">or $29.99/year (save 50%)</p>
+              <p className="mt-3 text-center text-xs text-[var(--landing-text-faint)]">or $39.99/year (save 33%)</p>
             </div>
 
             {/* Premium */}
@@ -559,7 +559,7 @@ export default async function LandingPage() {
               <Link href="/signup" className="mt-8 block text-center rounded-full bg-[#F59E0B] px-4 py-3 text-sm font-semibold text-[#0A0C0B] transition-all duration-300 hover:bg-[#F5C842] hover:shadow-lg hover:shadow-[var(--landing-card-shadow)]">
                 Subscribe for $9.99
               </Link>
-              <p className="mt-3 text-center text-xs text-[var(--landing-text-faint)]">or $59.99/year (save 50%)</p>
+              <p className="mt-3 text-center text-xs text-[var(--landing-text-faint)]">or $79.99/year (save 33%)</p>
             </div>
           </div>
         </div>
