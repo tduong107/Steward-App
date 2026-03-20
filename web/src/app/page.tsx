@@ -128,25 +128,25 @@ export default async function LandingPage() {
               ].map((item, i) => (
                 <div
                   key={item.name}
-                  className={`flex items-center rounded-xl px-4 py-3.5 transition-all duration-500 relative ${
+                  className={`grid grid-cols-[40px_1fr_90px] items-center gap-3 rounded-xl px-4 py-3.5 transition-all duration-500 ${
                     item.accent
                       ? 'bg-[#2A5C45]/20 border border-[#2A5C45]/30'
                       : 'bg-white/[0.03] border border-white/[0.06]'
                   } animate-fade-in-up`}
                   style={{ animationDelay: `${700 + i * 150}ms` }}
                 >
-                  <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/[0.06] text-xl shrink-0">{item.emoji}</span>
-                  <div className="flex-1 text-center">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/[0.06] text-xl">{item.emoji}</span>
+                  <div className="text-center">
                     <p className="text-sm font-medium text-white/90">{item.name}</p>
                     <p className={`text-xs ${item.accent ? 'text-[#6EE7B7]' : 'text-white/40'}`}>{item.status}</p>
                   </div>
-                  {item.badge ? (
-                    <span className="text-xs font-semibold text-[#6EE7B7] bg-[#6EE7B7]/10 px-2.5 py-1 rounded-full whitespace-nowrap shrink-0">
-                      {item.badge}
-                    </span>
-                  ) : (
-                    <span className="w-10 shrink-0" />
-                  )}
+                  <div className="flex justify-end">
+                    {item.badge && (
+                      <span className="text-xs font-semibold text-[#6EE7B7] bg-[#6EE7B7]/10 px-2.5 py-1 rounded-full whitespace-nowrap">
+                        {item.badge}
+                      </span>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
