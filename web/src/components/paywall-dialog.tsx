@@ -56,7 +56,26 @@ export function PaywallDialog({ open, onClose }: PaywallDialogProps) {
   const [loadingTier, setLoadingTier] = useState<string | null>(null)
 
   const handleSubscribe = async (tierKey: string) => {
-    if (tierKey === 'free' || tierKey === currentTier) return
+    if (tierKey === currentTier) return
+
+    // Downgrade to free = open Stripe portal to cancel subscription
+    if (tierKey === 'free') {
+      setLoadingTier('free')
+      try {
+        const res = await fetch('/api/stripe/portal', { method: 'POST' })
+        const data = await res.json()
+        if (data.url) {
+          window.location.href = data.url
+        } else if (data.error) {
+          alert(data.error)
+        }
+      } catch (err) {
+        console.error('Failed to open portal:', err)
+      } finally {
+        setLoadingTier(null)
+      }
+      return
+    }
 
     setLoadingTier(tierKey)
     try {
@@ -165,6 +184,28 @@ export function PaywallDialog({ open, onClose }: PaywallDialogProps) {
                   ))}
                 </ul>
 
+                {/* Show button for paid tiers, or show downgrade on Free card when user is paid */}
+                {t.key === 'free' && currentTier !== 'free' && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={isLoadingThis}
+                    className="mt-4 w-full"
+                    onClick={() => handleSubscribe('free')}
+                  >
+                    {isLoadingThis ? 'Loading...' : 'Downgrade to Free'}
+                  </Button>
+                )}
+                {t.key === 'free' && currentTier === 'free' && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled
+                    className="mt-4 w-full"
+                  >
+                    Current Plan
+                  </Button>
+                )}
                 {t.key !== 'free' && (
                   <Button
                     size="sm"
