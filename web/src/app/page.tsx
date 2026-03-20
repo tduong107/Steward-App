@@ -494,7 +494,7 @@ export default async function LandingPage() {
                   { text: 'Watches once per day', included: true },
                   { text: 'Push notifications (Notify Me)', included: true },
                   { text: 'Notify + Quick Link', included: false },
-                  { text: 'Steward Acts (auto-execute)', included: false },
+                  { text: 'Steward Acts', included: false },
                   { text: 'Faster watch frequencies', included: false },
                   { text: 'Price insights & deal alerts', included: false },
                 ].map(f => (
@@ -547,7 +547,7 @@ export default async function LandingPage() {
                 {[
                   'Up to 15 watches',
                   'Watch frequency up to every 2 hours',
-                  'Steward Acts (auto-execute actions)',
+                  'Steward Acts',
                   'Everything in Pro included',
                   'Priority support',
                 ].map(f => (
