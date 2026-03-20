@@ -5,10 +5,13 @@ import { SubscriptionProvider } from '@/providers/subscription-provider'
 import { ThemeProvider } from '@/providers/theme-provider'
 
 export const metadata: Metadata = {
-  title: 'Steward — Watch the web for you',
-  description: 'Automatically monitor websites for price drops, restocks, and availability changes.',
+  title: 'Steward — Your AI Concierge',
+  description: 'Steward monitors websites for price drops, restocks, and availability changes — then notifies you or acts on your behalf.',
   icons: {
-    icon: '/favicon.ico',
+    icon: [
+      { url: '/favicon.ico', sizes: '48x48' },
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+    ],
     apple: '/apple-touch-icon.png',
   },
 }

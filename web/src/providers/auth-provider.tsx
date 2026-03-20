@@ -45,6 +45,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut()
     setUser(null)
     setProfile(null)
+    // Clear animation flag so it plays again on next login
+    sessionStorage.removeItem('steward_animation_shown')
     router.push('/')
   }, [supabase, router])
 

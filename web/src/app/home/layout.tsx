@@ -20,6 +20,9 @@ function DashboardLayoutInner({ children }: { children: ReactNode }) {
     if (checkedRef.current) return
     checkedRef.current = true
 
+    // If we already showed the animation this session, skip entirely
+    if (sessionStorage.getItem('steward_animation_shown')) return
+
     // Check sessionStorage flag (email/password login & signup)
     const fromLogin = sessionStorage.getItem('steward_just_signed_in')
     // Check URL param (OAuth callback)
@@ -28,6 +31,8 @@ function DashboardLayoutInner({ children }: { children: ReactNode }) {
     if (fromLogin || fromOAuth) {
       setShowAnimation(true)
       sessionStorage.removeItem('steward_just_signed_in')
+      // Mark that we've already shown the animation this session
+      sessionStorage.setItem('steward_animation_shown', '1')
 
       // Clean up the ?welcome param from the URL
       if (fromOAuth) {
