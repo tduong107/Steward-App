@@ -9,7 +9,7 @@ export const metadata: Metadata = {
     default: 'Steward — AI Price Tracker & Web Monitor | Track Prices, Restocks, Reservations',
     template: '%s | Steward',
   },
-  description: 'Steward is an AI-powered price tracker that monitors price drops, restocks, restaurant reservations, campsite openings, flight deals, and event tickets. Set up in 30 seconds with plain English. Free to start.',
+  description: 'Steward is an AI-powered price tracker that monitors price drops, restocks, restaurant reservations, campsite openings, flight deals, and event tickets. Set up in 30 seconds. Free to start.',
   keywords: [
     'price tracker',
     'price drop alert',
@@ -35,7 +35,7 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://www.joinsteward.app'),
   openGraph: {
     title: 'Steward — AI Price Tracker & Web Monitor',
-    description: 'Track price drops, restocks, restaurant reservations, campsites, flights, and event tickets. AI-powered setup in plain English. Free to start.',
+    description: 'Track price drops, restocks, restaurant reservations, campsites, flights, and event tickets. AI-powered setup in seconds. Free to start.',
     url: 'https://www.joinsteward.app',
     siteName: 'Steward',
     type: 'website',

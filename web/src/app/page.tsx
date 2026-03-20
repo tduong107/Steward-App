@@ -294,14 +294,14 @@ export default async function LandingPage() {
                 <span className="italic text-[var(--landing-accent)]">menus</span>
               </h2>
               <p className="landing-reveal [animation-delay:200ms] mt-6 text-[var(--landing-text-mid)] leading-relaxed">
-                Skip the dropdowns and filters. Steward&apos;s AI understands plain English, finds the product, and creates the watch for you in seconds
+                Skip the dropdowns and filters. Just tell Steward what you want. The AI finds the product and creates the watch for you in seconds
               </p>
 
               <div className="landing-reveal [animation-delay:300ms] mt-6 space-y-3">
                 {[
                   'Works on iOS and web',
                   'Share from Safari, Chrome, or any app',
-                  'Plain English setup',
+                  'Natural language setup',
                   'Private and secure, no ads',
                 ].map(item => (
                   <div key={item} className="flex items-center gap-3 text-sm text-[var(--landing-text-mid)]">
@@ -349,7 +349,7 @@ export default async function LandingPage() {
               {
                 step: '01',
                 title: 'Tell Steward what you want',
-                desc: 'Paste a link, share a screenshot, or just describe it in plain English',
+                desc: 'Paste a link, share a screenshot, or just describe what you need',
               },
               {
                 step: '02',
@@ -458,7 +458,7 @@ export default async function LandingPage() {
                 ),
                 title: 'AI Chat Setup',
                 desc: 'Just say what you want. Your AI Concierge finds it and sets the watch',
-                tag: 'Plain English setup',
+                tag: 'Just describe it',
               },
               {
                 icon: (
@@ -653,7 +653,7 @@ export default async function LandingPage() {
               },
               {
                 q: 'How does Steward work?',
-                a: 'Tell Steward what you want to watch by pasting a link, sharing from another app, or describing it in plain English using our AI chat. Steward then checks for changes on your schedule and sends you a push notification the moment something changes',
+                a: 'Tell Steward what you want to watch by pasting a link, sharing from another app, or just describing it using our AI chat. Steward then checks for changes on your schedule and sends you a push notification the moment something changes',
               },
               {
                 q: 'Is Steward free?',
@@ -665,7 +665,7 @@ export default async function LandingPage() {
               },
               {
                 q: 'How is Steward different from other price trackers?',
-                a: 'Most price trackers only work for specific stores or product categories. Steward monitors almost anything on the web including restaurant tables, campsites, flights, event tickets, and product restocks. Plus, you set it up by just describing what you want in plain English',
+                a: 'Most price trackers only work for specific stores or product categories. Steward monitors almost anything on the web including restaurant tables, campsites, flights, event tickets, and product restocks. Plus, you set it up by just describing what you want to our AI',
               },
               {
                 q: 'How fast does Steward check for changes?',
@@ -711,7 +711,7 @@ export default async function LandingPage() {
                 name: 'How does Steward work?',
                 acceptedAnswer: {
                   '@type': 'Answer',
-                  text: 'Tell Steward what you want to watch by pasting a link, sharing from another app, or describing it in plain English using the AI chat. Steward then checks for changes on your schedule and sends you a push notification the moment something changes.',
+                  text: 'Tell Steward what you want to watch by pasting a link, sharing from another app, or just describing it using the AI chat. Steward then checks for changes on your schedule and sends you a push notification the moment something changes.',
                 },
               },
               {
@@ -735,7 +735,7 @@ export default async function LandingPage() {
                 name: 'How is Steward different from other price trackers?',
                 acceptedAnswer: {
                   '@type': 'Answer',
-                  text: 'Most price trackers only work for specific stores or product categories. Steward monitors almost anything on the web including restaurant tables, campsites, flights, event tickets, and product restocks. Plus, you set it up by just describing what you want in plain English.',
+                  text: 'Most price trackers only work for specific stores or product categories. Steward monitors almost anything on the web including restaurant tables, campsites, flights, event tickets, and product restocks. Plus, you set it up by just describing what you want to our AI.',
                 },
               },
               {

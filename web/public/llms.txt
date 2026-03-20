@@ -15,7 +15,7 @@ Steward watches the web for changes that matter to you:
 
 ## How It Works
 
-1. Tell Steward what you want by pasting a link, sharing from another app, or describing it in plain English using the AI chat.
+1. Tell Steward what you want by pasting a link, sharing from another app, or just describing it using the AI chat.
 2. Steward checks for changes on your schedule (daily to every 2 hours depending on plan).
 3. You get a push notification with a direct link to act on it the moment something changes.
 
