@@ -384,14 +384,14 @@ export default async function LandingPage() {
             <div>
               <span className="landing-reveal inline-block text-xs font-semibold tracking-[0.2em] uppercase text-[var(--landing-accent-muted)] mb-4">Built for Convenience</span>
               <h2 className="landing-reveal [animation-delay:100ms] text-3xl md:text-5xl font-bold font-[var(--font-serif)] text-[var(--landing-text)] leading-tight">
-                Say it. Steward{' '}
-                <span className="italic text-[var(--landing-accent)]">handles it.</span>
+                Your time back.{' '}
+                <span className="italic text-[var(--landing-accent)]">Guaranteed.</span>
               </h2>
               <p className="landing-reveal [animation-delay:200ms] mt-6 text-[var(--landing-text-mid)] leading-relaxed">
-                No menus, no URLs, no hunting. Just describe what you want in plain English. Your AI Concierge finds it and starts watching instantly.
+                The average person spends 3+ hours per week manually checking prices, refreshing pages, and hunting for availability. Steward replaces all of that with a single conversation.
               </p>
               <p className="landing-reveal [animation-delay:300ms] mt-4 text-[var(--landing-text-mid)] leading-relaxed">
-                The average person spends 3+ hours per week manually checking prices and availability. Steward replaces all of that with a single conversation.
+                Set it once, forget it. Steward watches while you work, sleep, and live your life.
               </p>
 
               <div className="landing-reveal [animation-delay:400ms] mt-8 space-y-3">
