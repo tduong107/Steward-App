@@ -793,6 +793,7 @@ export default async function LandingPage() {
           </div>
           <div className="flex items-center gap-6 text-sm text-[var(--landing-text-dim)]">
             <a href="#pricing" className="hover:text-[var(--landing-text)] transition-colors duration-300">Pricing</a>
+            <Link href="/support" className="hover:text-[var(--landing-text)] transition-colors duration-300">Support</Link>
             <Link href="/login" className="hover:text-[var(--landing-text)] transition-colors duration-300">Sign In</Link>
             <Link href="/signup" className="hover:text-[var(--landing-text)] transition-colors duration-300">Sign Up</Link>
           </div>
