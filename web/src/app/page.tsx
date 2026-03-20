@@ -447,7 +447,7 @@ export default async function LandingPage() {
             <div className="order-1 md:order-2">
               <span className="landing-reveal inline-block text-xs font-semibold tracking-[0.2em] uppercase text-[var(--landing-gold-label)] mb-4">Why Steward</span>
               <h2 className="landing-reveal [animation-delay:100ms] text-3xl md:text-5xl font-bold font-[var(--font-serif)] text-[var(--landing-text)] leading-tight">
-                Everything costs more<br />Steward fights back
+                Inflation affects us all<br />Steward fights back
               </h2>
               <p className="landing-reveal [animation-delay:200ms] mt-6 text-[var(--landing-text-mid)] leading-relaxed">
                 Grocery prices are up 25%, flight prices are up 30%. The cost of living keeps climbing but you don&apos;t have time to constantly check for better prices or refresh pages hoping for a cancellation
