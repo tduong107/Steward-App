@@ -1,10 +1,20 @@
 import SwiftUI
 
 /// Flow B — First Sign-In (post-auth)
-/// 6 slides: Welcome → Watches → AI Chat → Savings → Share Extension → All Set
+/// 7 slides: Welcome → Watches → AI Chat → Savings → Share Extension → Notifications → All Set
 struct OnboardingFlowB: View {
     @Environment(AuthManager.self) private var authManager
+    @Environment(NotificationManager.self) private var notificationManager
+    @AppStorage("notifyEmail") private var notifyEmail = false
+    @AppStorage("notifySMS") private var notifySMS = false
     @State private var currentPage = 0
+    @State private var pushEnabled = false
+    @State private var emailEnabled = false
+    @State private var smsEnabled = false
+    @State private var emailInput = ""
+    @State private var showEmailField = false
+    @State private var showPhoneField = false
+    @State private var phoneInput = ""
     var onFinish: () -> Void
 
     // Brand colours
@@ -15,7 +25,7 @@ struct OnboardingFlowB: View {
     private let cream = Color(hex: "F7F6F3")
     private let gold = Color(hex: "F59E0B")
 
-    private let totalPages = 6
+    private let totalPages = 7
 
     var body: some View {
         ZStack {
@@ -27,7 +37,8 @@ struct OnboardingFlowB: View {
                 aiChatSlide.tag(2)
                 savingsSlide.tag(3)
                 shareExtensionSlide.tag(4)
-                allSetSlide.tag(5)
+                notificationsSlide.tag(5)
+                allSetSlide.tag(6)
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
             .animation(.easeInOut(duration: 0.35), value: currentPage)
@@ -40,14 +51,28 @@ struct OnboardingFlowB: View {
                     .padding(.bottom, 20)
 
                 if currentPage < totalPages - 1 {
-                    primaryButton(currentPage == 0 ? "Let's go →" : "Continue →") {
-                        withAnimation { currentPage += 1 }
+                    if currentPage == 5 {
+                        // Notifications slide — save preferences and continue
+                        primaryButton("Save & continue →") {
+                            Task {
+                                await saveNotificationPreferences()
+                                withAnimation { currentPage += 1 }
+                            }
+                        }
+                        .padding(.horizontal, 28)
+                    } else {
+                        primaryButton(currentPage == 0 ? "Let's go →" : "Continue →") {
+                            withAnimation { currentPage += 1 }
+                        }
+                        .padding(.horizontal, 28)
                     }
-                    .padding(.horizontal, 28)
 
                     if currentPage == 0 {
                         Button("Skip tour") {
-                            onFinish()
+                            Task {
+                                await notificationManager.requestPermission()
+                                onFinish()
+                            }
                         }
                         .font(.system(size: 13))
                         .foregroundStyle(.white.opacity(0.35))
@@ -317,7 +342,7 @@ struct OnboardingFlowB: View {
             VStack(alignment: .leading, spacing: 0) {
                 Spacer().frame(height: 68)
 
-                featureLabel(emoji: "💸", text: "Savings")
+                featureLabel(emoji: "💸", text: "Potential Savings")
                     .padding(.horizontal, 32)
 
                 Spacer().frame(height: 14)
@@ -340,7 +365,7 @@ struct OnboardingFlowB: View {
 
                 // Savings card
                 VStack(alignment: .leading, spacing: 0) {
-                    Text("TOTAL SAVINGS")
+                    Text("POTENTIAL SAVINGS")
                         .font(.system(size: 11, weight: .medium))
                         .tracking(1.5)
                         .foregroundStyle(mint.opacity(0.6))
@@ -540,7 +565,321 @@ struct OnboardingFlowB: View {
         }
     }
 
-    // MARK: - Slide B6: All Set
+    // MARK: - Slide B6: Notifications Setup
+
+    private var notificationsSlide: some View {
+        ZStack {
+            RadialGradient(
+                colors: [stewardGreen.opacity(0.4), .clear],
+                center: .init(x: 0.3, y: 0.4),
+                startRadius: 0,
+                endRadius: 220
+            )
+            .ignoresSafeArea()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    Spacer().frame(height: 68)
+
+                    featureLabel(emoji: "🔔", text: "Notifications")
+                        .padding(.horizontal, 32)
+
+                    Spacer().frame(height: 14)
+
+                    Text("Never miss\na deal")
+                        .font(Theme.serif(26, weight: .bold))
+                        .foregroundStyle(cream)
+                        .lineSpacing(4)
+                        .padding(.horizontal, 32)
+
+                    Spacer().frame(height: 10)
+
+                    Text("Choose how you'd like Steward to reach you when something changes.")
+                        .font(.system(size: 13.5, weight: .light))
+                        .lineSpacing(3)
+                        .foregroundStyle(cream.opacity(0.6))
+                        .padding(.horizontal, 32)
+
+                    Spacer().frame(height: 24)
+
+                    // Channel toggles
+                    VStack(spacing: 0) {
+                        // Push
+                        notifChannelRow(
+                            icon: "bell.fill",
+                            title: "Push Notifications",
+                            subtitle: "Instant alerts on your device",
+                            isOn: $pushEnabled
+                        )
+
+                        dividerLine
+
+                        // Email
+                        notifChannelRow(
+                            icon: "envelope.fill",
+                            title: "Email",
+                            subtitle: hasEmail ? (authManager.effectiveEmail ?? "") : "Add an email for detailed alerts",
+                            isOn: Binding(
+                                get: { emailEnabled },
+                                set: { newValue in
+                                    if newValue {
+                                        emailEnabled = true
+                                        if !hasEmail {
+                                            withAnimation(.spring(response: 0.3)) {
+                                                showEmailField = true
+                                            }
+                                        }
+                                    } else {
+                                        emailEnabled = false
+                                        showEmailField = false
+                                    }
+                                }
+                            )
+                        )
+
+                        // Inline email entry
+                        if showEmailField && !hasEmail {
+                            VStack(spacing: 10) {
+                                HStack(spacing: 12) {
+                                    Image(systemName: "envelope")
+                                        .font(.system(size: 14))
+                                        .foregroundStyle(mint.opacity(0.5))
+                                        .frame(width: 20)
+
+                                    TextField("", text: $emailInput, prompt: Text("your@email.com").foregroundStyle(mint.opacity(0.3)))
+                                        .font(.system(size: 14))
+                                        .foregroundStyle(.white)
+                                        .keyboardType(.emailAddress)
+                                        .textContentType(.emailAddress)
+                                        .autocorrectionDisabled()
+                                        .textInputAutocapitalization(.never)
+                                }
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 12)
+                                .background(deepForest.opacity(0.6))
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .stroke(mint.opacity(0.15), lineWidth: 1)
+                                )
+
+                                if isValidEmail(emailInput.trimmingCharacters(in: .whitespacesAndNewlines)) {
+                                    Button {
+                                        let trimmed = emailInput.trimmingCharacters(in: .whitespacesAndNewlines)
+                                        Task {
+                                            await authManager.saveNotificationEmail(trimmed)
+                                            emailEnabled = true
+                                            showEmailField = false
+                                        }
+                                    } label: {
+                                        Text("Save email")
+                                            .font(.system(size: 12, weight: .medium))
+                                            .foregroundStyle(deepForest)
+                                            .padding(.horizontal, 16)
+                                            .padding(.vertical, 8)
+                                            .background(mint)
+                                            .clipShape(Capsule())
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+
+                                Text("By saving, you agree to receive watch alert emails from Steward. You can turn this off anytime in Settings.")
+                                    .font(.system(size: 10, weight: .light))
+                                    .foregroundStyle(cream.opacity(0.35))
+                                    .lineSpacing(2)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 12)
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                        }
+
+                        dividerLine
+
+                        // SMS
+                        notifChannelRow(
+                            icon: "message.fill",
+                            title: "SMS",
+                            subtitle: hasPhone ? (authManager.effectivePhone ?? "") : "Add a phone number for text alerts",
+                            isOn: Binding(
+                                get: { smsEnabled },
+                                set: { newValue in
+                                    if newValue {
+                                        smsEnabled = true
+                                        if !hasPhone {
+                                            withAnimation(.spring(response: 0.3)) {
+                                                showPhoneField = true
+                                            }
+                                        }
+                                    } else {
+                                        smsEnabled = false
+                                        showPhoneField = false
+                                    }
+                                }
+                            )
+                        )
+
+                        // Inline phone entry
+                        if showPhoneField && !hasPhone {
+                            VStack(spacing: 10) {
+                                HStack(spacing: 12) {
+                                    Image(systemName: "phone")
+                                        .font(.system(size: 14))
+                                        .foregroundStyle(mint.opacity(0.5))
+                                        .frame(width: 20)
+
+                                    TextField("", text: $phoneInput, prompt: Text("(555) 123-4567").foregroundStyle(mint.opacity(0.3)))
+                                        .font(.system(size: 14))
+                                        .foregroundStyle(.white)
+                                        .keyboardType(.phonePad)
+                                        .textContentType(.telephoneNumber)
+                                }
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 12)
+                                .background(deepForest.opacity(0.6))
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .stroke(mint.opacity(0.15), lineWidth: 1)
+                                )
+
+                                if isValidPhone(phoneInput.trimmingCharacters(in: .whitespacesAndNewlines)) {
+                                    Button {
+                                        let trimmed = phoneInput.trimmingCharacters(in: .whitespacesAndNewlines)
+                                        Task {
+                                            await authManager.savePhoneNumber(trimmed)
+                                            smsEnabled = true
+                                            showPhoneField = false
+                                        }
+                                    } label: {
+                                        Text("Agree & enable SMS")
+                                            .font(.system(size: 12, weight: .medium))
+                                            .foregroundStyle(deepForest)
+                                            .padding(.horizontal, 16)
+                                            .padding(.vertical, 8)
+                                            .background(mint)
+                                            .clipShape(Capsule())
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+
+                                Text("By enabling, you consent to receive automated SMS watch alerts from Steward at this number. Msg frequency varies. Msg & data rates may apply. Reply STOP to opt out. See our [Privacy Policy](https://www.joinsteward.app/privacy) and [Terms](https://www.joinsteward.app/terms).")
+                                    .font(.system(size: 10, weight: .light))
+                                    .foregroundStyle(cream.opacity(0.35))
+                                    .tint(mint.opacity(0.5))
+                                    .lineSpacing(2)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 12)
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                        }
+                    }
+                    .padding(4)
+                    .background(.white.opacity(0.04))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(.white.opacity(0.08), lineWidth: 1)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .padding(.horizontal, 20)
+
+                    Spacer().frame(height: 16)
+
+                    // Info note
+                    HStack(spacing: 8) {
+                        Image(systemName: "info.circle")
+                            .font(.system(size: 11))
+                            .foregroundStyle(cream.opacity(0.3))
+
+                        Text("You can change these anytime in Settings.")
+                            .font(.system(size: 11, weight: .light))
+                            .foregroundStyle(cream.opacity(0.35))
+                    }
+                    .padding(.horizontal, 24)
+
+                    Spacer().frame(height: 120) // room for button
+                }
+            }
+            .scrollDismissesKeyboard(.interactively)
+        }
+        .onAppear {
+            // Pre-populate based on what the user already has + prefs from sign-up
+            pushEnabled = notificationManager.isPermissionGranted
+            emailEnabled = (notifyEmail && hasEmail) || hasEmail
+            smsEnabled = (notifySMS && hasPhone) || hasPhone
+        }
+    }
+
+    private var dividerLine: some View {
+        Rectangle()
+            .fill(.white.opacity(0.06))
+            .frame(height: 1)
+            .padding(.leading, 52)
+    }
+
+    private func notifChannelRow(icon: String, title: String, subtitle: String, isOn: Binding<Bool>) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 15))
+                .foregroundStyle(isOn.wrappedValue ? mint : cream.opacity(0.4))
+                .frame(width: 32, height: 32)
+                .background(isOn.wrappedValue ? mint.opacity(0.12) : .white.opacity(0.04))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(cream)
+                Text(subtitle)
+                    .font(.system(size: 11, weight: .light))
+                    .foregroundStyle(cream.opacity(0.5))
+                    .lineLimit(1)
+            }
+
+            Spacer()
+
+            Toggle("", isOn: isOn)
+                .labelsHidden()
+                .tint(mint)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+    }
+
+    /// Whether the user has a usable email for notifications
+    private var hasEmail: Bool {
+        authManager.effectiveEmail != nil
+    }
+
+    /// Whether the user has a usable phone number for SMS
+    private var hasPhone: Bool {
+        authManager.effectivePhone != nil
+    }
+
+    private func isValidEmail(_ email: String) -> Bool {
+        let pattern = #"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$"#
+        return email.range(of: pattern, options: .regularExpression) != nil
+    }
+
+    private func isValidPhone(_ phone: String) -> Bool {
+        let digits = phone.filter { $0.isNumber }
+        return digits.count >= 10
+    }
+
+    /// Saves notification preferences when leaving the notifications slide
+    private func saveNotificationPreferences() async {
+        // Push
+        if pushEnabled {
+            await notificationManager.requestPermission()
+        }
+
+        // Email
+        notifyEmail = emailEnabled
+
+        // SMS
+        notifySMS = smsEnabled
+    }
+
+    // MARK: - Slide B7: All Set
 
     private var allSetSlide: some View {
         ZStack {
@@ -572,8 +911,8 @@ struct OnboardingFlowB: View {
                         Circle().stroke(mint.opacity(0.35), lineWidth: 2)
                     )
                     .clipShape(Circle())
-                    .scaleEffect(currentPage == 5 ? 1.0 : 0.5)
-                    .opacity(currentPage == 5 ? 1.0 : 0)
+                    .scaleEffect(currentPage == 6 ? 1.0 : 0.5)
+                    .opacity(currentPage == 6 ? 1.0 : 0)
                     .animation(.spring(response: 0.6, dampingFraction: 0.6), value: currentPage)
 
                 Spacer().frame(height: 24)
