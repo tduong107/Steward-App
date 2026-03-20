@@ -8,11 +8,13 @@ import {
   Home,
   Activity,
   PiggyBank,
+  BarChart3,
   Settings,
   LogOut,
   Sparkles,
   ArrowUpRight,
   Crown,
+  Lock,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { useSub } from '@/hooks/use-subscription'
@@ -27,6 +29,7 @@ const navItems = [
   { label: 'Home', icon: Home, href: '/home' },
   { label: 'Activity', icon: Activity, href: '/home/activity' },
   { label: 'Savings', icon: PiggyBank, href: '/home/savings' },
+  { label: 'Price Insights', icon: BarChart3, href: '/home/price-insights', proOnly: true },
 ] as const
 
 export function Sidebar({ onChatOpen }: SidebarProps) {
@@ -83,12 +86,14 @@ export function Sidebar({ onChatOpen }: SidebarProps) {
 
         {/* Navigation */}
         <nav className="flex-1 flex flex-col gap-1 px-3 mt-3">
-          {navItems.map(({ label, icon: Icon, href }) => {
+          {navItems.map(({ label, icon: Icon, href, ...rest }) => {
             const active = isActive(href)
+            const isProLocked = 'proOnly' in rest && rest.proOnly && showUpgrade
             return (
               <Link
                 key={href}
-                href={href}
+                href={isProLocked ? '#' : href}
+                onClick={isProLocked ? (e: React.MouseEvent) => { e.preventDefault(); setShowPaywall(true) } : undefined}
                 className={`flex items-center gap-3 rounded-[var(--radius-lg)] px-3 py-2.5 text-sm font-medium transition-colors ${
                   active
                     ? 'bg-[var(--color-accent-light)] text-[var(--color-accent)]'
@@ -97,6 +102,7 @@ export function Sidebar({ onChatOpen }: SidebarProps) {
               >
                 <Icon size={20} />
                 {label}
+                {isProLocked && <Lock size={12} className="ml-auto text-[var(--color-ink-light)]" />}
               </Link>
             )
           })}
