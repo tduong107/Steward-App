@@ -111,26 +111,24 @@ export default async function LandingPage() {
           Free forever · No credit card required · Set up in 30 seconds
         </p>
 
-        {/* Hero visual — branded marketing asset (cropped to hide baked-in button + stats) */}
-        <div className="landing-reveal [animation-delay:500ms] mt-20 mx-auto max-w-4xl overflow-hidden rounded-2xl" style={{ maxHeight: '82%' }}>
-          <div className="relative" style={{ marginBottom: '-18%' }}>
+        {/* Hero visual — branded marketing asset */}
+        <div className="landing-reveal [animation-delay:500ms] mt-20 mx-auto max-w-4xl">
             <Image
               src="/assets/hero-dark.svg"
               alt="Steward watches prices, restocks, reservations and more"
               width={1200}
-              height={600}
-              className="w-full h-auto hidden dark:block"
+              height={630}
+              className="w-full h-auto hidden dark:block rounded-2xl"
               priority
             />
             <Image
               src="/assets/hero-light.svg"
               alt="Steward watches prices, restocks, reservations and more"
               width={1200}
-              height={600}
-              className="w-full h-auto dark:hidden"
+              height={630}
+              className="w-full h-auto dark:hidden rounded-2xl"
               priority
             />
-          </div>
         </div>
       </section>
 
@@ -226,7 +224,7 @@ export default async function LandingPage() {
                 <span className="italic text-[var(--landing-accent)]">menus</span>
               </h2>
               <p className="landing-reveal [animation-delay:200ms] mt-6 text-[var(--landing-text-mid)] leading-relaxed">
-                Skip the dropdowns and filters &mdash; Steward&apos;s AI understands plain English, finds the product, and creates the watch for you in seconds
+                Skip the dropdowns and filters. Steward&apos;s AI understands plain English, finds the product, and creates the watch for you in seconds
               </p>
 
               <div className="landing-reveal [animation-delay:300ms] mt-6 space-y-3">
@@ -365,7 +363,7 @@ export default async function LandingPage() {
                   <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15.362 5.214A8.252 8.252 0 0 1 12 21 8.25 8.25 0 0 1 6.038 7.047 8.287 8.287 0 0 0 9 9.601a8.983 8.983 0 0 1 3.361-6.867 8.21 8.21 0 0 0 3 2.48Z" /><path strokeLinecap="round" strokeLinejoin="round" d="M12 18a3.75 3.75 0 0 0 .495-7.468 5.99 5.99 0 0 0-1.925 3.547 5.975 5.975 0 0 1-2.133-1.001A3.75 3.75 0 0 0 12 18Z" /></svg>
                 ),
                 title: 'Campsites',
-                desc: 'Yosemite, Yellowstone, Big Sur \u2014 snag that cancellation before anyone else',
+                desc: 'Yosemite, Yellowstone, Big Sur. Snag that cancellation before anyone else',
                 tag: 'Recreation.gov sites',
               },
               {
@@ -381,7 +379,7 @@ export default async function LandingPage() {
                   <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" /></svg>
                 ),
                 title: 'Restocks',
-                desc: 'Limited releases, sold-out sneakers, viral products \u2014 be first in line when they return',
+                desc: 'Limited releases, sold-out sneakers, viral products. Be first in line when they return',
                 tag: 'Most URLs work',
               },
               {
@@ -389,7 +387,7 @@ export default async function LandingPage() {
                   <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.076-4.076a1.526 1.526 0 0 1 1.037-.443 48.282 48.282 0 0 0 5.68-.494c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" /></svg>
                 ),
                 title: 'AI Chat Setup',
-                desc: 'Just say what you want \u2014 your AI Concierge finds it and sets the watch',
+                desc: 'Just say what you want. Your AI Concierge finds it and sets the watch',
                 tag: 'Plain English setup',
               },
               {
@@ -397,7 +395,7 @@ export default async function LandingPage() {
                   <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 1 0 0 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186 9.566-5.314m-9.566 7.5 9.566 5.314m0 0a2.25 2.25 0 1 0 3.935 2.186 2.25 2.25 0 0 0-3.935-2.186Zm0-12.814a2.25 2.25 0 1 0 3.933-2.185 2.25 2.25 0 0 0-3.933 2.185Z" /></svg>
                 ),
                 title: 'Share Extension',
-                desc: 'See something in Safari or Chrome? Tap Share, then Steward \u2014 link loaded and ready',
+                desc: 'See something in Safari or Chrome? Tap Share, then Steward. Link loaded and ready',
                 tag: 'Works in most apps',
               },
             ].map((item, i) => (
@@ -452,10 +450,10 @@ export default async function LandingPage() {
                 Everything costs more<br />Steward fights back
               </h2>
               <p className="landing-reveal [animation-delay:200ms] mt-6 text-[var(--landing-text-mid)] leading-relaxed">
-                Groceries up 25%, flights up 30% &mdash; the cost of living keeps climbing but you don&apos;t have time to constantly check for better prices or refresh pages hoping for a cancellation
+                Grocery prices are up 25%, flight prices are up 30%. The cost of living keeps climbing but you don&apos;t have time to constantly check for better prices or refresh pages hoping for a cancellation
               </p>
               <p className="landing-reveal [animation-delay:300ms] mt-4 text-[var(--landing-text-mid)] leading-relaxed">
-                Tell Steward what you want and your AI concierge handles the rest &mdash; no browser tabs, no price alert fatigue, just real savings delivered to you
+                Tell Steward what you want and your AI concierge handles the rest. No browser tabs, no price alert fatigue, just real savings delivered to you
               </p>
               <Link
                 href="/signup"
@@ -581,7 +579,7 @@ export default async function LandingPage() {
               <span className="italic text-[var(--landing-accent)]">ready</span>
             </h2>
             <p className="landing-reveal [animation-delay:100ms] text-lg text-[var(--landing-text-dim)] mb-12 max-w-xl mx-auto">
-              Stop refreshing, stop missing out &mdash; Steward watches prices, tables, tickets, and campsites and pings you the moment something moves
+              Stop refreshing, stop missing out. Steward watches prices, tables, tickets, and campsites and pings you the moment something moves
             </p>
             <Link
               href="/signup"
