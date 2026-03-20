@@ -136,7 +136,7 @@ export function Sidebar({ onChatOpen }: SidebarProps) {
                 </div>
               </div>
               <div className="mt-3 flex items-center justify-center rounded-full bg-white/20 py-1.5 text-xs font-semibold text-white">
-                From $2.99/mo
+                From $3.33/mo (billed yearly)
               </div>
             </button>
           </div>

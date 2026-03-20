@@ -38,14 +38,14 @@ const tiers: TierConfig[] = [
     name: 'Pro',
     key: 'pro',
     monthlyPrice: '$4.99',
-    yearlyPrice: '$2.99',
+    yearlyPrice: '$39.99',
     features: ['7 watches', 'Every 12h checks', 'Quick Links', 'Price insights'],
   },
   {
     name: 'Premium',
     key: 'premium',
     monthlyPrice: '$9.99',
-    yearlyPrice: '$5.99',
+    yearlyPrice: '$79.99',
     features: ['15 watches', 'Every 2h checks', 'Steward Acts', 'Auto-actions'],
   },
 ]
@@ -117,7 +117,7 @@ export function PaywallDialog({ open, onClose }: PaywallDialogProps) {
           </div>
           {billing === 'yearly' && (
             <span className="ml-2 rounded-full bg-[var(--color-green-light)] px-2 py-0.5 text-xs font-medium text-[var(--color-green)]">
-              Save 40%
+              Save 33%
             </span>
           )}
         </div>
@@ -150,7 +150,9 @@ export function PaywallDialog({ open, onClose }: PaywallDialogProps) {
                 <div className="mt-2">
                   <span className="text-2xl font-bold text-[var(--color-ink)]">{price}</span>
                   {t.key !== 'free' && (
-                    <span className="text-sm text-[var(--color-ink-mid)]">/mo</span>
+                    <span className="text-sm text-[var(--color-ink-mid)]">
+                      {billing === 'yearly' ? '/yr' : '/mo'}
+                    </span>
                   )}
                 </div>
 
