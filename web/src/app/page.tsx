@@ -330,7 +330,7 @@ export default async function LandingPage() {
           <div className="text-center mb-16">
             <span className="landing-reveal inline-block text-xs font-semibold tracking-[0.2em] uppercase text-[var(--landing-gold-label)] mb-4">Use Cases</span>
             <h2 className="landing-reveal [animation-delay:100ms] text-3xl md:text-5xl font-bold font-[var(--font-serif)] text-[var(--landing-text)]">
-              One app, endless savings
+              One app, endless ways to save
             </h2>
           </div>
 
@@ -349,8 +349,8 @@ export default async function LandingPage() {
                   <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8.25v-1.5m0 1.5c-1.355 0-2.697.056-4.024.166C6.845 8.51 6 9.473 6 10.608v2.513m6-4.871c1.355 0 2.697.056 4.024.166C17.155 8.51 18 9.473 18 10.608v2.513M15 8.25v-1.5m-6 1.5v-1.5m12 9.75-1.5.75a3.354 3.354 0 0 1-3 0 3.354 3.354 0 0 0-3 0 3.354 3.354 0 0 1-3 0 3.354 3.354 0 0 0-3 0 3.354 3.354 0 0 1-3 0L3 16.5m15-3.379a48.474 48.474 0 0 0-6-.371c-2.032 0-4.034.126-6 .371m12 0c.39.049.777.102 1.163.16 1.07.16 1.837 1.094 1.837 2.175v5.169c0 .621-.504 1.125-1.125 1.125H4.125A1.125 1.125 0 0 1 3 20.625v-5.17c0-1.08.768-2.014 1.837-2.174A47.78 47.78 0 0 1 6 13.12M12.265 3.11a.375.375 0 1 1-.53 0L12 2.845l.265.265Z" /></svg>
                 ),
                 title: 'Restaurant Tables',
-                desc: 'Impossible reservation? Steward monitors Resy and OpenTable for cancellations',
-                tag: 'Resy, OpenTable & more',
+                desc: 'Impossible reservation? Steward monitors Resy for cancellations and new openings',
+                tag: 'Resy & more',
               },
               {
                 icon: (
@@ -365,7 +365,7 @@ export default async function LandingPage() {
                   <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15.362 5.214A8.252 8.252 0 0 1 12 21 8.25 8.25 0 0 1 6.038 7.047 8.287 8.287 0 0 0 9 9.601a8.983 8.983 0 0 1 3.361-6.867 8.21 8.21 0 0 0 3 2.48Z" /><path strokeLinecap="round" strokeLinejoin="round" d="M12 18a3.75 3.75 0 0 0 .495-7.468 5.99 5.99 0 0 0-1.925 3.547 5.975 5.975 0 0 1-2.133-1.001A3.75 3.75 0 0 0 12 18Z" /></svg>
                 ),
                 title: 'Campsites',
-                desc: 'Yosemite, Yellowstone, Big Sur &mdash; snag that cancellation before anyone else',
+                desc: 'Yosemite, Yellowstone, Big Sur \u2014 snag that cancellation before anyone else',
                 tag: 'Recreation.gov sites',
               },
               {
@@ -374,14 +374,14 @@ export default async function LandingPage() {
                 ),
                 title: 'Event Tickets',
                 desc: 'Concert tickets sold out? Watch for face-value drops and new inventory',
-                tag: 'Ticketmaster, SeatGeek',
+                tag: 'Ticketmaster & more',
               },
               {
                 icon: (
                   <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" /></svg>
                 ),
                 title: 'Restocks',
-                desc: 'Limited releases, sold-out sneakers, viral products &mdash; be first in line when they return',
+                desc: 'Limited releases, sold-out sneakers, viral products \u2014 be first in line when they return',
                 tag: 'Most URLs work',
               },
               {
@@ -389,7 +389,7 @@ export default async function LandingPage() {
                   <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.076-4.076a1.526 1.526 0 0 1 1.037-.443 48.282 48.282 0 0 0 5.68-.494c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" /></svg>
                 ),
                 title: 'AI Chat Setup',
-                desc: 'Just say what you want &mdash; your AI Concierge finds it and sets the watch',
+                desc: 'Just say what you want \u2014 your AI Concierge finds it and sets the watch',
                 tag: 'Plain English setup',
               },
               {
@@ -397,7 +397,7 @@ export default async function LandingPage() {
                   <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 1 0 0 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186 9.566-5.314m-9.566 7.5 9.566 5.314m0 0a2.25 2.25 0 1 0 3.935 2.186 2.25 2.25 0 0 0-3.935-2.186Zm0-12.814a2.25 2.25 0 1 0 3.933-2.185 2.25 2.25 0 0 0-3.933 2.185Z" /></svg>
                 ),
                 title: 'Share Extension',
-                desc: 'See something in Safari or Chrome? Tap Share, then Steward &mdash; link loaded and ready',
+                desc: 'See something in Safari or Chrome? Tap Share, then Steward \u2014 link loaded and ready',
                 tag: 'Works in most apps',
               },
             ].map((item, i) => (
