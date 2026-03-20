@@ -7,6 +7,7 @@ import { X, SendHorizontal, RotateCcw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useChat } from '@/hooks/use-chat'
 import { useWatches } from '@/hooks/use-watches'
+import { useSub } from '@/hooks/use-subscription'
 import { ChatMessage } from '@/components/chat-message'
 import type { Watch } from '@/lib/types'
 
@@ -38,7 +39,8 @@ function TypingIndicator() {
 }
 
 export function ChatDrawer({ open, onClose }: ChatDrawerProps) {
-  const { messages, sendMessage, isLoading, clearMessages, addMessage } = useChat()
+  const { tier } = useSub()
+  const { messages, sendMessage, isLoading, clearMessages, addMessage } = useChat(tier)
   const { createWatch } = useWatches()
   const [input, setInput] = useState('')
   const [mounted, setMounted] = useState(false)

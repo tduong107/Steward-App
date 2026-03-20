@@ -1,8 +1,11 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { ChatMessage, ProductLink, Watch } from '@/lib/types'
+
+// Detect URLs in text (matches iOS enrichURLsInText behavior)
+const URL_REGEX = /https?:\/\/[^\s<>"{}|\\^`[\]]+/gi
 
 function parseWatchData(text: string): Partial<Watch> | undefined {
   const match = text.match(/\[CREATE_WATCH\]([\s\S]*?)\[\/CREATE_WATCH\]/)
@@ -69,9 +72,10 @@ function stripTags(text: string): string {
     .trim()
 }
 
-export function useChat() {
+export function useChat(tier: string = 'free') {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const isFirstMessageRef = useRef(true)
 
   const sendMessage = useCallback(
     async (text: string) => {
@@ -93,11 +97,54 @@ export function useChat() {
         const { data: { session } } = await supabase.auth.getSession()
         const accessToken = session?.access_token
 
+        // Enrich the user message with context (matches iOS behavior)
+        let enrichedText = text
+
+        // Inject [USER_TIER] on first message (matches iOS ChatViewModel.send())
+        if (isFirstMessageRef.current) {
+          const tierLabel = tier === 'premium' ? 'Premium' : tier === 'pro' ? 'Pro' : 'Free'
+          enrichedText = `[USER_TIER]${tierLabel}[/USER_TIER]\n${enrichedText}`
+          isFirstMessageRef.current = false
+        }
+
+        // Resolve URLs in the message (matches iOS enrichURLsInText)
+        const urls = text.match(URL_REGEX)
+        if (urls && urls.length > 0) {
+          try {
+            const res = await fetch('/api/resolve-url', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ url: urls[0] }),
+            })
+            if (res.ok) {
+              const meta = await res.json()
+              if (meta.title || meta.price) {
+                let context = `\n[URL_CONTEXT: I resolved the URLs for you. Here's what I found:\nURL: ${urls[0]}`
+                if (meta.resolvedUrl && meta.resolvedUrl !== urls[0]) {
+                  context += ` → resolves to: ${meta.resolvedUrl}`
+                }
+                if (meta.title) context += ` | Page title: "${meta.title}"`
+                if (meta.price) context += ` | Price found: $${meta.price}`
+                if (meta.hostname) context += ` | Website: ${meta.hostname}`
+                context += ']'
+                enrichedText += context
+              }
+            }
+          } catch {
+            // URL resolution failed — continue without context
+          }
+        }
+
         // Build conversation history for the API
-        const history = [...messages, userMessage].map((m) => ({
+        const history = [...messages, { ...userMessage, text: enrichedText }].map((m) => ({
           role: m.role === 'steward' ? 'assistant' : 'user',
-          content: m.text,
+          content: m.role === 'user' ? m.text : m.text,
         }))
+
+        // For the latest message, use the enriched text
+        if (history.length > 0) {
+          history[history.length - 1].content = enrichedText
+        }
 
         const headers: Record<string, string> = {
           apikey: anonKey,
@@ -161,6 +208,7 @@ export function useChat() {
 
   const clearMessages = useCallback(() => {
     setMessages([])
+    isFirstMessageRef.current = true
   }, [])
 
   return { messages, sendMessage, isLoading, clearMessages, addMessage }

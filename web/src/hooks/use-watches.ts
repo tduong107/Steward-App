@@ -109,9 +109,38 @@ export function useWatches() {
     async (data: Partial<Watch>): Promise<Watch> => {
       if (!user) throw new Error('Not authenticated')
 
+      // Ensure all required fields have defaults (matches iOS Watch initializer)
+      const watchPayload = {
+        user_id: user.id,
+        emoji: data.emoji || '👀',
+        name: data.name || 'New Watch',
+        url: data.url || '',
+        condition: data.condition || '',
+        action_label: data.action_label || 'Notify when changed',
+        action_type: data.action_type || 'notify',
+        action_url: data.action_url || null,
+        status: 'watching' as const,
+        triggered: false,
+        change_note: null,
+        notify_channels: 'push',
+        check_frequency: data.check_frequency || 'Daily',
+        preferred_check_time: null,
+        image_url: data.image_url || null,
+        watch_mode: data.watch_mode || 'url',
+        search_query: data.search_query || null,
+        consecutive_failures: 0,
+        last_error: null,
+        needs_attention: false,
+        auto_act: false,
+        spending_limit: null,
+        response_mode: 'notify' as const,
+        coupon_code: null,
+        action_executed: false,
+      }
+
       const { data: created, error: createError } = await supabaseRef.current
         .from('watches')
-        .insert({ ...data, user_id: user.id })
+        .insert(watchPayload)
         .select()
         .single()
 
