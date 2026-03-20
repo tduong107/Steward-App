@@ -179,11 +179,11 @@ final class SubscriptionManager {
     private func syncTierToSupabase() {
         Task {
             do {
-                let userId = try await SupabaseService.shared.client.auth.session.user.id
-                try await SupabaseService.shared.client
+                let userId = try await SupabaseConfig.client.auth.session.user.id
+                try await SupabaseConfig.client
                     .from("profiles")
                     .update(["subscription_tier": currentTier.rawValue])
-                    .eq("id", userId.uuidString)
+                    .eq("id", value: userId.uuidString)
                     .execute()
                 #if DEBUG
                 print("[SubscriptionManager] Synced tier to Supabase: \(currentTier.rawValue)")
