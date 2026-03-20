@@ -84,7 +84,7 @@ export default async function LandingPage() {
         </h1>
 
         <p className="landing-reveal [animation-delay:200ms] mt-8 text-lg md:text-xl text-white/50 max-w-2xl mx-auto leading-relaxed">
-          Steward monitors prices, restocks, reservations, and availability — then notifies you or acts on your behalf. Never miss a deal again.
+          Steward monitors prices, restocks, reservations, and availability, then notifies you or acts on your behalf. Never miss a deal again.
         </p>
 
         <div className="landing-reveal [animation-delay:300ms] mt-12 flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -124,7 +124,7 @@ export default async function LandingPage() {
               {[
                 { emoji: '👟', name: 'Nike Air Max 90', status: 'Price dropped to $89', accent: true, badge: '↓ $41 saved' },
                 { emoji: '🏕️', name: 'Yosemite Camp IV', status: 'Checking daily', accent: false, badge: '' },
-                { emoji: '🍽️', name: 'Resy — Carbone NYC', status: 'Watching for openings', accent: false, badge: '' },
+                { emoji: '🍽️', name: 'Resy - Carbone NYC', status: 'Watching for openings', accent: false, badge: '' },
               ].map((item, i) => (
                 <div
                   key={item.name}
@@ -197,7 +197,7 @@ export default async function LandingPage() {
                 step: '02',
                 icon: '👀',
                 title: 'We monitor 24/7',
-                desc: 'Steward checks on your schedule — prices, stock, availability, reservations — whatever matters to you.',
+                desc: 'Steward checks on your schedule: prices, stock, availability, reservations, whatever matters to you.',
               },
               {
                 step: '03',
@@ -236,7 +236,7 @@ export default async function LandingPage() {
               What can Steward watch?
             </h2>
             <p className="landing-reveal [animation-delay:200ms] mt-4 text-white/40 max-w-xl mx-auto">
-              From everyday shopping to hard-to-get reservations — Steward has you covered.
+              From everyday shopping to hard-to-get reservations, Steward has you covered.
             </p>
           </div>
 
@@ -338,7 +338,7 @@ export default async function LandingPage() {
                 {[
                   { text: 'Up to 15 watches', special: false },
                   { text: 'Check every 2 hours', special: false },
-                  { text: 'Steward Acts — auto add to cart', special: true },
+                  { text: 'Steward Acts: auto add to cart', special: true },
                   { text: 'Everything in Pro', special: false },
                   { text: 'Priority support', special: false },
                 ].map(f => (
@@ -372,7 +372,7 @@ export default async function LandingPage() {
               Stop overpaying.<br />Start watching.
             </h2>
             <p className="landing-reveal [animation-delay:100ms] text-lg text-white/40 mb-12 max-w-xl mx-auto">
-              Set up your first watch in under 30 seconds — our AI assistant does the heavy lifting.
+              Set up your first watch in under 30 seconds. Our AI assistant does the heavy lifting.
             </p>
             <Link
               href="/signup"
