@@ -8,16 +8,15 @@ import { useWatches } from '@/hooks/use-watches'
 import type { CheckResult } from '@/lib/types'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { timeAgo } from '@/lib/utils'
 
-interface SavingsEntry {
+// Per-watch savings: highest price seen - current (latest) price
+interface WatchSavings {
   watchId: string
   watchEmoji: string
   watchName: string
-  originalPrice: number
-  triggeredPrice: number
+  highestPrice: number
+  currentPrice: number
   saved: number
-  date: string
 }
 
 export default function SavingsPage() {
@@ -40,11 +39,11 @@ export default function SavingsPage() {
 
       const { data, error } = await supabaseRef.current
         .from('check_results')
-        .select('*')
+        .select('id, watch_id, price, checked_at')
         .in('watch_id', watchIds)
         .not('price', 'is', null)
         .order('checked_at', { ascending: true })
-        .limit(500)
+        .limit(1000)
 
       if (error) {
         console.error('Failed to fetch check results:', error.message)
@@ -57,45 +56,43 @@ export default function SavingsPage() {
     fetchResults()
   }, [user, watches])
 
-  // Build savings entries by comparing sequential check prices per watch
+  // Match iOS logic: savings = highestPrice - currentPrice per watch
   const savingsEntries = useMemo(() => {
-    const entries: SavingsEntry[] = []
     const watchMap = new Map(watches.map((w) => [w.id, w]))
+    const entries: WatchSavings[] = []
 
-    // Group check results by watch (already sorted by checked_at ascending)
-    const resultsByWatch = new Map<string, CheckResult[]>()
+    // Group check results by watch
+    const resultsByWatch = new Map<string, number[]>()
     for (const cr of checkResults) {
       if (cr.price === null || cr.price === undefined) continue
       const list = resultsByWatch.get(cr.watch_id) || []
-      list.push(cr)
+      list.push(cr.price)
       resultsByWatch.set(cr.watch_id, list)
     }
 
-    // For each watch, compare consecutive prices to find drops
-    for (const [watchId, results] of resultsByWatch) {
+    // For each watch: highest price ever - latest price
+    for (const [watchId, prices] of resultsByWatch) {
       const watch = watchMap.get(watchId)
-      if (!watch || results.length < 2) continue
+      if (!watch || prices.length < 2) continue
 
-      for (let i = 1; i < results.length; i++) {
-        const prev = results[i - 1]
-        const curr = results[i]
-        if (prev.price === null || curr.price === null) continue
-        if (curr.price >= prev.price) continue // only track drops
+      const highestPrice = Math.max(...prices)
+      const currentPrice = prices[prices.length - 1] // last = most recent (sorted asc)
+      const saved = Math.max(0, highestPrice - currentPrice)
 
+      if (saved > 0) {
         entries.push({
           watchId,
           watchEmoji: watch.emoji || '👀',
           watchName: watch.name,
-          originalPrice: prev.price,
-          triggeredPrice: curr.price,
-          saved: prev.price - curr.price,
-          date: curr.checked_at,
+          highestPrice,
+          currentPrice,
+          saved,
         })
       }
     }
 
-    // Sort by date descending (most recent first)
-    entries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    // Sort by savings descending (biggest first, matches iOS)
+    entries.sort((a, b) => b.saved - a.saved)
     return entries
   }, [checkResults, watches])
 
@@ -151,11 +148,11 @@ export default function SavingsPage() {
             </div>
           )}
 
-          {/* Savings list */}
+          {/* Savings list — one row per watch */}
           {savingsEntries.length > 0 && (
             <div className="space-y-2">
-              {savingsEntries.map((entry, i) => (
-                <Card key={`${entry.watchId}-${i}`}>
+              {savingsEntries.map((entry) => (
+                <Card key={entry.watchId}>
                   <CardContent className="flex items-center gap-3 py-3">
                     <span className="text-xl">{entry.watchEmoji}</span>
                     <div className="min-w-0 flex-1">
@@ -163,15 +160,12 @@ export default function SavingsPage() {
                         {entry.watchName}
                       </p>
                       <p className="text-xs text-[var(--color-ink-mid)]">
-                        ${entry.originalPrice.toFixed(2)} &rarr; ${entry.triggeredPrice.toFixed(2)}
+                        ${entry.highestPrice.toFixed(2)} &rarr; ${entry.currentPrice.toFixed(2)}
                       </p>
                     </div>
                     <div className="shrink-0 text-right">
                       <p className="text-sm font-semibold text-[var(--color-green)]">
                         -${entry.saved.toFixed(2)}
-                      </p>
-                      <p className="text-xs text-[var(--color-ink-light)]">
-                        {timeAgo(entry.date)}
                       </p>
                     </div>
                   </CardContent>

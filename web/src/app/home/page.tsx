@@ -61,44 +61,41 @@ export default function DashboardPage() {
     fetchResults()
   }, [user, watches])
 
-  // Build savings entries by comparing sequential check prices
+  // Match iOS logic: savings = highestPrice - currentPrice per watch
   const savingsData = useMemo(() => {
     const watchMap = new Map(watches.map((w) => [w.id, w]))
-    const drops: { name: string; emoji: string; amount: number; date: string }[] = []
+    const drops: { name: string; emoji: string; amount: number }[] = []
     let total = 0
 
-    // Group by watch
-    const resultsByWatch = new Map<string, CheckResult[]>()
+    // Group prices by watch
+    const pricesByWatch = new Map<string, number[]>()
     for (const cr of checkResults) {
       if (cr.price === null || cr.price === undefined) continue
-      const list = resultsByWatch.get(cr.watch_id) || []
-      list.push(cr)
-      resultsByWatch.set(cr.watch_id, list)
+      const list = pricesByWatch.get(cr.watch_id) || []
+      list.push(cr.price)
+      pricesByWatch.set(cr.watch_id, list)
     }
 
-    for (const [watchId, results] of resultsByWatch) {
+    for (const [watchId, prices] of pricesByWatch) {
       const watch = watchMap.get(watchId)
-      if (!watch || results.length < 2) continue
+      if (!watch || prices.length < 2) continue
 
-      for (let i = 1; i < results.length; i++) {
-        const prev = results[i - 1]
-        const curr = results[i]
-        if (prev.price === null || curr.price === null) continue
-        if (curr.price >= prev.price) continue
+      const highestPrice = Math.max(...prices)
+      const currentPrice = prices[prices.length - 1]
+      const saved = Math.max(0, highestPrice - currentPrice)
 
-        const saved = prev.price - curr.price
+      if (saved > 0) {
         total += saved
         drops.push({
           name: watch.name,
           emoji: watch.emoji || '👀',
           amount: saved,
-          date: curr.checked_at,
         })
       }
     }
 
-    // Sort drops by date descending
-    drops.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    // Sort by biggest savings first
+    drops.sort((a, b) => b.amount - a.amount)
     return { total, drops: drops.slice(0, 2) }
   }, [checkResults, watches])
 
