@@ -169,11 +169,13 @@ export function ChatDrawer({ open, onClose }: ChatDrawerProps) {
       const activeWatches = watches.filter((w) => w.status !== 'deleted')
       const limit = WATCH_LIMITS[tier] ?? WATCH_LIMITS.free
       if (activeWatches.length >= limit) {
+        // Show the paywall popup immediately
+        setShowPaywall(true)
         addMessage({
           id: crypto.randomUUID(),
           role: 'steward',
           text: `You've reached the ${limit}-watch limit on your ${tier === 'free' ? 'Free' : tier === 'pro' ? 'Pro' : 'Premium'} plan. Upgrade to add more watches!`,
-          suggestions: ['Upgrade plan', 'Show my watches'],
+          suggestions: ['Upgrade plan'],
         })
         setIsCreating(false)
         return
@@ -189,22 +191,14 @@ export function ChatDrawer({ open, onClose }: ChatDrawerProps) {
         })
       } catch (err) {
         console.error('Failed to create watch from chat:', err)
-        const errorMsg = err instanceof Error ? err.message : ''
-        // Check if it's a permission/limit error from RLS or constraint
-        if (errorMsg.includes('row-level security') || errorMsg.includes('violates') || errorMsg.includes('limit')) {
-          addMessage({
-            id: crypto.randomUUID(),
-            role: 'steward',
-            text: `You've hit your watch limit on the ${tier === 'free' ? 'Free' : tier === 'pro' ? 'Pro' : 'Premium'} plan. Upgrade to create more watches!`,
-            suggestions: ['Upgrade plan', 'Show my watches'],
-          })
-        } else {
-          addMessage({
-            id: crypto.randomUUID(),
-            role: 'steward',
-            text: 'Sorry, I had trouble creating that watch. Please try again.',
-          })
-        }
+        // Any creation failure — show paywall since it's most likely a limit issue
+        setShowPaywall(true)
+        addMessage({
+          id: crypto.randomUUID(),
+          role: 'steward',
+          text: `You've hit your watch limit on the ${tier === 'free' ? 'Free' : tier === 'pro' ? 'Pro' : 'Premium'} plan. Upgrade to create more watches!`,
+          suggestions: ['Upgrade plan'],
+        })
       } finally {
         setIsCreating(false)
       }

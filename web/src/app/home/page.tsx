@@ -11,6 +11,8 @@ import {
   BarChart3,
   Lock,
   Plus,
+  AlertTriangle,
+  Crown,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
@@ -19,8 +21,9 @@ import { useSub } from '@/hooks/use-subscription'
 import { useChatDrawer } from '@/providers/chat-provider'
 import { WatchCard } from '@/components/watch-card'
 import { CategoryFilter, watchCategory } from '@/components/category-filter'
+import { PaywallDialog } from '@/components/paywall-dialog'
 import { Skeleton } from '@/components/ui/skeleton'
-import { watchLimit } from '@/lib/utils'
+import { watchLimit, tierLabel } from '@/lib/utils'
 import type { CheckResult } from '@/lib/types'
 
 export default function DashboardPage() {
@@ -30,9 +33,12 @@ export default function DashboardPage() {
   const { tier } = useSub()
   const { openChat } = useChatDrawer()
   const [category, setCategory] = useState('')
+  const [showPaywall, setShowPaywall] = useState(false)
 
   const limit = watchLimit(tier)
   const activeWatches = watches.filter((w) => w.status !== 'deleted')
+  const isAtLimit = activeWatches.length >= limit
+  const isOverLimit = activeWatches.length > limit
   const triggeredWatches = activeWatches.filter((w) => w.triggered)
   const filteredWatches = category
     ? activeWatches.filter((w) => watchCategory(w) === category)
@@ -147,6 +153,42 @@ export default function DashboardPage() {
             : `${activeWatches.length} watch${activeWatches.length === 1 ? '' : 'es'} active`}
         </p>
       </div>
+
+      {/* ── Watch Limit Warning Banner ── */}
+      {!loading && isAtLimit && (
+        <button
+          type="button"
+          onClick={() => setShowPaywall(true)}
+          className={`w-full flex items-center gap-3 rounded-2xl px-4 py-3.5 text-left transition-all duration-200 hover:opacity-90 animate-fade-in-up [animation-delay:50ms] cursor-pointer ${
+            isOverLimit
+              ? 'bg-red-500/10 border border-red-500/30'
+              : 'bg-amber-500/10 border border-amber-500/30'
+          }`}
+        >
+          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
+            isOverLimit ? 'bg-red-500/20' : 'bg-amber-500/20'
+          }`}>
+            {isOverLimit ? (
+              <AlertTriangle size={18} className="text-red-500" />
+            ) : (
+              <Crown size={18} className="text-amber-500" />
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className={`text-sm font-semibold ${isOverLimit ? 'text-red-400' : 'text-amber-400'}`}>
+              {isOverLimit
+                ? `Over the ${limit}-watch limit`
+                : `You've used all ${limit} watches`}
+            </p>
+            <p className="text-xs text-[var(--color-ink-mid)] mt-0.5">
+              Upgrade to {tier === 'free' ? 'Pro' : 'Premium'} for {tier === 'free' ? '7' : '15'} watches and faster checks
+            </p>
+          </div>
+          <span className="shrink-0 rounded-full bg-[var(--color-accent)] px-3 py-1.5 text-xs font-bold text-white">
+            Upgrade
+          </span>
+        </button>
+      )}
 
       {/* ── Ask Steward — prominent chat prompt bar (matches iOS) ── */}
       <button
@@ -386,10 +428,22 @@ export default function DashboardPage() {
 
       {/* Watch count */}
       {!loading && activeWatches.length > 0 && (
-        <p className="text-center text-xs text-[var(--color-ink-light)]">
+        <p className={`text-center text-xs ${isAtLimit ? 'font-semibold text-amber-400' : 'text-[var(--color-ink-light)]'}`}>
           {activeWatches.length} of {limit} watches used
+          {isAtLimit && (
+            <button
+              type="button"
+              onClick={() => setShowPaywall(true)}
+              className="ml-1.5 text-[var(--color-accent)] underline underline-offset-2 hover:opacity-80"
+            >
+              Upgrade
+            </button>
+          )}
         </p>
       )}
+
+      {/* Paywall dialog */}
+      <PaywallDialog open={showPaywall} onClose={() => setShowPaywall(false)} />
     </div>
   )
 }
