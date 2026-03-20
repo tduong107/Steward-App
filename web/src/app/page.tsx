@@ -73,20 +73,20 @@ export default async function LandingPage() {
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--landing-green)] opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-[var(--landing-green)]"></span>
           </span>
-          Now monitoring the web for thousands of users
+          Saving users an average of $2,400/year
         </div>
 
         <h1 className="landing-reveal [animation-delay:100ms] text-5xl md:text-7xl lg:text-8xl font-bold font-[var(--font-serif)] text-[var(--landing-text)] leading-[1.05] max-w-4xl mx-auto tracking-tight">
-          Your AI concierge that{' '}
+          Stop overpaying.{' '}
           <span className="relative">
             <span className="text-transparent bg-clip-text bg-[length:200%_auto] animate-shimmer" style={{ backgroundImage: 'linear-gradient(to right, var(--landing-shimmer-from), var(--landing-shimmer-via), var(--landing-shimmer-to))' }}>
-              watches the web
+              Start saving.
             </span>
           </span>
         </h1>
 
         <p className="landing-reveal [animation-delay:200ms] mt-8 text-lg md:text-xl text-[var(--landing-text-mid)] max-w-2xl mx-auto leading-relaxed">
-          Steward monitors prices, restocks, reservations, and availability, then notifies you or acts on your behalf. Never miss a deal again.
+          Prices keep rising. Steward is your AI-powered watchdog that tracks price drops, restocks, restaurant reservations, campground openings, and flight deals around the clock, so you never miss a deal or pay more than you have to.
         </p>
 
         <div className="landing-reveal [animation-delay:300ms] mt-12 flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -95,7 +95,7 @@ export default async function LandingPage() {
             className="group relative w-full sm:w-auto rounded-full bg-gradient-to-r from-[#2A5C45] to-[#3A7C5A] px-8 py-4 text-base font-semibold text-white transition-all duration-300 hover:shadow-xl hover:shadow-[var(--landing-card-shadow)] hover:scale-[1.02] active:scale-[0.98]"
           >
             <span className="relative z-10 flex items-center justify-center gap-2">
-              Start Watching for Free
+              Start Saving for Free
               <svg className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
             </span>
           </Link>
@@ -108,7 +108,7 @@ export default async function LandingPage() {
         </div>
 
         <p className="landing-reveal [animation-delay:400ms] mt-6 text-xs text-[var(--landing-text-faint)]">
-          Free plan includes 3 watches · No credit card required
+          Free forever plan included · No credit card required · Set up in 30 seconds
         </p>
 
         {/* Hero visual — mock dashboard card */}
@@ -119,14 +119,16 @@ export default async function LandingPage() {
               <span className="text-sm font-medium text-[var(--landing-text-mid)]">Steward Dashboard</span>
               <span className="ml-auto flex items-center gap-1.5 text-xs text-[var(--landing-green)]">
                 <span className="h-1.5 w-1.5 rounded-full bg-[var(--landing-green)] animate-pulse" />
-                3 watches active
+                5 watches active
               </span>
             </div>
             <div className="space-y-3">
               {[
-                { emoji: '👟', name: 'Nike Air Max 90', status: 'Price dropped to $89', accent: true, badge: '↓ $41 saved' },
-                { emoji: '🏕️', name: 'Yosemite Camp IV', status: 'Checking daily', accent: false, badge: '' },
-                { emoji: '🍽️', name: 'Resy - Carbone NYC', status: 'Watching for openings', accent: false, badge: '' },
+                { emoji: '👟', name: 'Nike Air Max 90', status: 'Price dropped $41 since last week', accent: true, badge: '↓ $41 saved' },
+                { emoji: '✈️', name: 'SFO to Tokyo (Oct)', status: 'Fare dropped to $489 roundtrip', accent: true, badge: '↓ $230' },
+                { emoji: '🏕️', name: 'Yosemite Camp IV', status: 'Site opened up for Jul 14-16!', accent: true, badge: 'Available!' },
+                { emoji: '🍽️', name: 'Resy - Carbone NYC', status: 'Watching for 2-top openings', accent: false, badge: '' },
+                { emoji: '📦', name: 'PS5 Pro Bundle', status: 'Back in stock at Best Buy!', accent: true, badge: 'In Stock' },
               ].map((item, i) => (
                 <div
                   key={item.name}
@@ -161,10 +163,10 @@ export default async function LandingPage() {
         <div className="mx-auto max-w-6xl px-6 py-16">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             {[
-              { value: '24/7', label: 'Web monitoring' },
-              { value: '100+', label: 'Supported stores' },
-              { value: '<2min', label: 'Alert delivery' },
-              { value: '50%', label: 'Avg. yearly savings' },
+              { value: '$2,400+', label: 'Avg. yearly savings per user' },
+              { value: '24/7', label: 'Always-on monitoring' },
+              { value: '<2min', label: 'Time to get alerted' },
+              { value: '30sec', label: 'To set up your first watch' },
             ].map((stat, i) => (
               <div key={stat.label} className="landing-reveal" style={{ animationDelay: `${i * 100}ms` }}>
                 <p className="text-3xl md:text-4xl font-bold font-[var(--font-serif)] text-[var(--landing-accent)]">
@@ -177,14 +179,65 @@ export default async function LandingPage() {
         </div>
       </section>
 
+      {/* ── Why Steward — Cost of Living Section ── */}
+      <section className="relative z-10 border-t border-[var(--landing-border)]">
+        <div className="mx-auto max-w-6xl px-6 py-24 md:py-32">
+          <div className="grid md:grid-cols-2 gap-16 items-center">
+            <div>
+              <span className="landing-reveal inline-block text-xs font-semibold tracking-[0.2em] uppercase text-[var(--landing-gold-label)] mb-4">Why Steward</span>
+              <h2 className="landing-reveal [animation-delay:100ms] text-3xl md:text-5xl font-bold font-[var(--font-serif)] text-[var(--landing-text)] leading-tight">
+                Everything costs more.<br />Steward fights back.
+              </h2>
+              <p className="landing-reveal [animation-delay:200ms] mt-6 text-[var(--landing-text-mid)] leading-relaxed">
+                Groceries up 25%. Flights up 30%. The cost of living keeps climbing, but you don&apos;t have time to constantly check for better prices, wait for restocks, or refresh campground pages hoping for a cancellation.
+              </p>
+              <p className="landing-reveal [animation-delay:300ms] mt-4 text-[var(--landing-text-mid)] leading-relaxed">
+                Steward was built for convenience. Tell it what you want, and your AI concierge handles the rest. No browser tabs. No price alert fatigue. Just real savings delivered to you.
+              </p>
+              <Link
+                href="/signup"
+                className="landing-reveal [animation-delay:400ms] inline-flex items-center gap-2 mt-8 rounded-full bg-[var(--landing-accent-solid)] px-6 py-3 text-sm font-semibold text-white transition-all duration-300 hover:bg-[var(--landing-accent-hover)] hover:shadow-lg hover:shadow-[var(--landing-card-shadow)]"
+              >
+                Start Saving Today
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
+              </Link>
+            </div>
+
+            <div className="landing-reveal [animation-delay:200ms] space-y-4">
+              {[
+                { icon: '💸', title: 'Average user saves $200/month', desc: 'On everyday purchases across electronics, clothing, travel, and more.' },
+                { icon: '⏱️', title: 'Built for busy lives', desc: 'Set it once, forget it. Steward watches while you work, sleep, and live your life.' },
+                { icon: '🧠', title: 'AI that gets smarter', desc: 'Steward learns the best times to buy, spots pricing patterns, and gives you deal quality scores.' },
+                { icon: '🔔', title: 'Never miss the moment', desc: 'Instant push notifications the second a price drops, a campsite opens, or a table becomes available.' },
+              ].map((item, i) => (
+                <div
+                  key={item.title}
+                  className="landing-reveal flex items-start gap-4 rounded-xl border border-[var(--landing-border)] bg-[var(--landing-card)] p-5 transition-all duration-300 hover:bg-[var(--landing-card-hover)] hover:border-[var(--landing-border-hover)]"
+                  style={{ animationDelay: `${300 + i * 100}ms` }}
+                >
+                  <span className="text-2xl shrink-0 mt-0.5">{item.icon}</span>
+                  <div>
+                    <h3 className="text-sm font-semibold text-[var(--landing-text)] mb-1">{item.title}</h3>
+                    <p className="text-sm text-[var(--landing-text-dim)] leading-relaxed">{item.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ── How It Works ── */}
       <section id="how-it-works" className="relative z-10 border-t border-[var(--landing-border)]">
         <div className="mx-auto max-w-6xl px-6 py-24 md:py-32">
           <div className="text-center mb-20">
             <span className="landing-reveal inline-block text-xs font-semibold tracking-[0.2em] uppercase text-[var(--landing-accent-muted)] mb-4">How it Works</span>
             <h2 className="landing-reveal [animation-delay:100ms] text-3xl md:text-5xl font-bold font-[var(--font-serif)] text-[var(--landing-text)]">
-              Three steps to savings
+              Effortless savings in three steps
             </h2>
+            <p className="landing-reveal [animation-delay:200ms] mt-4 text-[var(--landing-text-dim)] max-w-xl mx-auto">
+              No complicated setup. No spreadsheets. Just tell Steward what matters to you.
+            </p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-6">
@@ -192,20 +245,20 @@ export default async function LandingPage() {
               {
                 step: '01',
                 icon: '💬',
-                title: 'Tell Steward what to watch',
-                desc: 'Paste a URL or describe what you\'re looking for. Our AI sets up the perfect watch in seconds.',
+                title: 'Tell Steward what you want',
+                desc: 'Paste a link, share a screenshot, or just describe it. "Watch this Nike shoe for a price drop." "Let me know when Yosemite campsites open for July." Steward understands.',
               },
               {
                 step: '02',
                 icon: '👀',
-                title: 'We monitor 24/7',
-                desc: 'Steward checks on your schedule: prices, stock, availability, reservations, whatever matters to you.',
+                title: 'Steward watches around the clock',
+                desc: 'Your AI concierge checks prices, stock levels, campground availability, restaurant openings, and flight fares on your schedule. Every 2 hours, every 12 hours, or daily.',
               },
               {
                 step: '03',
                 icon: '🎯',
-                title: 'Get notified or we act',
-                desc: 'Instant alerts via push, email, or SMS. On Premium, Steward can even add items to your cart.',
+                title: 'Get alerted or Steward acts for you',
+                desc: 'The instant something changes, you get a push notification with a direct link. On Premium, Steward can even add items to your cart before they sell out again.',
               },
             ].map((item, i) => (
               <div
@@ -226,6 +279,18 @@ export default async function LandingPage() {
               </div>
             ))}
           </div>
+
+          {/* Mid-section CTA */}
+          <div className="landing-reveal mt-16 text-center">
+            <Link
+              href="/signup"
+              className="inline-flex items-center gap-2 rounded-full bg-[var(--landing-accent-solid)] px-8 py-4 text-base font-semibold text-white transition-all duration-300 hover:bg-[var(--landing-accent-hover)] hover:shadow-lg hover:shadow-[var(--landing-card-shadow)] hover:scale-[1.02] active:scale-[0.98]"
+            >
+              Try It Free
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
+            </Link>
+            <p className="mt-3 text-xs text-[var(--landing-text-faint)]">Takes 30 seconds. No credit card needed.</p>
+          </div>
         </div>
       </section>
 
@@ -235,21 +300,51 @@ export default async function LandingPage() {
           <div className="text-center mb-20">
             <span className="landing-reveal inline-block text-xs font-semibold tracking-[0.2em] uppercase text-[var(--landing-gold-label)] mb-4">Use Cases</span>
             <h2 className="landing-reveal [animation-delay:100ms] text-3xl md:text-5xl font-bold font-[var(--font-serif)] text-[var(--landing-text)]">
-              What can Steward watch?
+              One app. Endless savings.
             </h2>
-            <p className="landing-reveal [animation-delay:200ms] mt-4 text-[var(--landing-text-dim)] max-w-xl mx-auto">
-              From everyday shopping to hard-to-get reservations, Steward has you covered.
+            <p className="landing-reveal [animation-delay:200ms] mt-4 text-[var(--landing-text-dim)] max-w-2xl mx-auto">
+              Whether you&apos;re hunting for a deal, waiting for a restock, or trying to score an impossible reservation, Steward has your back.
             </p>
           </div>
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {[
-              { emoji: '🏷️', title: 'Price Drops', desc: 'Track prices on Amazon, Target, Best Buy, Nike, and any online store.', color: 'from-[#2A5C45]/20 to-transparent' },
-              { emoji: '📦', title: 'Restocks', desc: 'Get notified the moment sold-out items are back in stock.', color: 'from-[#1E4A8A]/20 to-transparent' },
-              { emoji: '🏕️', title: 'Campsite Availability', desc: 'Watch for campsite openings at popular parks and recreation areas.', color: 'from-[#27AE60]/20 to-transparent' },
-              { emoji: '🎫', title: 'Event Tickets', desc: 'Monitor ticket drops and price changes on StubHub and more.', color: 'from-[#F59E0B]/20 to-transparent' },
-              { emoji: '✈️', title: 'Flight Prices', desc: 'Track flights on Kayak, Google Flights, and Skyscanner for the best fares.', color: 'from-[#6EE7B7]/15 to-transparent' },
-              { emoji: '🍽️', title: 'Restaurant Reservations', desc: 'Watch for Resy openings at your favorite hard-to-book restaurants.', color: 'from-[#C0392B]/15 to-transparent' },
+              {
+                emoji: '🏷️',
+                title: 'Price Drop Alerts',
+                desc: 'Track prices across Amazon, Target, Best Buy, Nike, Walmart, and thousands more. Get notified the second prices fall. Users save an average of $41 per watched item.',
+                color: 'from-[#2A5C45]/20 to-transparent',
+              },
+              {
+                emoji: '📦',
+                title: 'Back in Stock Alerts',
+                desc: 'That sold-out PS5, limited sneaker drop, or viral skincare product? Steward watches inventory 24/7 and pings you the moment it comes back. Be first in line, not last.',
+                color: 'from-[#1E4A8A]/20 to-transparent',
+              },
+              {
+                emoji: '🏕️',
+                title: 'Campground Reservations',
+                desc: 'Yosemite, Glacier, Yellowstone, Joshua Tree. Campsites book out in seconds but cancellations happen daily. Steward catches openings so you can lock in your dream trip.',
+                color: 'from-[#27AE60]/20 to-transparent',
+              },
+              {
+                emoji: '🍽️',
+                title: 'Restaurant Reservations',
+                desc: 'Score a table at Carbone, Don Angie, or your city\'s hottest spot. Steward monitors Resy and OpenTable for cancellations and new openings, then alerts you instantly.',
+                color: 'from-[#C0392B]/15 to-transparent',
+              },
+              {
+                emoji: '✈️',
+                title: 'Flight Price Tracking',
+                desc: 'Watch routes on Google Flights, Kayak, and Skyscanner. Steward tracks fare changes and notifies you when prices drop. One user saved $230 on a Tokyo roundtrip.',
+                color: 'from-[#6EE7B7]/15 to-transparent',
+              },
+              {
+                emoji: '🎫',
+                title: 'Event Tickets & Drops',
+                desc: 'Concert tickets, limited edition releases, flash sales. Set a watch on any page and Steward will alert you the moment something changes. No more FOMO.',
+                color: 'from-[#F59E0B]/20 to-transparent',
+              },
             ].map((item, i) => (
               <div
                 key={item.title}
@@ -270,6 +365,47 @@ export default async function LandingPage() {
               </div>
             ))}
           </div>
+
+          {/* Use cases CTA */}
+          <div className="landing-reveal mt-16 text-center">
+            <p className="text-[var(--landing-text-mid)] mb-6">
+              And that&apos;s just the beginning. Steward can watch <strong className="text-[var(--landing-text)]">any webpage</strong> for <strong className="text-[var(--landing-text)]">any change</strong>.
+            </p>
+            <Link
+              href="/signup"
+              className="inline-flex items-center gap-2 rounded-full border border-[var(--landing-border)] bg-[var(--landing-surface)] px-8 py-4 text-base font-medium text-[var(--landing-text-mid)] transition-all duration-300 hover:bg-[var(--landing-surface-hover)] hover:border-[var(--landing-border-hover)] backdrop-blur-sm"
+            >
+              See What You Could Save
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Convenience / Built for You ── */}
+      <section className="relative z-10 border-t border-[var(--landing-border)]">
+        <div className="mx-auto max-w-6xl px-6 py-24 md:py-32 text-center">
+          <span className="landing-reveal inline-block text-xs font-semibold tracking-[0.2em] uppercase text-[var(--landing-accent-muted)] mb-4">Built for Convenience</span>
+          <h2 className="landing-reveal [animation-delay:100ms] text-3xl md:text-5xl font-bold font-[var(--font-serif)] text-[var(--landing-text)] max-w-3xl mx-auto">
+            Your time is worth more than refreshing pages
+          </h2>
+          <p className="landing-reveal [animation-delay:200ms] mt-6 text-[var(--landing-text-mid)] max-w-2xl mx-auto leading-relaxed">
+            The average person spends 3+ hours per week manually checking prices and availability. Steward replaces all of that with a single conversation.
+          </p>
+
+          <div className="landing-reveal [animation-delay:300ms] grid sm:grid-cols-3 gap-6 mt-16 max-w-4xl mx-auto">
+            {[
+              { icon: '📱', title: 'Works on any device', desc: 'iOS app and full-featured web app. Your watches sync everywhere.' },
+              { icon: '🗣️', title: 'Just talk to it', desc: 'No forms to fill. Describe what you want in plain English and Steward handles the rest.' },
+              { icon: '🔒', title: 'Private and secure', desc: 'No ads. No tracking. No selling your data. Steward works for you, not advertisers.' },
+            ].map((item, i) => (
+              <div key={item.title} className="landing-reveal text-center" style={{ animationDelay: `${400 + i * 100}ms` }}>
+                <span className="text-3xl block mb-3">{item.icon}</span>
+                <h3 className="text-base font-semibold text-[var(--landing-text)] mb-2">{item.title}</h3>
+                <p className="text-sm text-[var(--landing-text-dim)] leading-relaxed">{item.desc}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -279,10 +415,10 @@ export default async function LandingPage() {
           <div className="text-center mb-20">
             <span className="landing-reveal inline-block text-xs font-semibold tracking-[0.2em] uppercase text-[var(--landing-accent-muted)] mb-4">Pricing</span>
             <h2 className="landing-reveal [animation-delay:100ms] text-3xl md:text-5xl font-bold font-[var(--font-serif)] text-[var(--landing-text)]">
-              Simple, transparent pricing
+              Pays for itself with one deal
             </h2>
             <p className="landing-reveal [animation-delay:200ms] mt-4 text-[var(--landing-text-dim)] max-w-xl mx-auto">
-              Start free and upgrade when you need more.
+              Start free. Upgrade when you see how much you save. Most users make back their subscription cost within the first week.
             </p>
           </div>
 
@@ -310,7 +446,7 @@ export default async function LandingPage() {
                 ))}
               </ul>
               <Link href="/signup" className="mt-8 block text-center rounded-full border border-[var(--landing-border)] bg-[var(--landing-surface)] px-4 py-3 text-sm font-medium text-[var(--landing-text-mid)] transition-all duration-300 hover:bg-[var(--landing-surface-hover)]">
-                Get Started
+                Get Started Free
               </Link>
             </div>
 
@@ -381,10 +517,10 @@ export default async function LandingPage() {
 
           <div className="relative z-10">
             <h2 className="landing-reveal text-4xl md:text-6xl font-bold font-[var(--font-serif)] text-[var(--landing-text)] mb-6">
-              Stop overpaying.<br />Start watching.
+              Every dollar counts.<br />Let Steward count them for you.
             </h2>
             <p className="landing-reveal [animation-delay:100ms] text-lg text-[var(--landing-text-dim)] mb-12 max-w-xl mx-auto">
-              Set up your first watch in under 30 seconds. Our AI assistant does the heavy lifting.
+              Join thousands of users who stopped overpaying. Set up your first watch in 30 seconds and let your AI concierge do the heavy lifting.
             </p>
             <Link
               href="/signup"
@@ -393,6 +529,9 @@ export default async function LandingPage() {
               Create Your Free Account
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
             </Link>
+            <p className="landing-reveal [animation-delay:300ms] mt-4 text-xs text-[var(--landing-text-faint)]">
+              Free forever plan available. No credit card required.
+            </p>
           </div>
         </div>
       </section>
