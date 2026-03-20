@@ -46,10 +46,12 @@ export default function SignupPage() {
       const supabase = createClient()
 
       if (authMethod === 'phone') {
-        // Phone signup with OTP
+        // Phone signup: create account with phone + password, then verify with OTP
         if (!otpSent) {
-          const { error: otpError } = await supabase.auth.signInWithOtp({
+          // First, sign up with phone and password
+          const { error: signUpError } = await supabase.auth.signUp({
             phone,
+            password,
             options: {
               data: {
                 display_name: fullName,
@@ -61,8 +63,8 @@ export default function SignupPage() {
             },
           })
 
-          if (otpError) {
-            setError(otpError.message)
+          if (signUpError) {
+            setError(signUpError.message)
             return
           }
 
@@ -273,23 +275,21 @@ export default function SignupPage() {
             />
           </div>
 
-          {/* Password (only for email signup) */}
-          {authMethod === 'email' && (
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                <svg className="w-4 h-4 text-[#6EE7B7]/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>
-              </div>
-              <input
-                type="password"
-                required={authMethod === 'email'}
-                minLength={6}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Password"
-                className="w-full rounded-xl border border-[#2A5C45]/30 bg-[#0F2018]/50 pl-10 pr-4 py-3 text-sm text-[#F7F6F3] placeholder:text-[#F7F6F3]/25 focus:outline-none focus:border-[#6EE7B7]/40 transition-colors"
-              />
+          {/* Password */}
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+              <svg className="w-4 h-4 text-[#6EE7B7]/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>
             </div>
-          )}
+            <input
+              type="password"
+              required
+              minLength={6}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Password (min 6 characters)"
+              className="w-full rounded-xl border border-[#2A5C45]/30 bg-[#0F2018]/50 pl-10 pr-4 py-3 text-sm text-[#F7F6F3] placeholder:text-[#F7F6F3]/25 focus:outline-none focus:border-[#6EE7B7]/40 transition-colors"
+            />
+          </div>
 
           {/* OTP input (phone mode, after OTP sent) */}
           {authMethod === 'phone' && otpSent && (
@@ -310,29 +310,43 @@ export default function SignupPage() {
           )}
 
           {/* Alert preferences */}
-          <div className="flex flex-col gap-2.5 mt-1">
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={smsAlerts}
-                onChange={(e) => setSmsAlerts(e.target.checked)}
-                className="w-4.5 h-4.5 rounded border-[#2A5C45] bg-[#0F2018] text-[#6EE7B7] focus:ring-[#6EE7B7] focus:ring-offset-0 accent-[#6EE7B7]"
-              />
-              <span className="flex items-center gap-2 text-sm text-[#6EE7B7]">
+          <div className="flex flex-col gap-3 mt-1">
+            <label className="flex items-center gap-3 cursor-pointer group">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={smsAlerts}
+                onClick={() => setSmsAlerts(!smsAlerts)}
+                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors duration-200 focus:outline-none ${
+                  smsAlerts ? 'bg-[#6EE7B7]' : 'bg-[#2A5C45]/50'
+                }`}
+              >
+                <span className={`inline-block h-[18px] w-[18px] rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                  smsAlerts ? 'translate-x-[22px]' : 'translate-x-[2px]'
+                }`} />
+              </button>
+              <span className={`flex items-center gap-2 text-sm transition-colors ${smsAlerts ? 'text-[#6EE7B7]' : 'text-[#F7F6F3]/40'}`}>
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M8.625 9.75a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" /></svg>
-                Enable SMS alerts
+                SMS alerts
               </span>
             </label>
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={emailAlerts}
-                onChange={(e) => setEmailAlerts(e.target.checked)}
-                className="w-4.5 h-4.5 rounded border-[#2A5C45] bg-[#0F2018] text-[#6EE7B7] focus:ring-[#6EE7B7] focus:ring-offset-0 accent-[#6EE7B7]"
-              />
-              <span className="flex items-center gap-2 text-sm text-[#F7F6F3]/40">
+            <label className="flex items-center gap-3 cursor-pointer group">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={emailAlerts}
+                onClick={() => setEmailAlerts(!emailAlerts)}
+                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors duration-200 focus:outline-none ${
+                  emailAlerts ? 'bg-[#6EE7B7]' : 'bg-[#2A5C45]/50'
+                }`}
+              >
+                <span className={`inline-block h-[18px] w-[18px] rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                  emailAlerts ? 'translate-x-[22px]' : 'translate-x-[2px]'
+                }`} />
+              </button>
+              <span className={`flex items-center gap-2 text-sm transition-colors ${emailAlerts ? 'text-[#6EE7B7]' : 'text-[#F7F6F3]/40'}`}>
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" /></svg>
-                Enable email alerts
+                Email alerts
               </span>
             </label>
           </div>
