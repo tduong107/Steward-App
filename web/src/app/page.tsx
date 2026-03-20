@@ -334,14 +334,91 @@ export default async function LandingPage() {
             </h2>
           </div>
 
-          <div className="landing-reveal [animation-delay:200ms]">
-            <Image
-              src="/assets/capabilities-grid.svg"
-              alt="Steward capabilities: Price Drops, Restaurant Tables, Flight Deals, Campsites, Event Tickets, Restocks, AI Chat Setup, Share Extension"
-              width={1200}
-              height={700}
-              className="w-full h-auto"
-            />
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[
+              {
+                icon: (
+                  <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 0 1 3 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 0 0-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 0 1-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 0 0 3 15h-.75M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
+                ),
+                title: 'Price Drops',
+                desc: 'Set a target price and get pinged the instant it hits across thousands of retailers',
+                tag: 'Nike, Dyson, Apple & more',
+              },
+              {
+                icon: (
+                  <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8.25v-1.5m0 1.5c-1.355 0-2.697.056-4.024.166C6.845 8.51 6 9.473 6 10.608v2.513m6-4.871c1.355 0 2.697.056 4.024.166C17.155 8.51 18 9.473 18 10.608v2.513M15 8.25v-1.5m-6 1.5v-1.5m12 9.75-1.5.75a3.354 3.354 0 0 1-3 0 3.354 3.354 0 0 0-3 0 3.354 3.354 0 0 1-3 0 3.354 3.354 0 0 0-3 0 3.354 3.354 0 0 1-3 0L3 16.5m15-3.379a48.474 48.474 0 0 0-6-.371c-2.032 0-4.034.126-6 .371m12 0c.39.049.777.102 1.163.16 1.07.16 1.837 1.094 1.837 2.175v5.169c0 .621-.504 1.125-1.125 1.125H4.125A1.125 1.125 0 0 1 3 20.625v-5.17c0-1.08.768-2.014 1.837-2.174A47.78 47.78 0 0 1 6 13.12M12.265 3.11a.375.375 0 1 1-.53 0L12 2.845l.265.265Z" /></svg>
+                ),
+                title: 'Restaurant Tables',
+                desc: 'Impossible reservation? Steward monitors Resy and OpenTable for cancellations',
+                tag: 'Resy, OpenTable & more',
+              },
+              {
+                icon: (
+                  <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" /></svg>
+                ),
+                title: 'Flight Deals',
+                desc: 'Track fares across airlines and routes, get pinged when prices drop',
+                tag: 'Major airlines',
+              },
+              {
+                icon: (
+                  <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15.362 5.214A8.252 8.252 0 0 1 12 21 8.25 8.25 0 0 1 6.038 7.047 8.287 8.287 0 0 0 9 9.601a8.983 8.983 0 0 1 3.361-6.867 8.21 8.21 0 0 0 3 2.48Z" /><path strokeLinecap="round" strokeLinejoin="round" d="M12 18a3.75 3.75 0 0 0 .495-7.468 5.99 5.99 0 0 0-1.925 3.547 5.975 5.975 0 0 1-2.133-1.001A3.75 3.75 0 0 0 12 18Z" /></svg>
+                ),
+                title: 'Campsites',
+                desc: 'Yosemite, Yellowstone, Big Sur &mdash; snag that cancellation before anyone else',
+                tag: 'Recreation.gov sites',
+              },
+              {
+                icon: (
+                  <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 6v.75m0 3v.75m0 3v.75m0 3V18m-9-5.25h5.25M7.5 15h3M3.375 5.25c-.621 0-1.125.504-1.125 1.125v3.026a2.999 2.999 0 0 1 0 5.198v3.026c0 .621.504 1.125 1.125 1.125h17.25c.621 0 1.125-.504 1.125-1.125v-3.026a2.999 2.999 0 0 1 0-5.198V6.375c0-.621-.504-1.125-1.125-1.125H3.375Z" /></svg>
+                ),
+                title: 'Event Tickets',
+                desc: 'Concert tickets sold out? Watch for face-value drops and new inventory',
+                tag: 'Ticketmaster, SeatGeek',
+              },
+              {
+                icon: (
+                  <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" /></svg>
+                ),
+                title: 'Restocks',
+                desc: 'Limited releases, sold-out sneakers, viral products &mdash; be first in line when they return',
+                tag: 'Most URLs work',
+              },
+              {
+                icon: (
+                  <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.076-4.076a1.526 1.526 0 0 1 1.037-.443 48.282 48.282 0 0 0 5.68-.494c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" /></svg>
+                ),
+                title: 'AI Chat Setup',
+                desc: 'Just say what you want &mdash; your AI Concierge finds it and sets the watch',
+                tag: 'Plain English setup',
+              },
+              {
+                icon: (
+                  <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 1 0 0 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186 9.566-5.314m-9.566 7.5 9.566 5.314m0 0a2.25 2.25 0 1 0 3.935 2.186 2.25 2.25 0 0 0-3.935-2.186Zm0-12.814a2.25 2.25 0 1 0 3.933-2.185 2.25 2.25 0 0 0-3.933 2.185Z" /></svg>
+                ),
+                title: 'Share Extension',
+                desc: 'See something in Safari or Chrome? Tap Share, then Steward &mdash; link loaded and ready',
+                tag: 'Works in most apps',
+              },
+            ].map((item, i) => (
+              <div
+                key={item.title}
+                className="landing-reveal group relative rounded-2xl border border-[var(--landing-border)] bg-[var(--landing-card)] p-6 transition-all duration-500 hover:bg-[var(--landing-card-hover)] hover:border-[var(--landing-border-hover)] hover:shadow-xl hover:shadow-[var(--landing-card-shadow)] overflow-hidden"
+                style={{ animationDelay: `${200 + i * 80}ms` }}
+              >
+                <div className="relative z-10">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--landing-surface)] border border-[var(--landing-border)] text-[var(--landing-accent)] mb-4 transition-transform duration-300 group-hover:scale-110">
+                    {item.icon}
+                  </div>
+                  <h3 className="text-base font-semibold text-[var(--landing-text)] mb-2">{item.title}</h3>
+                  <p className="text-sm text-[var(--landing-text-dim)] leading-relaxed mb-4">{item.desc}</p>
+                  <div className="flex items-center gap-1.5 text-xs text-[var(--landing-green)]">
+                    <span>&#10003;</span>
+                    <span>{item.tag}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
 
           <div className="landing-reveal mt-16 text-center">
