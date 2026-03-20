@@ -301,7 +301,6 @@ export default async function LandingPage() {
                 {[
                   'Works on iOS and web',
                   'Share from Safari, Chrome, or any app',
-                  'Natural language setup',
                   'Private and secure, no ads',
                 ].map(item => (
                   <div key={item} className="flex items-center gap-3 text-sm text-[var(--landing-text-mid)]">
