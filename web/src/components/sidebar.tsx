@@ -13,6 +13,7 @@ import {
   ArrowUpRight,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
+import { ThemeToggle } from '@/components/theme-toggle'
 
 interface SidebarProps {
   onChatOpen: () => void
@@ -108,6 +109,9 @@ export function Sidebar({ onChatOpen }: SidebarProps) {
             <Settings size={20} />
             Settings
           </Link>
+
+          {/* Theme toggle */}
+          <ThemeToggle />
 
           {/* User + Sign Out */}
           <div className="flex items-center gap-3 px-3 py-2.5 mt-1">

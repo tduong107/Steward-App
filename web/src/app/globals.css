@@ -58,6 +58,54 @@
   --color-blue-light: #141E2A;
 }
 
+/* Landing page colors — dark by default */
+:root {
+  --landing-bg: #0A0C0B;
+  --landing-text: #ffffff;
+  --landing-text-mid: rgba(255,255,255,0.50);
+  --landing-text-dim: rgba(255,255,255,0.40);
+  --landing-text-faint: rgba(255,255,255,0.20);
+  --landing-border: rgba(255,255,255,0.08);
+  --landing-border-hover: rgba(255,255,255,0.15);
+  --landing-card: rgba(255,255,255,0.02);
+  --landing-card-hover: rgba(255,255,255,0.05);
+  --landing-surface: rgba(255,255,255,0.04);
+  --landing-surface-hover: rgba(255,255,255,0.08);
+  --landing-glow-green: rgba(42,92,69,0.20);
+  --landing-glow-mint: rgba(110,231,183,0.10);
+  --landing-glow-gold: rgba(245,158,11,0.05);
+  --landing-accent: #6EE7B7;
+  --landing-accent-solid: #2A5C45;
+  --landing-accent-hover: #3A7C5A;
+  --landing-mock-card-bg: rgba(255,255,255,0.06);
+  --landing-mock-item-bg: rgba(255,255,255,0.03);
+  --landing-mock-item-border: rgba(255,255,255,0.06);
+}
+
+/* Landing light mode overrides — only when NOT .dark */
+html:not(.dark) {
+  --landing-bg: #F7F6F3;
+  --landing-text: #1A1814;
+  --landing-text-mid: rgba(26,24,20,0.55);
+  --landing-text-dim: rgba(26,24,20,0.45);
+  --landing-text-faint: rgba(26,24,20,0.15);
+  --landing-border: rgba(26,24,20,0.08);
+  --landing-border-hover: rgba(26,24,20,0.15);
+  --landing-card: rgba(0,0,0,0.02);
+  --landing-card-hover: rgba(0,0,0,0.04);
+  --landing-surface: rgba(0,0,0,0.03);
+  --landing-surface-hover: rgba(0,0,0,0.06);
+  --landing-glow-green: rgba(42,92,69,0.08);
+  --landing-glow-mint: rgba(110,231,183,0.06);
+  --landing-glow-gold: rgba(245,158,11,0.04);
+  --landing-accent: #2A5C45;
+  --landing-accent-solid: #2A5C45;
+  --landing-accent-hover: #3A7C5A;
+  --landing-mock-card-bg: rgba(0,0,0,0.04);
+  --landing-mock-item-bg: rgba(0,0,0,0.02);
+  --landing-mock-item-border: rgba(0,0,0,0.06);
+}
+
 html {
   font-family: var(--font-body);
   color: var(--color-ink);
