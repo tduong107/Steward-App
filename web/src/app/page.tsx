@@ -118,15 +118,7 @@ export default async function LandingPage() {
               alt="Steward watches prices, restocks, reservations and more"
               width={1200}
               height={630}
-              className="w-full h-auto hidden dark:block rounded-2xl"
-              priority
-            />
-            <Image
-              src="/assets/hero-light.svg"
-              alt="Steward watches prices, restocks, reservations and more"
-              width={1200}
-              height={630}
-              className="w-full h-auto dark:hidden rounded-2xl"
+              className="w-full h-auto rounded-2xl"
               priority
             />
         </div>
@@ -139,7 +131,7 @@ export default async function LandingPage() {
             {[
               { value: 'Watch Most Things', label: 'Beyond price tracking', small: true },
               { value: '24/7', label: 'Always-on monitoring', small: false },
-              { value: 'Up to 2hr', label: 'Check frequency', small: false },
+              { value: 'Daily+', label: 'Check frequency', small: false },
               { value: '30sec', label: 'To set up your first watch', small: false },
             ].map((stat, i) => (
               <div key={stat.label} className="landing-reveal" style={{ animationDelay: `${i * 100}ms` }}>

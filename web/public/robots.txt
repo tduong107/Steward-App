@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /home
+Disallow: /api
+Disallow: /auth
+
+Sitemap: https://www.joinsteward.app/sitemap.xml
