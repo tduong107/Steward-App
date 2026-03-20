@@ -135,7 +135,7 @@ export default async function LandingPage() {
                   } animate-fade-in-up`}
                   style={{ animationDelay: `${700 + i * 150}ms` }}
                 >
-                  <span className="text-xl">{item.emoji}</span>
+                  <span className="text-xl w-8 text-center shrink-0">{item.emoji}</span>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-white/90 truncate">{item.name}</p>
                     <p className={`text-xs ${item.accent ? 'text-[#6EE7B7]' : 'text-white/40'}`}>{item.status}</p>
