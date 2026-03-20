@@ -67,15 +67,6 @@ export default async function LandingPage() {
 
       {/* ── Hero ── */}
       <section className="relative z-10 mx-auto max-w-6xl px-6 pt-24 pb-20 md:pt-36 md:pb-32 text-center">
-        {/* Status badge */}
-        <div className="landing-reveal inline-flex items-center gap-2.5 rounded-full border border-[var(--landing-border)] bg-[var(--landing-surface)] px-5 py-2 text-xs font-medium text-[var(--landing-text-mid)] mb-8 backdrop-blur-sm">
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--landing-green)] opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-[var(--landing-green)]"></span>
-          </span>
-          Saving users an average of $2,400/year
-        </div>
-
         <h1 className="landing-reveal [animation-delay:100ms] text-5xl md:text-7xl lg:text-8xl font-bold font-[var(--font-serif)] text-[var(--landing-text)] leading-[1.05] max-w-4xl mx-auto tracking-tight">
           Stop overpaying{' '}
           <span className="relative">
