@@ -13,10 +13,15 @@ function parseWatchData(text: string): Partial<Watch> | undefined {
   try {
     const raw = JSON.parse(match[1])
     // Map camelCase keys from the edge function to snake_case for the database
+    let url = raw.url || ''
+    // Ensure URL has protocol (matches iOS createWatchFromJSON)
+    if (url && !url.match(/^https?:\/\//i)) {
+      url = `https://${url}`
+    }
     return {
       emoji: raw.emoji,
       name: raw.name,
-      url: raw.url,
+      url,
       condition: raw.condition,
       action_label: raw.actionLabel || raw.action_label,
       action_type: raw.actionType || raw.action_type || 'notify',
@@ -44,17 +49,36 @@ function parseProductLinks(text: string): ProductLink[] | undefined {
   if (!match) return undefined
   const content = match[1].trim()
 
-  // The edge function enriches product links into JSON array format
-  // Try parsing as JSON first (enriched format from the server)
+  // Try parsing as a JSON array first (if the whole block is a valid array)
   try {
     const parsed = JSON.parse(content)
     if (Array.isArray(parsed)) return parsed as ProductLink[]
   } catch {
-    // Not JSON — it might be the raw "search:query" format
-    // which means the server didn't enrich it; skip rendering
+    // Not a single JSON array — try newline-separated JSON objects
+    // (this is the format the edge function actually returns)
   }
 
-  return undefined
+  // Parse newline-separated JSON objects (edge function format)
+  const links: ProductLink[] = []
+  const lines = content.split('\n').filter((l) => l.trim())
+  for (const line of lines) {
+    try {
+      const obj = JSON.parse(line.trim())
+      if (obj && obj.title && obj.url) {
+        links.push({
+          title: obj.title,
+          url: obj.url,
+          price: obj.price || '',
+          image: obj.imageURL || obj.image || undefined,
+          store: obj.source || obj.store || undefined,
+        })
+      }
+    } catch {
+      // Skip non-JSON lines
+    }
+  }
+
+  return links.length > 0 ? links : undefined
 }
 
 function stripTags(text: string): string {
@@ -72,10 +96,18 @@ function stripTags(text: string): string {
     .trim()
 }
 
+// Separate type for internal conversation history (includes enriched context)
+interface HistoryEntry {
+  role: 'user' | 'assistant'
+  content: string
+}
+
 export function useChat(tier: string = 'free') {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const isFirstMessageRef = useRef(true)
+  // Separate conversation history that preserves enriched context (matches iOS conversationHistory)
+  const conversationHistoryRef = useRef<HistoryEntry[]>([])
 
   const sendMessage = useCallback(
     async (text: string) => {
@@ -119,15 +151,16 @@ export function useChat(tier: string = 'free') {
             if (res.ok) {
               const meta = await res.json()
               if (meta.title || meta.price) {
-                let context = `\n[URL_CONTEXT: I resolved the URLs for you. Here's what I found:\nURL: ${urls[0]}`
+                // Sanitize title to avoid breaking bracket format
+                const safeTitle = meta.title ? meta.title.replace(/[\[\]]/g, '') : null
+                const parts = [`URL: ${urls[0]}`]
                 if (meta.resolvedUrl && meta.resolvedUrl !== urls[0]) {
-                  context += ` → resolves to: ${meta.resolvedUrl}`
+                  parts.push(`resolves to: ${meta.resolvedUrl}`)
                 }
-                if (meta.title) context += ` | Page title: "${meta.title}"`
-                if (meta.price) context += ` | Price found: $${meta.price}`
-                if (meta.hostname) context += ` | Website: ${meta.hostname}`
-                context += ']'
-                enrichedText += context
+                if (safeTitle) parts.push(`Page title: "${safeTitle}"`)
+                if (meta.price) parts.push(`Price found: $${meta.price}`)
+                if (meta.hostname) parts.push(`Website: ${meta.hostname}`)
+                enrichedText += `\n[URL_CONTEXT: I resolved the URLs for you. Here is what I found:\n${parts.join(' | ')}]`
               }
             }
           } catch {
@@ -135,16 +168,14 @@ export function useChat(tier: string = 'free') {
           }
         }
 
-        // Build conversation history for the API
-        const history = [...messages, { ...userMessage, text: enrichedText }].map((m) => ({
-          role: m.role === 'steward' ? 'assistant' : 'user',
-          content: m.role === 'user' ? m.text : m.text,
-        }))
+        // Add to conversation history (preserves enriched context like iOS)
+        conversationHistoryRef.current.push({
+          role: 'user',
+          content: enrichedText,
+        })
 
-        // For the latest message, use the enriched text
-        if (history.length > 0) {
-          history[history.length - 1].content = enrichedText
-        }
+        // Build message list from our enriched history (capped at 30 like the edge function)
+        const history = conversationHistoryRef.current.slice(-30)
 
         const headers: Record<string, string> = {
           apikey: anonKey,
@@ -167,6 +198,12 @@ export function useChat(tier: string = 'free') {
 
         const data = await response.json()
         const rawText: string = data.text ?? data.reply ?? data.content ?? ''
+
+        // Store full AI response in history (with markers, so AI has context)
+        conversationHistoryRef.current.push({
+          role: 'assistant',
+          content: rawText,
+        })
 
         const watchData = parseWatchData(rawText)
         const isProposal = parseProposedWatch(rawText)
@@ -199,15 +236,21 @@ export function useChat(tier: string = 'free') {
         setIsLoading(false)
       }
     },
-    [messages]
+    [tier]
   )
 
   const addMessage = useCallback((msg: ChatMessage) => {
     setMessages((prev) => [...prev, msg])
+    // Also add to conversation history so AI sees it
+    conversationHistoryRef.current.push({
+      role: msg.role === 'steward' ? 'assistant' : 'user',
+      content: msg.text,
+    })
   }, [])
 
   const clearMessages = useCallback(() => {
     setMessages([])
+    conversationHistoryRef.current = []
     isFirstMessageRef.current = true
   }, [])
 

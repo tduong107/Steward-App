@@ -43,6 +43,7 @@ export function ChatDrawer({ open, onClose }: ChatDrawerProps) {
   const { messages, sendMessage, isLoading, clearMessages, addMessage } = useChat(tier)
   const { createWatch } = useWatches()
   const [input, setInput] = useState('')
+  const [isCreating, setIsCreating] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [visible, setVisible] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -111,6 +112,9 @@ export function ChatDrawer({ open, onClose }: ChatDrawerProps) {
 
   const handleCreateWatch = useCallback(
     async (data: Partial<Watch>) => {
+      // Prevent duplicate creation from rapid clicks
+      if (isCreating) return
+      setIsCreating(true)
       try {
         const created = await createWatch(data)
         addMessage({
@@ -126,9 +130,11 @@ export function ChatDrawer({ open, onClose }: ChatDrawerProps) {
           role: 'steward',
           text: 'Sorry, I had trouble creating that watch. Please try again.',
         })
+      } finally {
+        setIsCreating(false)
       }
     },
-    [createWatch, addMessage],
+    [createWatch, addMessage, isCreating],
   )
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

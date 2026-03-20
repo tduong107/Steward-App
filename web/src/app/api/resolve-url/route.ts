@@ -149,7 +149,29 @@ export async function POST(req: NextRequest) {
     }
 
     const finalUrl = response.url
-    const html = await response.text()
+
+    // Limit HTML size to prevent memory issues (500KB is enough for metadata)
+    const contentLength = response.headers.get('content-length')
+    if (contentLength && parseInt(contentLength) > 2_000_000) {
+      // Page is over 2MB — read only first 500KB for metadata
+    }
+    const reader = response.body?.getReader()
+    let html = ''
+    const MAX_HTML_BYTES = 500_000
+    if (reader) {
+      const decoder = new TextDecoder()
+      let bytesRead = 0
+      while (bytesRead < MAX_HTML_BYTES) {
+        const { done, value } = await reader.read()
+        if (done) break
+        html += decoder.decode(value, { stream: true })
+        bytesRead += value.length
+      }
+      reader.cancel().catch(() => {})
+    } else {
+      const fullText = await response.text()
+      html = fullText.slice(0, MAX_HTML_BYTES)
+    }
 
     // Extract page title
     let title: string | null = null
