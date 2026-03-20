@@ -107,14 +107,30 @@ export function Sidebar({ onChatOpen }: SidebarProps) {
           <div className="px-3 mb-2">
             <button
               onClick={() => setShowPaywall(true)}
-              className="flex w-full items-center gap-3 rounded-[var(--radius-lg)] bg-gradient-to-r from-[var(--color-accent)] to-emerald-600 px-3 py-3 text-left transition-all hover:opacity-90 shadow-sm"
+              className="flex w-full flex-col rounded-[var(--radius-lg)] bg-gradient-to-br from-[var(--color-accent)] to-emerald-600 p-3.5 text-left transition-all hover:opacity-90 shadow-sm"
             >
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20">
-                <Crown size={16} className="text-white" />
-              </div>
-              <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20">
+                  <Crown size={16} className="text-white" />
+                </div>
                 <p className="text-sm font-semibold text-white">Upgrade to Pro</p>
-                <p className="text-[11px] text-white/70">More watches & faster checks</p>
+              </div>
+              <div className="mt-2.5 space-y-1.5 pl-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-white/90">✓ 7 watches (vs 3)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-white/90">✓ Check every 12 hours</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-white/90">✓ Price history & insights</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-white/90">✓ Quick action links</span>
+                </div>
+              </div>
+              <div className="mt-3 flex items-center justify-center rounded-full bg-white/20 py-1.5 text-xs font-semibold text-white">
+                From $2.99/mo
               </div>
             </button>
           </div>

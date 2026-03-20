@@ -296,7 +296,7 @@ export default function DashboardPage() {
           type="button"
           onClick={() =>
             tier === 'free'
-              ? router.push('/home/settings')
+              ? setShowPaywall(true)
               : router.push('/home/savings')
           }
           className="w-full text-left flex items-center gap-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-3 shadow-sm transition-all duration-200 hover:shadow-md hover:border-[var(--color-accent-mid)] animate-fade-in-up [animation-delay:250ms] cursor-pointer"
