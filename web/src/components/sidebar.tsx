@@ -39,7 +39,7 @@ export function Sidebar({ onChatOpen }: SidebarProps) {
   return (
     <>
       {/* ── Desktop sidebar ── */}
-      <aside className="hidden md:flex w-60 shrink-0 flex-col bg-[var(--color-bg-card)] border-r border-[var(--color-border)]">
+      <aside className="hidden md:flex w-60 shrink-0 flex-col bg-[var(--color-bg-card)] border-r border-[var(--color-border)] sticky top-0 h-dvh overflow-y-auto">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5 px-5 pt-6 pb-4 transition-opacity hover:opacity-80">
           <Image
