@@ -230,6 +230,7 @@ export default async function LandingPage() {
               <div className="landing-reveal [animation-delay:300ms] mt-6 space-y-3">
                 {[
                   'Works on iOS and web',
+                  'Share from Safari, Chrome, or any app',
                   'Plain English setup',
                   'Private and secure, no ads',
                 ].map(item => (
