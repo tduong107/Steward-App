@@ -145,9 +145,15 @@ export function Sidebar({ onChatOpen }: SidebarProps) {
         {/* Tier badge for paid users */}
         {!showUpgrade && (
           <div className="px-3 mb-2">
-            <div className="flex items-center gap-2 rounded-[var(--radius-lg)] bg-[var(--color-accent-light)] px-3 py-2">
-              <Crown size={14} className="text-[var(--color-accent)]" />
-              <span className="text-xs font-semibold text-[var(--color-accent)] uppercase tracking-wide">
+            <div className={`flex items-center gap-2 rounded-[var(--radius-lg)] px-3 py-2 ${
+              tier === 'premium'
+                ? 'bg-amber-500/10 border border-amber-500/30'
+                : 'bg-[var(--color-accent-light)] border border-[var(--color-accent)]/20'
+            }`}>
+              <Crown size={14} className={tier === 'premium' ? 'text-amber-500' : 'text-[var(--color-accent)]'} />
+              <span className={`text-xs font-semibold uppercase tracking-wide ${
+                tier === 'premium' ? 'text-amber-500' : 'text-[var(--color-accent)]'
+              }`}>
                 {tier} Plan
               </span>
             </div>
@@ -177,6 +183,9 @@ export function Sidebar({ onChatOpen }: SidebarProps) {
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-[var(--color-ink)] truncate">
                 {profile?.display_name ?? 'User'}
+              </p>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-ink-light)]">
+                {tier === 'free' ? 'Free' : tier === 'premium' ? 'Premium' : 'Pro'} account
               </p>
             </div>
             <button

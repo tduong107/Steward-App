@@ -1,7 +1,8 @@
 'use client'
 
 import { usePathname } from 'next/navigation'
-import { MessageCircle } from 'lucide-react'
+import { MessageCircle, Crown } from 'lucide-react'
+import { useSub } from '@/hooks/use-subscription'
 
 interface HeaderProps {
   onChatOpen: () => void
@@ -11,6 +12,7 @@ const titleMap: Record<string, string> = {
   '/home': 'Home',
   '/home/activity': 'Activity',
   '/home/savings': 'Savings',
+  '/home/price-insights': 'Price Insights',
   '/home/settings': 'Settings',
 }
 
@@ -25,15 +27,42 @@ function getPageTitle(pathname: string): string {
   return match ? match[1] : 'Steward'
 }
 
+const tierColors: Record<string, { bg: string; text: string; border: string }> = {
+  free: {
+    bg: 'bg-[var(--color-bg-deep)]',
+    text: 'text-[var(--color-ink-mid)]',
+    border: 'border-[var(--color-border)]',
+  },
+  pro: {
+    bg: 'bg-[var(--color-accent-light)]',
+    text: 'text-[var(--color-accent)]',
+    border: 'border-[var(--color-accent)]/30',
+  },
+  premium: {
+    bg: 'bg-amber-500/10',
+    text: 'text-amber-500',
+    border: 'border-amber-500/30',
+  },
+}
+
 export function Header({ onChatOpen }: HeaderProps) {
   const pathname = usePathname()
   const title = getPageTitle(pathname)
+  const { tier } = useSub()
+  const colors = tierColors[tier] || tierColors.free
 
   return (
     <header className="md:hidden flex items-center justify-between px-4 py-3 bg-[var(--color-bg-card)] border-b border-[var(--color-border)]">
-      <h1 className="text-lg font-semibold font-[var(--font-serif)] text-[var(--color-ink)]">
-        {title}
-      </h1>
+      <div className="flex items-center gap-2.5">
+        <h1 className="text-lg font-semibold font-[var(--font-serif)] text-[var(--color-ink)]">
+          {title}
+        </h1>
+        {/* Tier badge */}
+        <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${colors.bg} ${colors.text} ${colors.border}`}>
+          {tier !== 'free' && <Crown size={10} />}
+          {tier}
+        </span>
+      </div>
 
       <button
         onClick={onChatOpen}
