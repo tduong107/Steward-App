@@ -143,7 +143,7 @@ export default async function LandingPage() {
               { value: '30sec', label: 'To set up your first watch', small: false },
             ].map((stat, i) => (
               <div key={stat.label} className="landing-reveal" style={{ animationDelay: `${i * 100}ms` }}>
-                <p className={`font-bold font-[var(--font-serif)] text-[var(--landing-accent)] whitespace-nowrap ${stat.small ? 'text-xl md:text-2xl' : 'text-3xl md:text-4xl'}`}>
+                <p className={`font-bold font-[var(--font-serif)] text-[var(--landing-accent)] whitespace-nowrap flex items-end justify-center h-[2.75rem] md:h-[3.5rem] ${stat.small ? 'text-xl md:text-2xl' : 'text-3xl md:text-4xl'}`}>
                   {stat.value}
                 </p>
                 <p className="mt-2 text-sm text-[var(--landing-text-dim)]">{stat.label}</p>
