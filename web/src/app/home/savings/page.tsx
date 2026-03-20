@@ -27,7 +27,7 @@ export default function SavingsPage() {
   const [loading, setLoading] = useState(true)
   const supabaseRef = useRef(createClient())
 
-  // Fetch changed check results for all user watches
+  // Fetch all check results with prices for user watches
   useEffect(() => {
     if (!user || watches.length === 0) {
       setLoading(false)
@@ -42,9 +42,9 @@ export default function SavingsPage() {
         .from('check_results')
         .select('*')
         .in('watch_id', watchIds)
-        .eq('changed', true)
-        .order('checked_at', { ascending: false })
-        .limit(200)
+        .not('price', 'is', null)
+        .order('checked_at', { ascending: true })
+        .limit(500)
 
       if (error) {
         console.error('Failed to fetch check results:', error.message)
@@ -57,35 +57,45 @@ export default function SavingsPage() {
     fetchResults()
   }, [user, watches])
 
-  // Build savings entries from check results with price data
+  // Build savings entries by comparing sequential check prices per watch
   const savingsEntries = useMemo(() => {
     const entries: SavingsEntry[] = []
     const watchMap = new Map(watches.map((w) => [w.id, w]))
 
+    // Group check results by watch (already sorted by checked_at ascending)
+    const resultsByWatch = new Map<string, CheckResult[]>()
     for (const cr of checkResults) {
-      const data = cr.result_data as Record<string, unknown>
-      const triggeredPrice = typeof data?.price === 'number' ? data.price : null
-      const originalPrice = typeof data?.original_price === 'number' ? data.original_price : null
-      const previousPrice = typeof data?.previous_price === 'number' ? data.previous_price : null
-
-      const basePrice = originalPrice ?? previousPrice
-      if (triggeredPrice === null || basePrice === null) continue
-      if (triggeredPrice >= basePrice) continue
-
-      const watch = watchMap.get(cr.watch_id)
-      if (!watch) continue
-
-      entries.push({
-        watchId: cr.watch_id,
-        watchEmoji: watch.emoji || '👀',
-        watchName: watch.name,
-        originalPrice: basePrice,
-        triggeredPrice,
-        saved: basePrice - triggeredPrice,
-        date: cr.checked_at,
-      })
+      if (cr.price === null || cr.price === undefined) continue
+      const list = resultsByWatch.get(cr.watch_id) || []
+      list.push(cr)
+      resultsByWatch.set(cr.watch_id, list)
     }
 
+    // For each watch, compare consecutive prices to find drops
+    for (const [watchId, results] of resultsByWatch) {
+      const watch = watchMap.get(watchId)
+      if (!watch || results.length < 2) continue
+
+      for (let i = 1; i < results.length; i++) {
+        const prev = results[i - 1]
+        const curr = results[i]
+        if (prev.price === null || curr.price === null) continue
+        if (curr.price >= prev.price) continue // only track drops
+
+        entries.push({
+          watchId,
+          watchEmoji: watch.emoji || '👀',
+          watchName: watch.name,
+          originalPrice: prev.price,
+          triggeredPrice: curr.price,
+          saved: prev.price - curr.price,
+          date: curr.checked_at,
+        })
+      }
+    }
+
+    // Sort by date descending (most recent first)
+    entries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     return entries
   }, [checkResults, watches])
 

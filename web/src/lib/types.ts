@@ -54,6 +54,7 @@ export interface CheckResult {
   watch_id: string
   result_data: Record<string, unknown>
   changed: boolean
+  price: number | null
   checked_at: string
   created_at: string
 }
