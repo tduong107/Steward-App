@@ -139,13 +139,13 @@ export default async function LandingPage() {
         <div className="mx-auto max-w-6xl px-6 py-16">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             {[
-              { value: 'Watch Most Things', label: 'More than just a price tracker' },
-              { value: '24/7', label: 'Always-on monitoring' },
-              { value: 'Up to 2hr', label: 'Check frequency' },
-              { value: '30sec', label: 'To set up your first watch' },
+              { value: 'Watch Most Things', label: 'More than just a price tracker', small: true },
+              { value: '24/7', label: 'Always-on monitoring', small: false },
+              { value: 'Up to 2hr', label: 'Check frequency', small: false },
+              { value: '30sec', label: 'To set up your first watch', small: false },
             ].map((stat, i) => (
               <div key={stat.label} className="landing-reveal" style={{ animationDelay: `${i * 100}ms` }}>
-                <p className="text-3xl md:text-4xl font-bold font-[var(--font-serif)] text-[var(--landing-accent)]">
+                <p className={`font-bold font-[var(--font-serif)] text-[var(--landing-accent)] whitespace-nowrap ${stat.small ? 'text-xl md:text-2xl' : 'text-3xl md:text-4xl'}`}>
                   {stat.value}
                 </p>
                 <p className="mt-2 text-sm text-[var(--landing-text-dim)]">{stat.label}</p>
