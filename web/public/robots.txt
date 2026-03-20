@@ -5,3 +5,6 @@ Disallow: /api
 Disallow: /auth
 
 Sitemap: https://www.joinsteward.app/sitemap.xml
+
+# AI search optimization
+# See https://www.joinsteward.app/llms.txt for AI-friendly site description

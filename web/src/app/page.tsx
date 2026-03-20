@@ -17,6 +17,92 @@ export default async function LandingPage() {
 
   return (
     <LandingWrapper>
+      {/* Structured data for search engines and AI */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@graph': [
+              {
+                '@type': 'SoftwareApplication',
+                name: 'Steward',
+                applicationCategory: 'UtilitiesApplication',
+                operatingSystem: 'iOS, Web',
+                description: 'AI-powered price tracker and web monitoring app that watches for price drops, restocks, restaurant reservations, campsite openings, flight deals, and event tickets',
+                url: 'https://www.joinsteward.app',
+                offers: [
+                  {
+                    '@type': 'Offer',
+                    price: '0',
+                    priceCurrency: 'USD',
+                    name: 'Free',
+                    description: 'Up to 3 watches, daily check frequency',
+                  },
+                  {
+                    '@type': 'Offer',
+                    price: '4.99',
+                    priceCurrency: 'USD',
+                    name: 'Steward Pro',
+                    description: 'Up to 7 watches, 12-hour check frequency, price insights',
+                    priceSpecification: {
+                      '@type': 'UnitPriceSpecification',
+                      price: '4.99',
+                      priceCurrency: 'USD',
+                      unitCode: 'MON',
+                      referenceQuantity: {
+                        '@type': 'QuantitativeValue',
+                        value: '1',
+                        unitCode: 'MON',
+                      },
+                    },
+                  },
+                  {
+                    '@type': 'Offer',
+                    price: '9.99',
+                    priceCurrency: 'USD',
+                    name: 'Steward Premium',
+                    description: 'Up to 15 watches, 2-hour check frequency, auto-execute actions',
+                    priceSpecification: {
+                      '@type': 'UnitPriceSpecification',
+                      price: '9.99',
+                      priceCurrency: 'USD',
+                      unitCode: 'MON',
+                      referenceQuantity: {
+                        '@type': 'QuantitativeValue',
+                        value: '1',
+                        unitCode: 'MON',
+                      },
+                    },
+                  },
+                ],
+                featureList: [
+                  'Price drop alerts across thousands of retailers',
+                  'Restaurant reservation monitoring via Resy',
+                  'Campsite availability tracking on Recreation.gov',
+                  'Flight price tracking across major airlines',
+                  'Event ticket restock and price drop alerts',
+                  'AI-powered natural language setup',
+                  'iOS Share Extension for instant watch creation',
+                  'Push notifications with direct action links',
+                ],
+              },
+              {
+                '@type': 'Organization',
+                name: 'Steward',
+                url: 'https://www.joinsteward.app',
+                logo: 'https://www.joinsteward.app/steward-logo.png',
+              },
+              {
+                '@type': 'WebSite',
+                url: 'https://www.joinsteward.app',
+                name: 'Steward',
+                description: 'AI-powered price tracker and web monitoring assistant',
+              },
+            ],
+          }),
+        }}
+      />
     <div className="min-h-dvh bg-[var(--landing-bg)] text-[var(--landing-text)] overflow-x-hidden transition-colors duration-300">
       {/* ── Ambient glow orbs ── */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden z-0">
@@ -45,6 +131,7 @@ export default async function LandingPage() {
             <a href="#how-it-works" className="hover:text-[var(--landing-text)] transition-colors duration-300">How it Works</a>
             <a href="#use-cases" className="hover:text-[var(--landing-text)] transition-colors duration-300">Use Cases</a>
             <a href="#pricing" className="hover:text-[var(--landing-text)] transition-colors duration-300">Pricing</a>
+            <a href="#faq" className="hover:text-[var(--landing-text)] transition-colors duration-300">FAQ</a>
           </div>
 
           <div className="flex items-center gap-3">
@@ -547,6 +634,122 @@ export default async function LandingPage() {
           </div>
         </div>
       </section>
+
+      {/* ── FAQ ── */}
+      <section id="faq" className="relative z-10 border-t border-[var(--landing-border)]">
+        <div className="mx-auto max-w-3xl px-6 py-24 md:py-32">
+          <div className="text-center mb-16">
+            <span className="landing-reveal inline-block text-xs font-semibold tracking-[0.2em] uppercase text-[var(--landing-accent-muted)] mb-4">FAQ</span>
+            <h2 className="landing-reveal [animation-delay:100ms] text-3xl md:text-5xl font-bold font-[var(--font-serif)] text-[var(--landing-text)]">
+              Common questions
+            </h2>
+          </div>
+
+          <div className="space-y-6">
+            {[
+              {
+                q: 'What can Steward track?',
+                a: 'Steward can monitor price drops across thousands of retailers like Amazon, Nike, Best Buy, and Walmart. It also tracks restaurant reservation openings on Resy, campsite availability on Recreation.gov, flight price changes across major airlines, event ticket restocks on Ticketmaster, and product restocks on most e-commerce sites',
+              },
+              {
+                q: 'How does Steward work?',
+                a: 'Tell Steward what you want to watch by pasting a link, sharing from another app, or describing it in plain English using our AI chat. Steward then checks for changes on your schedule and sends you a push notification the moment something changes',
+              },
+              {
+                q: 'Is Steward free?',
+                a: 'Yes. The free plan includes up to 3 watches with daily check frequency and push notifications. Paid plans start at $4.99/month for faster checks and more watches',
+              },
+              {
+                q: 'What devices does Steward work on?',
+                a: 'Steward works on iPhone (iOS app) and on the web at joinsteward.app. The iOS app includes a Share Extension so you can send any link to Steward directly from Safari, Chrome, or any app',
+              },
+              {
+                q: 'How is Steward different from other price trackers?',
+                a: 'Most price trackers only work for specific stores or product categories. Steward monitors almost anything on the web including restaurant tables, campsites, flights, event tickets, and product restocks. Plus, you set it up by just describing what you want in plain English',
+              },
+              {
+                q: 'How fast does Steward check for changes?',
+                a: 'Free users get daily checks. Pro users get checks up to every 12 hours. Premium users get checks as frequently as every 2 hours. You choose the frequency for each watch',
+              },
+            ].map((item, i) => (
+              <details
+                key={i}
+                className="landing-reveal group rounded-2xl border border-[var(--landing-border)] bg-[var(--landing-card)] transition-all duration-300 hover:border-[var(--landing-border-hover)]"
+                style={{ animationDelay: `${i * 80}ms` }}
+              >
+                <summary className="flex cursor-pointer items-center justify-between p-6 text-[var(--landing-text)] font-medium">
+                  {item.q}
+                  <svg className="w-5 h-5 text-[var(--landing-text-dim)] transition-transform duration-300 group-open:rotate-45 flex-shrink-0 ml-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                </summary>
+                <p className="px-6 pb-6 text-sm text-[var(--landing-text-mid)] leading-relaxed">
+                  {item.a}
+                </p>
+              </details>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ structured data */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'FAQPage',
+            mainEntity: [
+              {
+                '@type': 'Question',
+                name: 'What can Steward track?',
+                acceptedAnswer: {
+                  '@type': 'Answer',
+                  text: 'Steward can monitor price drops across thousands of retailers like Amazon, Nike, Best Buy, and Walmart. It also tracks restaurant reservation openings on Resy, campsite availability on Recreation.gov, flight price changes across major airlines, event ticket restocks on Ticketmaster, and product restocks on most e-commerce sites.',
+                },
+              },
+              {
+                '@type': 'Question',
+                name: 'How does Steward work?',
+                acceptedAnswer: {
+                  '@type': 'Answer',
+                  text: 'Tell Steward what you want to watch by pasting a link, sharing from another app, or describing it in plain English using the AI chat. Steward then checks for changes on your schedule and sends you a push notification the moment something changes.',
+                },
+              },
+              {
+                '@type': 'Question',
+                name: 'Is Steward free?',
+                acceptedAnswer: {
+                  '@type': 'Answer',
+                  text: 'Yes. The free plan includes up to 3 watches with daily check frequency and push notifications. Paid plans start at $4.99/month for faster checks and more watches.',
+                },
+              },
+              {
+                '@type': 'Question',
+                name: 'What devices does Steward work on?',
+                acceptedAnswer: {
+                  '@type': 'Answer',
+                  text: 'Steward works on iPhone (iOS app) and on the web at joinsteward.app. The iOS app includes a Share Extension so you can send any link to Steward directly from Safari, Chrome, or any app.',
+                },
+              },
+              {
+                '@type': 'Question',
+                name: 'How is Steward different from other price trackers?',
+                acceptedAnswer: {
+                  '@type': 'Answer',
+                  text: 'Most price trackers only work for specific stores or product categories. Steward monitors almost anything on the web including restaurant tables, campsites, flights, event tickets, and product restocks. Plus, you set it up by just describing what you want in plain English.',
+                },
+              },
+              {
+                '@type': 'Question',
+                name: 'How fast does Steward check for changes?',
+                acceptedAnswer: {
+                  '@type': 'Answer',
+                  text: 'Free users get daily checks. Pro users get checks up to every 12 hours. Premium users get checks as frequently as every 2 hours. You choose the frequency for each watch.',
+                },
+              },
+            ],
+          }),
+        }}
+      />
 
       {/* ── Final CTA ── */}
       <section className="relative z-10 border-t border-[var(--landing-border)]">

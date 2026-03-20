@@ -1,0 +1,41 @@
+# Steward — AI-Powered Price Tracker & Web Monitor
+
+> Steward is an AI-powered app that monitors websites for price drops, restocks, restaurant reservations, campsite openings, flight deals, and event tickets. Available on iOS and web.
+
+## What Steward Does
+
+Steward watches the web for changes that matter to you:
+
+- **Price Drops**: Track prices across Amazon, Nike, Best Buy, Target, Walmart, and thousands of other retailers. Set a target price and get notified the instant it hits.
+- **Restaurant Reservations**: Monitor hard-to-get reservations on Resy. Get alerted when cancellations or new slots open up.
+- **Campsite Availability**: Watch Recreation.gov for campsite cancellations at Yosemite, Yellowstone, Big Sur, and other national parks.
+- **Flight Deals**: Track fares across major airlines and routes. Get pinged when prices drop.
+- **Event Tickets**: Watch for face-value ticket drops and restocks on Ticketmaster and other platforms.
+- **Product Restocks**: Monitor sold-out products, limited releases, and viral items across most e-commerce sites.
+
+## How It Works
+
+1. Tell Steward what you want by pasting a link, sharing from another app, or describing it in plain English using the AI chat.
+2. Steward checks for changes on your schedule (daily to every 2 hours depending on plan).
+3. You get a push notification with a direct link to act on it the moment something changes.
+
+## Pricing
+
+- **Free**: Up to 3 watches, daily checks, push notifications. Free forever.
+- **Pro ($4.99/month or $39.99/year)**: Up to 7 watches, 12-hour check frequency, price insights and deal alerts.
+- **Premium ($9.99/month or $79.99/year)**: Up to 15 watches, 2-hour check frequency, Steward Acts (auto-execute), priority support.
+
+## Key Features
+
+- AI-powered natural language setup (just describe what you want)
+- iOS Share Extension (share any link from Safari, Chrome, or any app)
+- Works on iPhone and web (joinsteward.app)
+- Private and secure, no ads
+- Set up in 30 seconds
+
+## Links
+
+- Website: https://www.joinsteward.app
+- Sign Up: https://www.joinsteward.app/signup
+- Privacy Policy: https://www.joinsteward.app/privacy
+- Terms of Service: https://www.joinsteward.app/terms
