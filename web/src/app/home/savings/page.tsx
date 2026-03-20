@@ -72,39 +72,61 @@ export default function SavingsPage() {
   const [sortOpen, setSortOpen] = useState(false)
   const supabaseRef = useRef(createClient())
 
-  // Fetch all check results with prices
+  // Filter to price-related watches only (matches iOS logic)
+  const priceWatches = useMemo(
+    () =>
+      watches.filter(
+        (w) =>
+          w.action_type === 'price' ||
+          w.condition?.toLowerCase().includes('price') ||
+          w.action_label?.toLowerCase().includes('price'),
+      ),
+    [watches],
+  )
+
+  // Fetch check results per watch (no global limit — matches iOS per-watch fetch)
   useEffect(() => {
-    if (!user || watches.length === 0) {
+    if (!user || priceWatches.length === 0) {
       setLoading(false)
       return
     }
 
     const fetchResults = async () => {
       setLoading(true)
-      const watchIds = watches.map((w) => w.id)
 
-      const { data, error } = await supabaseRef.current
-        .from('check_results')
-        .select('id, watch_id, price, checked_at')
-        .in('watch_id', watchIds)
-        .not('price', 'is', null)
-        .order('checked_at', { ascending: true })
-        .limit(1000)
+      // Calculate 90-day cutoff (matches iOS 90-day window)
+      const cutoff = new Date()
+      cutoff.setDate(cutoff.getDate() - 90)
+      const cutoffStr = cutoff.toISOString()
 
-      if (error) {
-        console.error('Failed to fetch check results:', error.message)
-      } else {
-        setCheckResults((data as CheckResult[]) ?? [])
-      }
+      // Fetch per watch concurrently (matches iOS concurrent TaskGroup approach)
+      const allResults: CheckResult[] = []
+      const promises = priceWatches.map(async (w) => {
+        const { data, error } = await supabaseRef.current
+          .from('check_results')
+          .select('id, watch_id, price, checked_at')
+          .eq('watch_id', w.id)
+          .not('price', 'is', null)
+          .gte('checked_at', cutoffStr)
+          .order('checked_at', { ascending: true })
+
+        if (!error && data) return data as CheckResult[]
+        return []
+      })
+
+      const results = await Promise.all(promises)
+      for (const batch of results) allResults.push(...batch)
+
+      setCheckResults(allResults)
       setLoading(false)
     }
 
     fetchResults()
-  }, [user, watches])
+  }, [user, priceWatches])
 
   // ── Per-watch savings (iOS: highest - current) ──
   const savingsEntries = useMemo(() => {
-    const watchMap = new Map(watches.map((w) => [w.id, w]))
+    const watchMap = new Map(priceWatches.map((w) => [w.id, w]))
     const entries: WatchSavings[] = []
 
     const resultsByWatch = new Map<string, number[]>()
@@ -146,7 +168,7 @@ export default function SavingsPage() {
 
   // ── Price change history (iOS: consecutive price changes) ──
   const priceChanges = useMemo(() => {
-    const watchMap = new Map(watches.map((w) => [w.id, w]))
+    const watchMap = new Map(priceWatches.map((w) => [w.id, w]))
     const items: PriceChange[] = []
 
     const resultsByWatch = new Map<string, CheckResult[]>()

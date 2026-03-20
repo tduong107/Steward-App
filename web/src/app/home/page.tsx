@@ -42,28 +42,49 @@ export default function DashboardPage() {
   const supabaseRef = useRef(createClient())
   const [checkResults, setCheckResults] = useState<CheckResult[]>([])
 
+  // Filter to price-related watches (matches iOS)
+  const priceWatches = useMemo(
+    () =>
+      watches.filter(
+        (w) =>
+          w.action_type === 'price' ||
+          w.condition?.toLowerCase().includes('price') ||
+          w.action_label?.toLowerCase().includes('price'),
+      ),
+    [watches],
+  )
+
   useEffect(() => {
-    if (!user || watches.length === 0) return
+    if (!user || priceWatches.length === 0) return
 
     const fetchResults = async () => {
-      const watchIds = watches.map((w) => w.id)
-      const { data } = await supabaseRef.current
-        .from('check_results')
-        .select('*')
-        .in('watch_id', watchIds)
-        .not('price', 'is', null)
-        .order('checked_at', { ascending: true })
-        .limit(500)
+      const cutoff = new Date()
+      cutoff.setDate(cutoff.getDate() - 90)
+      const cutoffStr = cutoff.toISOString()
 
-      if (data) setCheckResults(data as CheckResult[])
+      // Fetch per watch concurrently (matches iOS — no global limit)
+      const promises = priceWatches.map(async (w) => {
+        const { data } = await supabaseRef.current
+          .from('check_results')
+          .select('id, watch_id, price, checked_at')
+          .eq('watch_id', w.id)
+          .not('price', 'is', null)
+          .gte('checked_at', cutoffStr)
+          .order('checked_at', { ascending: true })
+
+        return (data as CheckResult[]) ?? []
+      })
+
+      const results = await Promise.all(promises)
+      setCheckResults(results.flat())
     }
 
     fetchResults()
-  }, [user, watches])
+  }, [user, priceWatches])
 
   // Match iOS logic: savings = highestPrice - currentPrice per watch
   const savingsData = useMemo(() => {
-    const watchMap = new Map(watches.map((w) => [w.id, w]))
+    const watchMap = new Map(priceWatches.map((w) => [w.id, w]))
     const drops: { name: string; emoji: string; amount: number }[] = []
     let total = 0
 
@@ -97,7 +118,7 @@ export default function DashboardPage() {
     // Sort by biggest savings first
     drops.sort((a, b) => b.amount - a.amount)
     return { total, drops: drops.slice(0, 2) }
-  }, [checkResults, watches])
+  }, [checkResults, priceWatches])
 
   // Price watches for insights card
   const priceWatchCount = useMemo(
