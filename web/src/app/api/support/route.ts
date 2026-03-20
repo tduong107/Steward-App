@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
           },
           body: JSON.stringify({
             from: 'Steward Support <onboarding@resend.dev>',
-            to: 'tienduong107@gmail.com',
+            to: 'steward.app.privacy@gmail.com',
             subject: `[Steward Support] ${category || 'General'}: ${name}`,
             html: `
               <h2>New Support Message</h2>

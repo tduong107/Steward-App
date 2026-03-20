@@ -175,8 +175,8 @@ export default function SupportPage() {
 
             <p className="text-center text-xs text-[var(--landing-text-faint)]">
               You can also email us directly at{' '}
-              <a href="mailto:tienduong107@gmail.com" className="text-[var(--landing-accent)] hover:underline">
-                tienduong107@gmail.com
+              <a href="mailto:steward.app.privacy@gmail.com" className="text-[var(--landing-accent)] hover:underline">
+                steward.app.privacy@gmail.com
               </a>
             </p>
           </form>
