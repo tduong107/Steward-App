@@ -92,6 +92,8 @@ export interface ChatMessage {
   watchData?: Partial<Watch>
   productLinks?: ProductLink[]
   dismiss?: boolean
+  /** When present, the drawer should auto-create this watch (matches iOS CREATE_WATCH flow) */
+  autoCreateWatch?: Partial<Watch>
 }
 
 export interface ProductLink {

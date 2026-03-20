@@ -116,10 +116,55 @@ export function ChatDrawer({ open, onClose }: ChatDrawerProps) {
     if (lastMsg?.dismiss) {
       const timer = setTimeout(() => {
         onClose()
-      }, 1500) // Brief delay so user can read the goodbye message
+      }, 1500)
       return () => clearTimeout(timer)
     }
   }, [messages, onClose])
+
+  // Auto-create watches when AI sends [CREATE_WATCH] (matches iOS behavior)
+  const autoCreateProcessedRef = useRef(new Set<string>())
+  useEffect(() => {
+    const lastMsg = messages[messages.length - 1]
+    if (!lastMsg?.autoCreateWatch || autoCreateProcessedRef.current.has(lastMsg.id)) return
+    autoCreateProcessedRef.current.add(lastMsg.id)
+
+    // Auto-create with limit check
+    const doAutoCreate = async () => {
+      const activeWatches = watches.filter((w) => w.status !== 'deleted')
+      const limit = WATCH_LIMITS[tier] ?? WATCH_LIMITS.free
+      if (activeWatches.length >= limit) {
+        setShowPaywall(true)
+        addMessage({
+          id: crypto.randomUUID(),
+          role: 'steward',
+          text: `You've reached the ${limit}-watch limit on your ${tier === 'free' ? 'Free' : tier === 'pro' ? 'Pro' : 'Premium'} plan. Upgrade to add more watches!`,
+          suggestions: ['Upgrade plan'],
+        })
+        return
+      }
+
+      try {
+        const created = await createWatch(lastMsg.autoCreateWatch!)
+        addMessage({
+          id: crypto.randomUUID(),
+          role: 'steward',
+          text: `✅ Created "${created.name || 'your watch'}"! I'll start monitoring it right away.`,
+          suggestions: ['Create another watch', "That's all for now"],
+        })
+      } catch (err) {
+        console.error('Auto-create watch failed:', err)
+        setShowPaywall(true)
+        addMessage({
+          id: crypto.randomUUID(),
+          role: 'steward',
+          text: `Couldn't create the watch — you may have hit your ${tier === 'free' ? 'Free' : tier === 'pro' ? 'Pro' : 'Premium'} plan limit. Upgrade to add more!`,
+          suggestions: ['Upgrade plan'],
+        })
+      }
+    }
+
+    doAutoCreate()
+  }, [messages, watches, tier, createWatch, addMessage])
 
   // Cleanup image preview URL on unmount
   useEffect(() => {
