@@ -7,34 +7,70 @@ import type { ChatMessage, ProductLink, Watch } from '@/lib/types'
 // Detect URLs in text (matches iOS enrichURLsInText behavior)
 const URL_REGEX = /https?:\/\/[^\s<>"{}|\\^`[\]]+/gi
 
+// Watch limits per tier (matches iOS)
+export const WATCH_LIMITS: Record<string, number> = {
+  free: 3,
+  pro: 7,
+  premium: 15,
+}
+
 function parseWatchData(text: string): Partial<Watch> | undefined {
   const match = text.match(/\[CREATE_WATCH\]([\s\S]*?)\[\/CREATE_WATCH\]/)
   if (!match) return undefined
   try {
     const raw = JSON.parse(match[1])
-    // Map camelCase keys from the edge function to snake_case for the database
-    let url = raw.url || ''
-    // Ensure URL has protocol (matches iOS createWatchFromJSON)
-    if (url && !url.match(/^https?:\/\//i)) {
-      url = `https://${url}`
-    }
-    return {
-      emoji: raw.emoji,
-      name: raw.name,
-      url,
-      condition: raw.condition,
-      action_label: raw.actionLabel || raw.action_label,
-      action_type: raw.actionType || raw.action_type || 'notify',
-      check_frequency: raw.checkFrequency || raw.check_frequency || 'Daily',
-      image_url: raw.imageURL || raw.image_url || null,
-    } as Partial<Watch>
+    return mapWatchJson(raw)
   } catch {
     return undefined
   }
 }
 
+/** Parse [PROPOSE_WATCH] blocks — AI sometimes puts JSON inside */
+function parseProposedWatchData(text: string): Partial<Watch> | undefined {
+  // Try with JSON payload between tags
+  const matchFull = text.match(/\[PROPOSE_WATCH\]\s*([\s\S]*?)\s*\[\/PROPOSE_WATCH\]/)
+  if (matchFull) {
+    const content = matchFull[1].trim()
+    if (content.startsWith('{')) {
+      try {
+        return mapWatchJson(JSON.parse(content))
+      } catch { /* not valid JSON, fall through */ }
+    }
+  }
+  // Also try bare JSON after [PROPOSE_WATCH] marker (no closing tag)
+  const matchBare = text.match(/\[PROPOSE_WATCH\]\s*(\{[\s\S]*?\})/);
+  if (matchBare) {
+    try {
+      return mapWatchJson(JSON.parse(matchBare[1]))
+    } catch { /* fall through */ }
+  }
+  return undefined
+}
+
 function parseProposedWatch(text: string): boolean {
   return /\[PROPOSE_WATCH\]/.test(text)
+}
+
+function parseDismiss(text: string): boolean {
+  return /\[DISMISS\]/.test(text)
+}
+
+/** Map camelCase JSON from AI to snake_case Watch fields */
+function mapWatchJson(raw: Record<string, unknown>): Partial<Watch> {
+  let url = (raw.url as string) || ''
+  if (url && !url.match(/^https?:\/\//i)) {
+    url = `https://${url}`
+  }
+  return {
+    emoji: raw.emoji as string,
+    name: raw.name as string,
+    url,
+    condition: raw.condition as string,
+    action_label: (raw.actionLabel || raw.action_label) as string,
+    action_type: (raw.actionType || raw.action_type || 'notify') as Watch['action_type'],
+    check_frequency: (raw.checkFrequency || raw.check_frequency || 'Daily') as Watch['check_frequency'],
+    image_url: (raw.imageURL || raw.image_url || null) as string | null,
+  } as Partial<Watch>
 }
 
 function parseSuggestions(text: string): string[] | undefined {
@@ -97,9 +133,12 @@ function parseProductLinks(text: string): ProductLink[] | undefined {
 function stripTags(text: string): string {
   return text
     .replace(/\[CREATE_WATCH\][\s\S]*?\[\/CREATE_WATCH\]/g, '')
+    .replace(/\[PROPOSE_WATCH\][\s\S]*?\[\/PROPOSE_WATCH\]/g, '')
+    .replace(/\[PROPOSE_WATCH\]\s*\{[\s\S]*?\}/g, '')  // bare JSON after PROPOSE_WATCH
+    .replace(/\[PROPOSE_WATCH\]/g, '')
+    .replace(/\[\/PROPOSE_WATCH\]/g, '')
     .replace(/\[SUGGESTIONS\][\s\S]*?\[\/SUGGESTIONS\]/g, '')
     .replace(/\[PRODUCT_LINKS\][\s\S]*?\[\/PRODUCT_LINKS\]/g, '')
-    .replace(/\[PROPOSE_WATCH\]/g, '')
     .replace(/\[FETCH_PRICE\][\s\S]*?\[\/FETCH_PRICE\]/g, '')
     .replace(/\[DISMISS\]/g, '')
     .replace(/\[SUGGEST_WATCH\][\s\S]*?\[\/SUGGEST_WATCH\]/g, '')
@@ -153,10 +192,18 @@ export function useChat(tier: string = 'free') {
         // Enrich the user message with context (matches iOS behavior)
         let enrichedText = text
 
-        // Inject [USER_TIER] on first message (matches iOS ChatViewModel.send())
+        // On first message, seed conversation history with the welcome greeting
+        // so the AI knows it already introduced itself
         if (isFirstMessageRef.current) {
           const tierLabel = tier === 'premium' ? 'Premium' : tier === 'pro' ? 'Pro' : 'Free'
           enrichedText = `[USER_TIER]${tierLabel}[/USER_TIER]\n${enrichedText}`
+
+          // Seed the history with the welcome message so AI doesn't re-greet
+          conversationHistoryRef.current.push({
+            role: 'assistant',
+            content: "Hey there! 👋 I'm Steward. I watch websites so you don't have to, and I'll let you know when something changes.\n\nWhat can I help you keep an eye on?",
+          })
+
           isFirstMessageRef.current = false
         }
 
@@ -244,8 +291,10 @@ export function useChat(tier: string = 'free') {
           content: rawText,
         })
 
-        const watchData = parseWatchData(rawText)
+        // Parse watch data from either CREATE_WATCH or PROPOSE_WATCH
+        const watchData = parseWatchData(rawText) || parseProposedWatchData(rawText)
         const isProposal = parseProposedWatch(rawText)
+        const isDismiss = parseDismiss(rawText)
         const suggestions = parseSuggestions(rawText)
 
         // If it's a proposal (not yet confirmed), add confirm/deny suggestions
@@ -260,6 +309,7 @@ export function useChat(tier: string = 'free') {
           watchData,
           suggestions: finalSuggestions,
           productLinks: parseProductLinks(rawText),
+          dismiss: isDismiss,
         }
 
         setMessages((prev) => [...prev, stewardMessage])

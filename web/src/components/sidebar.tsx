@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -11,9 +12,12 @@ import {
   LogOut,
   Sparkles,
   ArrowUpRight,
+  Crown,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
+import { useSub } from '@/hooks/use-subscription'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { PaywallDialog } from '@/components/paywall-dialog'
 
 interface SidebarProps {
   onChatOpen: () => void
@@ -28,6 +32,9 @@ const navItems = [
 export function Sidebar({ onChatOpen }: SidebarProps) {
   const pathname = usePathname()
   const { profile, signOut } = useAuth()
+  const { tier } = useSub()
+  const [showPaywall, setShowPaywall] = useState(false)
+  const showUpgrade = tier === 'free'
 
   const isActive = (href: string) =>
     href === '/home'
@@ -95,6 +102,36 @@ export function Sidebar({ onChatOpen }: SidebarProps) {
           })}
         </nav>
 
+        {/* Upgrade CTA — only shown for free tier */}
+        {showUpgrade && (
+          <div className="px-3 mb-2">
+            <button
+              onClick={() => setShowPaywall(true)}
+              className="flex w-full items-center gap-3 rounded-[var(--radius-lg)] bg-gradient-to-r from-[var(--color-accent)] to-emerald-600 px-3 py-3 text-left transition-all hover:opacity-90 shadow-sm"
+            >
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20">
+                <Crown size={16} className="text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-white">Upgrade to Pro</p>
+                <p className="text-[11px] text-white/70">More watches & faster checks</p>
+              </div>
+            </button>
+          </div>
+        )}
+
+        {/* Tier badge for paid users */}
+        {!showUpgrade && (
+          <div className="px-3 mb-2">
+            <div className="flex items-center gap-2 rounded-[var(--radius-lg)] bg-[var(--color-accent-light)] px-3 py-2">
+              <Crown size={14} className="text-[var(--color-accent)]" />
+              <span className="text-xs font-semibold text-[var(--color-accent)] uppercase tracking-wide">
+                {tier} Plan
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* Bottom area: Settings + User + Sign Out */}
         <div className="border-t border-[var(--color-border)] px-3 pt-2 pb-4">
           {/* Settings */}
@@ -130,6 +167,9 @@ export function Sidebar({ onChatOpen }: SidebarProps) {
           </div>
         </div>
       </aside>
+
+      {/* Paywall dialog */}
+      <PaywallDialog open={showPaywall} onClose={() => setShowPaywall(false)} />
 
       {/* ── Mobile bottom tab bar ── */}
       <div className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-[var(--color-bg-card)] border-t border-[var(--color-border)]">

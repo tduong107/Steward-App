@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getStripe } from '@/lib/stripe'
+import { createClient } from '@supabase/supabase-js'
 import type Stripe from 'stripe'
+
+// Lazy-initialize admin client (service role key may not be available at build time)
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
+}
 
 export async function POST(request: NextRequest) {
   const body = await request.text()
@@ -35,22 +44,60 @@ export async function POST(request: NextRequest) {
         const tier = session.metadata?.tier
 
         if (userId && tier) {
-          // TODO: Update user's subscription tier in Supabase
-          // e.g. await supabaseAdmin.from('profiles').update({ subscription_tier: tier }).eq('id', userId)
-          console.log(`Checkout completed: user=${userId} tier=${tier} session=${session.id}`)
+          // Update user's subscription tier in Supabase
+          const { error } = await getSupabaseAdmin()
+            .from('profiles')
+            .update({ subscription_tier: tier })
+            .eq('id', userId)
+
+          if (error) {
+            console.error(`Failed to update tier for user ${userId}:`, error.message)
+          } else {
+            console.log(`Checkout completed: user=${userId} tier=${tier} session=${session.id}`)
+          }
         } else {
           console.warn('Checkout session missing user_id or tier metadata:', session.id)
         }
         break
       }
 
+      case 'customer.subscription.updated': {
+        const subscription = event.data.object as Stripe.Subscription
+        // Handle subscription changes (upgrades/downgrades)
+        if (subscription.status === 'active') {
+          const userId = subscription.metadata?.user_id
+          const tier = subscription.metadata?.tier
+          if (userId && tier) {
+            await getSupabaseAdmin()
+              .from('profiles')
+              .update({ subscription_tier: tier })
+              .eq('id', userId)
+          }
+        }
+        break
+      }
+
       case 'customer.subscription.deleted': {
         const subscription = event.data.object as Stripe.Subscription
-        const customerId = subscription.customer as string
+        const userId = subscription.metadata?.user_id
 
-        // TODO: Look up user by Stripe customer ID and reset to free tier
-        // e.g. await supabaseAdmin.from('profiles').update({ subscription_tier: 'free' }).eq('stripe_customer_id', customerId)
-        console.log(`Subscription deleted: customer=${customerId} subscription=${subscription.id}`)
+        if (userId) {
+          // Reset to free tier when subscription is cancelled
+          const { error } = await getSupabaseAdmin()
+            .from('profiles')
+            .update({ subscription_tier: 'free' })
+            .eq('id', userId)
+
+          if (error) {
+            console.error(`Failed to reset tier for user ${userId}:`, error.message)
+          } else {
+            console.log(`Subscription deleted: user=${userId} subscription=${subscription.id}`)
+          }
+        } else {
+          // Fallback: look up by Stripe customer ID
+          const customerId = subscription.customer as string
+          console.log(`Subscription deleted for customer ${customerId}, but no user_id in metadata`)
+        }
         break
       }
 

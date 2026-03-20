@@ -5,10 +5,11 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X, SendHorizontal, RotateCcw, ImagePlus } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useChat } from '@/hooks/use-chat'
+import { useChat, WATCH_LIMITS } from '@/hooks/use-chat'
 import { useWatches } from '@/hooks/use-watches'
 import { useSub } from '@/hooks/use-subscription'
 import { ChatMessage } from '@/components/chat-message'
+import { PaywallDialog } from '@/components/paywall-dialog'
 import type { Watch } from '@/lib/types'
 
 interface ChatDrawerProps {
@@ -52,12 +53,13 @@ function TypingIndicator() {
 export function ChatDrawer({ open, onClose }: ChatDrawerProps) {
   const { tier } = useSub()
   const { messages, sendMessage, isLoading, clearMessages, addMessage } = useChat(tier)
-  const { createWatch } = useWatches()
+  const { watches, createWatch } = useWatches()
   const [input, setInput] = useState('')
   const [isCreating, setIsCreating] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [visible, setVisible] = useState(false)
   const [pendingImage, setPendingImage] = useState<{ file: File; preview: string } | null>(null)
+  const [showPaywall, setShowPaywall] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -108,6 +110,17 @@ export function ChatDrawer({ open, onClose }: ChatDrawerProps) {
     return () => document.removeEventListener('keydown', handleKey)
   }, [open, onClose])
 
+  // Auto-close on [DISMISS] — watch for new messages with dismiss flag
+  useEffect(() => {
+    const lastMsg = messages[messages.length - 1]
+    if (lastMsg?.dismiss) {
+      const timer = setTimeout(() => {
+        onClose()
+      }, 1500) // Brief delay so user can read the goodbye message
+      return () => clearTimeout(timer)
+    }
+  }, [messages, onClose])
+
   // Cleanup image preview URL on unmount
   useEffect(() => {
     return () => {
@@ -151,6 +164,21 @@ export function ChatDrawer({ open, onClose }: ChatDrawerProps) {
     async (data: Partial<Watch>) => {
       if (isCreating) return
       setIsCreating(true)
+
+      // Check watch limit before attempting creation
+      const activeWatches = watches.filter((w) => w.status !== 'deleted')
+      const limit = WATCH_LIMITS[tier] ?? WATCH_LIMITS.free
+      if (activeWatches.length >= limit) {
+        addMessage({
+          id: crypto.randomUUID(),
+          role: 'steward',
+          text: `You've reached the ${limit}-watch limit on your ${tier === 'free' ? 'Free' : tier === 'pro' ? 'Pro' : 'Premium'} plan. Upgrade to add more watches!`,
+          suggestions: ['Upgrade plan', 'Show my watches'],
+        })
+        setIsCreating(false)
+        return
+      }
+
       try {
         const created = await createWatch(data)
         addMessage({
@@ -161,16 +189,43 @@ export function ChatDrawer({ open, onClose }: ChatDrawerProps) {
         })
       } catch (err) {
         console.error('Failed to create watch from chat:', err)
-        addMessage({
-          id: crypto.randomUUID(),
-          role: 'steward',
-          text: 'Sorry, I had trouble creating that watch. Please try again.',
-        })
+        const errorMsg = err instanceof Error ? err.message : ''
+        // Check if it's a permission/limit error from RLS or constraint
+        if (errorMsg.includes('row-level security') || errorMsg.includes('violates') || errorMsg.includes('limit')) {
+          addMessage({
+            id: crypto.randomUUID(),
+            role: 'steward',
+            text: `You've hit your watch limit on the ${tier === 'free' ? 'Free' : tier === 'pro' ? 'Pro' : 'Premium'} plan. Upgrade to create more watches!`,
+            suggestions: ['Upgrade plan', 'Show my watches'],
+          })
+        } else {
+          addMessage({
+            id: crypto.randomUUID(),
+            role: 'steward',
+            text: 'Sorry, I had trouble creating that watch. Please try again.',
+          })
+        }
       } finally {
         setIsCreating(false)
       }
     },
-    [createWatch, addMessage, isCreating],
+    [createWatch, addMessage, isCreating, watches, tier],
+  )
+
+  // Handle special suggestion clicks (e.g. "Upgrade plan")
+  const handleSuggestionClickWrapped = useCallback(
+    (text: string) => {
+      if (text === 'Upgrade plan') {
+        setShowPaywall(true)
+        return
+      }
+      if (text === 'Show my watches') {
+        onClose()
+        return
+      }
+      handleSuggestionClick(text)
+    },
+    [handleSuggestionClick, onClose],
   )
 
   const handleImageSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -293,7 +348,7 @@ export function ChatDrawer({ open, onClose }: ChatDrawerProps) {
                       <button
                         key={chip}
                         type="button"
-                        onClick={() => handleSuggestionClick(chip)}
+                        onClick={() => handleSuggestionClickWrapped(chip)}
                         className="flex items-center gap-[5px] rounded-full border border-[var(--color-accent-mid)] bg-[var(--color-bg-card)] px-3.5 py-[7px] text-xs font-medium text-[var(--color-accent)] transition-colors hover:bg-[var(--color-accent-light)]"
                       >
                         {chip}
@@ -314,7 +369,7 @@ export function ChatDrawer({ open, onClose }: ChatDrawerProps) {
             <ChatMessage
               key={msg.id}
               message={msg}
-              onSuggestionClick={handleSuggestionClick}
+              onSuggestionClick={handleSuggestionClickWrapped}
               onCreateWatch={handleCreateWatch}
             />
           ))}
@@ -399,6 +454,9 @@ export function ChatDrawer({ open, onClose }: ChatDrawerProps) {
           </div>
         </div>
       </div>
+
+      {/* Paywall dialog */}
+      <PaywallDialog open={showPaywall} onClose={() => setShowPaywall(false)} />
     </div>,
     document.body,
   )

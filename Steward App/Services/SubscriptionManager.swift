@@ -44,7 +44,7 @@ final class SubscriptionManager {
                 let tierB = SubscriptionTier.tier(for: b.id)
                 if tierA.rank != tierB.rank { return tierA.rank < tierB.rank }
                 // Monthly before yearly within same tier
-                return a.id.contains("monthly")
+                return a.id.contains("month")
             }
             #if DEBUG
             print("[SubscriptionManager] Loaded \(products.count) products: \(products.map(\.id))")
@@ -76,6 +76,7 @@ final class SubscriptionManager {
 
         currentTier = highestTier
         syncToAppStorage()
+        syncTierToSupabase()
 
         #if DEBUG
         print("[SubscriptionManager] Current tier: \(currentTier.displayName)")
@@ -172,12 +173,39 @@ final class SubscriptionManager {
         return products.first { $0.id == id }
     }
 
+    // MARK: - Supabase Sync
+
+    /// Sync the current subscription tier to Supabase so the web app can read it
+    private func syncTierToSupabase() {
+        Task {
+            do {
+                let userId = try await SupabaseService.shared.client.auth.session.user.id
+                try await SupabaseService.shared.client
+                    .from("profiles")
+                    .update(["subscription_tier": currentTier.rawValue])
+                    .eq("id", userId.uuidString)
+                    .execute()
+                #if DEBUG
+                print("[SubscriptionManager] Synced tier to Supabase: \(currentTier.rawValue)")
+                #endif
+            } catch {
+                #if DEBUG
+                print("[SubscriptionManager] Failed to sync tier to Supabase: \(error)")
+                #endif
+            }
+        }
+    }
+
     // MARK: - AppStorage Sync
 
     /// Keep @AppStorage("subscriptionTier") in sync for backwards compat + App Group for Share Extension
     private func syncToAppStorage() {
+        let shared = UserDefaults(suiteName: "group.Steward.Steward-App")
         UserDefaults.standard.set(currentTier.rawValue, forKey: "subscriptionTier")
         // Also sync to App Group so Share Extension can read the tier
-        UserDefaults(suiteName: "group.Steward.Steward-App")?.set(currentTier.rawValue, forKey: "subscriptionTier")
+        shared?.set(currentTier.rawValue, forKey: "subscriptionTier")
+        // Sync response mode default so Share Extension applies it to new watches
+        let responseMode = UserDefaults.standard.string(forKey: "defaultResponseMode") ?? "notify"
+        shared?.set(responseMode, forKey: "defaultResponseMode")
     }
 }

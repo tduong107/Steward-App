@@ -57,14 +57,14 @@ export function ChatMessage({ message, onSuggestionClick, onCreateWatch }: ChatM
           {/* Message bubble */}
           <div
             className={cn(
-              'rounded-2xl px-4 py-2.5 text-sm leading-relaxed',
+              'rounded-2xl px-4 py-2.5 text-sm leading-relaxed break-words overflow-hidden',
               isUser
                 ? 'bg-[var(--color-accent)] text-white rounded-br-md'
                 : 'bg-[var(--color-bg-deep)] text-[var(--color-ink)] rounded-bl-md',
             )}
           >
             {message.text.split('\n').map((line, i) => (
-              <p key={i} className={cn(i > 0 && 'mt-1.5')}>
+              <p key={i} className={cn(i > 0 && 'mt-1.5', '[overflow-wrap:anywhere]')}>
                 {line}
               </p>
             ))}

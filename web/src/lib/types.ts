@@ -66,6 +66,7 @@ export interface Profile {
   phone_number: string | null
   spending_limit: number | null
   auto_act_default: boolean
+  subscription_tier: SubscriptionTier
   created_at: string
   updated_at: string
 }
@@ -90,6 +91,7 @@ export interface ChatMessage {
   suggestions?: string[]
   watchData?: Partial<Watch>
   productLinks?: ProductLink[]
+  dismiss?: boolean
 }
 
 export interface ProductLink {
