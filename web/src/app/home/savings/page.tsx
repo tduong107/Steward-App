@@ -112,7 +112,7 @@ export default function SavingsPage() {
 
       {!loading && (
         <>
-          {/* Total savings card */}
+          {/* Potential savings card */}
           <Card>
             <CardContent className="flex items-center gap-4 py-6">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[var(--color-gold-light)]">
@@ -120,7 +120,7 @@ export default function SavingsPage() {
               </div>
               <div>
                 <p className="text-xs font-medium uppercase tracking-wider text-[var(--color-ink-light)]">
-                  Total Savings
+                  Potential Savings
                 </p>
                 <p className="text-3xl font-bold text-[var(--color-gold)]">
                   ${totalSaved.toFixed(2)}

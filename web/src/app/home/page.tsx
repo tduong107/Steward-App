@@ -176,7 +176,7 @@ export default function DashboardPage() {
           onClick={() => router.push('/home/savings')}
           className="w-full text-left rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-4 shadow-sm transition-all duration-200 hover:shadow-md hover:border-[var(--color-accent-mid)] animate-fade-in-up [animation-delay:200ms] cursor-pointer"
         >
-          {/* Top row: title + total savings */}
+          {/* Top row: title + potential savings */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--color-accent-light)]">
@@ -184,7 +184,7 @@ export default function DashboardPage() {
               </div>
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-mid)]">
-                  Savings
+                  Potential Savings
                 </p>
                 <p className="text-lg font-bold font-[var(--font-serif)] text-[var(--color-accent)]">
                   ${savingsData.total.toFixed(2)}
