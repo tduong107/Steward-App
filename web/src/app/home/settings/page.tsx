@@ -89,6 +89,8 @@ export default function SettingsPage() {
   }, [pushEnabled])
 
   // Manage subscription
+  const [subMessage, setSubMessage] = useState<string | null>(null)
+
   const handleManageSubscription = useCallback(async () => {
     if (tier === 'free') {
       setPaywallOpen(true)
@@ -103,10 +105,17 @@ export default function SettingsPage() {
       const data = await res.json()
       if (data.url) {
         window.location.href = data.url
+      } else {
+        // No Stripe customer — likely subscribed via iOS
+        setSubMessage(
+          'Your subscription is managed through the App Store. To change or cancel your plan, go to Settings → Apple ID → Subscriptions on your iPhone.'
+        )
       }
     } catch (err) {
       console.error('Failed to open portal:', err)
-      setPaywallOpen(true)
+      setSubMessage(
+        'Your subscription is managed through the App Store. To change or cancel your plan, go to Settings → Apple ID → Subscriptions on your iPhone.'
+      )
     }
   }, [tier])
 
@@ -221,6 +230,11 @@ export default function SettingsPage() {
           >
             {tier === 'free' ? 'Upgrade Plan' : 'Manage Subscription'}
           </Button>
+          {subMessage && (
+            <div className="rounded-[var(--radius-md)] bg-amber-500/10 border border-amber-500/20 p-3">
+              <p className="text-xs text-amber-600 dark:text-amber-400">{subMessage}</p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
