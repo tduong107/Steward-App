@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useRef, useState } from 'react'
-import { LogOut, Sun, Moon, Monitor, Bell, Mail, CreditCard } from 'lucide-react'
+import { LogOut, Sun, Moon, Monitor, Bell, Mail, MessageSquare, CreditCard } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { useSub } from '@/hooks/use-subscription'
 import { useTheme } from '@/providers/theme-provider'
@@ -33,9 +33,23 @@ export default function SettingsPage() {
   const [profileSaved, setProfileSaved] = useState(false)
 
   const [pushEnabled, setPushEnabled] = useState(false)
-  const [emailNotif, setEmailNotif] = useState(true)
+  const [emailNotif, setEmailNotif] = useState(profile?.email_alerts ?? true)
+  const [smsNotif, setSmsNotif] = useState(profile?.sms_alerts ?? false)
 
   const [paywallOpen, setPaywallOpen] = useState(false)
+
+  // Persist notification preferences to DB
+  const updateNotifPref = useCallback(async (field: string, value: boolean) => {
+    if (!user) return
+    try {
+      await supabaseRef.current
+        .from('profiles')
+        .update({ [field]: value })
+        .eq('id', user.id)
+    } catch (err) {
+      console.error(`Failed to update ${field}:`, err)
+    }
+  }, [user])
 
   // Save profile
   const handleSaveProfile = useCallback(async () => {
@@ -267,7 +281,11 @@ export default function SettingsPage() {
               type="button"
               role="switch"
               aria-checked={emailNotif}
-              onClick={() => setEmailNotif(!emailNotif)}
+              onClick={() => {
+                const next = !emailNotif
+                setEmailNotif(next)
+                updateNotifPref('email_alerts', next)
+              }}
               className={cn(
                 'relative h-6 w-11 shrink-0 rounded-full transition-colors duration-200',
                 emailNotif
@@ -279,6 +297,44 @@ export default function SettingsPage() {
                 className={cn(
                   'absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200',
                   emailNotif && 'translate-x-5',
+                )}
+              />
+            </button>
+          </div>
+
+          {/* SMS notifications */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <MessageSquare className="h-5 w-5 text-[var(--color-ink-mid)]" />
+              <div>
+                <p className="text-sm font-medium text-[var(--color-ink)]">
+                  SMS Notifications
+                </p>
+                <p className="text-xs text-[var(--color-ink-mid)]">
+                  Get text message alerts
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={smsNotif}
+              onClick={() => {
+                const next = !smsNotif
+                setSmsNotif(next)
+                updateNotifPref('sms_alerts', next)
+              }}
+              className={cn(
+                'relative h-6 w-11 shrink-0 rounded-full transition-colors duration-200',
+                smsNotif
+                  ? 'bg-[var(--color-accent)]'
+                  : 'bg-[var(--color-border)]',
+              )}
+            >
+              <span
+                className={cn(
+                  'absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200',
+                  smsNotif && 'translate-x-5',
                 )}
               />
             </button>

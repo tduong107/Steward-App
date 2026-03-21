@@ -67,6 +67,8 @@ export interface Profile {
   spending_limit: number | null
   auto_act_default: boolean
   subscription_tier: SubscriptionTier
+  email_alerts: boolean
+  sms_alerts: boolean
   created_at: string
   updated_at: string
 }
