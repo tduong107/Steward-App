@@ -184,27 +184,21 @@ export function PaywallDialog({ open, onClose }: PaywallDialogProps) {
                   ))}
                 </ul>
 
-                {/* Show button for paid tiers, or show downgrade on Free card when user is paid */}
-                {t.key === 'free' && currentTier !== 'free' && (
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    disabled={isLoadingThis}
-                    className="mt-4 w-full"
-                    onClick={() => handleSubscribe('free')}
-                  >
-                    {isLoadingThis ? 'Loading...' : 'Downgrade to Free'}
-                  </Button>
-                )}
+                {/* Free card: small text link for downgrade, or "Current Plan" label */}
                 {t.key === 'free' && currentTier === 'free' && (
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    disabled
-                    className="mt-4 w-full"
+                  <div className="mt-4 text-center">
+                    <span className="text-[11px] font-medium text-[var(--color-ink-light)]">Current Plan</span>
+                  </div>
+                )}
+                {t.key === 'free' && currentTier !== 'free' && (
+                  <button
+                    type="button"
+                    disabled={isLoadingThis}
+                    onClick={() => handleSubscribe('free')}
+                    className="mt-4 w-full text-center text-[11px] text-[var(--color-ink-light)] underline underline-offset-2 hover:text-[var(--color-ink-mid)] transition-colors disabled:opacity-50"
                   >
-                    Current Plan
-                  </Button>
+                    {isLoadingThis ? 'Loading...' : 'Switch to Free'}
+                  </button>
                 )}
                 {t.key !== 'free' && (
                   <Button
