@@ -59,6 +59,8 @@ export interface CheckResult {
   created_at: string
 }
 
+export type SubscriptionSource = 'none' | 'apple' | 'stripe'
+
 export interface Profile {
   id: string
   display_name: string | null
@@ -67,6 +69,7 @@ export interface Profile {
   spending_limit: number | null
   auto_act_default: boolean
   subscription_tier: SubscriptionTier
+  subscription_source: SubscriptionSource
   email_alerts: boolean
   sms_alerts: boolean
   created_at: string

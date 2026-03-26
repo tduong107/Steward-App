@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
           // Update user's subscription tier in Supabase
           const { error } = await getSupabaseAdmin()
             .from('profiles')
-            .update({ subscription_tier: tier })
+            .update({ subscription_tier: tier, subscription_source: 'stripe' })
             .eq('id', userId)
 
           if (error) {
@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
           if (userId && tier) {
             await getSupabaseAdmin()
               .from('profiles')
-              .update({ subscription_tier: tier })
+              .update({ subscription_tier: tier, subscription_source: 'stripe' })
               .eq('id', userId)
           }
         }
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
           // Reset to free tier when subscription is cancelled
           const { error } = await getSupabaseAdmin()
             .from('profiles')
-            .update({ subscription_tier: 'free' })
+            .update({ subscription_tier: 'free', subscription_source: 'none' })
             .eq('id', userId)
 
           if (error) {

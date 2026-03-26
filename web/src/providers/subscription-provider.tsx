@@ -2,10 +2,11 @@
 
 import { createContext, useContext, useCallback, useState, type ReactNode } from 'react'
 import { useAuth } from '@/hooks/use-auth'
-import type { SubscriptionTier } from '@/lib/types'
+import type { SubscriptionTier, SubscriptionSource } from '@/lib/types'
 
 interface SubscriptionContextValue {
   tier: SubscriptionTier
+  source: SubscriptionSource
   refreshTier: () => void
 }
 
@@ -17,12 +18,14 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   // Normalize to lowercase — iOS may write "Premium" / "Pro" with capital letters
   const rawTier = (profile?.subscription_tier ?? 'free').toLowerCase() as SubscriptionTier
   const tier: SubscriptionTier = ['free', 'pro', 'premium'].includes(rawTier) ? rawTier : 'free'
+  // Read subscription source (apple, stripe, or none)
+  const source: SubscriptionSource = profile?.subscription_source ?? 'none'
   // Bump state to force re-render after profile refresh
   const [, setTick] = useState(0)
   const refreshTier = useCallback(() => setTick((t) => t + 1), [])
 
   return (
-    <SubscriptionContext.Provider value={{ tier, refreshTier }}>
+    <SubscriptionContext.Provider value={{ tier, source, refreshTier }}>
       {children}
     </SubscriptionContext.Provider>
   )

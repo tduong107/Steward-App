@@ -2,6 +2,7 @@ import Foundation
 import StoreKit
 import SwiftUI
 import Observation
+import Supabase
 
 @Observable
 @MainActor
@@ -182,7 +183,7 @@ final class SubscriptionManager {
                 let userId = try await SupabaseConfig.client.auth.session.user.id
                 try await SupabaseConfig.client
                     .from("profiles")
-                    .update(["subscription_tier": currentTier.rawValue])
+                    .update(["subscription_tier": currentTier.rawValue, "subscription_source": "apple"])
                     .eq("id", value: userId.uuidString)
                     .execute()
                 #if DEBUG

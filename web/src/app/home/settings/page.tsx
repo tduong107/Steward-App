@@ -89,6 +89,7 @@ export default function SettingsPage() {
   }, [pushEnabled])
 
   // Manage subscription
+  const { source } = useSub()
   const [subMessage, setSubMessage] = useState<string | null>(null)
 
   const handleManageSubscription = useCallback(async () => {
@@ -97,6 +98,15 @@ export default function SettingsPage() {
       return
     }
 
+    // Apple subscribers — direct them to App Store
+    if (source === 'apple') {
+      setSubMessage(
+        'Your subscription is managed through the App Store. To change or cancel your plan, go to Settings → Apple ID → Subscriptions on your iPhone.'
+      )
+      return
+    }
+
+    // Stripe subscribers — open Stripe Customer Portal
     try {
       const res = await fetch('/api/stripe/portal', {
         method: 'POST',
@@ -106,18 +116,13 @@ export default function SettingsPage() {
       if (data.url) {
         window.location.href = data.url
       } else {
-        // No Stripe customer — likely subscribed via iOS
-        setSubMessage(
-          'Your subscription is managed through the App Store. To change or cancel your plan, go to Settings → Apple ID → Subscriptions on your iPhone.'
-        )
+        setSubMessage(data.error || 'Unable to open subscription management. Please try again.')
       }
     } catch (err) {
       console.error('Failed to open portal:', err)
-      setSubMessage(
-        'Your subscription is managed through the App Store. To change or cancel your plan, go to Settings → Apple ID → Subscriptions on your iPhone.'
-      )
+      setSubMessage('Unable to open subscription management. Please try again.')
     }
-  }, [tier])
+  }, [tier, source])
 
   return (
     <div className="space-y-6">
@@ -218,9 +223,16 @@ export default function SettingsPage() {
               <p className="text-sm font-medium text-[var(--color-ink)]">
                 Current plan
               </p>
-              <Badge variant={tier === 'free' ? 'secondary' : 'default'}>
-                {tierLabel(tier)}
-              </Badge>
+              <div className="flex items-center gap-2">
+                <Badge variant={tier === 'free' ? 'secondary' : 'default'}>
+                  {tierLabel(tier)}
+                </Badge>
+                {source !== 'none' && tier !== 'free' && (
+                  <span className="text-[10px] text-[var(--color-ink-light)]">
+                    via {source === 'apple' ? 'App Store' : 'Stripe'}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           <Button
@@ -228,7 +240,11 @@ export default function SettingsPage() {
             size="sm"
             onClick={handleManageSubscription}
           >
-            {tier === 'free' ? 'Upgrade Plan' : 'Manage Subscription'}
+            {tier === 'free'
+              ? 'Upgrade Plan'
+              : source === 'apple'
+                ? 'View Plan'
+                : 'Manage Subscription'}
           </Button>
           {subMessage && (
             <div className="rounded-[var(--radius-md)] bg-amber-500/10 border border-amber-500/20 p-3">

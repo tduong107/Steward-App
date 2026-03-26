@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Check } from 'lucide-react'
+import { Check, Apple } from 'lucide-react'
 import { Dialog } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { useSub } from '@/hooks/use-subscription'
@@ -51,12 +51,21 @@ const tiers: TierConfig[] = [
 ]
 
 export function PaywallDialog({ open, onClose }: PaywallDialogProps) {
-  const { tier: currentTier } = useSub()
+  const { tier: currentTier, source } = useSub()
   const [billing, setBilling] = useState<'monthly' | 'yearly'>('yearly')
   const [loadingTier, setLoadingTier] = useState<string | null>(null)
+  const [appleMessage, setAppleMessage] = useState(false)
+
+  const isAppleSub = source === 'apple'
 
   const handleSubscribe = async (tierKey: string) => {
     if (tierKey === currentTier) return
+
+    // Apple subscribers can't change plan through web
+    if (isAppleSub) {
+      setAppleMessage(true)
+      return
+    }
 
     // Downgrade to free = open Stripe portal to cancel subscription
     if (tierKey === 'free') {
@@ -97,14 +106,28 @@ export function PaywallDialog({ open, onClose }: PaywallDialogProps) {
   }
 
   return (
-    <Dialog open={open} onClose={onClose} className="max-w-2xl">
+    <Dialog open={open} onClose={() => { onClose(); setAppleMessage(false) }} className="max-w-2xl">
       <div className="space-y-6">
         {/* Title */}
         <div className="text-center">
           <h2 className="text-xl font-semibold font-[var(--font-serif)] text-[var(--color-ink)]">
-            Unlock More with Steward
+            {currentTier === 'free' ? 'Unlock More with Steward' : 'Your Steward Plan'}
           </h2>
         </div>
+
+        {/* Apple subscription banner */}
+        {isAppleSub && appleMessage && (
+          <div className="rounded-[var(--radius-md)] bg-blue-500/10 border border-blue-500/20 p-3.5 text-center">
+            <div className="flex items-center justify-center gap-2 mb-1.5">
+              <Apple size={14} className="text-blue-500" />
+              <span className="text-xs font-semibold text-blue-500">Managed via App Store</span>
+            </div>
+            <p className="text-[11px] text-blue-400 leading-relaxed">
+              Your subscription is managed through Apple. To change or cancel your plan, go to
+              <span className="font-semibold"> Settings → Apple ID → Subscriptions</span> on your iPhone.
+            </p>
+          </div>
+        )}
 
         {/* Billing toggle */}
         <div className="flex items-center justify-center gap-1">
@@ -147,6 +170,7 @@ export function PaywallDialog({ open, onClose }: PaywallDialogProps) {
             const isCurrent = t.key === currentTier
             const price = billing === 'monthly' ? t.monthlyPrice : t.yearlyPrice
             const isLoadingThis = loadingTier === t.key
+            const isDowngrade = tierRank(t.key) < tierRank(currentTier)
 
             return (
               <div
@@ -184,13 +208,13 @@ export function PaywallDialog({ open, onClose }: PaywallDialogProps) {
                   ))}
                 </ul>
 
-                {/* Free card: small text link for downgrade, or "Current Plan" label */}
-                {t.key === 'free' && currentTier === 'free' && (
+                {/* Free card */}
+                {t.key === 'free' && isCurrent && (
                   <div className="mt-4 text-center">
                     <span className="text-[11px] font-medium text-[var(--color-ink-light)]">Current Plan</span>
                   </div>
                 )}
-                {t.key === 'free' && currentTier !== 'free' && (
+                {t.key === 'free' && !isCurrent && (
                   <button
                     type="button"
                     disabled={isLoadingThis}
@@ -200,6 +224,8 @@ export function PaywallDialog({ open, onClose }: PaywallDialogProps) {
                     {isLoadingThis ? 'Loading...' : 'Switch to Free'}
                   </button>
                 )}
+
+                {/* Paid tier cards */}
                 {t.key !== 'free' && (
                   <Button
                     size="sm"
@@ -212,7 +238,7 @@ export function PaywallDialog({ open, onClose }: PaywallDialogProps) {
                       ? 'Current Plan'
                       : isLoadingThis
                         ? 'Loading...'
-                        : tierRank(t.key) < tierRank(currentTier)
+                        : isDowngrade
                           ? 'Downgrade'
                           : 'Subscribe'}
                   </Button>
@@ -221,6 +247,17 @@ export function PaywallDialog({ open, onClose }: PaywallDialogProps) {
             )
           })}
         </div>
+
+        {/* Source indicator for paid users */}
+        {currentTier !== 'free' && (
+          <p className="text-center text-[11px] text-[var(--color-ink-light)]">
+            {isAppleSub
+              ? 'Subscription managed via App Store'
+              : source === 'stripe'
+                ? 'Subscription managed via Stripe'
+                : 'Subscription active'}
+          </p>
+        )}
       </div>
     </Dialog>
   )
