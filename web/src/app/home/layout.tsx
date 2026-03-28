@@ -58,7 +58,7 @@ function DashboardLayoutInner({ children }: { children: ReactNode }) {
           {/* Mobile header */}
           <Header onChatOpen={openChat} />
 
-          <main className="flex-1 overflow-y-auto p-4 md:p-8">
+          <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-8">
             <div className="mx-auto max-w-3xl w-full">{children}</div>
           </main>
         </div>
