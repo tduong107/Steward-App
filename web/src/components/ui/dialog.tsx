@@ -76,17 +76,18 @@ function Dialog({ open, onClose, title, children, className }: DialogProps) {
             <h2 className="text-lg font-semibold font-[var(--font-serif)] text-[var(--color-ink)]">
               {title}
             </h2>
-            <button
-              onClick={onClose}
-              className="flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] text-[var(--color-ink-light)] hover:bg-[var(--color-bg-deep)] hover:text-[var(--color-ink)] transition-colors"
-              aria-label="Close"
-            >
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <path d="M4 4l8 8M12 4l-8 8" />
-              </svg>
-            </button>
           </div>
         )}
+        {/* Close button — always visible */}
+        <button
+          onClick={onClose}
+          className="absolute top-3 right-3 z-10 flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] text-[var(--color-ink-light)] hover:bg-[var(--color-bg-deep)] hover:text-[var(--color-ink)] transition-colors"
+          aria-label="Close"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <path d="M4 4l8 8M12 4l-8 8" />
+          </svg>
+        </button>
         <div className="p-4 sm:p-5">{children}</div>
       </div>
     </div>,
