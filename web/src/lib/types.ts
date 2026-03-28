@@ -66,6 +66,7 @@ export interface Profile {
   display_name: string | null
   device_token: string | null
   phone_number: string | null
+  notification_email: string | null
   spending_limit: number | null
   auto_act_default: boolean
   subscription_tier: SubscriptionTier

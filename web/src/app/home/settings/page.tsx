@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardHeader, CardContent } from '@/components/ui/card'
+import { Dialog } from '@/components/ui/dialog'
 import { PaywallDialog } from '@/components/paywall-dialog'
 
 type Theme = 'light' | 'dark' | 'system'
@@ -21,6 +22,15 @@ const themeOptions: { label: string; value: Theme; icon: typeof Sun }[] = [
   { label: 'Dark', value: 'dark', icon: Moon },
   { label: 'System', value: 'system', icon: Monitor },
 ]
+
+function isValidEmail(email: string): boolean {
+  return /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(email)
+}
+
+function isValidPhone(phone: string): boolean {
+  const digits = phone.replace(/\D/g, '')
+  return phone.startsWith('+') && digits.length >= 10
+}
 
 export default function SettingsPage() {
   const { user, profile, signOut, refreshProfile } = useAuth()
@@ -36,7 +46,21 @@ export default function SettingsPage() {
   const [emailNotif, setEmailNotif] = useState(profile?.email_alerts ?? true)
   const [smsNotif, setSmsNotif] = useState(profile?.sms_alerts ?? false)
 
+  // Email entry dialog
+  const [showEmailDialog, setShowEmailDialog] = useState(false)
+  const [emailInput, setEmailInput] = useState('')
+  const [emailSaving, setEmailSaving] = useState(false)
+
+  // Phone entry dialog
+  const [showPhoneDialog, setShowPhoneDialog] = useState(false)
+  const [phoneInput, setPhoneInput] = useState('')
+  const [phoneSaving, setPhoneSaving] = useState(false)
+
   const [paywallOpen, setPaywallOpen] = useState(false)
+
+  // Effective contact info (matches iOS effectiveEmail/effectivePhone)
+  const effectiveEmail = profile?.notification_email || user?.email || null
+  const effectivePhone = profile?.phone_number || null
 
   // Persist notification preferences to DB
   const updateNotifPref = useCallback(async (field: string, value: boolean) => {
@@ -50,6 +74,84 @@ export default function SettingsPage() {
       console.error(`Failed to update ${field}:`, err)
     }
   }, [user])
+
+  // Handle email toggle — show dialog if no email on file
+  const handleToggleEmail = useCallback(() => {
+    if (emailNotif) {
+      // Turning off — just disable
+      setEmailNotif(false)
+      updateNotifPref('email_alerts', false)
+      return
+    }
+
+    if (effectiveEmail) {
+      // Has email — just enable
+      setEmailNotif(true)
+      updateNotifPref('email_alerts', true)
+    } else {
+      // No email — show entry dialog
+      setEmailInput('')
+      setShowEmailDialog(true)
+    }
+  }, [emailNotif, effectiveEmail, updateNotifPref])
+
+  // Handle SMS toggle — show dialog if no phone on file
+  const handleToggleSMS = useCallback(() => {
+    if (smsNotif) {
+      // Turning off — just disable
+      setSmsNotif(false)
+      updateNotifPref('sms_alerts', false)
+      return
+    }
+
+    if (effectivePhone) {
+      // Has phone — just enable
+      setSmsNotif(true)
+      updateNotifPref('sms_alerts', true)
+    } else {
+      // No phone — show entry dialog
+      setPhoneInput('')
+      setShowPhoneDialog(true)
+    }
+  }, [smsNotif, effectivePhone, updateNotifPref])
+
+  // Save email and enable notifications
+  const handleSaveEmail = useCallback(async () => {
+    if (!user || !isValidEmail(emailInput)) return
+    setEmailSaving(true)
+    try {
+      await supabaseRef.current
+        .from('profiles')
+        .update({ notification_email: emailInput, email_alerts: true })
+        .eq('id', user.id)
+      setEmailNotif(true)
+      setShowEmailDialog(false)
+      await refreshProfile()
+    } catch (err) {
+      console.error('Failed to save email:', err)
+    } finally {
+      setEmailSaving(false)
+    }
+  }, [user, emailInput, refreshProfile])
+
+  // Save phone and enable SMS
+  const handleSavePhone = useCallback(async () => {
+    if (!user || !isValidPhone(phoneInput)) return
+    setPhoneSaving(true)
+    try {
+      await supabaseRef.current
+        .from('profiles')
+        .update({ phone_number: phoneInput, sms_alerts: true })
+        .eq('id', user.id)
+      setSmsNotif(true)
+      setShowPhoneDialog(false)
+      await refreshProfile()
+    } catch (err) {
+      console.error('Failed to save phone:', err)
+    } finally {
+      setPhoneSaving(false)
+    }
+  }, [user, phoneInput, refreshProfile])
 
   // Save profile
   const handleSaveProfile = useCallback(async () => {
@@ -98,7 +200,6 @@ export default function SettingsPage() {
       return
     }
 
-    // Apple subscribers — direct them to App Store
     if (source === 'apple') {
       setSubMessage(
         'Your subscription is managed through the App Store. To change or cancel your plan, go to Settings → Apple ID → Subscriptions on your iPhone.'
@@ -106,7 +207,6 @@ export default function SettingsPage() {
       return
     }
 
-    // Stripe subscribers — open Stripe Customer Portal
     try {
       const res = await fetch('/api/stripe/portal', {
         method: 'POST',
@@ -303,7 +403,9 @@ export default function SettingsPage() {
                   Email Notifications
                 </p>
                 <p className="text-xs text-[var(--color-ink-mid)]">
-                  Receive alerts via email
+                  {effectiveEmail
+                    ? effectiveEmail
+                    : 'Add an email for alerts'}
                 </p>
               </div>
             </div>
@@ -311,11 +413,7 @@ export default function SettingsPage() {
               type="button"
               role="switch"
               aria-checked={emailNotif}
-              onClick={() => {
-                const next = !emailNotif
-                setEmailNotif(next)
-                updateNotifPref('email_alerts', next)
-              }}
+              onClick={handleToggleEmail}
               className={cn(
                 'relative h-6 w-11 shrink-0 rounded-full transition-colors duration-200',
                 emailNotif
@@ -341,7 +439,9 @@ export default function SettingsPage() {
                   SMS Notifications
                 </p>
                 <p className="text-xs text-[var(--color-ink-mid)]">
-                  Get text message alerts
+                  {effectivePhone
+                    ? effectivePhone
+                    : 'Add a phone number for texts'}
                 </p>
               </div>
             </div>
@@ -349,11 +449,7 @@ export default function SettingsPage() {
               type="button"
               role="switch"
               aria-checked={smsNotif}
-              onClick={() => {
-                const next = !smsNotif
-                setSmsNotif(next)
-                updateNotifPref('sms_alerts', next)
-              }}
+              onClick={handleToggleSMS}
               className={cn(
                 'relative h-6 w-11 shrink-0 rounded-full transition-colors duration-200',
                 smsNotif
@@ -387,6 +483,78 @@ export default function SettingsPage() {
 
       {/* Paywall dialog */}
       <PaywallDialog open={paywallOpen} onClose={() => setPaywallOpen(false)} />
+
+      {/* Email entry dialog */}
+      <Dialog open={showEmailDialog} onClose={() => setShowEmailDialog(false)}>
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-lg font-semibold font-[var(--font-serif)] text-[var(--color-ink)]">
+              Add your email
+            </h3>
+            <p className="mt-1 text-sm text-[var(--color-ink-mid)]">
+              We&apos;ll send watch alerts to this email address.
+            </p>
+          </div>
+
+          <Input
+            label="Email address"
+            type="email"
+            value={emailInput}
+            onChange={(e) => setEmailInput(e.target.value)}
+            placeholder="you@example.com"
+          />
+
+          <Button
+            className="w-full"
+            disabled={!isValidEmail(emailInput) || emailSaving}
+            onClick={handleSaveEmail}
+          >
+            {emailSaving ? 'Saving...' : 'Save & enable email alerts'}
+          </Button>
+
+          <p className="text-[11px] text-[var(--color-ink-light)] leading-relaxed">
+            By saving, you agree to receive watch alert emails from Steward.
+            You can turn this off anytime in Settings.
+          </p>
+        </div>
+      </Dialog>
+
+      {/* Phone entry dialog */}
+      <Dialog open={showPhoneDialog} onClose={() => setShowPhoneDialog(false)}>
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-lg font-semibold font-[var(--font-serif)] text-[var(--color-ink)]">
+              Add your phone number
+            </h3>
+            <p className="mt-1 text-sm text-[var(--color-ink-mid)]">
+              We&apos;ll send SMS alerts when your watches trigger.
+            </p>
+          </div>
+
+          <Input
+            label="Phone number"
+            type="tel"
+            value={phoneInput}
+            onChange={(e) => setPhoneInput(e.target.value)}
+            placeholder="+1 (555) 000-0000"
+          />
+
+          <Button
+            className="w-full"
+            disabled={!isValidPhone(phoneInput) || phoneSaving}
+            onClick={handleSavePhone}
+          >
+            {phoneSaving ? 'Saving...' : 'Agree & enable SMS alerts'}
+          </Button>
+
+          <p className="text-[11px] text-[var(--color-ink-light)] leading-relaxed">
+            By tapping &quot;Agree &amp; enable SMS alerts&quot; you consent to receive
+            automated text messages from Steward at this number. Message frequency
+            varies based on your watches. Msg &amp; data rates may apply. Reply STOP
+            to cancel anytime.
+          </p>
+        </div>
+      </Dialog>
     </div>
   )
 }
