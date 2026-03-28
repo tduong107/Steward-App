@@ -1,6 +1,5 @@
 'use client'
 
-import Image from 'next/image'
 import { ChevronRight } from 'lucide-react'
 import type { Watch } from '@/lib/types'
 import { cn, getDomain } from '@/lib/utils'
@@ -27,11 +26,10 @@ export function WatchCard({ watch, onClick }: WatchCardProps) {
       {/* Left: Image or emoji */}
       <div className="shrink-0">
         {watch.image_url ? (
-          <Image
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
             src={watch.image_url}
             alt={watch.name}
-            width={56}
-            height={56}
             className="h-12 w-12 sm:h-14 sm:w-14 rounded-[var(--radius-sm)] object-cover"
           />
         ) : (
