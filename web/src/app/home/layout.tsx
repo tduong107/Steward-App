@@ -54,7 +54,7 @@ function DashboardLayoutInner({ children }: { children: ReactNode }) {
         <Sidebar onChatOpen={openChat} />
 
         {/* Main column */}
-        <div className="flex-1 flex flex-col pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0">
+        <div className="flex-1 min-w-0 flex flex-col pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0">
           {/* Mobile header */}
           <Header onChatOpen={openChat} />
 
