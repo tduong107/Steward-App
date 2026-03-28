@@ -40,6 +40,7 @@ function milestoneProgress(amount: number) {
 interface WatchSavings {
   watchId: string
   watchEmoji: string
+  watchImageUrl: string | null
   watchName: string
   highestPrice: number
   currentPrice: number
@@ -50,6 +51,7 @@ interface PriceChange {
   id: string
   watchId: string
   watchEmoji: string
+  watchImageUrl: string | null
   watchName: string
   oldPrice: number
   newPrice: number
@@ -149,6 +151,7 @@ export default function SavingsPage() {
         entries.push({
           watchId,
           watchEmoji: watch.emoji || '👀',
+          watchImageUrl: watch.image_url || null,
           watchName: watch.name,
           highestPrice,
           currentPrice,
@@ -196,6 +199,7 @@ export default function SavingsPage() {
           id: `${watchId}-${i}-${curr.checked_at}`,
           watchId,
           watchEmoji: watch.emoji || '👀',
+          watchImageUrl: watch.image_url || null,
           watchName: watch.name,
           oldPrice: prev.price,
           newPrice: curr.price,
@@ -322,7 +326,12 @@ export default function SavingsPage() {
                   {savingsEntries.slice(0, 3).map((entry, i) => (
                     <div key={entry.watchId} className="flex items-center gap-2.5">
                       <span className="text-sm">{rankEmoji(i)}</span>
-                      <span className="text-sm">{entry.watchEmoji}</span>
+                      {entry.watchImageUrl ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img src={entry.watchImageUrl} alt="" className="h-5 w-5 rounded-sm object-cover shrink-0" />
+                      ) : (
+                        <span className="text-sm">{entry.watchEmoji}</span>
+                      )}
                       <span className="flex-1 truncate text-xs font-medium text-[var(--color-ink)]">
                         {entry.watchName}
                       </span>
@@ -395,9 +404,16 @@ export default function SavingsPage() {
                 {sortedChanges.map((item) => (
                   <Card key={item.id}>
                     <CardContent className="flex items-center gap-3 py-3">
-                      {/* Watch emoji */}
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-bg-deep)]">
-                        <span className="text-lg">{item.watchEmoji}</span>
+                      {/* Watch image or emoji */}
+                      <div className="h-10 w-10 shrink-0 rounded-[var(--radius-md)] overflow-hidden bg-[var(--color-bg-deep)]">
+                        {item.watchImageUrl ? (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img src={item.watchImageUrl} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center">
+                            <span className="text-lg">{item.watchEmoji}</span>
+                          </div>
+                        )}
                       </div>
 
                       {/* Name + date */}

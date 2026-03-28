@@ -91,7 +91,7 @@ export default function DashboardPage() {
   // Match iOS logic: savings = highestPrice - currentPrice per watch
   const savingsData = useMemo(() => {
     const watchMap = new Map(priceWatches.map((w) => [w.id, w]))
-    const drops: { name: string; emoji: string; amount: number }[] = []
+    const drops: { name: string; emoji: string; imageUrl: string | null; amount: number }[] = []
     let total = 0
 
     // Group prices by watch
@@ -116,6 +116,7 @@ export default function DashboardPage() {
         drops.push({
           name: watch.name,
           emoji: watch.emoji || '👀',
+          imageUrl: watch.image_url || null,
           amount: saved,
         })
       }
@@ -268,7 +269,12 @@ export default function DashboardPage() {
             <div className="mt-3 space-y-1.5">
               {savingsData.drops.map((drop, i) => (
                 <div key={i} className="flex items-center gap-2 text-xs">
-                  <span>{drop.emoji}</span>
+                  {drop.imageUrl ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img src={drop.imageUrl} alt="" className="h-5 w-5 rounded-sm object-cover shrink-0" />
+                  ) : (
+                    <span>{drop.emoji}</span>
+                  )}
                   <span className="flex-1 truncate text-[var(--color-ink-mid)]">
                     {drop.name}
                   </span>
