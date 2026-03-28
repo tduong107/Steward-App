@@ -66,29 +66,29 @@ function Dialog({ open, onClose, title, children, className }: DialogProps) {
         aria-modal="true"
         aria-label={title}
         className={cn(
-          'relative w-full max-w-[calc(100vw-2rem)] sm:max-w-lg rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] shadow-xl transition-all duration-200',
+          'relative flex flex-col w-full max-h-[calc(100dvh-2rem)] max-w-[calc(100vw-2rem)] sm:max-w-lg rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] shadow-xl transition-all duration-200',
           visible ? 'scale-100 opacity-100' : 'scale-95 opacity-0',
           className,
         )}
       >
         {title && (
-          <div className="flex items-center justify-between border-b border-[var(--color-border)] px-5 py-4">
+          <div className="shrink-0 flex items-center justify-between border-b border-[var(--color-border)] px-5 py-4">
             <h2 className="text-lg font-semibold font-[var(--font-serif)] text-[var(--color-ink)]">
               {title}
             </h2>
           </div>
         )}
-        {/* Close button — always visible */}
+        {/* Close button — sticky in top-right corner */}
         <button
           onClick={onClose}
-          className="absolute top-3 right-3 z-10 flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] text-[var(--color-ink-light)] hover:bg-[var(--color-bg-deep)] hover:text-[var(--color-ink)] transition-colors"
+          className="sticky top-0 z-10 ml-auto mr-2 mt-2 mb-[-2.5rem] flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-md)] text-[var(--color-ink-light)] hover:bg-[var(--color-bg-deep)] hover:text-[var(--color-ink)] transition-colors"
           aria-label="Close"
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <path d="M4 4l8 8M12 4l-8 8" />
           </svg>
         </button>
-        <div className="p-4 sm:p-5">{children}</div>
+        <div className="overflow-y-auto p-4 sm:p-5">{children}</div>
       </div>
     </div>,
     document.body,
