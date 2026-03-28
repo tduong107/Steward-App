@@ -332,15 +332,25 @@ export default async function LandingPage() {
             </h2>
           </div>
 
-          {/* App screens showcase */}
-          <div className="landing-reveal [animation-delay:200ms] mb-16">
-            <Image
-              src="/assets/app-screens.svg"
-              alt="Steward app screens showing watches, AI chat, activity log, and savings tracker"
-              width={1200}
-              height={500}
-              className="w-full h-auto"
-            />
+          {/* App screens showcase — floating + 3D tilt + scroll entrance */}
+          <div className="scroll-entrance mb-16 phone-glow">
+            <div className="animate-float-breathe phone-tilt rounded-2xl overflow-hidden">
+              <Image
+                src="/assets/app-screens.svg"
+                alt="Steward app screens showing watches, AI chat, activity log, and savings tracker"
+                width={1200}
+                height={500}
+                className="w-full h-auto"
+              />
+            </div>
+          </div>
+
+          {/* Branding tagline */}
+          <div className="scroll-entrance text-center mb-12">
+            <p className="text-sm text-[var(--landing-text-faint)] font-medium tracking-wide">
+              <span className="font-[var(--font-serif)] text-[var(--landing-accent)]">Steward</span>
+              {' '}Your AI Concierge — Available on iOS
+            </p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-6">
@@ -363,8 +373,8 @@ export default async function LandingPage() {
             ].map((item, i) => (
               <div
                 key={item.step}
-                className="landing-reveal group relative rounded-2xl border border-[var(--landing-border)] bg-[var(--landing-card)] p-8 transition-all duration-500 hover:bg-[var(--landing-card-hover)] hover:border-[var(--landing-border-hover)] hover:shadow-xl hover:shadow-[var(--landing-card-shadow)]"
-                style={{ animationDelay: `${300 + i * 120}ms` }}
+                className="step-card-entrance group relative rounded-2xl border border-[var(--landing-border)] bg-[var(--landing-card)] p-8 transition-all duration-500 hover:bg-[var(--landing-card-hover)] hover:border-[var(--landing-border-hover)] hover:shadow-xl hover:shadow-[var(--landing-card-shadow)] hover:-translate-y-1"
+                style={{ transitionDelay: `${i * 120}ms` }}
               >
                 <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-[var(--landing-accent-solid)]/15 text-sm font-bold text-[var(--landing-accent)] mb-5">{item.step}</span>
                 <h3 className="text-lg font-semibold text-[var(--landing-text)] mb-3">
