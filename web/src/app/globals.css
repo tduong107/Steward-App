@@ -289,65 +289,93 @@ body {
   box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.08);
 }
 
-/* ── How It Works section animations ── */
+/* ── Landing Page Kinetic Animations ── */
 
-/* Gentle floating/breathing for phone showcase */
-@keyframes float-breathe {
-  0%, 100% { transform: translateY(0) scale(1); }
-  50% { transform: translateY(-12px) scale(1.005); }
+@keyframes tickerScroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
 }
-.animate-float-breathe {
-  animation: float-breathe 6s ease-in-out infinite;
+.landing-ticker-track {
+  display: flex;
+  gap: 40px;
+  animation: tickerScroll 50s linear infinite;
+  width: max-content;
+}
+.landing-ticker-track:hover { animation-play-state: paused; }
+
+@keyframes pulseDot {
+  0%, 100% { box-shadow: 0 0 8px rgba(110,231,183,0.4); transform: scale(1); }
+  50%       { box-shadow: 0 0 18px rgba(110,231,183,0.9); transform: scale(1.15); }
 }
 
-/* 3D hover tilt for phone showcase */
-.phone-tilt {
-  transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  transform-style: preserve-3d;
-}
-.phone-tilt:hover {
-  transform: perspective(800px) rotateX(2deg) rotateY(-3deg) scale(1.02);
+@keyframes wordReveal {
+  to { opacity: 1; transform: translateY(0) rotateX(0deg); }
 }
 
-/* Scroll-triggered entrance: slide up with scale */
-.scroll-entrance {
+@keyframes cardFloat1 { 0%,100% { transform: translateY(0px); }   50% { transform: translateY(-12px); } }
+@keyframes cardFloat2 { 0%,100% { transform: translateY(0px) rotate(0deg); } 50% { transform: translateY(-8px) rotate(0.5deg); } }
+@keyframes cardFloat3 { 0%,100% { transform: translateY(0px); }   50% { transform: translateY(-15px); } }
+
+@keyframes gridDrift {
+  0%   { background-position: 0 0; }
+  100% { background-position: 44px 44px; }
+}
+
+@keyframes btnShimmer {
+  0%       { left: -100%; }
+  30%, 100% { left: 150%; }
+}
+
+@keyframes typeBounce {
+  0%, 60%, 100% { transform: translateY(0); }
+  30%           { transform: translateY(-6px); }
+}
+
+@keyframes hiw-spin { to { transform: rotate(360deg); } }
+@keyframes hiw-fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Floating deal card animations */
+.lfc-1 { animation: cardFloat1 8s  ease-in-out infinite; }
+.lfc-2 { animation: cardFloat2 9s  ease-in-out infinite; }
+.lfc-3 { animation: cardFloat3 7s  ease-in-out infinite; }
+.lfc-4 { animation: cardFloat1 10s ease-in-out infinite; }
+.lfc-5 { animation: cardFloat2 8s  ease-in-out infinite; }
+
+/* Word-reveal animation for hero title */
+.landing-word {
+  display: inline-block;
   opacity: 0;
-  transform: translateY(40px) scale(0.95);
-  transition: opacity 0.9s cubic-bezier(0.16, 1, 0.3, 1),
-              transform 0.9s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.scroll-entrance.visible {
-  opacity: 1;
-  transform: translateY(0) scale(1);
+  transform: translateY(40px) rotateX(15deg);
+  animation: wordReveal 0.6s ease forwards;
+  transform-origin: bottom left;
 }
 
-/* Step card entrance: slide up + fade with stagger */
-.step-card-entrance {
-  opacity: 0;
-  transform: translateY(30px);
-  transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
-              transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.step-card-entrance.visible {
-  opacity: 1;
-  transform: translateY(0);
+/* Dot-grid parallax bg */
+.landing-dot-grid {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, rgba(110,231,183,0.06) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 0%, transparent 80%);
+  animation: gridDrift 25s linear infinite;
 }
 
-/* Subtle glow pulse behind phones on hover */
-.phone-glow {
+/* CTA button shimmer effect */
+.landing-btn-shimmer {
   position: relative;
+  overflow: hidden;
 }
-.phone-glow::after {
+.landing-btn-shimmer::before {
   content: '';
   position: absolute;
-  inset: -20px;
-  border-radius: 2rem;
-  background: radial-gradient(ellipse at center, rgba(110,231,183,0.06) 0%, transparent 70%);
-  opacity: 0;
-  transition: opacity 0.5s ease;
+  top: 0;
+  left: -100%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
+  animation: btnShimmer 3s 2.5s ease-in-out infinite;
   pointer-events: none;
-  z-index: -1;
-}
-.phone-glow:hover::after {
-  opacity: 1;
 }

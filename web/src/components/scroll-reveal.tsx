@@ -12,9 +12,9 @@ export function ScrollReveal() {
       (entries) => {
         for (const entry of entries) {
           if (entry.isIntersecting) {
-            // Respect animation-delay or transition-delay from style attribute
+            // Respect animation-delay from style attribute or CSS class
             const el = entry.target as HTMLElement
-            const delay = el.style.animationDelay || el.style.transitionDelay || ''
+            const delay = el.style.animationDelay || ''
             if (delay) {
               const ms = parseFloat(delay) * (delay.includes('ms') ? 1 : 1000)
               setTimeout(() => el.classList.add('visible'), ms)
@@ -28,8 +28,8 @@ export function ScrollReveal() {
       { threshold: 0.1, rootMargin: '0px 0px -40px 0px' }
     )
 
-    // Observe all reveal elements (landing-reveal, scroll-entrance, step-card-entrance)
-    const elements = document.querySelectorAll('.landing-reveal, .scroll-entrance, .step-card-entrance')
+    // Observe all reveal elements
+    const elements = document.querySelectorAll('.landing-reveal')
     elements.forEach((el) => observer.observe(el))
 
     return () => observer.disconnect()
