@@ -106,9 +106,9 @@ export default async function LandingPage() {
     <div className="min-h-dvh bg-[var(--landing-bg)] text-[var(--landing-text)] overflow-x-hidden transition-colors duration-300">
       {/* ── Ambient glow orbs ── */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden z-0">
-        <div className="absolute -top-40 -left-40 h-[600px] w-[600px] rounded-full bg-[var(--landing-glow-green)] blur-[120px] animate-drift-slow" />
-        <div className="absolute top-1/3 -right-60 h-[500px] w-[500px] rounded-full bg-[var(--landing-glow-mint)] blur-[100px] animate-drift-slow-reverse" />
-        <div className="absolute bottom-0 left-1/4 h-[400px] w-[400px] rounded-full bg-[var(--landing-glow-gold)] blur-[100px] animate-drift-slow" />
+        <div className="absolute -top-40 -left-40 h-[300px] w-[300px] md:h-[600px] md:w-[600px] rounded-full bg-[var(--landing-glow-green)] blur-[80px] md:blur-[120px] animate-drift-slow" />
+        <div className="absolute top-1/3 -right-60 h-[250px] w-[250px] md:h-[500px] md:w-[500px] rounded-full bg-[var(--landing-glow-mint)] blur-[60px] md:blur-[100px] animate-drift-slow-reverse" />
+        <div className="absolute bottom-0 left-1/4 h-[200px] w-[200px] md:h-[400px] md:w-[400px] rounded-full bg-[var(--landing-glow-gold)] blur-[60px] md:blur-[100px] animate-drift-slow" />
       </div>
 
       {/* ── Nav ── */}
@@ -154,7 +154,7 @@ export default async function LandingPage() {
 
       {/* ── Hero ── */}
       <section className="relative z-10 mx-auto max-w-6xl px-6 pt-24 pb-20 md:pt-36 md:pb-32 text-center">
-        <h1 className="landing-reveal [animation-delay:100ms] text-5xl md:text-7xl lg:text-8xl font-bold font-[var(--font-serif)] text-[var(--landing-text)] leading-[1.05] max-w-4xl mx-auto tracking-tight">
+        <h1 className="landing-reveal [animation-delay:100ms] text-3xl sm:text-5xl md:text-7xl lg:text-8xl font-bold font-[var(--font-serif)] text-[var(--landing-text)] leading-[1.05] max-w-4xl mx-auto tracking-tight">
           Stop overpaying{' '}
           <span className="relative">
             <span className="text-transparent bg-clip-text bg-[length:200%_auto] animate-shimmer" style={{ backgroundImage: 'linear-gradient(to right, var(--landing-shimmer-from), var(--landing-shimmer-via), var(--landing-shimmer-to))' }}>
@@ -170,7 +170,7 @@ export default async function LandingPage() {
         <div className="landing-reveal [animation-delay:300ms] mt-12 flex flex-col sm:flex-row items-center justify-center gap-4">
           <Link
             href="/signup"
-            className="group relative w-full sm:w-auto rounded-full bg-gradient-to-r from-[#2A5C45] to-[#3A7C5A] px-8 py-4 text-base font-semibold text-white transition-all duration-300 hover:shadow-xl hover:shadow-[var(--landing-card-shadow)] hover:scale-[1.02] active:scale-[0.98]"
+            className="group relative w-full sm:w-auto rounded-full bg-gradient-to-r from-[#2A5C45] to-[#3A7C5A] px-6 py-3 sm:px-8 sm:py-4 text-sm sm:text-base font-semibold text-white transition-all duration-300 hover:shadow-xl hover:shadow-[var(--landing-card-shadow)] hover:scale-[1.02] active:scale-[0.98]"
           >
             <span className="relative z-10 flex items-center justify-center gap-2">
               Start Saving for Free
@@ -381,7 +381,7 @@ export default async function LandingPage() {
           <div className="landing-reveal mt-16 text-center">
             <Link
               href="/signup"
-              className="inline-flex items-center gap-2 rounded-full bg-[var(--landing-accent-solid)] px-8 py-4 text-base font-semibold text-white transition-all duration-300 hover:bg-[var(--landing-accent-hover)] hover:shadow-lg hover:shadow-[var(--landing-card-shadow)] hover:scale-[1.02] active:scale-[0.98]"
+              className="inline-flex items-center gap-2 rounded-full bg-[var(--landing-accent-solid)] px-6 py-3 sm:px-8 sm:py-4 text-sm sm:text-base font-semibold text-white transition-all duration-300 hover:bg-[var(--landing-accent-hover)] hover:shadow-lg hover:shadow-[var(--landing-card-shadow)] hover:scale-[1.02] active:scale-[0.98]"
             >
               Try It Free
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
@@ -549,7 +549,7 @@ export default async function LandingPage() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+          <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-3 max-w-4xl mx-auto">
             {/* Free */}
             <div className="landing-reveal rounded-2xl border border-[var(--landing-border)] bg-[var(--landing-card)] p-7 flex flex-col transition-all duration-300 hover:border-[var(--landing-border-hover)]">
               <h3 className="text-lg font-semibold font-[var(--font-serif)] text-[var(--landing-text)]">Free</h3>
@@ -759,7 +759,7 @@ export default async function LandingPage() {
           </div>
 
           <div className="relative z-10">
-            <h2 className="landing-reveal text-4xl md:text-6xl font-bold font-[var(--font-serif)] text-[var(--landing-text)] mb-6">
+            <h2 className="landing-reveal text-3xl sm:text-4xl md:text-6xl font-bold font-[var(--font-serif)] text-[var(--landing-text)] mb-6">
               Your AI Concierge is{' '}
               <span className="italic text-[var(--landing-accent)]">ready</span>
             </h2>
@@ -768,7 +768,7 @@ export default async function LandingPage() {
             </p>
             <Link
               href="/signup"
-              className="landing-reveal [animation-delay:200ms] inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[var(--landing-accent-solid)] to-[var(--landing-accent-hover)] px-10 py-4 text-base font-semibold text-white transition-all duration-300 hover:shadow-xl hover:shadow-[var(--landing-card-shadow)] hover:scale-[1.02] active:scale-[0.98]"
+              className="landing-reveal [animation-delay:200ms] inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[var(--landing-accent-solid)] to-[var(--landing-accent-hover)] px-6 py-3 sm:px-10 sm:py-4 text-sm sm:text-base font-semibold text-white transition-all duration-300 hover:shadow-xl hover:shadow-[var(--landing-card-shadow)] hover:scale-[1.02] active:scale-[0.98]"
             >
               Create Your Free Account
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>

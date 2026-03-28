@@ -34,7 +34,7 @@ export function ChatMessage({ message, onSuggestionClick, onCreateWatch }: ChatM
 
   return (
     <div className={cn('flex w-full', isUser ? 'justify-end' : 'justify-start')}>
-      <div className={cn('max-w-[85%]', !isUser && 'flex items-start gap-2')}>
+      <div className={cn('max-w-[90%] sm:max-w-[85%]', !isUser && 'flex items-start gap-2')}>
         {/* Steward avatar for AI messages — matches iOS StewardLogo(size:22) */}
         {!isUser && (
           <div className="shrink-0 mt-2">

@@ -117,7 +117,7 @@ export function ActivityTimeline({ activities }: ActivityTimelineProps) {
                   >
                     {/* Icon dot */}
                     <div
-                      className="relative z-10 flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full"
+                      className="relative z-10 flex h-8 w-8 sm:h-[30px] sm:w-[30px] shrink-0 items-center justify-center rounded-full"
                       style={{ backgroundColor: `color-mix(in srgb, ${color} 15%, transparent)` }}
                     >
                       <IconComponent

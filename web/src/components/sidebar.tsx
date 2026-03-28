@@ -207,7 +207,7 @@ export function Sidebar({ onChatOpen }: SidebarProps) {
       <PaywallDialog open={showPaywall} onClose={() => setShowPaywall(false)} />
 
       {/* ── Mobile bottom tab bar ── */}
-      <div className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-[var(--color-bg-card)] border-t border-[var(--color-border)]">
+      <div className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-[var(--color-bg-card)] border-t border-[var(--color-border)] pb-[env(safe-area-inset-bottom)]">
         <nav className="relative flex items-center justify-around h-16 px-2">
           {/* Home */}
           <Link

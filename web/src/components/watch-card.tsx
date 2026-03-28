@@ -32,10 +32,10 @@ export function WatchCard({ watch, onClick }: WatchCardProps) {
             alt={watch.name}
             width={56}
             height={56}
-            className="h-14 w-14 rounded-[var(--radius-sm)] object-cover"
+            className="h-12 w-12 sm:h-14 sm:w-14 rounded-[var(--radius-sm)] object-cover"
           />
         ) : (
-          <div className="flex h-14 w-14 items-center justify-center rounded-[var(--radius-sm)] bg-[var(--color-accent-light)]">
+          <div className="flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-[var(--radius-sm)] bg-[var(--color-accent-light)]">
             <span className="text-2xl">{watch.emoji || '👀'}</span>
           </div>
         )}

@@ -314,7 +314,7 @@ export function ChatDrawer({ open, onClose }: ChatDrawerProps) {
           'absolute flex flex-col bg-[var(--color-bg)] transition-transform duration-300 ease-out',
           'md:right-0 md:top-0 md:h-full md:w-96 md:border-l md:border-[var(--color-border)]',
           visible ? 'md:translate-x-0' : 'md:translate-x-full',
-          'max-md:inset-x-0 max-md:bottom-0 max-md:h-[85vh] max-md:rounded-t-[var(--radius-xl)]',
+          'max-md:inset-x-0 max-md:bottom-0 max-md:h-[85dvh] max-md:rounded-t-[var(--radius-xl)]',
           visible ? 'max-md:translate-y-0' : 'max-md:translate-y-full',
         )}
       >

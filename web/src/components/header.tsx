@@ -52,7 +52,7 @@ export function Header({ onChatOpen }: HeaderProps) {
   const colors = tierColors[tier] || tierColors.free
 
   return (
-    <header className="md:hidden flex items-center justify-between px-4 py-3 bg-[var(--color-bg-card)] border-b border-[var(--color-border)]">
+    <header className="md:hidden flex items-center justify-between px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] bg-[var(--color-bg-card)] border-b border-[var(--color-border)]">
       <div className="flex items-center gap-2.5">
         <h1 className="text-lg font-semibold font-[var(--font-serif)] text-[var(--color-ink)]">
           {title}

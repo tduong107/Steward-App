@@ -66,7 +66,7 @@ function Dialog({ open, onClose, title, children, className }: DialogProps) {
         aria-modal="true"
         aria-label={title}
         className={cn(
-          'relative w-full max-w-lg rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] shadow-xl transition-all duration-200',
+          'relative w-full max-w-[calc(100vw-2rem)] sm:max-w-lg rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] shadow-xl transition-all duration-200',
           visible ? 'scale-100 opacity-100' : 'scale-95 opacity-0',
           className,
         )}
@@ -78,7 +78,7 @@ function Dialog({ open, onClose, title, children, className }: DialogProps) {
             </h2>
             <button
               onClick={onClose}
-              className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-md)] text-[var(--color-ink-light)] hover:bg-[var(--color-bg-deep)] hover:text-[var(--color-ink)] transition-colors"
+              className="flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] text-[var(--color-ink-light)] hover:bg-[var(--color-bg-deep)] hover:text-[var(--color-ink)] transition-colors"
               aria-label="Close"
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -87,7 +87,7 @@ function Dialog({ open, onClose, title, children, className }: DialogProps) {
             </button>
           </div>
         )}
-        <div className="p-5">{children}</div>
+        <div className="p-4 sm:p-5">{children}</div>
       </div>
     </div>,
     document.body,

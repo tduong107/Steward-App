@@ -4,6 +4,12 @@ import { AuthProvider } from '@/providers/auth-provider'
 import { SubscriptionProvider } from '@/providers/subscription-provider'
 import { ThemeProvider } from '@/providers/theme-provider'
 
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover' as const,
+}
+
 export const metadata: Metadata = {
   title: {
     default: 'Steward — AI Price Tracker & Web Monitor | Track Prices, Restocks, Reservations',
