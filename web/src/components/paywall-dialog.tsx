@@ -52,7 +52,7 @@ const tiers: TierConfig[] = [
 
 export function PaywallDialog({ open, onClose }: PaywallDialogProps) {
   const { tier: currentTier, source } = useSub()
-  const [billing, setBilling] = useState<'monthly' | 'yearly'>('yearly')
+  const [billing, setBilling] = useState<'monthly' | 'yearly'>('monthly')
   const [loadingTier, setLoadingTier] = useState<string | null>(null)
   const [appleMessage, setAppleMessage] = useState(false)
 

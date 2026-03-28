@@ -6,6 +6,7 @@ import { Sidebar } from '@/components/sidebar'
 import { Header } from '@/components/header'
 import { ChatDrawer } from '@/components/chat-drawer'
 import { LaunchAnimation } from '@/components/launch-animation'
+import { PaywallDialog } from '@/components/paywall-dialog'
 import { ChatProvider, useChatDrawer } from '@/providers/chat-provider'
 
 function DashboardLayoutInner({ children }: { children: ReactNode }) {
@@ -13,6 +14,7 @@ function DashboardLayoutInner({ children }: { children: ReactNode }) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const [showAnimation, setShowAnimation] = useState(false)
+  const [showPaywall, setShowPaywall] = useState(false)
   const checkedRef = useRef(false)
 
   useEffect(() => {
@@ -56,7 +58,7 @@ function DashboardLayoutInner({ children }: { children: ReactNode }) {
         {/* Main column */}
         <div className="flex-1 min-w-0 flex flex-col pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0">
           {/* Mobile header */}
-          <Header onChatOpen={openChat} />
+          <Header onChatOpen={openChat} onTierBadgeClick={() => setShowPaywall(true)} />
 
           <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-8">
             <div className="mx-auto max-w-3xl w-full">{children}</div>
@@ -66,6 +68,9 @@ function DashboardLayoutInner({ children }: { children: ReactNode }) {
         {/* Chat drawer overlay */}
         <ChatDrawer open={isChatOpen} onClose={closeChat} />
       </div>
+
+      {/* Paywall dialog (opened from mobile header tier badge) */}
+      <PaywallDialog open={showPaywall} onClose={() => setShowPaywall(false)} />
     </>
   )
 }

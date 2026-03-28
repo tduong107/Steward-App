@@ -6,6 +6,7 @@ import { useSub } from '@/hooks/use-subscription'
 
 interface HeaderProps {
   onChatOpen: () => void
+  onTierBadgeClick: () => void
 }
 
 const titleMap: Record<string, string> = {
@@ -45,7 +46,7 @@ const tierColors: Record<string, { bg: string; text: string; border: string }> =
   },
 }
 
-export function Header({ onChatOpen }: HeaderProps) {
+export function Header({ onChatOpen, onTierBadgeClick }: HeaderProps) {
   const pathname = usePathname()
   const title = getPageTitle(pathname)
   const { tier } = useSub()
@@ -57,11 +58,15 @@ export function Header({ onChatOpen }: HeaderProps) {
         <h1 className="text-lg font-semibold font-[var(--font-serif)] text-[var(--color-ink)]">
           {title}
         </h1>
-        {/* Tier badge */}
-        <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${colors.bg} ${colors.text} ${colors.border}`}>
+        {/* Tier badge — clickable to open paywall */}
+        <button
+          type="button"
+          onClick={onTierBadgeClick}
+          className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider transition-opacity hover:opacity-80 active:opacity-60 ${colors.bg} ${colors.text} ${colors.border}`}
+        >
           {tier !== 'free' && <Crown size={10} />}
           {tier}
-        </span>
+        </button>
       </div>
 
       <button
