@@ -51,7 +51,7 @@ function DashboardLayoutInner({ children }: { children: ReactNode }) {
         <LaunchAnimation onComplete={() => setShowAnimation(false)} />
       )}
 
-      <div className="flex min-h-dvh bg-[var(--color-bg)]">
+      <div className="flex h-dvh overflow-hidden bg-[var(--color-bg)]">
         {/* Desktop sidebar */}
         <Sidebar onChatOpen={openChat} />
 
