@@ -303,17 +303,17 @@ function Hero() {
 
           {/* Title — word by word */}
           <div style={{ fontFamily: S.serif, lineHeight: 1.08, letterSpacing: '-0.03em', color: S.cream, marginBottom: 24, fontSize: 'clamp(38px,5.5vw,62px)', fontWeight: 700 }}>
-            {['Scalpers', 'have', 'bots.'].map((w, i) => (
+            {['Scalpers', 'have', 'bots'].map((w, i) => (
               <span key={w} className="landing-word" style={{ animationDelay: `${0.5 + i * 0.1}s`, marginRight: '0.22em' }}>{w}</span>
             ))}<br />
-            {['Now', 'you', 'have', 'a\u00a0concierge.'].map((w, i) => (
+            {['Now', 'you', 'have', 'a\u00a0concierge'].map((w, i) => (
               <span key={w} className="landing-word" style={{ animationDelay: `${0.85 + i * 0.1}s`, marginRight: i < 3 ? '0.22em' : 0, color: S.mint, fontStyle: 'italic' }}>{w}</span>
             ))}
           </div>
 
           {/* Body */}
           <p style={{ fontSize: 17, lineHeight: 1.65, color: S.textDim, fontWeight: 300, marginBottom: 36, maxWidth: 440, opacity: 0, transform: 'translateY(25px)', animation: 'hiw-fadeUp .8s 1.4s ease forwards' }}>
-            Be the first to snag deals, hard to get reservations, and sold-out tickets with Steward. Your personalized AI concierge, Steward, levels the playing field.
+            Be the first to snag deals, hard to get reservations, and sold-out tickets with Steward. Your personalized AI concierge that levels the playing field.
           </p>
 
           {/* CTAs */}
@@ -330,7 +330,7 @@ function Hero() {
 
           {/* Social proof */}
           <div style={{ marginTop: 28, display: 'flex', alignItems: 'center', gap: 8, opacity: 0, animation: 'hiw-fadeUp .7s 1.8s ease forwards' }}>
-            {['Free forever', 'No credit card', '30 sec setup'].map((t, i) => (
+            {['Free forever', 'No credit card', 'Setup in seconds'].map((t, i) => (
               <span key={t} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 {i > 0 && <span style={{ width: 3, height: 3, borderRadius: '50%', background: 'rgba(247,246,243,0.2)', display: 'inline-block' }} />}
                 <span style={{ fontSize: 12.5, color: 'rgba(247,246,243,0.35)', fontWeight: 300 }}>{t}</span>
@@ -495,7 +495,7 @@ function PriceFeature() {
       <div className="lnd-feature-grid" style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 80, alignItems: 'center' }}>
         <div className="landing-reveal">
           <Pill icon="📉" label="Price Drops" />
-          <FeatTitle>Your target<br />price. <em>Achieved.</em></FeatTitle>
+          <FeatTitle>Your target<br />price <em>Achieved</em></FeatTitle>
           <FeatBody>Works across Amazon, Nike, Best Buy, Target, Walmart, and thousands of other retailers. Steward monitors 24/7 and pings you the moment your target hits, with fake deal detection so you never get played by artificially inflated prices.</FeatBody>
           <FeatLink href="/signup">Start tracking prices →</FeatLink>
         </div>
@@ -583,7 +583,7 @@ function AIFeature() {
         {/* Text — lnd-ai-text allows order swap on mobile */}
         <div className="landing-reveal lnd-ai-text">
           <Pill icon="✦" label="AI Concierge" />
-          <FeatTitle>No forms.<br />Just say<br />what you <em>want.</em></FeatTitle>
+          <FeatTitle>No forms<br />Just say<br />what you <em>want</em></FeatTitle>
           <FeatBody>Skip the dropdowns and filters. Tell Steward what you want via text or a screenshot. The AI finds the product or experience and sets up tracking in seconds. It even detects fake deals.</FeatBody>
           <FeatLink href="/signup">Try the AI concierge →</FeatLink>
         </div>
@@ -693,7 +693,7 @@ function FinalCTA() {
       <div style={{ position: 'relative', zIndex: 1 }}>
         <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '0.2em', textTransform: 'uppercase' as const, color: S.mint, opacity: 0.7, marginBottom: 16 }}>Your concierge is ready</div>
         <div style={{ fontFamily: S.serif, fontSize: 'clamp(36px,5vw,52px)', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-0.03em', color: S.cream, marginBottom: 20 }}>
-          Stop losing to bots.<br />Get <em style={{ color: S.mint }}>your own.</em>
+          Stop losing to bots<br />Get <em style={{ color: S.mint }}>your own</em>
         </div>
         <p style={{ fontSize: 16, lineHeight: 1.6, color: 'rgba(247,246,243,0.5)', fontWeight: 300, maxWidth: 600, margin: '0 auto 40px' }}>
           Steward monitors prices, tables, tickets, and campsites around the clock and pings you the moment something opens up. No scripts. No refreshing. Just results.
