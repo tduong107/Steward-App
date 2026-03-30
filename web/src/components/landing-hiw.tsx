@@ -163,24 +163,29 @@ export function LandingHIW() {
   const phoneRef = useRef<HTMLDivElement>(null)
   const lockTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  const clickLockedRef = useRef(false)
+  useEffect(() => { clickLockedRef.current = clickLocked }, [clickLocked])
+
   useEffect(() => {
-    const obs = new IntersectionObserver(
-      (entries) => {
-        if (clickLocked) return
-        for (const entry of entries) {
-          if (entry.isIntersecting && entry.intersectionRatio > 0.5) {
-            const i = parseInt((entry.target as HTMLElement).dataset.step ?? '0')
-            setActiveStep(i)
-            setProgress((i / 2) * 100)
-          }
-        }
-      },
-      { threshold: [0.5], rootMargin: '-20% 0px -20% 0px' }
-    )
-    stepRefs.forEach((r) => { if (r.current) obs.observe(r.current) })
-    return () => obs.disconnect()
+    function onScroll() {
+      if (clickLockedRef.current) return
+      const target = window.innerHeight * 0.45
+      let best = 0
+      let bestDist = Infinity
+      stepRefs.forEach((ref, i) => {
+        if (!ref.current) return
+        const { top, height } = ref.current.getBoundingClientRect()
+        const dist = Math.abs(top + height / 2 - target)
+        if (dist < bestDist) { bestDist = dist; best = i }
+      })
+      setActiveStep(best)
+      setProgress((best / 2) * 100)
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    onScroll()
+    return () => window.removeEventListener('scroll', onScroll)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clickLocked])
+  }, [])
 
   function advancePhone() {
     const next = activeStep >= 2 ? 0 : activeStep + 1
