@@ -159,9 +159,6 @@ export function LandingHIW() {
   const [activeStep, setActiveStep] = useState(0)
   const [clickLocked, setClickLocked] = useState(false)
   const [progress, setProgress] = useState(0)
-  // JS-sticky state: 'before' | 'fixed' | 'after'
-  const [phoneMode, setPhoneMode] = useState<'before' | 'fixed' | 'after'>('before')
-  const [phoneRight, setPhoneRight] = useState(0)
   const stepRefs = [useRef<HTMLDivElement>(null), useRef<HTMLDivElement>(null), useRef<HTMLDivElement>(null)]
   const phoneRef = useRef<HTMLDivElement>(null)
   const phoneColRef = useRef<HTMLDivElement>(null)
@@ -170,6 +167,7 @@ export function LandingHIW() {
 
   const [isMobile, setIsMobile] = useState(false)
   const isMobileRef = useRef(false)
+  const stickyInnerRef = useRef<HTMLDivElement>(null)
   const touchStartX = useRef(0)
   const touchStartY = useRef(0)
 
@@ -184,7 +182,6 @@ export function LandingHIW() {
   function handleTouchEnd(e: React.TouchEvent) {
     const dx = e.changedTouches[0].clientX - touchStartX.current
     const dy = e.changedTouches[0].clientY - touchStartY.current
-    // Only treat as horizontal swipe if more horizontal than vertical
     if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return
     if (dx < 0 && activeStep < 2) {
       setActiveStep(s => s + 1)
@@ -197,7 +194,7 @@ export function LandingHIW() {
 
   useEffect(() => {
     const STICKY_TOP = 120
-    const PHONE_H = 620 // phone + dots + padding
+    const PHONE_H = 620
 
     let ticking = false
 
@@ -209,26 +206,47 @@ export function LandingHIW() {
       }
     }
 
+    // Direct DOM updates for sticky — avoids React re-render jank
+    function updateSticky() {
+      const el = stickyInnerRef.current
+      const sec = sectionRef.current
+      const col = phoneColRef.current
+      if (!el || !sec || !col) return
+
+      const secRect = sec.getBoundingClientRect()
+      const colRect = col.getBoundingClientRect()
+
+      // Before section reaches sticky zone
+      if (secRect.top > STICKY_TOP) {
+        el.style.position = 'absolute'
+        el.style.top = '20px'
+        el.style.bottom = 'auto'
+        el.style.right = '0'
+      }
+      // After section has scrolled past
+      else if (secRect.bottom < STICKY_TOP + PHONE_H) {
+        el.style.position = 'absolute'
+        el.style.top = 'auto'
+        el.style.bottom = '20px'
+        el.style.right = '0'
+      }
+      // In the sticky zone
+      else {
+        el.style.position = 'fixed'
+        el.style.top = STICKY_TOP + 'px'
+        el.style.bottom = 'auto'
+        el.style.right = (window.innerWidth - colRect.right) + 'px'
+      }
+    }
+
     function update() {
       if (!sectionRef.current || !phoneColRef.current) return
 
-      // JS sticky only on desktop; mobile uses static flow
       if (!isMobileRef.current) {
-        const sec = sectionRef.current.getBoundingClientRect()
-        const col = phoneColRef.current.getBoundingClientRect()
-        const right = window.innerWidth - col.right
-
-        if (sec.top > STICKY_TOP) {
-          setPhoneMode('before')
-        } else if (sec.bottom < STICKY_TOP + PHONE_H) {
-          setPhoneMode('after')
-        } else {
-          setPhoneMode('fixed')
-          setPhoneRight(right)
-        }
+        updateSticky()
       }
 
-      // Step tracking — desktop only (mobile uses swipe carousel)
+      // Step tracking — desktop only
       if (!isMobileRef.current && !clickLockedRef.current) {
         const target = window.innerHeight * 0.45
         let best = 0, bestDist = Infinity
@@ -351,15 +369,12 @@ export function LandingHIW() {
               </div>
             ))}
           </div>
-          {/* Phone — JS sticky */}
+          {/* Phone — JS sticky via direct DOM (no re-render jank) */}
           <div ref={phoneColRef} style={{ position: 'relative' }}>
-            <div style={{
-              position: phoneMode === 'fixed' ? 'fixed' : 'absolute',
-              top: phoneMode === 'fixed' ? 120 : phoneMode === 'after' ? 'auto' : 20,
-              bottom: phoneMode === 'after' ? 20 : 'auto',
-              right: phoneMode === 'fixed' ? phoneRight : 0,
-              width: 320, padding: '0 20px',
-            }}>
+            <div
+              ref={stickyInnerRef}
+              style={{ position: 'absolute', top: 20, right: 0, width: 320, padding: '0 20px' }}
+            >
               {phoneMockup('desktop', 280, 560, 44, 120, 28, 350, true)}
             </div>
           </div>
