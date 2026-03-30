@@ -140,12 +140,12 @@ html {
   font-family: var(--font-body);
   color: var(--color-ink);
   background-color: var(--color-bg);
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 body {
   min-height: 100dvh;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 /* Scrollbar styling */

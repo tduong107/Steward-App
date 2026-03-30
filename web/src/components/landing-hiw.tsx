@@ -159,31 +159,60 @@ export function LandingHIW() {
   const [activeStep, setActiveStep] = useState(0)
   const [clickLocked, setClickLocked] = useState(false)
   const [progress, setProgress] = useState(0)
+  // JS-sticky state: 'before' | 'fixed' | 'after'
+  const [phoneMode, setPhoneMode] = useState<'before' | 'fixed' | 'after'>('before')
+  const [phoneRight, setPhoneRight] = useState(0)
   const stepRefs = [useRef<HTMLDivElement>(null), useRef<HTMLDivElement>(null), useRef<HTMLDivElement>(null)]
   const phoneRef = useRef<HTMLDivElement>(null)
+  const phoneColRef = useRef<HTMLDivElement>(null)
+  const sectionRef = useRef<HTMLElement>(null)
   const lockTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const clickLockedRef = useRef(false)
   useEffect(() => { clickLockedRef.current = clickLocked }, [clickLocked])
 
   useEffect(() => {
-    function onScroll() {
-      if (clickLockedRef.current) return
-      const target = window.innerHeight * 0.45
-      let best = 0
-      let bestDist = Infinity
-      stepRefs.forEach((ref, i) => {
-        if (!ref.current) return
-        const { top, height } = ref.current.getBoundingClientRect()
-        const dist = Math.abs(top + height / 2 - target)
-        if (dist < bestDist) { bestDist = dist; best = i }
-      })
-      setActiveStep(best)
-      setProgress((best / 2) * 100)
+    const STICKY_TOP = 120
+    const PHONE_H = 620 // phone + dots + padding
+
+    function update() {
+      if (!sectionRef.current || !phoneColRef.current) return
+
+      const sec = sectionRef.current.getBoundingClientRect()
+      const col = phoneColRef.current.getBoundingClientRect()
+      const right = window.innerWidth - col.right
+
+      if (sec.top > STICKY_TOP) {
+        setPhoneMode('before')
+      } else if (sec.bottom < STICKY_TOP + PHONE_H) {
+        setPhoneMode('after')
+      } else {
+        setPhoneMode('fixed')
+        setPhoneRight(right)
+      }
+
+      // Step tracking
+      if (!clickLockedRef.current) {
+        const target = window.innerHeight * 0.45
+        let best = 0, bestDist = Infinity
+        stepRefs.forEach((ref, i) => {
+          if (!ref.current) return
+          const { top, height } = ref.current.getBoundingClientRect()
+          const dist = Math.abs(top + height / 2 - target)
+          if (dist < bestDist) { bestDist = dist; best = i }
+        })
+        setActiveStep(best)
+        setProgress((best / 2) * 100)
+      }
     }
-    window.addEventListener('scroll', onScroll, { passive: true })
-    onScroll()
-    return () => window.removeEventListener('scroll', onScroll)
+
+    window.addEventListener('scroll', update, { passive: true })
+    window.addEventListener('resize', update)
+    update()
+    return () => {
+      window.removeEventListener('scroll', update)
+      window.removeEventListener('resize', update)
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -197,7 +226,7 @@ export function LandingHIW() {
   }
 
   return (
-    <section id="how-it-works" style={{ position: 'relative', background: 'linear-gradient(180deg,#080A08 0%,rgba(15,32,24,0.15) 30%,rgba(15,32,24,0.15) 70%,#080A08 100%)' }}>
+    <section ref={sectionRef} id="how-it-works" style={{ position: 'relative', background: 'linear-gradient(180deg,#080A08 0%,rgba(15,32,24,0.15) 30%,rgba(15,32,24,0.15) 70%,#080A08 100%)' }}>
       {/* Header */}
       <div className="landing-reveal" style={{ textAlign: 'center', maxWidth: 600, margin: '0 auto', padding: '120px 60px 60px' }}>
         <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#6EE7B7', opacity: 0.7, marginBottom: 16 }}>How it works</div>
@@ -208,9 +237,9 @@ export function LandingHIW() {
       </div>
 
       {/* Layout */}
-      <div style={{ display: 'flex', maxWidth: 1100, margin: '0 auto', padding: '0 40px 120px', gap: 80, position: 'relative', alignItems: 'stretch', flexWrap: 'wrap' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', maxWidth: 1100, margin: '0 auto', padding: '0 40px 120px', gap: 80, position: 'relative' }}>
         {/* Steps */}
-        <div style={{ flex: 1, minWidth: 280, position: 'relative', padding: '40px 0' }}>
+        <div style={{ position: 'relative', padding: '40px 0' }}>
           {/* Progress line */}
           <div style={{ position: 'absolute', left: 27, top: 0, bottom: 0, width: 2 }}>
             <div style={{ position: 'absolute', inset: 0, background: 'rgba(110,231,183,0.06)', borderRadius: 2 }} />
@@ -251,9 +280,16 @@ export function LandingHIW() {
           ))}
         </div>
 
-        {/* Sticky phone */}
-        <div style={{ width: 320, flexShrink: 0 }}>
-          <div style={{ position: 'sticky', top: 120, padding: '20px 0' }}>
+        {/* JS-sticky phone column */}
+        <div ref={phoneColRef} style={{ position: 'relative' }}>
+          <div style={{
+            position: phoneMode === 'fixed' ? 'fixed' : 'absolute',
+            top: phoneMode === 'fixed' ? 120 : phoneMode === 'after' ? 'auto' : 20,
+            bottom: phoneMode === 'after' ? 20 : 'auto',
+            right: phoneMode === 'fixed' ? phoneRight : 0,
+            width: 320,
+            padding: '0 20px',
+          }}>
             <div style={{ position: 'relative' }}>
               {/* Glow */}
               <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 350, height: 350, borderRadius: '50%', background: 'radial-gradient(circle,rgba(110,231,183,0.08) 0%,transparent 70%)', zIndex: 0 }} />
@@ -300,5 +336,6 @@ export function LandingHIW() {
         </div>
       </div>
     </section>
+
   )
 }
