@@ -163,6 +163,7 @@ export function LandingHIW() {
   const phoneRef = useRef<HTMLDivElement>(null)
   const phoneColRef = useRef<HTMLDivElement>(null)
   const sectionRef = useRef<HTMLElement>(null)
+  const gridRef = useRef<HTMLDivElement>(null)
   const lockTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const [isMobile, setIsMobile] = useState(false)
@@ -207,24 +208,25 @@ export function LandingHIW() {
     }
 
     // Direct DOM updates for sticky — avoids React re-render jank
+    // Uses gridRef (the grid container) not sectionRef (which includes the header)
     function updateSticky() {
       const el = stickyInnerRef.current
-      const sec = sectionRef.current
+      const grid = gridRef.current
       const col = phoneColRef.current
-      if (!el || !sec || !col) return
+      if (!el || !grid || !col) return
 
-      const secRect = sec.getBoundingClientRect()
+      const gridRect = grid.getBoundingClientRect()
       const colRect = col.getBoundingClientRect()
 
-      // Before section reaches sticky zone
-      if (secRect.top > STICKY_TOP) {
+      // Before grid reaches sticky zone
+      if (gridRect.top > STICKY_TOP) {
         el.style.position = 'absolute'
         el.style.top = '20px'
         el.style.bottom = 'auto'
         el.style.right = '0'
       }
-      // After section has scrolled past
-      else if (secRect.bottom < STICKY_TOP + PHONE_H) {
+      // After grid has scrolled past
+      else if (gridRect.bottom < STICKY_TOP + PHONE_H) {
         el.style.position = 'absolute'
         el.style.top = 'auto'
         el.style.bottom = '20px'
@@ -342,7 +344,7 @@ export function LandingHIW() {
 
       {/* ══ DESKTOP layout (hidden on ≤768px via CSS) ══ */}
       <div className="hiw-desktop-layout">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', maxWidth: 1100, margin: '0 auto', padding: '0 clamp(24px,5vw,40px) clamp(80px,10vh,120px)', gap: 80, position: 'relative' }}>
+        <div ref={gridRef} style={{ display: 'grid', gridTemplateColumns: '1fr 320px', maxWidth: 1100, margin: '0 auto', padding: '0 clamp(24px,5vw,40px) clamp(80px,10vh,120px)', gap: 80, position: 'relative' }}>
           {/* Steps */}
           <div style={{ position: 'relative', padding: '40px 0' }}>
             <div style={{ position: 'absolute', left: 27, top: 0, bottom: 0, width: 2 }}>
