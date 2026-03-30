@@ -269,8 +269,8 @@ export default function PrivacyPolicyPage() {
             <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] px-5 py-4">
               <p className="text-[var(--color-ink)]">
                 <strong>Email:</strong>{' '}
-                <a href="mailto:support@steward.app" className="text-[var(--color-accent)] hover:underline">
-                  support@steward.app
+                <a href="mailto:hello@steward.app" className="text-[var(--color-accent)] hover:underline">
+                  hello@steward.app
                 </a>
               </p>
             </div>
