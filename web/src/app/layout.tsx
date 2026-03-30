@@ -12,7 +12,7 @@ export const viewport = {
 
 export const metadata: Metadata = {
   title: {
-    default: 'Steward — AI Price Tracker & Web Monitor | Track Prices, Restocks, Reservations',
+    default: 'Steward AI Concierge',
     template: '%s | Steward',
   },
   description: 'Steward is an AI-powered price tracker that monitors price drops, restocks, restaurant reservations, campsite openings, flight deals, and event tickets. Set up in 30 seconds. Free to start.',
