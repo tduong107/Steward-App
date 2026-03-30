@@ -162,30 +162,6 @@ export function LandingUseCases() {
               boxShadow: hovered === idx ? '0 16px 48px rgba(0,0,0,0.3)' : 'none',
             }}
           >
-            {/* Preview strip */}
-            <div style={{
-              height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'rgba(110,231,183,0.03)', borderBottom: '1px solid rgba(255,255,255,0.04)',
-              position: 'relative', overflow: 'hidden',
-              opacity: hovered === idx ? 1 : 0.5,
-              transition: 'all 0.4s',
-            }}>
-              <div style={{
-                background: 'rgba(110,231,183,0.1)', border: '1px solid rgba(110,231,183,0.2)',
-                borderRadius: 10, padding: '6px 10px', fontSize: 10, color: '#6EE7B7',
-                display: 'flex', alignItems: 'center', gap: 5,
-                transform: hovered === idx ? 'translateY(0)' : 'translateY(8px)',
-                opacity: hovered === idx ? 1 : 0,
-                transition: 'all 0.4s 0.1s ease',
-              }}>
-                <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#6EE7B7', boxShadow: '0 0 6px rgba(110,231,183,0.6)', animation: 'pulseDot 2s ease-in-out infinite', display: 'block' }} />
-                {card.preview}
-              </div>
-              {/* Visible when not hovered */}
-              {hovered !== idx && (
-                <div style={{ fontSize: 24, opacity: 0.4 }}>{card.emoji}</div>
-              )}
-            </div>
             {/* Body */}
             <div style={{ padding: '22px 22px 24px' }}>
               <span style={{ fontSize: 24, marginBottom: 12, display: 'block' }}>{card.emoji}</span>

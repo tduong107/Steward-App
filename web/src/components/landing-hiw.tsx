@@ -369,8 +369,12 @@ export function LandingHIW() {
       {/* ══ MOBILE layout (hidden on >768px via CSS) ══ */}
       <div className="hiw-mobile-layout">
         <div style={{ maxWidth: 600, margin: '0 auto', padding: '0 clamp(24px,5vw,40px) clamp(60px,8vh,100px)' }}>
-          {/* Centered phone */}
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 28 }}>
+          {/* Centered phone — swipeable */}
+          <div
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+            style={{ display: 'flex', justifyContent: 'center', marginBottom: 28, touchAction: 'pan-y', userSelect: 'none' }}
+          >
             {phoneMockup('mobile', 220, 440, 36, 90, 22, 260, false)}
           </div>
           {/* Swipe carousel */}
