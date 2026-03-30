@@ -276,6 +276,41 @@ export function LandingHIW() {
     lockTimer.current = setTimeout(() => setClickLocked(false), 3000)
   }
 
+  // Shared phone mockup
+  const phoneMockup = (cls: string, frameW: number, frameH: number, radius: number, notchW: number, notchH: number, glowSize: number, showTapHint: boolean) => (
+    <div style={{ position: 'relative' }}>
+      <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: glowSize, height: glowSize, borderRadius: '50%', background: 'radial-gradient(circle,rgba(110,231,183,0.08) 0%,transparent 70%)', zIndex: 0 }} />
+      <div
+        ref={cls === 'desktop' ? phoneRef : undefined}
+        onClick={advancePhone}
+        style={{
+          width: frameW, height: frameH, background: '#1C3D2E', borderRadius: radius,
+          border: '1px solid rgba(255,255,255,0.1)',
+          boxShadow: '0 0 0 8px rgba(15,32,24,0.5),0 0 0 9px rgba(255,255,255,0.05),0 48px 120px rgba(0,0,0,0.5),inset 0 1px 0 rgba(255,255,255,0.06)',
+          overflow: 'hidden', position: 'relative', cursor: 'pointer', zIndex: 1,
+        }}
+      >
+        <div style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', width: notchW, height: notchH, background: '#0F2018', borderRadius: `0 0 ${notchH * 0.65}px ${notchH * 0.65}px`, zIndex: 10, border: '1px solid rgba(255,255,255,0.05)', borderTop: 'none' }} />
+        {showTapHint && (
+          <div style={{ position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)', fontSize: 10, color: 'rgba(110,231,183,0.5)', zIndex: 20, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6, animation: 'tapHintPulse 2s ease-in-out infinite' }}>
+            <span>{activeStep >= 2 ? '🔄' : '👆'}</span>
+            {activeStep >= 2 ? 'Tap to replay' : 'Tap to continue'}
+          </div>
+        )}
+        <div style={{ position: 'absolute', inset: 0, opacity: activeStep === 0 ? 1 : 0, transform: activeStep === 0 ? 'scale(1)' : 'scale(0.96)', transition: 'all .6s cubic-bezier(.4,0,.2,1)', pointerEvents: activeStep === 0 ? 'auto' : 'none' }}>
+          <Screen1 />
+        </div>
+        <Screen2 active={activeStep === 1} />
+        <Screen3 active={activeStep === 2} />
+      </div>
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 16 }}>
+        {[0, 1, 2].map((i) => (
+          <div key={i} onClick={() => { setActiveStep(i); setProgress((i / 2) * 100) }} style={{ width: activeStep === i ? 24 : 8, height: 8, borderRadius: activeStep === i ? 4 : '50%', background: activeStep === i ? '#6EE7B7' : 'rgba(110,231,183,0.15)', border: '1px solid rgba(110,231,183,0.2)', transition: 'all 0.4s', boxShadow: activeStep === i ? '0 0 10px rgba(110,231,183,0.5)' : 'none', cursor: 'pointer' }} />
+        ))}
+      </div>
+    </div>
+  )
+
   return (
     <section ref={sectionRef} id="how-it-works" style={{ position: 'relative', background: 'linear-gradient(180deg,#080A08 0%,rgba(15,32,24,0.15) 30%,rgba(15,32,24,0.15) 70%,#080A08 100%)' }}>
       {/* Header */}
@@ -287,36 +322,20 @@ export function LandingHIW() {
         <div style={{ fontSize: 16, lineHeight: 1.6, color: 'rgba(247,246,243,0.5)', fontWeight: 300 }}>Set up in 30 seconds. Here&apos;s how.</div>
       </div>
 
-      {/* Layout */}
-      <div className="hiw-grid">
-
-        {/* Steps column */}
-        <div className="hiw-steps-col">
-
-          {/* ── Desktop: vertical scroll steps ── */}
-          <div className="hiw-desktop-steps">
-            {/* Progress line */}
+      {/* ══ DESKTOP layout (hidden on ≤768px via CSS) ══ */}
+      <div className="hiw-desktop-layout">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', maxWidth: 1100, margin: '0 auto', padding: '0 clamp(24px,5vw,40px) clamp(80px,10vh,120px)', gap: 80, position: 'relative' }}>
+          {/* Steps */}
+          <div style={{ position: 'relative', padding: '40px 0' }}>
             <div style={{ position: 'absolute', left: 27, top: 0, bottom: 0, width: 2 }}>
               <div style={{ position: 'absolute', inset: 0, background: 'rgba(110,231,183,0.06)', borderRadius: 2 }} />
               <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: `${progress}%`, background: 'linear-gradient(to bottom, #6EE7B7, rgba(110,231,183,0.3))', borderRadius: 2, transition: 'height 0.4s ease' }} />
             </div>
             {STEPS.map((step, i) => (
-              <div
-                key={i}
-                ref={stepRefs[i]}
-                data-step={i}
-                style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', padding: '40px 0', opacity: activeStep === i ? 1 : 0.3, transition: 'opacity 0.6s ease' }}
-              >
+              <div key={i} ref={stepRefs[i]} data-step={i}
+                style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', padding: '40px 0', opacity: activeStep === i ? 1 : 0.3, transition: 'opacity 0.6s ease' }}>
                 <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start' }}>
-                  <div style={{
-                    width: 56, height: 56, borderRadius: '50%', flexShrink: 0,
-                    background: activeStep === i ? 'rgba(110,231,183,0.12)' : 'rgba(110,231,183,0.04)',
-                    border: `1.5px solid ${activeStep === i ? 'rgba(110,231,183,0.35)' : 'rgba(110,231,183,0.15)'}`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontFamily: 'Georgia, serif', fontSize: 20, fontWeight: 700, color: '#6EE7B7',
-                    boxShadow: activeStep === i ? '0 0 40px rgba(110,231,183,0.2)' : 'none',
-                    transition: 'all 0.6s ease',
-                  }}>
+                  <div style={{ width: 56, height: 56, borderRadius: '50%', flexShrink: 0, background: activeStep === i ? 'rgba(110,231,183,0.12)' : 'rgba(110,231,183,0.04)', border: `1.5px solid ${activeStep === i ? 'rgba(110,231,183,0.35)' : 'rgba(110,231,183,0.15)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Georgia, serif', fontSize: 20, fontWeight: 700, color: '#6EE7B7', boxShadow: activeStep === i ? '0 0 40px rgba(110,231,183,0.2)' : 'none', transition: 'all 0.6s ease' }}>
                     {i + 1}
                   </div>
                   <div style={{ paddingTop: 6 }}>
@@ -332,20 +351,35 @@ export function LandingHIW() {
               </div>
             ))}
           </div>
+          {/* Phone — JS sticky */}
+          <div ref={phoneColRef} style={{ position: 'relative' }}>
+            <div style={{
+              position: phoneMode === 'fixed' ? 'fixed' : 'absolute',
+              top: phoneMode === 'fixed' ? 120 : phoneMode === 'after' ? 'auto' : 20,
+              bottom: phoneMode === 'after' ? 20 : 'auto',
+              right: phoneMode === 'fixed' ? phoneRight : 0,
+              width: 320, padding: '0 20px',
+            }}>
+              {phoneMockup('desktop', 280, 560, 44, 120, 28, 350, true)}
+            </div>
+          </div>
+        </div>
+      </div>
 
-          {/* ── Mobile: horizontal swipe carousel ── */}
+      {/* ══ MOBILE layout (hidden on >768px via CSS) ══ */}
+      <div className="hiw-mobile-layout">
+        <div style={{ maxWidth: 600, margin: '0 auto', padding: '0 clamp(24px,5vw,40px) clamp(60px,8vh,100px)' }}>
+          {/* Centered phone */}
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 28 }}>
+            {phoneMockup('mobile', 220, 440, 36, 90, 22, 260, false)}
+          </div>
+          {/* Swipe carousel */}
           <div
-            className="hiw-mobile-carousel"
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
             style={{ touchAction: 'pan-y', userSelect: 'none', overflow: 'hidden' }}
           >
-            <div style={{
-              display: 'flex',
-              width: `${STEPS.length * 100}%`,
-              transform: `translateX(-${activeStep * (100 / STEPS.length)}%)`,
-              transition: 'transform 0.4s cubic-bezier(.4,0,.2,1)',
-            }}>
+            <div style={{ display: 'flex', width: `${STEPS.length * 100}%`, transform: `translateX(-${activeStep * (100 / STEPS.length)}%)`, transition: 'transform 0.4s cubic-bezier(.4,0,.2,1)' }}>
               {STEPS.map((step, i) => (
                 <div key={i} style={{ width: `${100 / STEPS.length}%`, padding: '0 4px', boxSizing: 'border-box' }}>
                   <div style={{ background: 'rgba(110,231,183,0.04)', border: '1px solid rgba(110,231,183,0.12)', borderRadius: 20, padding: '24px 20px' }}>
@@ -367,53 +401,6 @@ export function LandingHIW() {
             </div>
             <div style={{ textAlign: 'center', marginTop: 12, fontSize: 11, color: 'rgba(110,231,183,0.4)', letterSpacing: '0.05em' }}>
               {activeStep < 2 ? '← swipe to continue →' : '← swipe back'}
-            </div>
-          </div>
-        </div>
-
-        {/* Phone column */}
-        <div ref={phoneColRef} className="hiw-phone-col">
-          <div
-            className="hiw-phone-inner"
-            style={{
-              position: phoneMode === 'fixed' ? 'fixed' : 'absolute',
-              top: phoneMode === 'fixed' ? 120 : phoneMode === 'after' ? 'auto' : 20,
-              bottom: phoneMode === 'after' ? 20 : 'auto',
-              right: phoneMode === 'fixed' ? phoneRight : 0,
-            }}
-          >
-            <div style={{ position: 'relative' }}>
-              <div className="hiw-glow" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', borderRadius: '50%', background: 'radial-gradient(circle,rgba(110,231,183,0.08) 0%,transparent 70%)', zIndex: 0 }} />
-              <div
-                ref={phoneRef}
-                onClick={advancePhone}
-                className="hiw-phone-frame"
-                style={{
-                  background: '#1C3D2E',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  boxShadow: '0 0 0 8px rgba(15,32,24,0.5),0 0 0 9px rgba(255,255,255,0.05),0 48px 120px rgba(0,0,0,0.5),inset 0 1px 0 rgba(255,255,255,0.06)',
-                  overflow: 'hidden', position: 'relative', cursor: 'pointer', zIndex: 1,
-                }}
-              >
-                <div className="hiw-notch" style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', background: '#0F2018', zIndex: 10, border: '1px solid rgba(255,255,255,0.05)', borderTop: 'none' }} />
-
-                <div className="hiw-tap-hint" style={{ position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)', fontSize: 10, color: 'rgba(110,231,183,0.5)', zIndex: 20, whiteSpace: 'nowrap', alignItems: 'center', gap: 6, animation: 'tapHintPulse 2s ease-in-out infinite' }}>
-                  <span>{activeStep >= 2 ? '🔄' : '👆'}</span>
-                  {activeStep >= 2 ? 'Tap to replay' : 'Tap to continue'}
-                </div>
-
-                <div style={{ position: 'absolute', inset: 0, opacity: activeStep === 0 ? 1 : 0, transform: activeStep === 0 ? 'scale(1)' : 'scale(0.96)', transition: 'all .6s cubic-bezier(.4,0,.2,1)', pointerEvents: activeStep === 0 ? 'auto' : 'none' }}>
-                  <Screen1 />
-                </div>
-                <Screen2 active={activeStep === 1} />
-                <Screen3 active={activeStep === 2} />
-              </div>
-
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 16 }}>
-                {[0, 1, 2].map((i) => (
-                  <div key={i} onClick={() => { setActiveStep(i); setProgress((i / 2) * 100) }} style={{ width: activeStep === i ? 24 : 8, height: 8, borderRadius: activeStep === i ? 4 : '50%', background: activeStep === i ? '#6EE7B7' : 'rgba(110,231,183,0.15)', border: '1px solid rgba(110,231,183,0.2)', transition: 'all 0.4s', boxShadow: activeStep === i ? '0 0 10px rgba(110,231,183,0.5)' : 'none', cursor: 'pointer' }} />
-                ))}
-              </div>
             </div>
           </div>
         </div>
