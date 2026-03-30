@@ -278,164 +278,189 @@ export function LandingHIW() {
 
   return (
     <section ref={sectionRef} id="how-it-works" style={{ position: 'relative', background: 'linear-gradient(180deg,#080A08 0%,rgba(15,32,24,0.15) 30%,rgba(15,32,24,0.15) 70%,#080A08 100%)' }}>
+      <style>{`
+        /* HIW layout — CSS-driven so it works on first paint without JS */
+        .hiw-header {
+          text-align: center; max-width: 600px; margin: 0 auto;
+          padding: clamp(80px,10vh,120px) clamp(24px,8vw,60px) 60px;
+        }
+        .hiw-grid {
+          display: grid;
+          grid-template-columns: 1fr 320px;
+          max-width: 1100px; margin: 0 auto;
+          padding: 0 clamp(24px,5vw,40px) clamp(80px,10vh,120px);
+          gap: 80px; position: relative;
+        }
+        /* Steps column */
+        .hiw-steps-col { position: relative; padding: 40px 0; order: 0; }
+        /* Desktop steps */
+        .hiw-desktop-steps { display: block; }
+        /* Mobile carousel */
+        .hiw-mobile-carousel { display: none; }
+        /* Phone column */
+        .hiw-phone-col { position: relative; order: 1; }
+        .hiw-phone-inner {
+          padding: 0 20px; width: 320px;
+        }
+        .hiw-phone-frame {
+          width: 280px; height: 560px;
+          border-radius: 44px;
+        }
+        .hiw-notch { width: 120px; height: 28px; border-radius: 0 0 18px 18px; }
+        .hiw-glow { width: 350px; height: 350px; }
+        .hiw-tap-hint { display: flex; }
+
+        @media (max-width: 768px) {
+          .hiw-header { padding-bottom: 40px; }
+          .hiw-grid { grid-template-columns: 1fr; gap: 28px; }
+          .hiw-steps-col { order: 1; padding: 0; }
+          .hiw-desktop-steps { display: none; }
+          .hiw-mobile-carousel { display: block; }
+          .hiw-phone-col { order: 0; display: flex; justify-content: center; }
+          .hiw-phone-inner {
+            position: relative !important;
+            top: auto !important; bottom: auto !important; right: auto !important;
+            width: auto !important; padding: 0 !important;
+            display: flex; flex-direction: column; align-items: center;
+          }
+          .hiw-phone-frame { width: 220px !important; height: 440px !important; border-radius: 36px !important; }
+          .hiw-notch { width: 90px !important; height: 22px !important; border-radius: 0 0 14px 14px !important; }
+          .hiw-glow { width: 260px !important; height: 260px !important; }
+          .hiw-tap-hint { display: none !important; }
+        }
+      `}</style>
+
       {/* Header */}
-      <div className="landing-reveal" style={{ textAlign: 'center', maxWidth: 600, margin: '0 auto', padding: `clamp(80px,10vh,120px) clamp(24px,8vw,60px) ${isMobile ? '40px' : '60px'}` }}>
+      <div className="hiw-header landing-reveal">
         <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#6EE7B7', opacity: 0.7, marginBottom: 16 }}>How it works</div>
         <div style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(32px,5vw,48px)', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-0.03em', color: '#F7F6F3', marginBottom: 16 }}>
           Effortless savings<br />in <em style={{ fontStyle: 'italic', color: '#6EE7B7' }}>three steps</em>
         </div>
-        <div style={{ fontSize: isMobile ? 15 : 16, lineHeight: 1.6, color: 'rgba(247,246,243,0.5)', fontWeight: 300 }}>Set up in 30 seconds. Here&apos;s how.</div>
+        <div style={{ fontSize: 16, lineHeight: 1.6, color: 'rgba(247,246,243,0.5)', fontWeight: 300 }}>Set up in 30 seconds. Here&apos;s how.</div>
       </div>
 
       {/* Layout */}
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 320px', maxWidth: 1100, margin: '0 auto', padding: `0 clamp(24px,5vw,40px) clamp(80px,10vh,120px)`, gap: isMobile ? 32 : 80, position: 'relative' }}>
-        {/* Steps */}
-        <div style={{ position: 'relative', padding: isMobile ? '20px 0 0' : '40px 0', order: isMobile ? 1 : 0 }}>
+      <div className="hiw-grid">
 
-          {isMobile ? (
-            /* ── Mobile: horizontal swipe carousel ── */
-            <div
-              onTouchStart={handleTouchStart}
-              onTouchEnd={handleTouchEnd}
-              style={{ overflow: 'hidden', touchAction: 'pan-y', userSelect: 'none' }}
-            >
-              {/* Slide track */}
-              <div style={{
-                display: 'flex',
-                width: `${STEPS.length * 100}%`,
-                transform: `translateX(-${activeStep * (100 / STEPS.length)}%)`,
-                transition: 'transform 0.4s cubic-bezier(.4,0,.2,1)',
-              }}>
-                {STEPS.map((step, i) => (
-                  <div key={i} style={{ width: `${100 / STEPS.length}%`, padding: '0 4px', boxSizing: 'border-box' }}>
-                    <div style={{
-                      background: 'rgba(110,231,183,0.04)',
-                      border: '1px solid rgba(110,231,183,0.12)',
-                      borderRadius: 20, padding: '24px 20px',
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
-                        <div style={{
-                          width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
-                          background: 'rgba(110,231,183,0.12)',
-                          border: '1.5px solid rgba(110,231,183,0.35)',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontFamily: 'Georgia, serif', fontSize: 16, fontWeight: 700, color: '#6EE7B7',
-                        }}>
-                          {i + 1}
-                        </div>
-                        <div style={{ fontFamily: 'Georgia, serif', fontSize: 20, fontWeight: 700, color: '#F7F6F3', letterSpacing: '-0.01em' }}>{step.title}</div>
-                      </div>
-                      <div style={{ fontSize: 14.5, lineHeight: 1.65, color: 'rgba(247,246,243,0.6)', fontWeight: 300, marginBottom: 14 }}>{step.body}</div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                        {step.features.map((f) => (
-                          <span key={f} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'rgba(110,231,183,0.06)', border: '1px solid rgba(110,231,183,0.12)', borderRadius: 20, padding: '4px 12px', fontSize: 11, color: '#6EE7B7', fontWeight: 500 }}>{f}</span>
-                        ))}
-                      </div>
+        {/* Steps column */}
+        <div className="hiw-steps-col">
+
+          {/* ── Desktop: vertical scroll steps ── */}
+          <div className="hiw-desktop-steps">
+            {/* Progress line */}
+            <div style={{ position: 'absolute', left: 27, top: 0, bottom: 0, width: 2 }}>
+              <div style={{ position: 'absolute', inset: 0, background: 'rgba(110,231,183,0.06)', borderRadius: 2 }} />
+              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: `${progress}%`, background: 'linear-gradient(to bottom, #6EE7B7, rgba(110,231,183,0.3))', borderRadius: 2, transition: 'height 0.4s ease' }} />
+            </div>
+            {STEPS.map((step, i) => (
+              <div
+                key={i}
+                ref={stepRefs[i]}
+                data-step={i}
+                style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', padding: '40px 0', opacity: activeStep === i ? 1 : 0.3, transition: 'opacity 0.6s ease' }}
+              >
+                <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start' }}>
+                  <div style={{
+                    width: 56, height: 56, borderRadius: '50%', flexShrink: 0,
+                    background: activeStep === i ? 'rgba(110,231,183,0.12)' : 'rgba(110,231,183,0.04)',
+                    border: `1.5px solid ${activeStep === i ? 'rgba(110,231,183,0.35)' : 'rgba(110,231,183,0.15)'}`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontFamily: 'Georgia, serif', fontSize: 20, fontWeight: 700, color: '#6EE7B7',
+                    boxShadow: activeStep === i ? '0 0 40px rgba(110,231,183,0.2)' : 'none',
+                    transition: 'all 0.6s ease',
+                  }}>
+                    {i + 1}
+                  </div>
+                  <div style={{ paddingTop: 6 }}>
+                    <div style={{ fontFamily: 'Georgia, serif', fontSize: 28, fontWeight: 700, color: '#F7F6F3', marginBottom: 12, letterSpacing: '-0.01em' }}>{step.title}</div>
+                    <div style={{ fontSize: 15.5, lineHeight: 1.65, color: activeStep === i ? 'rgba(247,246,243,0.6)' : 'rgba(247,246,243,0.45)', fontWeight: 300, maxWidth: 400, transition: 'color 0.4s' }}>{step.body}</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 16 }}>
+                      {step.features.map((f) => (
+                        <span key={f} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'rgba(110,231,183,0.06)', border: '1px solid rgba(110,231,183,0.12)', borderRadius: 20, padding: '4px 12px', fontSize: 11, color: '#6EE7B7', fontWeight: 500 }}>{f}</span>
+                      ))}
                     </div>
                   </div>
-                ))}
+                </div>
               </div>
+            ))}
+          </div>
 
-              {/* Swipe hint */}
-              <div style={{ textAlign: 'center', marginTop: 12, fontSize: 11, color: 'rgba(110,231,183,0.4)', letterSpacing: '0.05em' }}>
-                {activeStep < 2 ? '← swipe to continue →' : '← swipe back'}
-              </div>
-            </div>
-          ) : (
-            /* ── Desktop: vertical scroll steps ── */
-            <>
-              {/* Progress line */}
-              <div style={{ position: 'absolute', left: 27, top: 0, bottom: 0, width: 2 }}>
-                <div style={{ position: 'absolute', inset: 0, background: 'rgba(110,231,183,0.06)', borderRadius: 2 }} />
-                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: `${progress}%`, background: 'linear-gradient(to bottom, #6EE7B7, rgba(110,231,183,0.3))', borderRadius: 2, transition: 'height 0.4s ease' }} />
-              </div>
-
+          {/* ── Mobile: horizontal swipe carousel ── */}
+          <div
+            className="hiw-mobile-carousel"
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+            style={{ touchAction: 'pan-y', userSelect: 'none', overflow: 'hidden' }}
+          >
+            <div style={{
+              display: 'flex',
+              width: `${STEPS.length * 100}%`,
+              transform: `translateX(-${activeStep * (100 / STEPS.length)}%)`,
+              transition: 'transform 0.4s cubic-bezier(.4,0,.2,1)',
+            }}>
               {STEPS.map((step, i) => (
-                <div
-                  key={i}
-                  ref={stepRefs[i]}
-                  data-step={i}
-                  style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', padding: '40px 0', opacity: activeStep === i ? 1 : 0.3, transition: 'opacity 0.6s ease' }}
-                >
-                  <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start' }}>
-                    <div style={{
-                      width: 56, height: 56, borderRadius: '50%', flexShrink: 0,
-                      background: activeStep === i ? 'rgba(110,231,183,0.12)' : 'rgba(110,231,183,0.04)',
-                      border: `1.5px solid ${activeStep === i ? 'rgba(110,231,183,0.35)' : 'rgba(110,231,183,0.15)'}`,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontFamily: 'Georgia, serif', fontSize: 20, fontWeight: 700, color: '#6EE7B7',
-                      boxShadow: activeStep === i ? '0 0 40px rgba(110,231,183,0.2)' : 'none',
-                      transition: 'all 0.6s ease',
-                    }}>
-                      {i + 1}
-                    </div>
-                    <div style={{ paddingTop: 6 }}>
-                      <div style={{ fontFamily: 'Georgia, serif', fontSize: 28, fontWeight: 700, color: '#F7F6F3', marginBottom: 12, letterSpacing: '-0.01em' }}>{step.title}</div>
-                      <div style={{ fontSize: 15.5, lineHeight: 1.65, color: activeStep === i ? 'rgba(247,246,243,0.6)' : 'rgba(247,246,243,0.45)', fontWeight: 300, maxWidth: 400, transition: 'color 0.4s' }}>{step.body}</div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 16 }}>
-                        {step.features.map((f) => (
-                          <span key={f} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'rgba(110,231,183,0.06)', border: '1px solid rgba(110,231,183,0.12)', borderRadius: 20, padding: '4px 12px', fontSize: 11, color: '#6EE7B7', fontWeight: 500 }}>{f}</span>
-                        ))}
+                <div key={i} style={{ width: `${100 / STEPS.length}%`, padding: '0 4px', boxSizing: 'border-box' }}>
+                  <div style={{ background: 'rgba(110,231,183,0.04)', border: '1px solid rgba(110,231,183,0.12)', borderRadius: 20, padding: '24px 20px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+                      <div style={{ width: 40, height: 40, borderRadius: '50%', flexShrink: 0, background: 'rgba(110,231,183,0.12)', border: '1.5px solid rgba(110,231,183,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Georgia, serif', fontSize: 16, fontWeight: 700, color: '#6EE7B7' }}>
+                        {i + 1}
                       </div>
+                      <div style={{ fontFamily: 'Georgia, serif', fontSize: 20, fontWeight: 700, color: '#F7F6F3', letterSpacing: '-0.01em' }}>{step.title}</div>
+                    </div>
+                    <div style={{ fontSize: 14.5, lineHeight: 1.65, color: 'rgba(247,246,243,0.6)', fontWeight: 300, marginBottom: 14 }}>{step.body}</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                      {step.features.map((f) => (
+                        <span key={f} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'rgba(110,231,183,0.06)', border: '1px solid rgba(110,231,183,0.12)', borderRadius: 20, padding: '4px 12px', fontSize: 11, color: '#6EE7B7', fontWeight: 500 }}>{f}</span>
+                      ))}
                     </div>
                   </div>
                 </div>
               ))}
-            </>
-          )}
+            </div>
+            <div style={{ textAlign: 'center', marginTop: 12, fontSize: 11, color: 'rgba(110,231,183,0.4)', letterSpacing: '0.05em' }}>
+              {activeStep < 2 ? '← swipe to continue →' : '← swipe back'}
+            </div>
+          </div>
         </div>
 
-        {/* JS-sticky phone column — order 0 on mobile so it renders above steps */}
-        <div ref={phoneColRef} style={{ position: 'relative', order: isMobile ? 0 : 1 }}>
-          <div style={{
-            position: isMobile ? 'relative' : (phoneMode === 'fixed' ? 'fixed' : 'absolute'),
-            top: isMobile ? 0 : (phoneMode === 'fixed' ? 120 : phoneMode === 'after' ? 'auto' : 20),
-            bottom: isMobile ? 'auto' : (phoneMode === 'after' ? 20 : 'auto'),
-            right: isMobile ? 'auto' : (phoneMode === 'fixed' ? phoneRight : 0),
-            width: isMobile ? '100%' : 320,
-            padding: isMobile ? 0 : '0 20px',
-            display: isMobile ? 'flex' : 'block',
-            flexDirection: 'column' as const,
-            alignItems: isMobile ? 'center' as const : undefined,
-          }}>
+        {/* Phone column */}
+        <div ref={phoneColRef} className="hiw-phone-col">
+          <div
+            className="hiw-phone-inner"
+            style={{
+              position: phoneMode === 'fixed' ? 'fixed' : 'absolute',
+              top: phoneMode === 'fixed' ? 120 : phoneMode === 'after' ? 'auto' : 20,
+              bottom: phoneMode === 'after' ? 20 : 'auto',
+              right: phoneMode === 'fixed' ? phoneRight : 0,
+            }}
+          >
             <div style={{ position: 'relative' }}>
-              {/* Glow */}
-              <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: isMobile ? 260 : 350, height: isMobile ? 260 : 350, borderRadius: '50%', background: 'radial-gradient(circle,rgba(110,231,183,0.08) 0%,transparent 70%)', zIndex: 0 }} />
-              {/* Phone */}
+              <div className="hiw-glow" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', borderRadius: '50%', background: 'radial-gradient(circle,rgba(110,231,183,0.08) 0%,transparent 70%)', zIndex: 0 }} />
               <div
                 ref={phoneRef}
                 onClick={advancePhone}
+                className="hiw-phone-frame"
                 style={{
-                  width: isMobile ? 220 : 280, height: isMobile ? 440 : 560, background: '#1C3D2E', borderRadius: isMobile ? 36 : 44,
+                  background: '#1C3D2E',
                   border: '1px solid rgba(255,255,255,0.1)',
                   boxShadow: '0 0 0 8px rgba(15,32,24,0.5),0 0 0 9px rgba(255,255,255,0.05),0 48px 120px rgba(0,0,0,0.5),inset 0 1px 0 rgba(255,255,255,0.06)',
                   overflow: 'hidden', position: 'relative', cursor: 'pointer', zIndex: 1,
                 }}
               >
-                {/* Notch */}
-                <div style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', width: isMobile ? 90 : 120, height: isMobile ? 22 : 28, background: '#0F2018', borderRadius: '0 0 14px 14px', zIndex: 10, border: '1px solid rgba(255,255,255,0.05)', borderTop: 'none' }} />
+                <div className="hiw-notch" style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', background: '#0F2018', zIndex: 10, border: '1px solid rgba(255,255,255,0.05)', borderTop: 'none' }} />
 
-                {/* Tap hint — desktop only */}
-                {!isMobile && (
-                  <div style={{ position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)', fontSize: 10, color: 'rgba(110,231,183,0.5)', zIndex: 20, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6, animation: 'tapHintPulse 2s ease-in-out infinite' }}>
-                    <span>{activeStep >= 2 ? '🔄' : '👆'}</span>
-                    {activeStep >= 2 ? 'Tap to replay' : 'Tap to continue'}
-                  </div>
-                )}
+                <div className="hiw-tap-hint" style={{ position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)', fontSize: 10, color: 'rgba(110,231,183,0.5)', zIndex: 20, whiteSpace: 'nowrap', alignItems: 'center', gap: 6, animation: 'tapHintPulse 2s ease-in-out infinite' }}>
+                  <span>{activeStep >= 2 ? '🔄' : '👆'}</span>
+                  {activeStep >= 2 ? 'Tap to replay' : 'Tap to continue'}
+                </div>
 
-                {/* Screen 1 */}
                 <div style={{ position: 'absolute', inset: 0, opacity: activeStep === 0 ? 1 : 0, transform: activeStep === 0 ? 'scale(1)' : 'scale(0.96)', transition: 'all .6s cubic-bezier(.4,0,.2,1)', pointerEvents: activeStep === 0 ? 'auto' : 'none' }}>
                   <Screen1 />
                 </div>
-
-                {/* Screen 2 */}
                 <Screen2 active={activeStep === 1} />
-
-                {/* Screen 3 */}
                 <Screen3 active={activeStep === 2} />
               </div>
 
-              {/* Dots */}
               <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 16 }}>
                 {[0, 1, 2].map((i) => (
                   <div key={i} onClick={() => { setActiveStep(i); setProgress((i / 2) * 100) }} style={{ width: activeStep === i ? 24 : 8, height: 8, borderRadius: activeStep === i ? 4 : '50%', background: activeStep === i ? '#6EE7B7' : 'rgba(110,231,183,0.15)', border: '1px solid rgba(110,231,183,0.2)', transition: 'all 0.4s', boxShadow: activeStep === i ? '0 0 10px rgba(110,231,183,0.5)' : 'none', cursor: 'pointer' }} />
@@ -446,6 +471,5 @@ export function LandingHIW() {
         </div>
       </div>
     </section>
-
   )
 }
