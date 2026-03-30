@@ -278,58 +278,6 @@ export function LandingHIW() {
 
   return (
     <section ref={sectionRef} id="how-it-works" style={{ position: 'relative', background: 'linear-gradient(180deg,#080A08 0%,rgba(15,32,24,0.15) 30%,rgba(15,32,24,0.15) 70%,#080A08 100%)' }}>
-      <style>{`
-        /* HIW layout — CSS-driven so it works on first paint without JS */
-        .hiw-header {
-          text-align: center; max-width: 600px; margin: 0 auto;
-          padding: clamp(80px,10vh,120px) clamp(24px,8vw,60px) 60px;
-        }
-        .hiw-grid {
-          display: grid;
-          grid-template-columns: 1fr 320px;
-          max-width: 1100px; margin: 0 auto;
-          padding: 0 clamp(24px,5vw,40px) clamp(80px,10vh,120px);
-          gap: 80px; position: relative;
-        }
-        /* Steps column */
-        .hiw-steps-col { position: relative; padding: 40px 0; order: 0; }
-        /* Desktop steps */
-        .hiw-desktop-steps { display: block; }
-        /* Mobile carousel */
-        .hiw-mobile-carousel { display: none; }
-        /* Phone column */
-        .hiw-phone-col { position: relative; order: 1; }
-        .hiw-phone-inner {
-          padding: 0 20px; width: 320px;
-        }
-        .hiw-phone-frame {
-          width: 280px; height: 560px;
-          border-radius: 44px;
-        }
-        .hiw-notch { width: 120px; height: 28px; border-radius: 0 0 18px 18px; }
-        .hiw-glow { width: 350px; height: 350px; }
-        .hiw-tap-hint { display: flex; }
-
-        @media (max-width: 768px) {
-          .hiw-header { padding-bottom: 40px; }
-          .hiw-grid { grid-template-columns: 1fr; gap: 28px; }
-          .hiw-steps-col { order: 1; padding: 0; }
-          .hiw-desktop-steps { display: none; }
-          .hiw-mobile-carousel { display: block; }
-          .hiw-phone-col { order: 0; display: flex; justify-content: center; }
-          .hiw-phone-inner {
-            position: relative !important;
-            top: auto !important; bottom: auto !important; right: auto !important;
-            width: auto !important; padding: 0 !important;
-            display: flex; flex-direction: column; align-items: center;
-          }
-          .hiw-phone-frame { width: 220px !important; height: 440px !important; border-radius: 36px !important; }
-          .hiw-notch { width: 90px !important; height: 22px !important; border-radius: 0 0 14px 14px !important; }
-          .hiw-glow { width: 260px !important; height: 260px !important; }
-          .hiw-tap-hint { display: none !important; }
-        }
-      `}</style>
-
       {/* Header */}
       <div className="hiw-header landing-reveal">
         <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#6EE7B7', opacity: 0.7, marginBottom: 16 }}>How it works</div>
