@@ -49,13 +49,25 @@ const S = {
 }
 
 // ── Nav ───────────────────────────────────────────────────────────────────────
+const NAV_LINKS = [['#how-it-works', 'How it Works'], ['#why-steward', 'Why Steward'], ['#pricing', 'Pricing']] as const
+
 function Nav() {
   const [scrolled, setScrolled] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 60)
     window.addEventListener('scroll', fn, { passive: true })
     return () => window.removeEventListener('scroll', fn)
   }, [])
+
+  // Close mobile menu on outside click / ESC
+  useEffect(() => {
+    if (!menuOpen) return
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setMenuOpen(false)
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [menuOpen])
 
   return (
     <nav style={{
@@ -66,13 +78,14 @@ function Nav() {
       backdropFilter: 'blur(24px) saturate(1.4)',
       borderBottom: '1px solid rgba(110,231,183,0.06)',
       transition: 'all 0.4s',
+      flexWrap: 'wrap' as const,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <Logo />
         <span style={{ fontFamily: S.serif, fontSize: 22, fontWeight: 700, color: S.cream, letterSpacing: '-0.02em' }}>Steward</span>
       </div>
       <div className="lnd-nav-links" style={{ display: 'flex', gap: 28, alignItems: 'center' }}>
-        {[['#how-it-works', 'How it Works'], ['#why-steward', 'Why Steward'], ['#pricing', 'Pricing']].map(([href, label]) => (
+        {NAV_LINKS.map(([href, label]) => (
           <a key={href} href={href} style={{ fontSize: 13.5, fontWeight: 500, color: 'rgba(247,246,243,0.55)', textDecoration: 'none', transition: 'color .25s' }}
             onMouseEnter={e => (e.currentTarget.style.color = S.mint)}
             onMouseLeave={e => (e.currentTarget.style.color = 'rgba(247,246,243,0.55)')}>
@@ -84,6 +97,34 @@ function Nav() {
           borderRadius: 10, fontSize: 13.5, textDecoration: 'none', display: 'inline-block',
         }}>Get Started</Link>
       </div>
+
+      {/* Hamburger — visible on mobile only via CSS */}
+      <button
+        className="lnd-hamburger"
+        aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+        aria-expanded={menuOpen}
+        aria-controls="lnd-mobile-menu"
+        onClick={() => setMenuOpen(v => !v)}
+        style={{ display: 'none', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, borderRadius: 10, background: menuOpen ? 'rgba(110,231,183,0.1)' : 'transparent', border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', fontSize: 18, color: S.cream, fontFamily: 'inherit', transition: 'all .25s' }}
+      >
+        {menuOpen ? '✕' : '☰'}
+      </button>
+
+      {/* Mobile dropdown menu */}
+      {menuOpen && (
+        <div id="lnd-mobile-menu" style={{ width: '100%', borderTop: '1px solid rgba(110,231,183,0.08)', padding: '12px 0 16px', display: 'flex', flexDirection: 'column' as const, gap: 2 }}>
+          {NAV_LINKS.map(([href, label]) => (
+            <a key={href} href={href} onClick={() => setMenuOpen(false)}
+              style={{ fontSize: 15, fontWeight: 500, color: 'rgba(247,246,243,0.7)', textDecoration: 'none', padding: '11px 4px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+              {label}
+            </a>
+          ))}
+          <Link href="/signup" onClick={() => setMenuOpen(false)}
+            style={{ background: S.mint, color: S.forest, fontWeight: 700, padding: '13px', borderRadius: 10, fontSize: 15, textDecoration: 'none', textAlign: 'center' as const, marginTop: 8, display: 'block' }}>
+            Get Started Free
+          </Link>
+        </div>
+      )}
     </nav>
   )
 }
@@ -305,6 +346,7 @@ function Hero() {
                 onChange={e => setDemoInput(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && demoInput.trim() && runDemo({ q: demoInput, emoji: '✦', site: 'steward', price: 'AI detected', action: '📡 Start monitoring' })}
                 placeholder="What do you want to track?"
+                aria-label="What do you want Steward to track?"
                 style={{ flex: 1, background: 'none', border: 'none', outline: 'none', fontSize: 14.5, color: S.cream, minWidth: 0, fontFamily: 'inherit' }}
               />
               <button onClick={() => demoInput.trim() && runDemo({ q: demoInput, emoji: '✦', site: 'steward', price: 'AI detected', action: '📡 Start monitoring' })}
@@ -387,28 +429,31 @@ function Hero() {
 
 // ── Ticker ────────────────────────────────────────────────────────────────────
 const TICKER_ITEMS = [
-  { icon: '👟', html: '<strong>$31 saved</strong> on Nike Dunks', time: '2 min ago' },
-  { icon: '✈️', html: '<strong>$127 saved</strong> on LAX → Tokyo', time: '5 min ago' },
-  { icon: '🍽', html: '<strong>Table found</strong> at Carbone NY', time: '8 min ago' },
-  { icon: '🏕', html: '<strong>Campsite snagged</strong> at Yosemite', time: '12 min ago' },
-  { icon: '🎫', html: '<strong>Tickets found</strong> for Kendrick Lamar', time: '15 min ago' },
-  { icon: '📦', html: '<strong>Restock alert</strong> PS5 Pro at Target', time: '18 min ago' },
-  { icon: '👟', html: '<strong>$48 saved</strong> on New Balance 990v6', time: '22 min ago' },
-  { icon: '✈️', html: '<strong>$89 saved</strong> on SFO → JFK', time: '25 min ago' },
-  { icon: '🍽', html: '<strong>Table found</strong> at Don Angie', time: '28 min ago' },
-  { icon: '🏕', html: '<strong>Campsite snagged</strong> at Big Sur', time: '31 min ago' },
+  { icon: '👟', bold: '$31 saved', rest: 'on Nike Dunks', time: '2 min ago' },
+  { icon: '✈️', bold: '$127 saved', rest: 'on LAX → Tokyo', time: '5 min ago' },
+  { icon: '🍽', bold: 'Table found', rest: 'at Carbone NY', time: '8 min ago' },
+  { icon: '🏕', bold: 'Campsite snagged', rest: 'at Yosemite', time: '12 min ago' },
+  { icon: '🎫', bold: 'Tickets found', rest: 'for Kendrick Lamar', time: '15 min ago' },
+  { icon: '📦', bold: 'Restock alert', rest: 'PS5 Pro at Target', time: '18 min ago' },
+  { icon: '👟', bold: '$48 saved', rest: 'on New Balance 990v6', time: '22 min ago' },
+  { icon: '✈️', bold: '$89 saved', rest: 'on SFO → JFK', time: '25 min ago' },
+  { icon: '🍽', bold: 'Table found', rest: 'at Don Angie', time: '28 min ago' },
+  { icon: '🏕', bold: 'Campsite snagged', rest: 'at Big Sur', time: '31 min ago' },
 ]
 
 function Ticker() {
   const doubled = [...TICKER_ITEMS, ...TICKER_ITEMS]
   return (
-    <div style={{ overflow: 'hidden', padding: '32px 0', borderTop: '1px solid rgba(255,255,255,0.04)', borderBottom: '1px solid rgba(255,255,255,0.04)', background: 'rgba(15,32,24,0.3)' }}>
+    <div aria-hidden="true" style={{ overflow: 'hidden', padding: '32px 0', borderTop: '1px solid rgba(255,255,255,0.04)', borderBottom: '1px solid rgba(255,255,255,0.04)', background: 'rgba(15,32,24,0.3)' }}>
       <div className="landing-ticker-track">
         {doubled.map((item, i) => (
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 40, whiteSpace: 'nowrap' as const, flexShrink: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <div style={{ width: 32, height: 32, borderRadius: 10, background: 'rgba(110,231,183,0.08)', border: '1px solid rgba(110,231,183,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>{item.icon}</div>
-              <span style={{ fontSize: 13, color: 'rgba(247,246,243,0.55)' }} dangerouslySetInnerHTML={{ __html: `${item.html} <span style="font-size:11px;color:rgba(247,246,243,0.25);margin-left:4px">${item.time}</span>` }} />
+              <span style={{ fontSize: 13, color: 'rgba(247,246,243,0.55)' }}>
+                <strong>{item.bold}</strong>{' '}{item.rest}
+                <span style={{ fontSize: 11, color: 'rgba(247,246,243,0.25)', marginLeft: 4 }}>{item.time}</span>
+              </span>
             </div>
             <span style={{ color: 'rgba(255,255,255,0.1)', fontSize: 20, flexShrink: 0 }}>·</span>
           </div>
@@ -758,6 +803,7 @@ export function LandingClientPage() {
           .lnd-feature-reverse { direction: ltr !important; }
           .lnd-pricing-grid   { grid-template-columns: 1fr !important; max-width: 440px; margin: 0 auto; }
           .lnd-nav-links      { display: none !important; }
+          .lnd-hamburger      { display: flex !important; }
         }
         @media (max-width: 768px) {
           .lnd-hero-text { padding: 0 !important; }

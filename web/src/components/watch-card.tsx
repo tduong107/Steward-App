@@ -30,6 +30,8 @@ export function WatchCard({ watch, onClick }: WatchCardProps) {
           <img
             src={watch.image_url}
             alt={watch.name}
+            loading="lazy"
+            decoding="async"
             className="h-12 w-12 sm:h-14 sm:w-14 rounded-[var(--radius-sm)] object-cover"
           />
         ) : (

@@ -175,6 +175,8 @@ export function LandingHIW() {
     const STICKY_TOP = 120
     const PHONE_H = 620 // phone + dots + padding
 
+    let ticking = false
+
     function update() {
       if (!sectionRef.current || !phoneColRef.current) return
 
@@ -204,13 +206,21 @@ export function LandingHIW() {
         setActiveStep(best)
         setProgress((best / 2) * 100)
       }
+      ticking = false
     }
 
-    window.addEventListener('scroll', update, { passive: true })
+    function onScroll() {
+      if (!ticking) {
+        requestAnimationFrame(update)
+        ticking = true
+      }
+    }
+
+    window.addEventListener('scroll', onScroll, { passive: true })
     window.addEventListener('resize', update)
     update()
     return () => {
-      window.removeEventListener('scroll', update)
+      window.removeEventListener('scroll', onScroll)
       window.removeEventListener('resize', update)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
