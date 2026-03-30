@@ -168,6 +168,9 @@ export function LandingHIW() {
   const sectionRef = useRef<HTMLElement>(null)
   const lockTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  const [isMobile, setIsMobile] = useState(false)
+  const isMobileRef = useRef(false)
+
   const clickLockedRef = useRef(false)
   useEffect(() => { clickLockedRef.current = clickLocked }, [clickLocked])
 
@@ -177,23 +180,34 @@ export function LandingHIW() {
 
     let ticking = false
 
+    function checkMobile() {
+      const mobile = window.innerWidth <= 768
+      if (mobile !== isMobileRef.current) {
+        isMobileRef.current = mobile
+        setIsMobile(mobile)
+      }
+    }
+
     function update() {
       if (!sectionRef.current || !phoneColRef.current) return
 
-      const sec = sectionRef.current.getBoundingClientRect()
-      const col = phoneColRef.current.getBoundingClientRect()
-      const right = window.innerWidth - col.right
+      // JS sticky only on desktop; mobile uses static flow
+      if (!isMobileRef.current) {
+        const sec = sectionRef.current.getBoundingClientRect()
+        const col = phoneColRef.current.getBoundingClientRect()
+        const right = window.innerWidth - col.right
 
-      if (sec.top > STICKY_TOP) {
-        setPhoneMode('before')
-      } else if (sec.bottom < STICKY_TOP + PHONE_H) {
-        setPhoneMode('after')
-      } else {
-        setPhoneMode('fixed')
-        setPhoneRight(right)
+        if (sec.top > STICKY_TOP) {
+          setPhoneMode('before')
+        } else if (sec.bottom < STICKY_TOP + PHONE_H) {
+          setPhoneMode('after')
+        } else {
+          setPhoneMode('fixed')
+          setPhoneRight(right)
+        }
       }
 
-      // Step tracking
+      // Step tracking (runs on all screen sizes)
       if (!clickLockedRef.current) {
         const target = window.innerHeight * 0.45
         let best = 0, bestDist = Infinity
@@ -216,12 +230,18 @@ export function LandingHIW() {
       }
     }
 
+    function onResize() {
+      checkMobile()
+      update()
+    }
+
+    checkMobile()
     window.addEventListener('scroll', onScroll, { passive: true })
-    window.addEventListener('resize', update)
+    window.addEventListener('resize', onResize)
     update()
     return () => {
       window.removeEventListener('scroll', onScroll)
-      window.removeEventListener('resize', update)
+      window.removeEventListener('resize', onResize)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -238,18 +258,18 @@ export function LandingHIW() {
   return (
     <section ref={sectionRef} id="how-it-works" style={{ position: 'relative', background: 'linear-gradient(180deg,#080A08 0%,rgba(15,32,24,0.15) 30%,rgba(15,32,24,0.15) 70%,#080A08 100%)' }}>
       {/* Header */}
-      <div className="landing-reveal" style={{ textAlign: 'center', maxWidth: 600, margin: '0 auto', padding: '120px 60px 60px' }}>
+      <div className="landing-reveal" style={{ textAlign: 'center', maxWidth: 600, margin: '0 auto', padding: `clamp(80px,10vh,120px) clamp(24px,8vw,60px) ${isMobile ? '40px' : '60px'}` }}>
         <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#6EE7B7', opacity: 0.7, marginBottom: 16 }}>How it works</div>
-        <div style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(36px,5vw,48px)', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-0.03em', color: '#F7F6F3', marginBottom: 16 }}>
+        <div style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(32px,5vw,48px)', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-0.03em', color: '#F7F6F3', marginBottom: 16 }}>
           Effortless savings<br />in <em style={{ fontStyle: 'italic', color: '#6EE7B7' }}>three steps</em>
         </div>
-        <div style={{ fontSize: 16, lineHeight: 1.6, color: 'rgba(247,246,243,0.5)', fontWeight: 300 }}>Set up in 30 seconds. Here&apos;s how.</div>
+        <div style={{ fontSize: isMobile ? 15 : 16, lineHeight: 1.6, color: 'rgba(247,246,243,0.5)', fontWeight: 300 }}>Set up in 30 seconds. Here&apos;s how.</div>
       </div>
 
       {/* Layout */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', maxWidth: 1100, margin: '0 auto', padding: '0 40px 120px', gap: 80, position: 'relative' }}>
-        {/* Steps */}
-        <div style={{ position: 'relative', padding: '40px 0' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 320px', maxWidth: 1100, margin: '0 auto', padding: `0 clamp(24px,5vw,40px) clamp(80px,10vh,120px)`, gap: isMobile ? 32 : 80, position: 'relative' }}>
+        {/* Steps — order 1 on mobile so phone renders above */}
+        <div style={{ position: 'relative', padding: isMobile ? '24px 0' : '40px 0', order: isMobile ? 1 : 0 }}>
           {/* Progress line */}
           <div style={{ position: 'absolute', left: 27, top: 0, bottom: 0, width: 2 }}>
             <div style={{ position: 'absolute', inset: 0, background: 'rgba(110,231,183,0.06)', borderRadius: 2 }} />
@@ -261,25 +281,25 @@ export function LandingHIW() {
               key={i}
               ref={stepRefs[i]}
               data-step={i}
-              style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', padding: '40px 0', opacity: activeStep === i ? 1 : 0.3, transition: 'opacity 0.6s ease' }}
+              style={{ minHeight: isMobile ? 'auto' : '60vh', display: 'flex', alignItems: 'center', padding: isMobile ? '28px 0' : '40px 0', opacity: activeStep === i ? 1 : 0.3, transition: 'opacity 0.6s ease' }}
             >
-              <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start' }}>
+              <div style={{ display: 'flex', gap: isMobile ? 16 : 24, alignItems: 'flex-start' }}>
                 {/* Number circle */}
                 <div style={{
-                  width: 56, height: 56, borderRadius: '50%', flexShrink: 0,
+                  width: isMobile ? 44 : 56, height: isMobile ? 44 : 56, borderRadius: '50%', flexShrink: 0,
                   background: activeStep === i ? 'rgba(110,231,183,0.12)' : 'rgba(110,231,183,0.04)',
                   border: `1.5px solid ${activeStep === i ? 'rgba(110,231,183,0.35)' : 'rgba(110,231,183,0.15)'}`,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontFamily: 'Georgia, serif', fontSize: 20, fontWeight: 700, color: '#6EE7B7',
+                  fontFamily: 'Georgia, serif', fontSize: isMobile ? 16 : 20, fontWeight: 700, color: '#6EE7B7',
                   boxShadow: activeStep === i ? '0 0 40px rgba(110,231,183,0.2)' : 'none',
                   transition: 'all 0.6s ease',
                 }}>
                   {i + 1}
                 </div>
-                <div style={{ paddingTop: 6 }}>
-                  <div style={{ fontFamily: 'Georgia, serif', fontSize: 28, fontWeight: 700, color: '#F7F6F3', marginBottom: 12, letterSpacing: '-0.01em' }}>{step.title}</div>
-                  <div style={{ fontSize: 15.5, lineHeight: 1.65, color: activeStep === i ? 'rgba(247,246,243,0.6)' : 'rgba(247,246,243,0.45)', fontWeight: 300, maxWidth: 400, transition: 'color 0.4s' }}>{step.body}</div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 16 }}>
+                <div style={{ paddingTop: isMobile ? 2 : 6 }}>
+                  <div style={{ fontFamily: 'Georgia, serif', fontSize: isMobile ? 22 : 28, fontWeight: 700, color: '#F7F6F3', marginBottom: isMobile ? 8 : 12, letterSpacing: '-0.01em' }}>{step.title}</div>
+                  <div style={{ fontSize: isMobile ? 14.5 : 15.5, lineHeight: 1.65, color: activeStep === i ? 'rgba(247,246,243,0.6)' : 'rgba(247,246,243,0.45)', fontWeight: 300, maxWidth: isMobile ? '100%' : 400, transition: 'color 0.4s' }}>{step.body}</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: isMobile ? 12 : 16 }}>
                     {step.features.map((f) => (
                       <span key={f} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'rgba(110,231,183,0.06)', border: '1px solid rgba(110,231,183,0.12)', borderRadius: 20, padding: '4px 12px', fontSize: 11, color: '#6EE7B7', fontWeight: 500 }}>{f}</span>
                     ))}
@@ -290,32 +310,35 @@ export function LandingHIW() {
           ))}
         </div>
 
-        {/* JS-sticky phone column */}
-        <div ref={phoneColRef} style={{ position: 'relative' }}>
+        {/* JS-sticky phone column — order 0 on mobile so it renders above steps */}
+        <div ref={phoneColRef} style={{ position: 'relative', order: isMobile ? 0 : 1 }}>
           <div style={{
-            position: phoneMode === 'fixed' ? 'fixed' : 'absolute',
-            top: phoneMode === 'fixed' ? 120 : phoneMode === 'after' ? 'auto' : 20,
-            bottom: phoneMode === 'after' ? 20 : 'auto',
-            right: phoneMode === 'fixed' ? phoneRight : 0,
-            width: 320,
-            padding: '0 20px',
+            position: isMobile ? 'relative' : (phoneMode === 'fixed' ? 'fixed' : 'absolute'),
+            top: isMobile ? 0 : (phoneMode === 'fixed' ? 120 : phoneMode === 'after' ? 'auto' : 20),
+            bottom: isMobile ? 'auto' : (phoneMode === 'after' ? 20 : 'auto'),
+            right: isMobile ? 'auto' : (phoneMode === 'fixed' ? phoneRight : 0),
+            width: isMobile ? '100%' : 320,
+            padding: isMobile ? 0 : '0 20px',
+            display: isMobile ? 'flex' : 'block',
+            flexDirection: 'column' as const,
+            alignItems: isMobile ? 'center' as const : undefined,
           }}>
             <div style={{ position: 'relative' }}>
               {/* Glow */}
-              <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 350, height: 350, borderRadius: '50%', background: 'radial-gradient(circle,rgba(110,231,183,0.08) 0%,transparent 70%)', zIndex: 0 }} />
+              <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: isMobile ? 260 : 350, height: isMobile ? 260 : 350, borderRadius: '50%', background: 'radial-gradient(circle,rgba(110,231,183,0.08) 0%,transparent 70%)', zIndex: 0 }} />
               {/* Phone */}
               <div
                 ref={phoneRef}
                 onClick={advancePhone}
                 style={{
-                  width: 280, height: 560, background: '#1C3D2E', borderRadius: 44,
+                  width: isMobile ? 220 : 280, height: isMobile ? 440 : 560, background: '#1C3D2E', borderRadius: isMobile ? 36 : 44,
                   border: '1px solid rgba(255,255,255,0.1)',
                   boxShadow: '0 0 0 8px rgba(15,32,24,0.5),0 0 0 9px rgba(255,255,255,0.05),0 48px 120px rgba(0,0,0,0.5),inset 0 1px 0 rgba(255,255,255,0.06)',
                   overflow: 'hidden', position: 'relative', cursor: 'pointer', zIndex: 1,
                 }}
               >
                 {/* Notch */}
-                <div style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', width: 120, height: 28, background: '#0F2018', borderRadius: '0 0 18px 18px', zIndex: 10, border: '1px solid rgba(255,255,255,0.05)', borderTop: 'none' }} />
+                <div style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', width: isMobile ? 90 : 120, height: isMobile ? 22 : 28, background: '#0F2018', borderRadius: '0 0 14px 14px', zIndex: 10, border: '1px solid rgba(255,255,255,0.05)', borderTop: 'none' }} />
 
                 {/* Tap hint */}
                 <div style={{ position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)', fontSize: 10, color: 'rgba(110,231,183,0.5)', zIndex: 20, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6, animation: 'tapHintPulse 2s ease-in-out infinite' }}>

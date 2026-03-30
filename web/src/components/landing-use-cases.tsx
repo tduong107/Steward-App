@@ -110,9 +110,9 @@ export function LandingUseCases() {
   const visible = CARDS.filter((c) => filter === 'all' || c.cat === filter)
 
   return (
-    <section id="why-steward" style={{ padding: '120px 60px', background: '#080A08' }}>
+    <section id="why-steward" style={{ padding: 'clamp(60px,10vh,120px) clamp(24px,8vw,60px)', background: '#080A08' }}>
       {/* Header */}
-      <div className="landing-reveal" style={{ textAlign: 'center', maxWidth: 600, margin: '0 auto 72px' }}>
+      <div className="landing-reveal" style={{ textAlign: 'center', maxWidth: 600, margin: '0 auto clamp(40px,7vh,72px)' }}>
         <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#6EE7B7', opacity: 0.7, marginBottom: 16 }}>Why Steward</div>
         <div style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(36px,5vw,48px)', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-0.03em', color: '#F7F6F3', marginBottom: 16 }}>
           One app, endless<br />ways to <em style={{ fontStyle: 'italic', color: '#6EE7B7' }}>save</em>
@@ -210,7 +210,7 @@ export function LandingUseCases() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            style={{ background: '#0F2018', border: '1px solid rgba(110,231,183,0.2)', borderRadius: 24, padding: 36, maxWidth: 480, width: '90%', position: 'relative' }}
+            style={{ background: '#0F2018', border: '1px solid rgba(110,231,183,0.2)', borderRadius: 24, padding: 'clamp(24px,5vw,36px)', maxWidth: 480, width: '90%', position: 'relative', maxHeight: '90dvh', overflowY: 'auto' }}
           >
             <button ref={closeBtnRef} onClick={() => setModal(null)} aria-label="Close dialog" style={{ position: 'absolute', top: 16, right: 16, width: 32, height: 32, borderRadius: '50%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, color: 'rgba(247,246,243,0.5)', cursor: 'pointer', transition: 'all .25s', fontFamily: 'inherit' }}>✕</button>
             <div style={{ fontSize: 40, marginBottom: 16 }}>{modal.emoji}</div>

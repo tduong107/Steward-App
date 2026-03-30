@@ -284,7 +284,7 @@ function Hero() {
   return (
     <section style={{
       minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      position: 'relative', overflow: 'hidden', padding: '100px 40px 60px', background: S.bg,
+      position: 'relative', overflow: 'hidden', padding: 'clamp(80px,10vh,100px) clamp(20px,6vw,40px) 60px', background: S.bg,
     }}>
       {/* Bg gradients */}
       <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 900px 800px at 30% 40%,rgba(42,92,69,0.5) 0%,transparent 60%),radial-gradient(ellipse 600px 500px at 75% 25%,rgba(110,231,183,0.07) 0%,transparent 55%),radial-gradient(ellipse 500px 700px at 80% 80%,rgba(28,61,46,0.35) 0%,transparent 55%)' }} />
@@ -491,7 +491,7 @@ function PriceFeature() {
   }, [animated])
 
   return (
-    <section style={{ padding: '120px 60px', background: S.bg }}>
+    <section style={{ padding: 'clamp(60px,10vh,120px) clamp(24px,8vw,60px)', background: S.bg }}>
       <div className="lnd-feature-grid" style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 80, alignItems: 'center' }}>
         <div className="landing-reveal">
           <Pill icon="📉" label="Price Drops" />
@@ -546,9 +546,9 @@ function AIFeature() {
   }, [])
 
   return (
-    <section style={{ padding: '120px 60px', background: S.bg }}>
+    <section style={{ padding: 'clamp(60px,10vh,120px) clamp(24px,8vw,60px)', background: S.bg }}>
       <div className="lnd-feature-grid lnd-feature-reverse" style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 80, alignItems: 'center' }}>
-        {/* Chat visual (left visually, first in DOM) */}
+        {/* Chat visual — left visually, first in DOM */}
         <div className="landing-reveal" ref={ref} style={{ background: 'linear-gradient(135deg,rgba(42,92,69,0.25),rgba(15,32,24,0.15))', border: '1px solid rgba(110,231,183,0.08)', borderRadius: 24, padding: 32, display: 'flex', flexDirection: 'column', gap: 10, position: 'relative', overflow: 'hidden' }}>
           <div style={{ maxWidth: '85%', padding: '12px 16px', borderRadius: '18px 18px 4px 18px', fontSize: 13, lineHeight: 1.5, background: '#2A5C45', color: S.cream, alignSelf: 'flex-end', marginLeft: 'auto', opacity: chatStep >= 1 ? 1 : 0, transform: chatStep >= 1 ? 'none' : 'translateY(12px)', transition: 'all .5s ease' }}>
             Find the Dyson V15, alert me under $500
@@ -640,7 +640,7 @@ const PLANS = [
 
 function Pricing() {
   return (
-    <section id="pricing" style={{ padding: '120px 60px', background: S.bg }}>
+    <section id="pricing" style={{ padding: 'clamp(60px,10vh,120px) clamp(24px,8vw,60px)', background: S.bg }}>
       <div className="landing-reveal" style={{ textAlign: 'center', maxWidth: 600, margin: '0 auto 72px' }}>
         <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '0.2em', textTransform: 'uppercase' as const, color: S.mint, opacity: 0.7, marginBottom: 16 }}>Pricing</div>
         <div style={{ fontFamily: S.serif, fontSize: 'clamp(36px,5vw,48px)', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-0.03em', color: S.cream, marginBottom: 16 }}>
@@ -687,7 +687,7 @@ function Pricing() {
 // ── Final CTA ─────────────────────────────────────────────────────────────────
 function FinalCTA() {
   return (
-    <section className="landing-reveal" style={{ padding: '120px 60px', textAlign: 'center', position: 'relative', overflow: 'hidden', background: S.bg }}>
+    <section className="landing-reveal" style={{ padding: 'clamp(60px,10vh,120px) clamp(24px,8vw,60px)', textAlign: 'center', position: 'relative', overflow: 'hidden', background: S.bg }}>
       <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 600px 400px at 50% 50%,rgba(42,92,69,0.35) 0%,transparent 70%)' }} />
       <div style={{ position: 'relative', zIndex: 1 }}>
         <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '0.2em', textTransform: 'uppercase' as const, color: S.mint, opacity: 0.7, marginBottom: 16 }}>Your concierge is ready</div>
@@ -709,7 +709,7 @@ function FinalCTA() {
 // ── Footer ────────────────────────────────────────────────────────────────────
 function Footer() {
   return (
-    <footer style={{ padding: '48px 60px', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: S.bg, flexWrap: 'wrap' as const, gap: 20 }}>
+    <footer style={{ padding: '40px clamp(24px,8vw,60px)', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: S.bg, flexWrap: 'wrap' as const, gap: 20 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <Logo />
         <div>
@@ -807,6 +807,11 @@ export function LandingClientPage() {
         }
         @media (max-width: 768px) {
           .lnd-hero-text { padding: 0 !important; }
+          nav { padding-left: clamp(16px, 5vw, 40px) !important; padding-right: clamp(16px, 5vw, 40px) !important; }
+        }
+        @media (max-width: 540px) {
+          .lnd-pricing-grid { grid-template-columns: 1fr !important; }
+          .lnd-feature-grid { gap: 36px !important; }
         }
 
         /* Shared fade-in for chat items */
