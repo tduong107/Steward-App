@@ -621,25 +621,25 @@ function FeatLink({ href, children }: { href: string; children: React.ReactNode 
 
 // ── Pricing ───────────────────────────────────────────────────────────────────
 type Plan = {
-  name: string; monthly: string; yearly: string; period: string; featured: boolean; tag?: string
+  name: string; monthly: string; yearly: string; periodMonthly: string; periodYearly: string; featured: boolean; tag?: string
   features: string[]; btnMonthly: string; btnYearly: string
 }
 
 const PLANS: Plan[] = [
   {
-    name: 'Free', monthly: '$0', yearly: '$0', period: '/ forever', featured: false,
+    name: 'Free', monthly: '$0', yearly: '$0', periodMonthly: '/ forever', periodYearly: '/ forever', featured: false,
     features: ['Up to 3 trackers', 'Checks once per day', 'Push notifications', 'AI chat setup'],
     btnMonthly: 'Get Started Free', btnYearly: 'Get Started Free',
   },
   {
-    name: 'Steward Pro', monthly: '$4.99', yearly: '$3.99', period: '/ month', featured: false,
+    name: 'Steward Pro', monthly: '$4.99', yearly: '$39.99', periodMonthly: '/ month', periodYearly: '/ year', featured: false,
     features: ['Up to 7 trackers', 'Check every 12 hours', 'Notify + Quick Link', 'Price insights & deal alerts', 'Email & SMS alerts'],
-    btnMonthly: 'Subscribe for $4.99', btnYearly: 'Subscribe for $3.99',
+    btnMonthly: 'Subscribe for $4.99/mo', btnYearly: 'Subscribe for $39.99/yr',
   },
   {
-    name: 'Steward Premium', monthly: '$9.99', yearly: '$7.99', period: '/ month', featured: true, tag: 'BEST VALUE',
+    name: 'Steward Premium', monthly: '$9.99', yearly: '$79.99', periodMonthly: '/ month', periodYearly: '/ year', featured: true, tag: 'BEST VALUE',
     features: ['Up to 15 trackers', 'Check every 2 hours', 'Steward Acts for you', 'Everything in Pro', 'Fake deal detection', 'Priority support'],
-    btnMonthly: 'Subscribe for $9.99', btnYearly: 'Subscribe for $7.99',
+    btnMonthly: 'Subscribe for $9.99/mo', btnYearly: 'Subscribe for $79.99/yr',
   },
 ]
 
@@ -678,7 +678,7 @@ function Pricing() {
         </button>
         <span style={{ fontSize: 14, fontWeight: yearly ? 600 : 400, color: yearly ? S.cream : 'rgba(247,246,243,0.4)', transition: 'all .3s' }}>
           Yearly
-          <span style={{ fontSize: 11, fontWeight: 700, color: S.gold, marginLeft: 6 }}>Save 20%</span>
+          <span style={{ fontSize: 11, fontWeight: 700, color: S.gold, marginLeft: 6 }}>Save 33%</span>
         </span>
       </div>
 
@@ -696,7 +696,7 @@ function Pricing() {
             <div style={{ fontFamily: S.serif, fontSize: 22, fontWeight: 700, color: S.cream, marginBottom: 8 }}>{plan.name}</div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 20 }}>
               <span style={{ fontFamily: S.serif, fontSize: 38, fontWeight: 700, color: S.mint }}>{yearly ? plan.yearly : plan.monthly}</span>
-              <span style={{ fontSize: 13, color: 'rgba(247,246,243,0.4)' }}>{plan.period}</span>
+              <span style={{ fontSize: 13, color: 'rgba(247,246,243,0.4)' }}>{yearly ? plan.periodYearly : plan.periodMonthly}</span>
             </div>
             <ul style={{ listStyle: 'none', padding: 0, display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 28 }}>
               {plan.features.map(f => (
