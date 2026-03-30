@@ -656,6 +656,7 @@ function Pricing() {
               background: plan.featured ? 'linear-gradient(135deg,rgba(42,92,69,0.3),rgba(15,32,24,0.2))' : S.cardBg,
               border: plan.featured ? '1px solid rgba(110,231,183,0.2)' : S.border,
               borderRadius: 24, padding: '36px 28px', position: 'relative', overflow: 'hidden',
+              display: 'flex', flexDirection: 'column' as const,
               animationDelay: `${i * 100}ms`,
             }}>
             {plan.featured && <div style={{ position: 'absolute', top: 16, right: 16, background: S.gold, color: S.forest, fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', padding: '3px 10px', borderRadius: 20 }}>BEST VALUE</div>}
@@ -671,7 +672,7 @@ function Pricing() {
                 </li>
               ))}
             </ul>
-            <Link href="/signup" style={{
+            <Link href="/signup" style={{ marginTop: 'auto',
               display: 'block', textAlign: 'center', padding: 14, borderRadius: 12, fontSize: 14, fontWeight: plan.featured ? 700 : 600, textDecoration: 'none', transition: 'all .3s',
               background: plan.featured ? S.mint : 'rgba(110,231,183,0.06)',
               border: plan.featured ? 'none' : '1px solid rgba(110,231,183,0.18)',
