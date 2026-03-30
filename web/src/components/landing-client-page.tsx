@@ -313,7 +313,7 @@ function Hero() {
 
           {/* Body */}
           <p style={{ fontSize: 17, lineHeight: 1.65, color: S.textDim, fontWeight: 300, marginBottom: 36, maxWidth: 440, opacity: 0, transform: 'translateY(25px)', animation: 'hiw-fadeUp .8s 1.4s ease forwards' }}>
-            Tech-savvy shoppers build custom scripts to snag deals, reservations, and sold-out tickets before you even see them. Steward is your personal AI concierge that levels the playing field.
+            Be the first to snag deals, hard to get reservations, and sold-out tickets with Steward. Your personalized AI concierge, Steward, levels the playing field.
           </p>
 
           {/* CTAs */}
@@ -495,8 +495,8 @@ function PriceFeature() {
       <div className="lnd-feature-grid" style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 80, alignItems: 'center' }}>
         <div className="landing-reveal">
           <Pill icon="📉" label="Price Drops" />
-          <FeatTitle>Your target<br />price. <em>Nailed.</em></FeatTitle>
-          <FeatBody>Works across Amazon, Nike, Best Buy, Target, Walmart, and thousands of other retailers. Steward monitors 24/7 and pings you the moment your target hits — with fake deal detection so you never get played by artificially inflated prices.</FeatBody>
+          <FeatTitle>Your target<br />price. <em>Achieved.</em></FeatTitle>
+          <FeatBody>Works across Amazon, Nike, Best Buy, Target, Walmart, and thousands of other retailers. Steward monitors 24/7 and pings you the moment your target hits, with fake deal detection so you never get played by artificially inflated prices.</FeatBody>
           <FeatLink href="/signup">Start tracking prices →</FeatLink>
         </div>
         <div className="landing-reveal" ref={ref} style={{ background: 'linear-gradient(135deg,rgba(42,92,69,0.3),rgba(15,32,24,0.2))', border: '1px solid rgba(110,231,183,0.1)', borderRadius: 24, padding: 40, position: 'relative', overflow: 'hidden' }}>
@@ -584,7 +584,7 @@ function AIFeature() {
         <div className="landing-reveal lnd-ai-text">
           <Pill icon="✦" label="AI Concierge" />
           <FeatTitle>No forms.<br />Just say<br />what you <em>want.</em></FeatTitle>
-          <FeatBody>Skip the dropdowns and filters. Tell Steward what you want — in plain English or via a screenshot. The AI finds the product or experience and sets up tracking in seconds. It even detects fake deals.</FeatBody>
+          <FeatBody>Skip the dropdowns and filters. Tell Steward what you want via text or a screenshot. The AI finds the product or experience and sets up tracking in seconds. It even detects fake deals.</FeatBody>
           <FeatLink href="/signup">Try the AI concierge →</FeatLink>
         </div>
       </div>
