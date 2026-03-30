@@ -580,8 +580,8 @@ function AIFeature() {
           )}
         </div>
 
-        {/* Text */}
-        <div className="landing-reveal">
+        {/* Text — lnd-ai-text allows order swap on mobile */}
+        <div className="landing-reveal lnd-ai-text">
           <Pill icon="✦" label="AI Concierge" />
           <FeatTitle>No forms.<br />Just say<br />what you <em>want.</em></FeatTitle>
           <FeatBody>Skip the dropdowns and filters. Tell Steward what you want — in plain English or via a screenshot. The AI finds the product or experience and sets up tracking in seconds. It even detects fake deals.</FeatBody>
@@ -812,6 +812,10 @@ export function LandingClientPage() {
         @media (max-width: 540px) {
           .lnd-pricing-grid { grid-template-columns: 1fr !important; }
           .lnd-feature-grid { gap: 36px !important; }
+        }
+        /* AI feature: show text above animation on mobile */
+        @media (max-width: 1100px) {
+          .lnd-ai-text { order: -1 !important; }
         }
 
         /* Shared fade-in for chat items */

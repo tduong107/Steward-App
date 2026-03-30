@@ -170,9 +170,30 @@ export function LandingHIW() {
 
   const [isMobile, setIsMobile] = useState(false)
   const isMobileRef = useRef(false)
+  const touchStartX = useRef(0)
+  const touchStartY = useRef(0)
 
   const clickLockedRef = useRef(false)
   useEffect(() => { clickLockedRef.current = clickLocked }, [clickLocked])
+
+  function handleTouchStart(e: React.TouchEvent) {
+    touchStartX.current = e.touches[0].clientX
+    touchStartY.current = e.touches[0].clientY
+  }
+
+  function handleTouchEnd(e: React.TouchEvent) {
+    const dx = e.changedTouches[0].clientX - touchStartX.current
+    const dy = e.changedTouches[0].clientY - touchStartY.current
+    // Only treat as horizontal swipe if more horizontal than vertical
+    if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return
+    if (dx < 0 && activeStep < 2) {
+      setActiveStep(s => s + 1)
+      setProgress(((activeStep + 1) / 2) * 100)
+    } else if (dx > 0 && activeStep > 0) {
+      setActiveStep(s => s - 1)
+      setProgress(((activeStep - 1) / 2) * 100)
+    }
+  }
 
   useEffect(() => {
     const STICKY_TOP = 120
@@ -207,8 +228,8 @@ export function LandingHIW() {
         }
       }
 
-      // Step tracking (runs on all screen sizes)
-      if (!clickLockedRef.current) {
+      // Step tracking — desktop only (mobile uses swipe carousel)
+      if (!isMobileRef.current && !clickLockedRef.current) {
         const target = window.innerHeight * 0.45
         let best = 0, bestDist = Infinity
         stepRefs.forEach((ref, i) => {
@@ -268,46 +289,100 @@ export function LandingHIW() {
 
       {/* Layout */}
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 320px', maxWidth: 1100, margin: '0 auto', padding: `0 clamp(24px,5vw,40px) clamp(80px,10vh,120px)`, gap: isMobile ? 32 : 80, position: 'relative' }}>
-        {/* Steps — order 1 on mobile so phone renders above */}
-        <div style={{ position: 'relative', padding: isMobile ? '24px 0' : '40px 0', order: isMobile ? 1 : 0 }}>
-          {/* Progress line */}
-          <div style={{ position: 'absolute', left: 27, top: 0, bottom: 0, width: 2 }}>
-            <div style={{ position: 'absolute', inset: 0, background: 'rgba(110,231,183,0.06)', borderRadius: 2 }} />
-            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: `${progress}%`, background: 'linear-gradient(to bottom, #6EE7B7, rgba(110,231,183,0.3))', borderRadius: 2, transition: 'height 0.4s ease' }} />
-          </div>
+        {/* Steps */}
+        <div style={{ position: 'relative', padding: isMobile ? '20px 0 0' : '40px 0', order: isMobile ? 1 : 0 }}>
 
-          {STEPS.map((step, i) => (
+          {isMobile ? (
+            /* ── Mobile: horizontal swipe carousel ── */
             <div
-              key={i}
-              ref={stepRefs[i]}
-              data-step={i}
-              style={{ minHeight: isMobile ? 'auto' : '60vh', display: 'flex', alignItems: 'center', padding: isMobile ? '28px 0' : '40px 0', opacity: activeStep === i ? 1 : 0.3, transition: 'opacity 0.6s ease' }}
+              onTouchStart={handleTouchStart}
+              onTouchEnd={handleTouchEnd}
+              style={{ overflow: 'hidden', touchAction: 'pan-y', userSelect: 'none' }}
             >
-              <div style={{ display: 'flex', gap: isMobile ? 16 : 24, alignItems: 'flex-start' }}>
-                {/* Number circle */}
-                <div style={{
-                  width: isMobile ? 44 : 56, height: isMobile ? 44 : 56, borderRadius: '50%', flexShrink: 0,
-                  background: activeStep === i ? 'rgba(110,231,183,0.12)' : 'rgba(110,231,183,0.04)',
-                  border: `1.5px solid ${activeStep === i ? 'rgba(110,231,183,0.35)' : 'rgba(110,231,183,0.15)'}`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontFamily: 'Georgia, serif', fontSize: isMobile ? 16 : 20, fontWeight: 700, color: '#6EE7B7',
-                  boxShadow: activeStep === i ? '0 0 40px rgba(110,231,183,0.2)' : 'none',
-                  transition: 'all 0.6s ease',
-                }}>
-                  {i + 1}
-                </div>
-                <div style={{ paddingTop: isMobile ? 2 : 6 }}>
-                  <div style={{ fontFamily: 'Georgia, serif', fontSize: isMobile ? 22 : 28, fontWeight: 700, color: '#F7F6F3', marginBottom: isMobile ? 8 : 12, letterSpacing: '-0.01em' }}>{step.title}</div>
-                  <div style={{ fontSize: isMobile ? 14.5 : 15.5, lineHeight: 1.65, color: activeStep === i ? 'rgba(247,246,243,0.6)' : 'rgba(247,246,243,0.45)', fontWeight: 300, maxWidth: isMobile ? '100%' : 400, transition: 'color 0.4s' }}>{step.body}</div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: isMobile ? 12 : 16 }}>
-                    {step.features.map((f) => (
-                      <span key={f} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'rgba(110,231,183,0.06)', border: '1px solid rgba(110,231,183,0.12)', borderRadius: 20, padding: '4px 12px', fontSize: 11, color: '#6EE7B7', fontWeight: 500 }}>{f}</span>
-                    ))}
+              {/* Slide track */}
+              <div style={{
+                display: 'flex',
+                width: `${STEPS.length * 100}%`,
+                transform: `translateX(-${activeStep * (100 / STEPS.length)}%)`,
+                transition: 'transform 0.4s cubic-bezier(.4,0,.2,1)',
+              }}>
+                {STEPS.map((step, i) => (
+                  <div key={i} style={{ width: `${100 / STEPS.length}%`, padding: '0 4px', boxSizing: 'border-box' }}>
+                    <div style={{
+                      background: 'rgba(110,231,183,0.04)',
+                      border: '1px solid rgba(110,231,183,0.12)',
+                      borderRadius: 20, padding: '24px 20px',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+                        <div style={{
+                          width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
+                          background: 'rgba(110,231,183,0.12)',
+                          border: '1.5px solid rgba(110,231,183,0.35)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontFamily: 'Georgia, serif', fontSize: 16, fontWeight: 700, color: '#6EE7B7',
+                        }}>
+                          {i + 1}
+                        </div>
+                        <div style={{ fontFamily: 'Georgia, serif', fontSize: 20, fontWeight: 700, color: '#F7F6F3', letterSpacing: '-0.01em' }}>{step.title}</div>
+                      </div>
+                      <div style={{ fontSize: 14.5, lineHeight: 1.65, color: 'rgba(247,246,243,0.6)', fontWeight: 300, marginBottom: 14 }}>{step.body}</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                        {step.features.map((f) => (
+                          <span key={f} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'rgba(110,231,183,0.06)', border: '1px solid rgba(110,231,183,0.12)', borderRadius: 20, padding: '4px 12px', fontSize: 11, color: '#6EE7B7', fontWeight: 500 }}>{f}</span>
+                        ))}
+                      </div>
+                    </div>
                   </div>
-                </div>
+                ))}
+              </div>
+
+              {/* Swipe hint */}
+              <div style={{ textAlign: 'center', marginTop: 12, fontSize: 11, color: 'rgba(110,231,183,0.4)', letterSpacing: '0.05em' }}>
+                {activeStep < 2 ? '← swipe to continue →' : '← swipe back'}
               </div>
             </div>
-          ))}
+          ) : (
+            /* ── Desktop: vertical scroll steps ── */
+            <>
+              {/* Progress line */}
+              <div style={{ position: 'absolute', left: 27, top: 0, bottom: 0, width: 2 }}>
+                <div style={{ position: 'absolute', inset: 0, background: 'rgba(110,231,183,0.06)', borderRadius: 2 }} />
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: `${progress}%`, background: 'linear-gradient(to bottom, #6EE7B7, rgba(110,231,183,0.3))', borderRadius: 2, transition: 'height 0.4s ease' }} />
+              </div>
+
+              {STEPS.map((step, i) => (
+                <div
+                  key={i}
+                  ref={stepRefs[i]}
+                  data-step={i}
+                  style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', padding: '40px 0', opacity: activeStep === i ? 1 : 0.3, transition: 'opacity 0.6s ease' }}
+                >
+                  <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start' }}>
+                    <div style={{
+                      width: 56, height: 56, borderRadius: '50%', flexShrink: 0,
+                      background: activeStep === i ? 'rgba(110,231,183,0.12)' : 'rgba(110,231,183,0.04)',
+                      border: `1.5px solid ${activeStep === i ? 'rgba(110,231,183,0.35)' : 'rgba(110,231,183,0.15)'}`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontFamily: 'Georgia, serif', fontSize: 20, fontWeight: 700, color: '#6EE7B7',
+                      boxShadow: activeStep === i ? '0 0 40px rgba(110,231,183,0.2)' : 'none',
+                      transition: 'all 0.6s ease',
+                    }}>
+                      {i + 1}
+                    </div>
+                    <div style={{ paddingTop: 6 }}>
+                      <div style={{ fontFamily: 'Georgia, serif', fontSize: 28, fontWeight: 700, color: '#F7F6F3', marginBottom: 12, letterSpacing: '-0.01em' }}>{step.title}</div>
+                      <div style={{ fontSize: 15.5, lineHeight: 1.65, color: activeStep === i ? 'rgba(247,246,243,0.6)' : 'rgba(247,246,243,0.45)', fontWeight: 300, maxWidth: 400, transition: 'color 0.4s' }}>{step.body}</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 16 }}>
+                        {step.features.map((f) => (
+                          <span key={f} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'rgba(110,231,183,0.06)', border: '1px solid rgba(110,231,183,0.12)', borderRadius: 20, padding: '4px 12px', fontSize: 11, color: '#6EE7B7', fontWeight: 500 }}>{f}</span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
         </div>
 
         {/* JS-sticky phone column — order 0 on mobile so it renders above steps */}
@@ -340,11 +415,13 @@ export function LandingHIW() {
                 {/* Notch */}
                 <div style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', width: isMobile ? 90 : 120, height: isMobile ? 22 : 28, background: '#0F2018', borderRadius: '0 0 14px 14px', zIndex: 10, border: '1px solid rgba(255,255,255,0.05)', borderTop: 'none' }} />
 
-                {/* Tap hint */}
-                <div style={{ position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)', fontSize: 10, color: 'rgba(110,231,183,0.5)', zIndex: 20, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6, animation: 'tapHintPulse 2s ease-in-out infinite' }}>
-                  <span>{activeStep >= 2 ? '🔄' : '👆'}</span>
-                  {activeStep >= 2 ? 'Tap to replay' : 'Tap to continue'}
-                </div>
+                {/* Tap hint — desktop only */}
+                {!isMobile && (
+                  <div style={{ position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)', fontSize: 10, color: 'rgba(110,231,183,0.5)', zIndex: 20, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6, animation: 'tapHintPulse 2s ease-in-out infinite' }}>
+                    <span>{activeStep >= 2 ? '🔄' : '👆'}</span>
+                    {activeStep >= 2 ? 'Tap to replay' : 'Tap to continue'}
+                  </div>
+                )}
 
                 {/* Screen 1 */}
                 <div style={{ position: 'absolute', inset: 0, opacity: activeStep === 0 ? 1 : 0, transform: activeStep === 0 ? 'scale(1)' : 'scale(0.96)', transition: 'all .6s cubic-bezier(.4,0,.2,1)', pointerEvents: activeStep === 0 ? 'auto' : 'none' }}>
