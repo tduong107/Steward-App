@@ -620,33 +620,66 @@ function FeatLink({ href, children }: { href: string; children: React.ReactNode 
 }
 
 // ── Pricing ───────────────────────────────────────────────────────────────────
-const PLANS = [
+type Plan = {
+  name: string; monthly: string; yearly: string; period: string; featured: boolean; tag?: string
+  features: string[]; btnMonthly: string; btnYearly: string
+}
+
+const PLANS: Plan[] = [
   {
-    name: 'Free', amount: '$0', period: '/ forever', featured: false,
+    name: 'Free', monthly: '$0', yearly: '$0', period: '/ forever', featured: false,
     features: ['Up to 3 trackers', 'Checks once per day', 'Push notifications', 'AI chat setup'],
-    btn: 'Get Started Free',
+    btnMonthly: 'Get Started Free', btnYearly: 'Get Started Free',
   },
   {
-    name: 'Steward Pro', amount: '$4.99', period: '/ month', featured: true,
+    name: 'Steward Pro', monthly: '$4.99', yearly: '$3.99', period: '/ month', featured: false,
     features: ['Up to 7 trackers', 'Check every 12 hours', 'Notify + Quick Link', 'Price insights & deal alerts', 'Email & SMS alerts'],
-    btn: 'Subscribe for $4.99',
+    btnMonthly: 'Subscribe for $4.99', btnYearly: 'Subscribe for $3.99',
   },
   {
-    name: 'Steward Premium', amount: '$9.99', period: '/ month', featured: false,
+    name: 'Steward Premium', monthly: '$9.99', yearly: '$7.99', period: '/ month', featured: true, tag: 'BEST VALUE',
     features: ['Up to 15 trackers', 'Check every 2 hours', 'Steward Acts for you', 'Everything in Pro', 'Fake deal detection', 'Priority support'],
-    btn: 'Subscribe for $9.99',
+    btnMonthly: 'Subscribe for $9.99', btnYearly: 'Subscribe for $7.99',
   },
 ]
 
 function Pricing() {
+  const [yearly, setYearly] = useState(false)
+
   return (
     <section id="pricing" style={{ padding: 'clamp(60px,10vh,120px) clamp(24px,8vw,60px)', background: S.bg }}>
-      <div className="landing-reveal" style={{ textAlign: 'center', maxWidth: 600, margin: '0 auto 72px' }}>
+      <div className="landing-reveal" style={{ textAlign: 'center', maxWidth: 600, margin: '0 auto 40px' }}>
         <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '0.2em', textTransform: 'uppercase' as const, color: S.mint, opacity: 0.7, marginBottom: 16 }}>Pricing</div>
         <div style={{ fontFamily: S.serif, fontSize: 'clamp(36px,5vw,48px)', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-0.03em', color: S.cream, marginBottom: 16 }}>
           Pays for itself<br />with <em style={{ color: S.mint }}>one deal</em>
         </div>
         <p style={{ fontSize: 16, lineHeight: 1.6, color: 'rgba(247,246,243,0.5)', fontWeight: 300 }}>Start free, upgrade when you see how much you save.</p>
+      </div>
+
+      {/* Monthly / Yearly toggle */}
+      <div className="landing-reveal" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 14, marginBottom: 48 }}>
+        <span style={{ fontSize: 14, fontWeight: !yearly ? 600 : 400, color: !yearly ? S.cream : 'rgba(247,246,243,0.4)', transition: 'all .3s' }}>Monthly</span>
+        <button
+          onClick={() => setYearly(v => !v)}
+          aria-label={yearly ? 'Switch to monthly billing' : 'Switch to yearly billing'}
+          style={{
+            width: 52, height: 28, borderRadius: 14, padding: 3,
+            background: yearly ? S.mint : 'rgba(255,255,255,0.12)',
+            border: 'none', cursor: 'pointer', position: 'relative',
+            transition: 'background .3s', fontFamily: 'inherit',
+          }}
+        >
+          <div style={{
+            width: 22, height: 22, borderRadius: '50%',
+            background: yearly ? S.forest : 'rgba(247,246,243,0.8)',
+            transform: yearly ? 'translateX(24px)' : 'translateX(0)',
+            transition: 'transform .3s cubic-bezier(.34,1.56,.64,1)',
+          }} />
+        </button>
+        <span style={{ fontSize: 14, fontWeight: yearly ? 600 : 400, color: yearly ? S.cream : 'rgba(247,246,243,0.4)', transition: 'all .3s' }}>
+          Yearly
+          <span style={{ fontSize: 11, fontWeight: 700, color: S.gold, marginLeft: 6 }}>Save 20%</span>
+        </span>
       </div>
 
       <div className="lnd-pricing-grid" style={{ maxWidth: 960, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
@@ -659,10 +692,10 @@ function Pricing() {
               display: 'flex', flexDirection: 'column' as const,
               animationDelay: `${i * 100}ms`,
             }}>
-            {plan.featured && <div style={{ position: 'absolute', top: 16, right: 16, background: S.gold, color: S.forest, fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', padding: '3px 10px', borderRadius: 20 }}>BEST VALUE</div>}
+            {plan.tag && <div style={{ position: 'absolute', top: 16, right: 16, background: S.gold, color: S.forest, fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', padding: '3px 10px', borderRadius: 20 }}>{plan.tag}</div>}
             <div style={{ fontFamily: S.serif, fontSize: 22, fontWeight: 700, color: S.cream, marginBottom: 8 }}>{plan.name}</div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 20 }}>
-              <span style={{ fontFamily: S.serif, fontSize: 38, fontWeight: 700, color: S.mint }}>{plan.amount}</span>
+              <span style={{ fontFamily: S.serif, fontSize: 38, fontWeight: 700, color: S.mint }}>{yearly ? plan.yearly : plan.monthly}</span>
               <span style={{ fontSize: 13, color: 'rgba(247,246,243,0.4)' }}>{plan.period}</span>
             </div>
             <ul style={{ listStyle: 'none', padding: 0, display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 28 }}>
@@ -677,7 +710,7 @@ function Pricing() {
               background: plan.featured ? S.mint : 'rgba(110,231,183,0.06)',
               border: plan.featured ? 'none' : '1px solid rgba(110,231,183,0.18)',
               color: plan.featured ? S.forest : S.mint,
-            }}>{plan.btn}</Link>
+            }}>{yearly ? plan.btnYearly : plan.btnMonthly}</Link>
           </div>
         ))}
       </div>
