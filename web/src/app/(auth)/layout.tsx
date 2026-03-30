@@ -3,7 +3,7 @@ import Link from 'next/link'
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-dvh flex flex-col items-center justify-center bg-[#080A08] px-6 py-12">
+    <div className="min-h-dvh flex flex-col items-center justify-center px-6 py-12" style={{ background: 'radial-gradient(ellipse 80% 70% at 50% 40%, rgba(15,32,24,0.7) 0%, #080A08 70%)' }}>
       {/* Logo */}
       <Link href="/" className="flex flex-col items-center mb-8 group">
         <Image
