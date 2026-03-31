@@ -3,6 +3,7 @@ import './globals.css'
 import { AuthProvider } from '@/providers/auth-provider'
 import { SubscriptionProvider } from '@/providers/subscription-provider'
 import { ThemeProvider } from '@/providers/theme-provider'
+import { Analytics } from '@vercel/analytics/next'
 
 export const viewport = {
   width: 'device-width',
@@ -88,6 +89,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </SubscriptionProvider>
           </AuthProvider>
         </ThemeProvider>
+        <Analytics />
       </body>
     </html>
   )
