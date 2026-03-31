@@ -144,7 +144,6 @@ export function LandingUseCases() {
         {visible.map((card, idx) => (
           <div
             key={card.name}
-            className="landing-reveal"
             role="button"
             tabIndex={0}
             aria-label={`Learn more about ${card.name}`}
