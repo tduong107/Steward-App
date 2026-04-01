@@ -167,6 +167,32 @@ export default function SignupPage() {
     }
   }
 
+  const [resending, setResending] = useState(false)
+  const [resent, setResent] = useState(false)
+
+  async function handleResendEmail() {
+    if (resending || !email) return
+    setResending(true)
+    setResent(false)
+    try {
+      const supabase = createClient()
+      const { error: resendError } = await supabase.auth.resend({
+        type: 'signup',
+        email,
+      })
+      if (resendError) {
+        setError(resendError.message)
+      } else {
+        setResent(true)
+        setTimeout(() => setResent(false), 5000)
+      }
+    } catch {
+      setError('Failed to resend. Please try again.')
+    } finally {
+      setResending(false)
+    }
+  }
+
   if (success) {
     return (
       <div className="w-full max-w-sm">
@@ -180,10 +206,18 @@ export default function SignupPage() {
           </p>
           <Link
             href="/login"
-            className="inline-block w-full rounded-xl bg-[#2A5C45] text-white font-medium px-4 py-3 text-sm transition-opacity hover:opacity-90 text-center"
+            className="inline-block w-full rounded-xl bg-[#2A5C45] text-white font-medium px-4 py-3 text-sm transition-opacity hover:opacity-90 text-center mb-3"
           >
             Go to Sign In
           </Link>
+          <button
+            type="button"
+            onClick={handleResendEmail}
+            disabled={resending}
+            className="w-full text-sm font-medium text-[#6EE7B7]/70 hover:text-[#6EE7B7] transition-colors py-2 disabled:opacity-50"
+          >
+            {resending ? 'Sending...' : resent ? '✓ Email resent!' : 'Didn\'t get it? Resend email'}
+          </button>
         </div>
       </div>
     )
