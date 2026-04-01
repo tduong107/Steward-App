@@ -104,6 +104,7 @@ export default function SignupPage() {
           email,
           password,
           options: {
+            emailRedirectTo: `${window.location.origin}/auth/callback`,
             data: {
               display_name: fullName,
               phone_number: phone || undefined,
@@ -179,6 +180,9 @@ export default function SignupPage() {
       const { error: resendError } = await supabase.auth.resend({
         type: 'signup',
         email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
       })
       if (resendError) {
         setError(resendError.message)
