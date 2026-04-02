@@ -5,13 +5,6 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
-// Phone icon
-const PhoneIcon = () => (
-  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 0 0 2.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 0 1-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 0 0-1.091-.852H4.5A2.25 2.25 0 0 0 2.25 4.5v2.25Z" />
-  </svg>
-)
-
 // Format raw phone input to E.164 for Supabase (+1XXXXXXXXXX)
 function toE164(raw: string): string {
   const digits = raw.replace(/\D/g, '')
@@ -34,7 +27,9 @@ const INPUT_CLS =
 export default function SignupPage() {
   const router = useRouter()
   const [fullName, setFullName] = useState('')
-  const [phone, setPhone] = useState('')           // display value
+  const [phone, setPhone] = useState('')
+  const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [otpSent, setOtpSent] = useState(false)
   const [otp, setOtp] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -45,19 +40,32 @@ export default function SignupPage() {
 
   const e164 = toE164(phone)
 
-  async function handleSendCode(e: React.FormEvent) {
+  async function handleSignUp(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
 
     if (!fullName.trim()) { setError('Please enter your name'); return }
     const digits = phone.replace(/\D/g, '')
     if (digits.length < 10) { setError('Please enter a valid 10-digit US phone number'); return }
+    if (password.length < 6) { setError('Password must be at least 6 characters'); return }
 
     setLoading(true)
     try {
       const supabase = createClient()
-      const { error: otpError } = await supabase.auth.signInWithOtp({ phone: e164 })
-      if (otpError) { setError(otpError.message); return }
+      // Sign up with phone + password; Supabase sends an OTP to verify the number
+      const { error: signUpError } = await supabase.auth.signUp({
+        phone: e164,
+        password,
+        options: {
+          data: {
+            display_name: fullName.trim(),
+            phone_number: e164,
+            sms_alerts: true,
+          },
+        },
+      })
+
+      if (signUpError) { setError(signUpError.message); return }
       setOtpSent(true)
     } catch {
       setError('An unexpected error occurred. Please try again.')
@@ -84,7 +92,6 @@ export default function SignupPage() {
       if (verifyError) { setError(verifyError.message); return }
 
       if (data.user) {
-        // Create / update profile
         await supabase.from('profiles').upsert({
           id: data.user.id,
           display_name: fullName.trim(),
@@ -110,8 +117,11 @@ export default function SignupPage() {
     setError(null)
     try {
       const supabase = createClient()
-      const { error: otpError } = await supabase.auth.signInWithOtp({ phone: e164 })
-      if (otpError) { setError(otpError.message) }
+      const { error: resendError } = await supabase.auth.resend({
+        type: 'sms',
+        phone: e164,
+      })
+      if (resendError) { setError(resendError.message) }
       else { setResent(true); setTimeout(() => setResent(false), 5000) }
     } catch {
       setError('Failed to resend. Please try again.')
@@ -154,18 +164,18 @@ export default function SignupPage() {
       <div className="bg-[#1C3D2E]/40 border border-[#2A5C45]/30 rounded-2xl p-7">
 
         {!otpSent ? (
-          /* ── Step 1: Name + Phone ── */
+          /* ── Step 1: Name + Phone + Password ── */
           <>
             <div className="mb-5">
               <h2 className="text-lg font-semibold text-[#F7F6F3] mb-1">Create your account</h2>
-              <p className="text-sm text-[#F7F6F3]/40">We'll send a verification code to your phone</p>
+              <p className="text-sm text-[#F7F6F3]/40">We'll text a code to verify your number</p>
             </div>
 
-            <form onSubmit={handleSendCode} className="flex flex-col gap-4">
+            <form onSubmit={handleSignUp} className="flex flex-col gap-4">
               {/* Full Name */}
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                  <svg className="w-4 h-4 text-[#6EE7B7]/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#6EE7B7]/40">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
                   </svg>
                 </div>
@@ -180,12 +190,13 @@ export default function SignupPage() {
                 />
               </div>
 
-              {/* Phone Number */}
+              {/* Phone */}
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#6EE7B7]/40">
-                  <PhoneIcon />
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 0 0 2.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 0 1-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 0 0-1.091-.852H4.5A2.25 2.25 0 0 0 2.25 4.5v2.25Z" />
+                  </svg>
                 </div>
-                {/* Country code badge */}
                 <span className="absolute inset-y-0 left-9 flex items-center text-sm text-[#F7F6F3]/30 select-none pointer-events-none">
                   +1
                 </span>
@@ -198,6 +209,42 @@ export default function SignupPage() {
                   autoComplete="tel-national"
                   className={`${INPUT_CLS} pl-16`}
                 />
+              </div>
+
+              {/* Password */}
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#6EE7B7]/40">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+                  </svg>
+                </div>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  minLength={6}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder="Password (min 6 characters)"
+                  autoComplete="new-password"
+                  className={`${INPUT_CLS} pr-10`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(v => !v)}
+                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-[#F7F6F3]/25 hover:text-[#F7F6F3]/50 transition-colors"
+                  tabIndex={-1}
+                >
+                  {showPassword ? (
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" />
+                    </svg>
+                  ) : (
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                    </svg>
+                  )}
+                </button>
               </div>
 
               {error && (
@@ -219,12 +266,12 @@ export default function SignupPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 9.75a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
                   </svg>
                 )}
-                {loading ? 'Sending code...' : 'Send Verification Code'}
+                {loading ? 'Sending code...' : 'Create Account'}
               </button>
             </form>
           </>
         ) : (
-          /* ── Step 2: OTP Verification ── */
+          /* ── Step 2: Verify OTP ── */
           <>
             <div className="mb-5">
               <button
@@ -244,7 +291,6 @@ export default function SignupPage() {
             </div>
 
             <form onSubmit={handleVerify} className="flex flex-col gap-4">
-              {/* OTP input */}
               <input
                 type="text"
                 inputMode="numeric"
@@ -276,7 +322,7 @@ export default function SignupPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
                   </svg>
                 )}
-                {loading ? 'Verifying...' : 'Verify & Create Account'}
+                {loading ? 'Verifying...' : 'Verify & Finish'}
               </button>
 
               <button
@@ -285,7 +331,7 @@ export default function SignupPage() {
                 disabled={resending}
                 className="text-sm text-[#6EE7B7]/50 hover:text-[#6EE7B7] transition-colors text-center py-1 disabled:opacity-50"
               >
-                {resending ? 'Sending...' : resent ? '✓ Code resent!' : 'Didn\'t get it? Resend code'}
+                {resending ? 'Sending...' : resent ? '✓ Code resent!' : "Didn't get it? Resend code"}
               </button>
             </form>
           </>
