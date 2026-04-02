@@ -15,7 +15,7 @@ export const WATCH_LIMITS: Record<string, number> = {
 }
 
 // ── Category chips & follow-ups (matches iOS ChatMessage.categoryFollowUp) ──
-const CATEGORY_CHIPS = new Set(['Product', 'Travel', 'Reservation', 'Events', 'Camping', 'Screenshot', 'General'])
+const CATEGORY_CHIPS = new Set(['Product', 'Travel', 'Reservation', 'Events', 'Camping', 'Screenshot', 'General', 'Need help?'])
 
 interface CategoryFollowUp {
   text: string
@@ -49,6 +49,10 @@ const CATEGORY_FOLLOW_UPS: Record<string, CategoryFollowUp> = {
   General: {
     text: "I can keep tabs on pretty much any webpage!\n\nHeads up, general watches are still in beta so results can vary depending on the site. For the most reliable tracking, try Product, Events, or Camping.",
     suggestions: ['Track price changes (Beta)', 'Watch for any updates (Beta)', 'Monitor availability (Beta)'],
+  },
+  'Need help?': {
+    text: "I'm here to help! Here are some things I can do:\n\n• Set up watches to monitor websites for price drops, restocks, and availability\n• Track prices across multiple stores\n• Alert you via push, email, or SMS when conditions are met\n• Auto-add items to your cart when they drop in price\n\nWhat do you need help with?",
+    suggestions: ['How do watches work?', 'How do I change settings?', 'Email support', 'Set up a watch'],
   },
 }
 
@@ -239,7 +243,7 @@ export function useChat(tier: string = 'free') {
         if (isFirstMessageRef.current) {
           conversationHistoryRef.current.unshift({
             role: 'assistant',
-            content: "Hey there! 👋 I'm Steward. I watch websites so you don't have to, and I'll let you know when something changes.\n\nWhat can I help you keep an eye on?",
+            content: "Hello! I'm Steward, your personal web watcher. I keep an eye on websites and take action on your behalf.\n\nWhat are you looking to watch?",
           })
           isFirstMessageRef.current = false
         }
@@ -339,7 +343,7 @@ export function useChat(tier: string = 'free') {
           if (conversationHistoryRef.current.length === 0) {
             conversationHistoryRef.current.push({
               role: 'assistant',
-              content: "Hey there! 👋 I'm Steward. I watch websites so you don't have to, and I'll let you know when something changes.\n\nWhat can I help you keep an eye on?",
+              content: "Hello! I'm Steward, your personal web watcher. I keep an eye on websites and take action on your behalf.\n\nWhat are you looking to watch?",
             })
           }
           isFirstMessageRef.current = false

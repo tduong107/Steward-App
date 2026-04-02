@@ -184,6 +184,16 @@ body {
   animation: fade-in-up 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
 }
 
+/* Bounce in for celebration toasts */
+@keyframes bounce-in {
+  0% { opacity: 0; transform: translate(-50%, 8px) scale(0.9); }
+  60% { opacity: 1; transform: translate(-50%, -2px) scale(1.02); }
+  100% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+.animate-bounce-in {
+  animation: bounce-in 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+}
+
 /* Gentle float for empty state icon */
 @keyframes float {
   0%, 100% { transform: translateY(0); }

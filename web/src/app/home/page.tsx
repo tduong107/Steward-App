@@ -23,6 +23,7 @@ import { WatchCard } from '@/components/watch-card'
 import { CategoryFilter, watchCategory } from '@/components/category-filter'
 import { PaywallDialog } from '@/components/paywall-dialog'
 import { Skeleton } from '@/components/ui/skeleton'
+import { OnboardingChecklist } from '@/components/onboarding-checklist'
 import { watchLimit, tierLabel } from '@/lib/utils'
 import type { CheckResult } from '@/lib/types'
 
@@ -154,6 +155,9 @@ export default function DashboardPage() {
             : `${activeWatches.length} watch${activeWatches.length === 1 ? '' : 'es'} active`}
         </p>
       </div>
+
+      {/* ── Onboarding Checklist ── */}
+      <OnboardingChecklist />
 
       {/* ── Watch Limit Warning Banner ── */}
       {!loading && isAtLimit && (

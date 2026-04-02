@@ -26,6 +26,7 @@ const categoryChips = [
   'Camping',
   'Screenshot',
   'General',
+  'Need help?',
 ]
 const betaInitialChips = new Set(['General'])
 
@@ -251,7 +252,7 @@ export function ChatDrawer({ open, onClose }: ChatDrawerProps) {
     [createWatch, addMessage, isCreating, watches, tier],
   )
 
-  // Handle special suggestion clicks (e.g. "Upgrade plan")
+  // Handle special suggestion clicks (e.g. "Upgrade plan", "Email support")
   const handleSuggestionClickWrapped = useCallback(
     (text: string) => {
       if (text === 'Upgrade plan') {
@@ -260,6 +261,10 @@ export function ChatDrawer({ open, onClose }: ChatDrawerProps) {
       }
       if (text === 'Show my watches') {
         onClose()
+        return
+      }
+      if (text === 'Email support') {
+        window.open('mailto:hello@joinsteward.app?subject=Steward%20Support', '_blank')
         return
       }
       handleSuggestionClick(text)
@@ -378,8 +383,8 @@ export function ChatDrawer({ open, onClose }: ChatDrawerProps) {
                 <div className="space-y-2 min-w-0">
                   <span className="text-[11px] text-[var(--color-ink-light)]">Steward</span>
                   <div className="rounded-2xl rounded-bl-md bg-[var(--color-bg-deep)] px-4 py-2.5 text-sm leading-relaxed text-[var(--color-ink)]">
-                    <p>Hey there! 👋 I&apos;m Steward. I watch websites so you don&apos;t have to, and I&apos;ll let you know when something changes.</p>
-                    <p className="mt-1.5">What can I help you keep an eye on?</p>
+                    <p>Hello! I&apos;m Steward, your personal web watcher. I keep an eye on websites and take action on your behalf.</p>
+                    <p className="mt-1.5">What are you looking to watch?</p>
                   </div>
                   {/* Category chips — matches iOS exactly */}
                   <div className="flex flex-wrap gap-[7px] pt-1">
