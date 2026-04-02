@@ -3,7 +3,7 @@
 import Image from 'next/image'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { X, SendHorizontal, RotateCcw, ImagePlus } from 'lucide-react'
+import { X, SendHorizontal, RotateCcw, ImagePlus, Mic, Square } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useChat, WATCH_LIMITS } from '@/hooks/use-chat'
 import { useWatches } from '@/hooks/use-watches'
@@ -64,6 +64,69 @@ export function ChatDrawer({ open, onClose }: ChatDrawerProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // ─── Voice input (Web Speech API) ─────────────────────────────
+  const [isListening, setIsListening] = useState(false)
+  const recognitionRef = useRef<SpeechRecognition | null>(null)
+
+  const hasSpeechSupport = typeof window !== 'undefined' && ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)
+
+  const toggleVoiceInput = useCallback(() => {
+    if (isListening) {
+      // Stop
+      recognitionRef.current?.stop()
+      setIsListening(false)
+      return
+    }
+
+    // Start
+    const SpeechRecognition = window.SpeechRecognition || (window as any).webkitSpeechRecognition
+    if (!SpeechRecognition) return
+
+    const recognition = new SpeechRecognition()
+    recognition.lang = 'en-US'
+    recognition.interimResults = true
+    recognition.continuous = true
+    recognition.maxAlternatives = 1
+
+    let finalTranscript = ''
+
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      let interim = ''
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript
+        } else {
+          interim = transcript
+        }
+      }
+      setInput(finalTranscript + interim)
+    }
+
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      if (event.error !== 'aborted') {
+        console.log('[voice] Speech recognition error:', event.error)
+      }
+      setIsListening(false)
+    }
+
+    recognition.onend = () => {
+      setIsListening(false)
+    }
+
+    recognitionRef.current = recognition
+    recognition.start()
+    setIsListening(true)
+  }, [isListening])
+
+  // Stop listening when drawer closes
+  useEffect(() => {
+    if (!open && isListening) {
+      recognitionRef.current?.stop()
+      setIsListening(false)
+    }
+  }, [open, isListening])
 
   // Mount/unmount with animation
   useEffect(() => {
@@ -472,29 +535,69 @@ export function ChatDrawer({ open, onClose }: ChatDrawerProps) {
               className="hidden"
             />
 
-            <input
-              ref={inputRef}
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Describe what to watch..."
-              className="flex-1 rounded-full bg-[var(--color-bg-deep)] px-4 py-2.5 text-sm text-[var(--color-ink)] placeholder:text-[var(--color-ink-light)] outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
-            />
-            <button
-              type="button"
-              onClick={handleSend}
-              disabled={!hasContent || isLoading}
-              className={cn(
-                'flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors',
-                hasContent && !isLoading
-                  ? 'bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-mid)]'
-                  : 'bg-[var(--color-bg-deep)] text-[var(--color-ink-light)]',
+            <div className="relative flex-1">
+              <input
+                ref={inputRef}
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={isListening ? 'Listening...' : 'Describe what to watch...'}
+                className={cn(
+                  'w-full rounded-full bg-[var(--color-bg-deep)] px-4 py-2.5 text-sm text-[var(--color-ink)] placeholder:text-[var(--color-ink-light)] outline-none transition-all',
+                  isListening
+                    ? 'ring-2 ring-[var(--color-accent)] placeholder:text-[var(--color-accent)]'
+                    : 'focus:ring-2 focus:ring-[var(--color-accent)]',
+                )}
+              />
+              {isListening && (
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                </span>
               )}
-              aria-label="Send message"
-            >
-              <SendHorizontal className="h-4 w-4" />
-            </button>
+            </div>
+
+            {/* Mic button: shown when input is empty and speech is supported */}
+            {hasSpeechSupport && !hasContent && !isListening && (
+              <button
+                type="button"
+                onClick={toggleVoiceInput}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--color-bg-deep)] text-[var(--color-ink-light)] hover:bg-[var(--color-accent-light)] hover:text-[var(--color-accent)] transition-colors"
+                aria-label="Voice input"
+              >
+                <Mic className="h-4 w-4" />
+              </button>
+            )}
+
+            {/* Stop button: shown while listening */}
+            {isListening && (
+              <button
+                type="button"
+                onClick={toggleVoiceInput}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600 transition-colors"
+                aria-label="Stop listening"
+              >
+                <Square className="h-3.5 w-3.5" fill="currentColor" />
+              </button>
+            )}
+
+            {/* Send button: shown when there's content and not listening */}
+            {(hasContent || (!hasSpeechSupport && !isListening)) && !isListening && (
+              <button
+                type="button"
+                onClick={handleSend}
+                disabled={!hasContent || isLoading}
+                className={cn(
+                  'flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors',
+                  hasContent && !isLoading
+                    ? 'bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-mid)]'
+                    : 'bg-[var(--color-bg-deep)] text-[var(--color-ink-light)]',
+                )}
+                aria-label="Send message"
+              >
+                <SendHorizontal className="h-4 w-4" />
+              </button>
+            )}
           </div>
         </div>
       </div>

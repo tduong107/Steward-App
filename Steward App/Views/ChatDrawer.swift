@@ -12,6 +12,7 @@ struct ChatDrawer: View {
     @State private var showImageSourcePicker = false
     @State private var browserItem: BrowserItem?
     @State private var dragOffset: CGFloat = 0
+    @State private var speechRecognizer = SpeechRecognizer()
 
     var body: some View {
         GeometryReader { geo in
@@ -143,6 +144,102 @@ struct ChatDrawer: View {
         }
     }
 
+    // MARK: - Suggestion Handler
+
+    private func handleSuggestionTap(_ text: String) {
+        let lower: String = text.lowercased()
+
+        // "Email support" opens mailto link
+        if lower == "email support" {
+            let mailURL: URL? = URL(string: "mailto:hello@joinsteward.app?subject=Steward%20Support")
+            if let url = mailURL { UIApplication.shared.open(url) }
+            return
+        }
+
+        // "Browse & find it" / "Find the link myself" opens in-app browser
+        let isBrowse: Bool = lower.contains("browse & find it") || lower.contains("find the link myself") || lower.contains("find it myself")
+        if isBrowse {
+            // Determine category from conversation context to open the right site
+            let userMessages: [String] = chatVM.messages
+                .filter { $0.role == .user }
+                .map { $0.text.lowercased() }
+            let browseURL: URL? = {
+                // Check if any user message indicates a specific category
+                let allText: String = userMessages.joined(separator: " ")
+                if allText.contains("camping") || allText.contains("campground") || allText.contains("campsite") {
+                    return URL(string: "https://www.recreation.gov")
+                }
+                if allText.contains("reservation") || allText.contains("restaurant") || allText.contains("table for") || allText.contains("resy") {
+                    return URL(string: "https://resy.com")
+                }
+                if allText.contains("ticket") || allText.contains("concert") || allText.contains("event") {
+                    return URL(string: "https://www.ticketmaster.com")
+                }
+                if allText.contains("flight") || allText.contains("travel") || allText.contains("hotel") {
+                    return URL(string: "https://www.google.com/travel/flights")
+                }
+                // Default: Google search for the product/query
+                let query: String = watchVM.selectedWatch?.name ?? "product"
+                let encoded: String = query.addingPercentEncoding(withAllowedCharacters: CharacterSet.urlQueryAllowed) ?? query
+                return URL(string: "https://www.google.com/search?q=\(encoded)")
+            }()
+            if let url = browseURL { browserItem = BrowserItem(url: url) }
+            return
+        }
+
+        // Category follow-ups (Product, Travel, Reservation, Events, Camping, Screenshot, General, Need help?)
+        if let followUp = ChatMessage.categoryFollowUp(for: text) {
+            let userMsg = ChatMessage(role: .user, text: text)
+            withAnimation(.spring(response: 0.3)) {
+                chatVM.messages.append(userMsg)
+            }
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(300))
+                withAnimation(.spring(response: 0.3)) {
+                    chatVM.messages.append(followUp)
+                }
+            }
+            return
+        }
+
+        // Special sub-chip handlers (Best price anywhere, Watch Resy tables, camping/event chips)
+        if let followUp = ChatMessage.specialChipFollowUp(for: text) {
+            let userMsg = ChatMessage(role: .user, text: text)
+            withAnimation(.spring(response: 0.3)) {
+                chatVM.messages.append(userMsg)
+            }
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(300))
+                withAnimation(.spring(response: 0.3)) {
+                    chatVM.messages.append(followUp)
+                }
+            }
+            return
+        }
+
+        // Beta-tagged suggestions — show disclaimer then send to AI
+        if text.hasSuffix("(Beta)") {
+            let cleanText = text.replacingOccurrences(of: " (Beta)", with: "")
+            let userMsg = ChatMessage(role: .user, text: cleanText)
+            withAnimation(.spring(response: 0.3)) {
+                chatVM.messages.append(userMsg)
+            }
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(300))
+                let disclaimer = ChatMessage(
+                    role: .steward,
+                    text: "Just a heads up, this one's still in beta so it might not catch every change perfectly. But let's give it a shot!\n\nDrop me a link and I'll get it set up \u{1F517}"
+                )
+                withAnimation(.spring(response: 0.3)) {
+                    chatVM.messages.append(disclaimer)
+                }
+            }
+            return
+        }
+
+        chatVM.send(text)
+    }
+
     // MARK: - Drag Handle
 
     private var dragHandle: some View {
@@ -196,27 +293,87 @@ struct ChatDrawer: View {
         EmptyView()
     }
 
+    // MARK: - First Watch Suggestions
+
+    private var firstWatchSuggestions: some View {
+        VStack(spacing: 16) {
+            Spacer()
+
+            Image(systemName: "sparkles")
+                .font(.system(size: 32))
+                .foregroundStyle(Theme.accent.opacity(0.6))
+                .padding(.bottom, 4)
+
+            Text("What would you like to watch?")
+                .font(Theme.serif(18, weight: .bold))
+                .foregroundStyle(Theme.ink)
+
+            Text("Paste any URL, or try one of these:")
+                .font(Theme.body(13))
+                .foregroundStyle(Theme.inkLight)
+
+            VStack(spacing: 8) {
+                suggestionChip("Watch AirPods Pro price on Amazon", icon: "tag.fill")
+                suggestionChip("Track Nike Dunk Low price", icon: "cart.fill")
+                suggestionChip("Monitor a campsite on Recreation.gov", icon: "leaf.fill")
+                suggestionChip("Watch for concert ticket prices", icon: "music.note")
+            }
+            .padding(.horizontal, 8)
+
+            Spacer()
+        }
+        .padding(.horizontal, 20)
+    }
+
+    private func suggestionChip(_ text: String, icon: String) -> some View {
+        Button {
+            chatVM.send(text)
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: icon)
+                    .font(.system(size: 13))
+                    .foregroundStyle(Theme.accent)
+                    .frame(width: 24)
+
+                Text(text)
+                    .font(Theme.body(13))
+                    .foregroundStyle(Theme.ink)
+                    .lineLimit(1)
+
+                Spacer()
+
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(Theme.inkLight)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(Theme.bgCard)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Theme.border, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
     // MARK: - Message List
 
     private var messageList: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(spacing: 14) {
+                    // Show suggestions when chat is empty (first-watch flow)
+                    if chatVM.messages.isEmpty && watchVM.watches.isEmpty {
+                        firstWatchSuggestions
+                    }
+
                     ForEach(chatVM.messages) { msg in
                         ChatMessageView(
                             message: msg,
                             onSuggestion: { text in
-                                // "Find the link myself" opens in-app browser
-                                if text.lowercased().contains("find the link myself") || text.lowercased().contains("find it myself") {
-                                    // Search Google for the product using the watch name from fix context
-                                    let query = watchVM.selectedWatch?.name ?? "product"
-                                    let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
-                                    if let url = URL(string: "https://www.google.com/search?q=\(encoded)") {
-                                        browserItem = BrowserItem(url: url)
-                                    }
-                                    return
-                                }
-                                chatVM.send(text)
+                                handleSuggestionTap(text)
                             },
                             onProductLinkTap: { link in
                                 if let url = URL(string: link.url) {
@@ -309,50 +466,126 @@ struct ChatDrawer: View {
     // MARK: - Input Bar
 
     private var inputBar: some View {
-        HStack(spacing: 8) {
-            // Photo picker button
-            PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
-                Image(systemName: "photo.on.rectangle.angled")
-                    .font(.system(size: 18))
-                    .foregroundStyle(Theme.inkLight)
-                    .frame(width: 36, height: 42)
-            }
-            .accessibilityLabel("Attach screenshot")
+        VStack(spacing: 0) {
+            // Listening indicator
+            if speechRecognizer.isListening {
+                HStack(spacing: 8) {
+                    // Pulsing dot
+                    Circle()
+                        .fill(Color.red)
+                        .frame(width: 8, height: 8)
+                        .modifier(PulseModifier())
 
-            TextField("Tell Steward what to watch…", text: $chatVM.inputText)
-                .font(Theme.body(13))
-                .padding(.horizontal, 14)
-                .padding(.vertical, 12)
-                .background(Theme.bg)
-                .clipShape(RoundedRectangle(cornerRadius: 14))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 14)
-                        .stroke(Theme.border, lineWidth: 1)
-                )
-                .focused($isInputFocused)
-                .submitLabel(.send)
-                .onSubmit {
-                    chatVM.send()
+                    Text("Listening...")
+                        .font(Theme.body(12, weight: .medium))
+                        .foregroundStyle(Theme.accent)
+
+                    Spacer()
+
+                    Button {
+                        speechRecognizer.stopListening()
+                    } label: {
+                        Text("Done")
+                            .font(Theme.body(12, weight: .semibold))
+                            .foregroundStyle(Theme.accent)
+                    }
                 }
-
-            Button {
-                chatVM.send()
-            } label: {
-                Image(systemName: "arrow.up")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(canSend ? .white : Theme.inkLight)
-                    .frame(width: 42, height: 42)
-                    .background(canSend ? Theme.accent : Theme.bgDeep)
-                    .clipShape(RoundedRectangle(cornerRadius: 13))
+                .padding(.horizontal, 20)
+                .padding(.vertical, 8)
+                .background(Theme.accent.opacity(0.08))
+                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
-            .disabled(!canSend)
-            .accessibilityLabel("Send message")
+
+            HStack(spacing: 8) {
+                // Photo picker button
+                PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+                    Image(systemName: "photo.on.rectangle.angled")
+                        .font(.system(size: 18))
+                        .foregroundStyle(Theme.inkLight)
+                        .frame(width: 36, height: 42)
+                }
+                .accessibilityLabel("Attach screenshot")
+
+                TextField("Tell Steward what to watch…", text: $chatVM.inputText)
+                    .font(Theme.body(13))
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 12)
+                    .background(Theme.bg)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14)
+                            .stroke(speechRecognizer.isListening ? Theme.accent : Theme.border, lineWidth: speechRecognizer.isListening ? 1.5 : 1)
+                    )
+                    .focused($isInputFocused)
+                    .submitLabel(.send)
+                    .onSubmit {
+                        chatVM.send()
+                    }
+
+                // Mic button (shown when input is empty and not sending)
+                if !canSend && !speechRecognizer.isListening {
+                    Button {
+                        speechRecognizer.toggleListening()
+                    } label: {
+                        Image(systemName: "mic.fill")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundStyle(Theme.inkLight)
+                            .frame(width: 42, height: 42)
+                            .background(Theme.bgDeep)
+                            .clipShape(RoundedRectangle(cornerRadius: 13))
+                    }
+                    .accessibilityLabel("Voice input")
+                    .transition(.scale.combined(with: .opacity))
+                } else if speechRecognizer.isListening {
+                    // Stop/send button while listening
+                    Button {
+                        speechRecognizer.stopListening()
+                        // Small delay to let final transcript settle, then send
+                        if !chatVM.inputText.trimmingCharacters(in: .whitespaces).isEmpty {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                chatVM.send()
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "stop.fill")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(width: 42, height: 42)
+                            .background(Color.red)
+                            .clipShape(RoundedRectangle(cornerRadius: 13))
+                    }
+                    .accessibilityLabel("Stop listening and send")
+                    .transition(.scale.combined(with: .opacity))
+                } else {
+                    // Regular send button
+                    Button {
+                        chatVM.send()
+                    } label: {
+                        Image(systemName: "arrow.up")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(width: 42, height: 42)
+                            .background(Theme.accent)
+                            .clipShape(RoundedRectangle(cornerRadius: 13))
+                    }
+                    .accessibilityLabel("Send message")
+                    .transition(.scale.combined(with: .opacity))
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .padding(.bottom, 16)
+            .animation(.spring(response: 0.25), value: canSend)
+            .animation(.spring(response: 0.25), value: speechRecognizer.isListening)
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 12)
-        .padding(.bottom, 16)
         .overlay(alignment: .top) {
             Divider().foregroundStyle(Theme.border)
+        }
+        // Sync speech transcript → chat input in real time
+        .onChange(of: speechRecognizer.transcript) { _, newValue in
+            if !newValue.isEmpty {
+                chatVM.inputText = newValue
+            }
         }
     }
 
@@ -426,20 +659,34 @@ struct ChatMessageView: View {
                 if let suggestions = message.suggestions {
                     FlowLayout(spacing: 7) {
                         ForEach(suggestions, id: \.self) { suggestion in
+                            let isBeta = suggestion.hasSuffix("(Beta)") || suggestion == "General (Beta)"
+                            let displayText = isBeta ? suggestion.replacingOccurrences(of: " (Beta)", with: "").replacingOccurrences(of: "(Beta)", with: "") : suggestion
                             Button {
                                 onSuggestion(suggestion)
                             } label: {
-                                Text(suggestion)
-                                    .font(Theme.body(12, weight: .medium))
-                                    .foregroundStyle(Theme.accent)
-                                    .padding(.horizontal, 13)
-                                    .padding(.vertical, 7)
-                                    .background(Theme.bgCard)
-                                    .clipShape(Capsule())
-                                    .overlay(
-                                        Capsule()
-                                            .stroke(Theme.accentMid, lineWidth: 1)
-                                    )
+                                HStack(spacing: 5) {
+                                    Text(displayText)
+                                        .font(Theme.body(12, weight: .medium))
+                                        .foregroundStyle(Theme.accent)
+
+                                    if isBeta {
+                                        Text("Beta")
+                                            .font(.system(size: 9, weight: .bold))
+                                            .foregroundStyle(.white)
+                                            .padding(.horizontal, 5)
+                                            .padding(.vertical, 2)
+                                            .background(Color.orange)
+                                            .clipShape(Capsule())
+                                    }
+                                }
+                                .padding(.horizontal, 13)
+                                .padding(.vertical, 7)
+                                .background(Theme.bgCard)
+                                .clipShape(Capsule())
+                                .overlay(
+                                    Capsule()
+                                        .stroke(Theme.accentMid, lineWidth: 1)
+                                )
                             }
                             .buttonStyle(.plain)
                         }
@@ -672,6 +919,19 @@ struct BrowserItem: Identifiable {
     let url: URL
 }
 
+// MARK: - Pulse Animation for Recording Indicator
+
+private struct PulseModifier: ViewModifier {
+    @State private var isPulsing = false
+
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(isPulsing ? 1.3 : 1.0)
+            .opacity(isPulsing ? 0.6 : 1.0)
+            .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: isPulsing)
+            .onAppear { isPulsing = true }
+    }
+}
 
 // MARK: - Flow Layout
 

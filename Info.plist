@@ -14,10 +14,24 @@
 				<string>steward</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.789162188808-n6sd3857f78ap7jcq82di1k43bi7aj1a</string>
+			</array>
+		</dict>
 	</array>
+	<key>GIDClientID</key>
+	<string>789162188808-n6sd3857f78ap7jcq82di1k43bi7aj1a.apps.googleusercontent.com</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>
 	</array>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Steward uses speech recognition so you can describe what to watch using your voice.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Steward needs microphone access for voice input in the AI chat.</string>
 </dict>
 </plist>
