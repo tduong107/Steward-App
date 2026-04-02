@@ -24,7 +24,7 @@ import { CategoryFilter, watchCategory } from '@/components/category-filter'
 import { PaywallDialog } from '@/components/paywall-dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { OnboardingChecklist } from '@/components/onboarding-checklist'
-import { watchLimit, tierLabel } from '@/lib/utils'
+import { watchLimit, tierLabel, maxFrequencyForTier, isFrequencyAllowed } from '@/lib/utils'
 import type { CheckResult } from '@/lib/types'
 
 export default function DashboardPage() {
@@ -44,6 +44,34 @@ export default function DashboardPage() {
   const filteredWatches = category
     ? activeWatches.filter((w) => watchCategory(w) === category)
     : activeWatches
+
+  const overLimitCount = Math.max(0, activeWatches.length - limit)
+
+  // ─── Tier enforcement: auto-downgrade frequencies that exceed tier ─────
+  const [hasEnforced, setHasEnforced] = useState(false)
+  useEffect(() => {
+    if (hasEnforced || loading || !user || activeWatches.length === 0) return
+    const maxFreq = maxFrequencyForTier(tier)
+    const needsDowngrade = activeWatches.filter(
+      (w) => w.check_frequency && !isFrequencyAllowed(w.check_frequency, tier),
+    )
+    if (needsDowngrade.length > 0) {
+      const supabase = createClient()
+      Promise.all(
+        needsDowngrade.map((w) =>
+          supabase
+            .from('watches')
+            .update({ check_frequency: maxFreq })
+            .eq('id', w.id),
+        ),
+      ).then(() => {
+        console.log(`[tier-enforcement] Downgraded ${needsDowngrade.length} watches to ${maxFreq}`)
+        setHasEnforced(true)
+      })
+    } else {
+      setHasEnforced(true)
+    }
+  }, [activeWatches, tier, loading, user, hasEnforced])
 
   // --- Savings data for preview card ---
   const supabaseRef = useRef(createClient())

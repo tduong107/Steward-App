@@ -112,3 +112,25 @@ export function tierLabel(tier: string): string {
     default: return 'Free'
   }
 }
+
+/** Maximum allowed check frequency for a given tier */
+export function maxFrequencyForTier(tier: string): string {
+  switch (tier) {
+    case 'premium': return 'Every 2 hours'
+    case 'pro': return 'Every 12 hours'
+    default: return 'Daily'
+  }
+}
+
+/** Whether a frequency is allowed for the given tier */
+export function isFrequencyAllowed(frequency: string, tier: string): boolean {
+  const tierRank: Record<string, number> = { free: 0, pro: 1, premium: 2 }
+  const freqTier: Record<string, number> = {
+    'Daily': 0,
+    'Every 12 hours': 1,
+    'Every 6 hours': 2,
+    'Every 4 hours': 2,
+    'Every 2 hours': 2,
+  }
+  return (freqTier[frequency] ?? 0) <= (tierRank[tier] ?? 0)
+}
