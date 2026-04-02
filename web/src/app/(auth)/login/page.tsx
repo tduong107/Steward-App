@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
@@ -33,10 +33,22 @@ function Spinner() {
 
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Show error from failed OAuth callback
+  useEffect(() => {
+    if (searchParams.get('error') === 'auth_callback_failed') {
+      setError('Sign-in failed. Please try again.')
+      // Clean up the URL
+      const url = new URL(window.location.href)
+      url.searchParams.delete('error')
+      window.history.replaceState({}, '', url.toString())
+    }
+  }, [searchParams])
   const [loading, setLoading] = useState(false)
   const [oauthLoading, setOauthLoading] = useState<'apple' | 'google' | null>(null)
 
