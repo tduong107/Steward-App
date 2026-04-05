@@ -43,7 +43,7 @@ serve(async (req) => {
       .from("watches")
       .select("id, user_id, check_frequency, last_checked, preferred_check_time, triggered, status, consecutive_failures, needs_attention")
       .in("status", ["watching", "triggered"])
-      .lt("consecutive_failures", 30);
+      .or("consecutive_failures.lt.30,consecutive_failures.is.null");
 
     // ─── Tier enforcement: cap frequency based on user's subscription tier ───
     // Build a map of user_id → subscription_tier

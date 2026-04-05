@@ -82,7 +82,7 @@ async function sendEmailNotification(
   actionUrl: string | null = null
 ): Promise<{ sent: boolean; error?: string }> {
   const resendKey = Deno.env.get("RESEND_API_KEY");
-  const fromEmail = Deno.env.get("RESEND_FROM_EMAIL") ?? "Steward <notifications@steward.app>";
+  const fromEmail = Deno.env.get("RESEND_FROM_EMAIL") ?? "Steward <notifications@joinsteward.app>";
 
   if (!resendKey) {
     console.log("[notify-user] Resend API key not configured — skipping email");
@@ -162,7 +162,7 @@ async function sendNeedsAttentionEmail(
   failures: number
 ): Promise<{ sent: boolean; error?: string }> {
   const resendKey = Deno.env.get("RESEND_API_KEY");
-  const fromEmail = Deno.env.get("RESEND_FROM_EMAIL") ?? "Steward <notifications@steward.app>";
+  const fromEmail = Deno.env.get("RESEND_FROM_EMAIL") ?? "Steward <notifications@joinsteward.app>";
 
   if (!resendKey) {
     return { sent: false, error: "Resend not configured" };
@@ -245,6 +245,7 @@ async function sendSMSNotification(
   if (actionUrl) {
     message += `\n${actionUrl}`;
   }
+  message += `\nReply STOP to opt out`;
 
   try {
     const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
@@ -315,7 +316,7 @@ serve(async (req) => {
     const watchActionType = watch?.action_type ?? "notify";
 
     // Set content based on notification type
-    const isNeedsAttention = notificationType === "needs_attention";
+    const isNeedsAttention = notificationType === "needs_attention" || notificationType === "auto_paused";
     const changeNote = isNeedsAttention
       ? (watch?.last_error ?? "Watch check is failing repeatedly")
       : (watch?.change_note ?? "Your watch condition was met!");
