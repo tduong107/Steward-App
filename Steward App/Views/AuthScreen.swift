@@ -263,13 +263,12 @@ struct AuthScreen: View {
                 }
             } label: {
                 HStack(spacing: 10) {
-                    Image(systemName: "g.circle.fill").font(.system(size: 18))
+                    GoogleLogoView().frame(width: 18, height: 18)
                     Text("Continue with Google").font(.system(size: 14, weight: .semibold))
                 }
-                .foregroundStyle(.white).frame(maxWidth: .infinity).frame(height: 50)
-                .background(Color.white.opacity(0.08))
+                .foregroundStyle(Color(white: 0.2)).frame(maxWidth: .infinity).frame(height: 50)
+                .background(Color.white)
                 .clipShape(RoundedRectangle(cornerRadius: 14))
-                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.15), lineWidth: 1))
             }.disabled(isSubmitting)
 
             // Apple
@@ -455,5 +454,88 @@ struct AuthScreen: View {
         if msg.contains("otp") || msg.contains("token") { return "Invalid verification code. Please check and try again." }
         if msg.contains("password") && (msg.contains("short") || msg.contains("weak")) { return "Password must be at least 6 characters." }
         return error.localizedDescription
+    }
+}
+
+// MARK: - Google Logo (4-color "G")
+
+private struct GoogleLogoView: View {
+    var body: some View {
+        Canvas { context, size in
+            let s = min(size.width, size.height) / 24.0
+
+            // Blue (top-right arc)
+            var blue = Path()
+            blue.move(to: CGPoint(x: 22.56 * s, y: 12.25 * s))
+            blue.addCurve(to: CGPoint(x: 12 * s, y: 10 * s),
+                          control1: CGPoint(x: 22.56 * s, y: 11.47 * s),
+                          control2: CGPoint(x: 22.49 * s, y: 10.72 * s))
+            blue.addLine(to: CGPoint(x: 12 * s, y: 10 * s))
+            blue.addLine(to: CGPoint(x: 12 * s, y: 14.26 * s))
+            blue.addLine(to: CGPoint(x: 17.92 * s, y: 14.26 * s))
+            blue.addCurve(to: CGPoint(x: 19.28 * s, y: 20.34 * s),
+                          control1: CGPoint(x: 17.66 * s, y: 15.63 * s),
+                          control2: CGPoint(x: 16.88 * s, y: 17.53 * s))
+            blue.addLine(to: CGPoint(x: 19.28 * s, y: 20.34 * s))
+            blue.addCurve(to: CGPoint(x: 22.56 * s, y: 12.25 * s),
+                          control1: CGPoint(x: 21.36 * s, y: 18.42 * s),
+                          control2: CGPoint(x: 22.56 * s, y: 15.49 * s))
+            blue.closeSubpath()
+            context.fill(blue, with: .color(Color(red: 0.259, green: 0.522, blue: 0.957)))
+
+            // Green (bottom-right)
+            var green = Path()
+            green.move(to: CGPoint(x: 12 * s, y: 23 * s))
+            green.addCurve(to: CGPoint(x: 19.28 * s, y: 20.34 * s),
+                           control1: CGPoint(x: 14.97 * s, y: 23 * s),
+                           control2: CGPoint(x: 17.46 * s, y: 22.02 * s))
+            green.addLine(to: CGPoint(x: 15.71 * s, y: 17.57 * s))
+            green.addCurve(to: CGPoint(x: 12 * s, y: 18.63 * s),
+                           control1: CGPoint(x: 14.73 * s, y: 18.23 * s),
+                           control2: CGPoint(x: 13.48 * s, y: 18.63 * s))
+            green.addCurve(to: CGPoint(x: 5.84 * s, y: 14.1 * s),
+                           control1: CGPoint(x: 9.14 * s, y: 18.63 * s),
+                           control2: CGPoint(x: 6.71 * s, y: 16.63 * s))
+            green.addLine(to: CGPoint(x: 2.18 * s, y: 16.94 * s))
+            green.addCurve(to: CGPoint(x: 12 * s, y: 23 * s),
+                           control1: CGPoint(x: 3.99 * s, y: 20.53 * s),
+                           control2: CGPoint(x: 7.7 * s, y: 23 * s))
+            green.closeSubpath()
+            context.fill(green, with: .color(Color(red: 0.204, green: 0.659, blue: 0.325)))
+
+            // Yellow (bottom-left)
+            var yellow = Path()
+            yellow.move(to: CGPoint(x: 5.84 * s, y: 14.09 * s))
+            yellow.addCurve(to: CGPoint(x: 5.84 * s, y: 9.91 * s),
+                            control1: CGPoint(x: 5.62 * s, y: 13.43 * s),
+                            control2: CGPoint(x: 5.49 * s, y: 10.57 * s))
+            yellow.addLine(to: CGPoint(x: 2.18 * s, y: 7.07 * s))
+            yellow.addCurve(to: CGPoint(x: 2.18 * s, y: 16.93 * s),
+                            control1: CGPoint(x: 1.43 * s, y: 8.55 * s),
+                            control2: CGPoint(x: 1 * s, y: 14.55 * s))
+            yellow.addLine(to: CGPoint(x: 5.84 * s, y: 14.09 * s))
+            yellow.closeSubpath()
+            context.fill(yellow, with: .color(Color(red: 0.984, green: 0.737, blue: 0.02)))
+
+            // Red (top-left)
+            var red = Path()
+            red.move(to: CGPoint(x: 12 * s, y: 5.38 * s))
+            red.addCurve(to: CGPoint(x: 16.21 * s, y: 7.02 * s),
+                         control1: CGPoint(x: 13.62 * s, y: 5.38 * s),
+                         control2: CGPoint(x: 15.06 * s, y: 5.94 * s))
+            red.addLine(to: CGPoint(x: 19.36 * s, y: 3.87 * s))
+            red.addCurve(to: CGPoint(x: 12 * s, y: 1 * s),
+                         control1: CGPoint(x: 17.45 * s, y: 2.09 * s),
+                         control2: CGPoint(x: 14.97 * s, y: 1 * s))
+            red.addCurve(to: CGPoint(x: 2.18 * s, y: 7.07 * s),
+                         control1: CGPoint(x: 7.7 * s, y: 1 * s),
+                         control2: CGPoint(x: 3.99 * s, y: 3.47 * s))
+            red.addLine(to: CGPoint(x: 5.84 * s, y: 9.91 * s))
+            red.addCurve(to: CGPoint(x: 12 * s, y: 5.38 * s),
+                         control1: CGPoint(x: 6.71 * s, y: 7.31 * s),
+                         control2: CGPoint(x: 9.14 * s, y: 5.38 * s))
+            red.closeSubpath()
+            context.fill(red, with: .color(Color(red: 0.918, green: 0.263, blue: 0.208)))
+        }
     }
 }
