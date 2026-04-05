@@ -17,6 +17,9 @@ const FREQUENCY_SECONDS: Record<string, number> = {
   "Daily": 86400,
   "Every 12 hours": 43200,
   "Every 6 hours": 21600,
+  "Every 4 hours": 14400,
+  "Every 2 hours": 7200,
+  // Legacy frequencies (migrated to Every 2 hours in app, but still valid in DB)
   "Every hour": 3600,
   "Every 30 min": 1800,
   "Every 15 min": 900,
@@ -34,12 +37,54 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // Fetch all active watches (watching + triggered) with their frequency and last check time
+    // Fetch all active watches with user_id to enforce tier limits
     // Triggered watches are re-checked at reduced frequency for self-healing
     const { data: watches, error } = await supabase
       .from("watches")
-      .select("id, check_frequency, last_checked, preferred_check_time, triggered, status")
-      .in("status", ["watching", "triggered"]);
+      .select("id, user_id, check_frequency, last_checked, preferred_check_time, triggered, status, consecutive_failures, needs_attention")
+      .in("status", ["watching", "triggered"])
+      .lt("consecutive_failures", 30);
+
+    // ─── Tier enforcement: cap frequency based on user's subscription tier ───
+    // Build a map of user_id → subscription_tier
+    const userIds = [...new Set((watches ?? []).map((w: any) => w.user_id).filter(Boolean))];
+    const tierMap: Record<string, string> = {};
+    if (userIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, subscription_tier")
+        .in("id", userIds);
+      for (const p of profiles ?? []) {
+        tierMap[p.id] = p.subscription_tier ?? "free";
+      }
+    }
+
+    // Max allowed frequency per tier (in seconds)
+    const TIER_MAX_FREQ: Record<string, number> = {
+      free: 86400,      // Daily
+      pro: 43200,       // Every 12 hours
+      premium: 7200,    // Every 2 hours
+    };
+
+    // Enforce: if a watch's frequency is faster than their tier allows, treat it as the tier max
+    for (const w of watches ?? []) {
+      const userTier = tierMap[w.user_id] ?? "free";
+      const tierMax = TIER_MAX_FREQ[userTier] ?? 86400;
+      const watchFreq = FREQUENCY_SECONDS[w.check_frequency] ?? 86400;
+      if (watchFreq < tierMax) {
+        // Watch frequency exceeds tier — cap it
+        // Find the appropriate frequency name for this tier
+        const cappedFreqName = Object.entries(FREQUENCY_SECONDS).find(([_, v]) => v === tierMax)?.[0] ?? "Daily";
+        console.log(`[check-all] Tier enforcement: ${w.id} has "${w.check_frequency}" but user tier is ${userTier}, capping to "${cappedFreqName}"`);
+        w.check_frequency = cappedFreqName;
+
+        // Also fix in database (one-time correction)
+        await supabase
+          .from("watches")
+          .update({ check_frequency: cappedFreqName })
+          .eq("id", w.id);
+      }
+    }
 
     if (error) {
       console.error(`[check-all] Query error: ${JSON.stringify(error)}`);
@@ -85,6 +130,11 @@ serve(async (req) => {
       // Triggered watches check at 2× their normal interval (reduced frequency)
       if (w.triggered) {
         intervalMs *= 2;
+      }
+
+      // Backoff: watches flagged needs_attention check at 4× interval to save API credits
+      if (w.needs_attention) {
+        intervalMs *= 4;
       }
 
       const lastCheckedMs = new Date(w.last_checked).getTime();
@@ -136,7 +186,7 @@ serve(async (req) => {
           succeeded++;
         }
       } catch (err) {
-        details.push({ watch_id: watch.id, error: err.message ?? "Unknown error" });
+        details.push({ watch_id: watch.id, error: err instanceof Error ? err.message : "Unknown error" });
       }
 
       // Delay between checks to avoid rate limit bursts (skip after last one)
@@ -162,8 +212,9 @@ serve(async (req) => {
       }
     );
   } catch (err) {
-    console.error(`[check-all] Unhandled error: ${err.message}`);
-    return new Response(JSON.stringify({ error: err.message }), {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`[check-all] Unhandled error: ${message}`);
+    return new Response(JSON.stringify({ error: message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

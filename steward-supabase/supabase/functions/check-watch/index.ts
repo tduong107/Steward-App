@@ -178,160 +178,261 @@ function parseShoppingPrice(priceStr: string | null | undefined): number | null 
   return isNaN(price) || price <= 0 ? null : price;
 }
 
-/** Checks a search-mode watch by querying Serper Shopping API for multi-source prices. */
+/**
+ * Checks a search-mode watch ("Best Price Anywhere") by querying
+ * Tier 1: Real-Time Product Search API (Google Shopping via RapidAPI)
+ * Tier 2: Serper Shopping API (fallback)
+ */
 async function checkSearchWatch(
   watch: any,
   supabase: any
 ): Promise<Record<string, unknown>> {
+  const RAPIDAPI_KEY = Deno.env.get("RAPIDAPI_KEY") ?? "";
   const SERPER_API_KEY = Deno.env.get("SERPER_API_KEY") ?? "";
-  if (!SERPER_API_KEY) {
-    console.error(`[check-watch] SERPER_API_KEY not set for search watch ${watch.id}`);
-    return { watch_id: watch.id, changed: false, result_text: "Search API unavailable" };
+  const query = watch.search_query;
+
+  if (!query) {
+    return { watch_id: watch.id, changed: false, result_text: "No search query set" };
   }
 
-  try {
-    const res = await fetch("https://google.serper.dev/shopping", {
-      method: "POST",
-      headers: {
-        "X-API-KEY": SERPER_API_KEY,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ q: watch.search_query, num: 10 }),
-    });
+  let priced: Array<{ title: string; url: string; source: string; price: number; imageURL: string | null }> = [];
 
-    if (!res.ok) {
-      console.error(`[check-watch] Serper API error ${res.status} for ${watch.id}`);
-      return { watch_id: watch.id, changed: false, result_text: "Search failed" };
-    }
-
-    const searchData = await res.json();
-    const results = (searchData.shopping || []).slice(0, 10);
-
-    if (results.length === 0) {
-      return { watch_id: watch.id, changed: false, result_text: "No results found" };
-    }
-
-    // Parse prices from results and sort by price ascending
-    const priced = results
-      .map((r: any) => ({
-        title: (r.title || "Product").substring(0, 80),
-        url: r.link,
-        source: (r.source || "Store").replace(/\.com$/i, ""),
-        price: parseShoppingPrice(r.price),
-        imageURL: r.imageUrl || null,
-      }))
-      .filter((r: any) => r.price !== null)
-      .sort((a: any, b: any) => a.price - b.price);
-
-    if (priced.length === 0) {
-      return { watch_id: watch.id, changed: false, result_text: "No prices found in search results" };
-    }
-
-    const bestResult = priced[0];
-    const currentBestPrice = bestResult.price;
-
-    // Get last known best price from previous check
-    let lastBestPrice: number | null = null;
+  // ── Tier 1: Real-Time Product Search API ──
+  if (RAPIDAPI_KEY) {
     try {
-      const { data: lastCheck } = await supabase
-        .from("check_results")
-        .select("price")
-        .eq("watch_id", watch.id)
-        .order("checked_at", { ascending: false })
-        .limit(1)
-        .single();
-      if (lastCheck?.price != null) {
-        lastBestPrice = parseFloat(lastCheck.price);
-        if (isNaN(lastBestPrice)) lastBestPrice = null;
+      const searchRes = await fetch(
+        `https://real-time-product-search.p.rapidapi.com/search?q=${encodeURIComponent(query)}&country=us&language=en&limit=10`,
+        {
+          headers: {
+            "x-rapidapi-key": RAPIDAPI_KEY,
+            "x-rapidapi-host": "real-time-product-search.p.rapidapi.com",
+          },
+        }
+      );
+
+      if (searchRes.ok) {
+        const searchData = await searchRes.json();
+        const products = searchData.data || [];
+
+        for (const product of products.slice(0, 10)) {
+          // Each product may have an offer price or typical_price_range
+          const price = parseShoppingPrice(product.offer?.price) ??
+            parseShoppingPrice(product.typical_price_range?.[0]);
+          if (price === null) continue;
+
+          // Extract store name from offer or product source
+          let storeName = product.offer?.store_name || product.product_source || "Store";
+          storeName = storeName.replace(/\.com$/i, "");
+
+          priced.push({
+            title: (product.product_title || "Product").substring(0, 80),
+            url: product.offer?.offer_page_url || product.product_page_url || "",
+            source: storeName,
+            price,
+            imageURL: product.product_photo || null,
+          });
+        }
+
+        // Also try /product-offers for the top result to get cross-store offers
+        if (products.length > 0 && products[0].product_id) {
+          try {
+            const offersRes = await fetch(
+              `https://real-time-product-search.p.rapidapi.com/product-offers?product_id=${encodeURIComponent(products[0].product_id)}&country=us&language=en&limit=10`,
+              {
+                headers: {
+                  "x-rapidapi-key": RAPIDAPI_KEY,
+                  "x-rapidapi-host": "real-time-product-search.p.rapidapi.com",
+                },
+              }
+            );
+
+            if (offersRes.ok) {
+              const offersData = await offersRes.json();
+              const offers = offersData.data || [];
+              for (const offer of offers.slice(0, 10)) {
+                const offerPrice = parseShoppingPrice(offer.offer_price || offer.price);
+                if (offerPrice === null) continue;
+                let store = offer.store_name || offer.source || "Store";
+                store = store.replace(/\.com$/i, "");
+                // Avoid duplicates by store name
+                if (!priced.some((p) => p.source.toLowerCase() === store.toLowerCase())) {
+                  priced.push({
+                    title: (offer.product_title || products[0].product_title || "Product").substring(0, 80),
+                    url: offer.offer_page_url || offer.url || "",
+                    source: store,
+                    price: offerPrice,
+                    imageURL: offer.product_photo || products[0].product_photo || null,
+                  });
+                }
+              }
+            }
+          } catch (offersErr: any) {
+            console.log(`[check-watch] Product offers fetch failed for ${watch.id}: ${offersErr.message}`);
+          }
+        }
+
+        console.log(`[check-watch] Tier 1 (Product Search API) returned ${priced.length} priced results for ${watch.id}`);
       }
-    } catch {
-      // First check — no previous data
+    } catch (apiErr: any) {
+      console.error(`[check-watch] Product Search API error for ${watch.id}: ${apiErr.message}`);
     }
-
-    // Determine if condition is met
-    const condLower = (watch.condition || "").toLowerCase();
-    let changed = false;
-    let resultText = `Best: $${currentBestPrice.toFixed(2)} at ${bestResult.source}`;
-
-    // Check against explicit target price in condition (e.g., "below $150")
-    const targetMatch = condLower.match(
-      /(?:below|under|less\s+than|drops?\s+(?:below|under|to))\s+\$?([\d,]+\.?\d*)/
-    );
-
-    if (targetMatch) {
-      const target = parseFloat(targetMatch[1].replace(/,/g, ""));
-      if (currentBestPrice <= target) {
-        changed = true;
-        resultText = `Price dropped to $${currentBestPrice.toFixed(2)} at ${bestResult.source} (target: $${target.toFixed(2)})`;
-      }
-    } else if (lastBestPrice !== null && currentBestPrice < lastBestPrice * 0.97) {
-      // No explicit target: trigger if price dropped 3%+ from last check
-      changed = true;
-      resultText = `Price dropped to $${currentBestPrice.toFixed(2)} at ${bestResult.source} (was $${lastBestPrice.toFixed(2)})`;
-    }
-
-    const now = new Date().toISOString();
-
-    // Store check result with multi-source data
-    await supabase.from("check_results").insert({
-      id: crypto.randomUUID(),
-      watch_id: watch.id,
-      result_data: {
-        text: resultText,
-        sources: priced.slice(0, 5).map((r: any) => ({
-          title: r.title,
-          url: r.url,
-          source: r.source,
-          price: r.price,
-          imageURL: r.imageURL,
-        })),
-      },
-      changed,
-      price: currentBestPrice,
-      checked_at: now,
-    });
-
-    // Update the watch
-    const updateData: Record<string, unknown> = { last_checked: now };
-    if (changed) {
-      updateData.triggered = true;
-      updateData.status = "triggered";
-      updateData.change_note = resultText;
-      updateData.action_url = bestResult.url;
-      if (bestResult.imageURL) {
-        updateData.image_url = bestResult.imageURL;
-      }
-    }
-
-    await supabase.from("watches").update(updateData).eq("id", watch.id);
-
-    // Send push notification if triggered
-    if (changed) {
-      try {
-        await supabase.functions.invoke("notify-user", {
-          body: { watch_id: watch.id, user_id: watch.user_id, action_url: bestResult.url },
-        });
-      } catch (notifyErr: any) {
-        console.error(`[check-watch] notify-user error for ${watch.id}: ${notifyErr.message}`);
-      }
-    }
-
-    console.log(
-      `[check-watch] Search watch ${watch.id}: best=$${currentBestPrice.toFixed(2)} at ${bestResult.source}, changed=${changed}, sources=${priced.length}`
-    );
-
-    return {
-      watch_id: watch.id,
-      changed,
-      result_text: resultText,
-      price: currentBestPrice,
-      checked_at: now,
-      sources_count: priced.length,
-    };
-  } catch (err: any) {
-    console.error(`[check-watch] Search watch error for ${watch.id}: ${err.message}`);
-    return { watch_id: watch.id, changed: false, result_text: `Search error: ${err.message}` };
   }
+
+  // ── Tier 2: Serper Shopping API (fallback) ──
+  if (priced.length === 0 && SERPER_API_KEY) {
+    try {
+      const res = await fetch("https://google.serper.dev/shopping", {
+        method: "POST",
+        headers: {
+          "X-API-KEY": SERPER_API_KEY,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ q: query, num: 10 }),
+      });
+
+      if (res.ok) {
+        const searchData = await res.json();
+        const results = (searchData.shopping || []).slice(0, 10);
+
+        priced = results
+          .map((r: any) => ({
+            title: (r.title || "Product").substring(0, 80),
+            url: r.link,
+            source: (r.source || "Store").replace(/\.com$/i, ""),
+            price: parseShoppingPrice(r.price),
+            imageURL: r.imageUrl || null,
+          }))
+          .filter((r: any) => r.price !== null) as typeof priced;
+
+        console.log(`[check-watch] Tier 2 (Serper) returned ${priced.length} priced results for ${watch.id}`);
+      }
+    } catch (serperErr: any) {
+      console.error(`[check-watch] Serper API error for ${watch.id}: ${serperErr.message}`);
+    }
+  }
+
+  // No results from any source
+  if (priced.length === 0) {
+    if (!RAPIDAPI_KEY && !SERPER_API_KEY) {
+      return { watch_id: watch.id, changed: false, result_text: "Search APIs unavailable" };
+    }
+    return { watch_id: watch.id, changed: false, result_text: "No results found" };
+  }
+
+  // Sort by price ascending and pick best
+  priced.sort((a, b) => a.price - b.price);
+  const bestResult = priced[0];
+  const currentBestPrice = bestResult.price;
+
+  // Get last known best price from previous check
+  let lastBestPrice: number | null = null;
+  try {
+    const { data: lastCheck } = await supabase
+      .from("check_results")
+      .select("price")
+      .eq("watch_id", watch.id)
+      .order("checked_at", { ascending: false })
+      .limit(1)
+      .single();
+    if (lastCheck?.price != null) {
+      lastBestPrice = parseFloat(lastCheck.price);
+      if (isNaN(lastBestPrice)) lastBestPrice = null;
+    }
+  } catch {
+    // First check — no previous data
+  }
+
+  // Determine if condition is met
+  const condLower = (watch.condition || "").toLowerCase();
+  let changed = false;
+  let resultText = `Best: $${currentBestPrice.toFixed(2)} at ${bestResult.source}`;
+
+  // Check against explicit target price in condition
+  const targetMatch = condLower.match(
+    /(?:below|under|less\s+than|drops?\s+(?:below|under|to))\s+\$?([\d,]+\.?\d*)/
+  );
+
+  if (targetMatch) {
+    const target = parseFloat(targetMatch[1].replace(/,/g, ""));
+    if (currentBestPrice <= target) {
+      changed = true;
+      resultText = `Price dropped to $${currentBestPrice.toFixed(2)} at ${bestResult.source} (target: $${target.toFixed(2)})`;
+    }
+  } else if (lastBestPrice !== null && currentBestPrice < lastBestPrice * 0.97) {
+    // No explicit target: trigger if price dropped 3%+ from last check
+    changed = true;
+    resultText = `Price dropped to $${currentBestPrice.toFixed(2)} at ${bestResult.source} (was $${lastBestPrice.toFixed(2)})`;
+  }
+
+  // Notify on any price decrease if user opted in (even if main condition not met)
+  if (!changed && watch.notify_any_price_drop && lastBestPrice !== null && currentBestPrice < lastBestPrice) {
+    changed = true;
+    resultText = `Price dropped to $${currentBestPrice.toFixed(2)} at ${bestResult.source} (was $${lastBestPrice.toFixed(2)})`;
+  }
+
+  const now = new Date().toISOString();
+
+  // Store check result with multi-source data
+  await supabase.from("check_results").insert({
+    id: crypto.randomUUID(),
+    watch_id: watch.id,
+    result_data: {
+      text: resultText,
+      sources: priced.slice(0, 5).map((r) => ({
+        title: r.title,
+        url: r.url,
+        source: r.source,
+        price: r.price,
+        imageURL: r.imageURL,
+      })),
+      cross_store_offers: priced.slice(0, 8).map((r) => ({
+        store: r.source,
+        price: r.price,
+        url: r.url,
+      })),
+    },
+    changed,
+    price: currentBestPrice,
+    checked_at: now,
+  });
+
+  // Update the watch
+  const updateData: Record<string, unknown> = { last_checked: now };
+  if (changed) {
+    updateData.triggered = true;
+    updateData.status = "triggered";
+    updateData.change_note = resultText;
+    updateData.action_url = bestResult.url;
+    if (bestResult.imageURL) {
+      updateData.image_url = bestResult.imageURL;
+    }
+  }
+
+  await supabase.from("watches").update(updateData).eq("id", watch.id);
+
+  // Send push notification if triggered
+  if (changed) {
+    try {
+      await supabase.functions.invoke("notify-user", {
+        body: { watch_id: watch.id, user_id: watch.user_id, action_url: bestResult.url },
+      });
+    } catch (notifyErr: any) {
+      console.error(`[check-watch] notify-user error for ${watch.id}: ${notifyErr.message}`);
+    }
+  }
+
+  console.log(
+    `[check-watch] Search watch ${watch.id}: best=$${currentBestPrice.toFixed(2)} at ${bestResult.source}, changed=${changed}, sources=${priced.length}`
+  );
+
+  return {
+    watch_id: watch.id,
+    changed,
+    result_text: resultText,
+    price: currentBestPrice,
+    checked_at: now,
+    sources_count: priced.length,
+  };
 }
 
 serve(async (req) => {
@@ -373,6 +474,10 @@ serve(async (req) => {
       );
     }
 
+    // Cumulative timeout tracker — Supabase edge functions have 26s limit
+    const funcStartTime = Date.now();
+    const timeRemaining = () => 24000 - (Date.now() - funcStartTime); // 2s margin
+
     // Skip if watch is paused (triggered watches are allowed through for re-checking)
     if (watch.status === "paused") {
       return new Response(
@@ -393,16 +498,191 @@ serve(async (req) => {
       });
     }
 
+    // ─── Recreation.gov: use native availability API (free, no key needed) ────────────
+    if (watch.url?.includes("recreation.gov")) {
+      const campResult = await checkCampgroundWatch(watch, supabase);
+      if (campResult) {
+        return new Response(JSON.stringify(campResult), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      // Fall through to standard check if API fails
+    }
+
+    // ─── Resy: use native availability API ────────────
+    if (watch.url?.includes("resy.com")) {
+      const resyResult = await checkResyWatch(watch, supabase);
+      if (resyResult) {
+        return new Response(JSON.stringify(resyResult), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      // Fall through to standard check if API fails
+    }
+
+    // ─── Flight watches: try booking119 API first, fallback to Flights Sky ────
+    const urlLowerForRoute = (watch.url || "").toLowerCase();
+    const FLIGHT_ROUTE_HOSTS = [
+      "kayak.com", "google.com/travel", "expedia.com", "skyscanner.com",
+      "priceline.com", "hopper.com", "kiwi.com", "momondo.com",
+      "cheapflights.com", "southwest.com", "united.com", "delta.com", "aa.com", "jetblue.com",
+      "spirit.com", "flyfrontier.com", "alaskaair.com",
+    ];
+    const condLowerFlight = (watch.condition || "").toLowerCase();
+    const isFlightWatch = FLIGHT_ROUTE_HOSTS.some((h) => urlLowerForRoute.includes(h)) ||
+      condLowerFlight.includes("flight") || condLowerFlight.includes("airfare") || condLowerFlight.includes("fly ");
+    if (isFlightWatch) {
+      // Try booking119 first (richer data), fallback to flights-sky
+      const flightResult = await checkFlightWatchBooking119(watch, supabase) ?? await checkFlightWatch(watch, supabase);
+      if (flightResult) {
+        return new Response(JSON.stringify(flightResult), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      // Fall through to standard check if API fails
+    }
+
+    // ─── Hotel watches: use booking119 API ────────────
+    const HOTEL_HOSTS = [
+      "booking.com", "hotels.com", "marriott.com", "hilton.com", "hyatt.com",
+      "ihg.com", "airbnb.com", "vrbo.com", "expedia.com/Hotel",
+      "kayak.com/hotels", "google.com/travel/hotels", "trivago.com",
+      "priceline.com/m/hotels", "agoda.com", "hostelworld.com",
+    ];
+    const condLowerHotel = (watch.condition || "").toLowerCase();
+    const isHotelByUrl = HOTEL_HOSTS.some((h) => urlLowerForRoute.includes(h));
+    const isHotelByCondition = condLowerHotel.includes("hotel") || condLowerHotel.includes("stay at") || condLowerHotel.includes("accommodation") || condLowerHotel.includes("lodging");
+    // Don't match if it's already matched as a flight (expedia can be both)
+    if ((isHotelByUrl || isHotelByCondition) && !isFlightWatch) {
+      const hotelResult = await checkHotelWatch(watch, supabase);
+      if (hotelResult) {
+        return new Response(JSON.stringify(hotelResult), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      // Fall through to standard check if API fails
+    }
+
+    // ─── Car Rental watches: use Flights Scraper Real-Time API ────────────
+    const CAR_RENTAL_HOSTS = [
+      "hertz.com", "enterprise.com", "avis.com", "budget.com", "nationalcar.com",
+      "sixt.com", "turo.com", "dollar.com", "thrifty.com", "alamo.com",
+      "kayak.com/cars", "google.com/travel/explore", "rentalcars.com",
+      "priceline.com/m/rental-cars", "costcotravel.com/rental-cars",
+    ];
+    const condLowerCar = (watch.condition || "").toLowerCase();
+    const isCarRentalByUrl = CAR_RENTAL_HOSTS.some((h) => urlLowerForRoute.includes(h));
+    const isCarRentalByCondition = condLowerCar.includes("car rental") || condLowerCar.includes("rental car") || condLowerCar.includes("rent a car");
+    if (isCarRentalByUrl || isCarRentalByCondition) {
+      const carResult = await checkCarRentalWatch(watch, supabase);
+      if (carResult) {
+        return new Response(JSON.stringify(carResult), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      // Fall through to standard check if API fails
+    }
+
     // Ensure URL has protocol
     let fetchUrl = watch.url;
     if (!fetchUrl.match(/^https?:\/\//i)) {
       fetchUrl = `https://${fetchUrl}`;
     }
 
-    // Build fetch headers (include cookies for auth-walled sites)
+    // Strip tracking/ad parameters that clutter URLs and can cause bot detection
+    try {
+      const urlObj = new URL(fetchUrl);
+      const trackingParams = [
+        "gclid", "gclsrc", "gad_source", "gad_campaignid",
+        "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "utm_id",
+        "fbclid", "msclkid", "dclid", "twclid",
+        "cm_mmc", "CAWELAID", "CAGPSPN", "CAAGID", "CATCI",
+        "ref", "ref_", "tag", "linkCode", "camp",
+        // Social/app share params
+        "social_share", "source_caller", "pid", "shortlink", "af_referrer_customer_id",
+        "deep_link_value", "af_channel", "af_siteid", "af_referrer_uid", "c",
+        // Facebook/Meta ad params
+        "campaign_id", "ad_id", "adset_id", "ad_name", "adset_name", "campaign_name",
+        "h_sid", "h_stype", "frp",
+        // Google Ads extended params
+        "sei", "sca_esv", "sca_upv", "sxsrf",
+      ];
+      for (const p of trackingParams) {
+        urlObj.searchParams.delete(p);
+      }
+
+      // Domain-specific: strip ALL query params for sites that don't need them
+      const cleanHost = urlObj.hostname.replace("www.", "");
+      const stripAllParamsDomains = ["rei.com", "birkenstock.com", "coach.com", "bloomingdales.com", "dickssportinggoods.com"];
+      if (stripAllParamsDomains.some(d => cleanHost.includes(d))) {
+        // Keep only essential params (e.g., product IDs)
+        const essential = new Map<string, string>();
+        // REI: keep sku, product ID is in the path
+        if (cleanHost.includes("rei.com")) {
+          // REI product URLs: /product/{id}/{name} — no query params needed
+          urlObj.search = "";
+        } else if (cleanHost.includes("bloomingdales.com")) {
+          // Bloomingdales: keep ID param
+          const id = urlObj.searchParams.get("ID");
+          urlObj.search = "";
+          if (id) urlObj.searchParams.set("ID", id);
+        } else if (cleanHost.includes("coach.com")) {
+          // Coach: product info is in the path, strip query params
+          urlObj.search = "";
+        } else {
+          // Default: strip all
+          urlObj.search = "";
+        }
+      }
+
+      // eBay: clean up massive tracking params but keep item ID (in path)
+      if (cleanHost.includes("ebay.com")) {
+        urlObj.search = "";
+      }
+
+      fetchUrl = urlObj.toString();
+    } catch { /* keep original URL if parsing fails */ }
+
+    // ─── Domain classification for fetch strategy ────────────
+    const fetchDomain = (() => {
+      try { return new URL(fetchUrl).hostname.replace("www.", ""); } catch { return ""; }
+    })();
+
+    // Domains where direct fetch almost always fails — go straight to Serper Shopping
+    const serperPrimaryDomains = ["temu.com", "shein.com"];
+    // Domains where direct fetch is flaky — try direct briefly, but rely on Serper
+    const serperFallbackDomains = ["coach.com", "bloomingdales.com", "dickssportinggoods.com", "rei.com", "arcteryx.com"];
+
+    // Build fetch headers with realistic browser fingerprint + rotating UA
+    const USER_AGENTS = [
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15",
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0",
+      "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36 Edg/123.0.0.0",
+    ];
+    const ua = USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
+
     const fetchHeaders: Record<string, string> = {
-      "User-Agent":
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      "User-Agent": ua,
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Accept-Encoding": "gzip, deflate",
+      "Connection": "keep-alive",
+      "Upgrade-Insecure-Requests": "1",
+      "Sec-Fetch-Dest": "document",
+      "Sec-Fetch-Mode": "navigate",
+      "Sec-Fetch-Site": "none",
+      "Sec-Fetch-User": "?1",
+      "DNT": "1",
+      "Cache-Control": "max-age=0",
     };
 
     let cookiesExpired = false;
@@ -456,15 +736,137 @@ serve(async (req) => {
       );
     }
 
+    // ─── eBay API shortcut: extract item ID from URL, get price via API ────────────
+    let ebayPrice: number | null = null;
+    if (fetchUrl.includes("ebay.com/itm/")) {
+      try {
+        const itemMatch = fetchUrl.match(/\/itm\/(\d+)/);
+        if (itemMatch) {
+          const itemId = itemMatch[1];
+          // Use eBay Browse API (free, no auth needed for basic item lookup via Serper)
+          const SERPER_KEY = Deno.env.get("SERPER_API_KEY") ?? "";
+          if (SERPER_KEY) {
+            const serperRes = await fetch("https://google.serper.dev/shopping", {
+              method: "POST",
+              headers: { "X-API-KEY": SERPER_KEY, "Content-Type": "application/json" },
+              body: JSON.stringify({ q: `site:ebay.com/itm/${itemId}`, num: 3 }),
+              signal: AbortSignal.timeout(5000),
+            });
+            if (serperRes.ok) {
+              const data = await serperRes.json();
+              const items = data.shopping ?? [];
+              for (const item of items) {
+                if (item.link?.includes(itemId)) {
+                  const p = parseShoppingPrice(item.price);
+                  if (p !== null) {
+                    ebayPrice = p;
+                    console.log(`[check-watch] eBay Serper: $${p} for item ${itemId}`);
+                    break;
+                  }
+                }
+              }
+            }
+          }
+        }
+      } catch { /* fall through */ }
+    }
+
+    // ─── Shopify API shortcut: try products.json before HTML fetch ────────────
+    let shopifyPrice: number | null = null;
+    if (fetchUrl.includes("/products/")) {
+      try {
+        const urlObj = new URL(fetchUrl);
+        const pathParts = urlObj.pathname.split("/products/");
+        if (pathParts[1]) {
+          const handle = pathParts[1].split("?")[0].split(".")[0].split("/")[0];
+          if (handle) {
+            const apiUrl = `${urlObj.origin}/products/${handle}.json`;
+            const shopRes = await fetch(apiUrl, {
+              headers: { "User-Agent": fetchHeaders["User-Agent"] },
+              signal: AbortSignal.timeout(5000),
+            });
+            if (shopRes.ok) {
+              const shopData = await shopRes.json();
+              const price = parseFloat(shopData.product?.variants?.[0]?.price);
+              if (price > 0) {
+                shopifyPrice = price;
+                console.log(`[check-watch] Shopify API: $${price} for ${watch.id}`);
+              }
+            }
+          }
+        }
+      } catch { /* fall through to HTML fetch */ }
+    }
+
+    // ─── Serper-primary domains: skip direct fetch, use Google Shopping API ────
+    let serperPrimaryPrice: number | null = null;
+    if (serperPrimaryDomains.some(d => fetchDomain.includes(d)) && watch.name) {
+      const SERPER_KEY = Deno.env.get("SERPER_API_KEY") ?? "";
+      if (SERPER_KEY) {
+        try {
+          console.log(`[check-watch] Serper-primary domain ${fetchDomain}, skipping direct fetch for ${watch.id}`);
+          const searchQuery = `${watch.name} site:${fetchDomain}`;
+          const serperRes = await fetch("https://google.serper.dev/shopping", {
+            method: "POST",
+            headers: { "X-API-KEY": SERPER_KEY, "Content-Type": "application/json" },
+            body: JSON.stringify({ q: searchQuery, num: 5 }),
+            signal: AbortSignal.timeout(6000),
+          });
+          if (serperRes.ok) {
+            const serperData = await serperRes.json();
+            const items = serperData.shopping ?? [];
+            for (const item of items) {
+              try {
+                const itemHost = new URL(item.link ?? "").hostname.replace("www.", "");
+                if (itemHost.includes(fetchDomain) || fetchDomain.includes(itemHost)) {
+                  const sp = parseShoppingPrice(item.price);
+                  if (sp !== null) {
+                    serperPrimaryPrice = sp;
+                    console.log(`[check-watch] Serper-primary: $${sp} for ${watch.id} from ${fetchDomain}`);
+                    break;
+                  }
+                }
+              } catch { /* skip */ }
+            }
+            // If no exact domain match, try first result as fallback
+            if (serperPrimaryPrice === null && items.length > 0) {
+              const sp = parseShoppingPrice(items[0].price);
+              if (sp !== null) {
+                serperPrimaryPrice = sp;
+                console.log(`[check-watch] Serper-primary (best match): $${sp} for ${watch.id}`);
+              }
+            }
+          }
+        } catch (e: any) {
+          console.log(`[check-watch] Serper-primary failed: ${e.message}`);
+        }
+      }
+    }
+
     // Fetch the URL content
     let pageText = "";
     let fetchSuccess = true;
+
+    // Skip direct fetch for serper-primary domains (they always block)
+    if (serperPrimaryDomains.some(d => fetchDomain.includes(d))) {
+      fetchSuccess = false;
+      pageText = "";
+    } else {
     try {
       const response = await fetch(fetchUrl, {
         headers: fetchHeaders,
         redirect: "follow",
+        signal: AbortSignal.timeout(10000),
       });
-      pageText = await response.text();
+
+      // Treat 4xx/5xx as failures (many bot-block systems return 403/503)
+      if (!response.ok) {
+        console.log(`[check-watch] HTTP ${response.status} for ${watch.id} — marking as failed`);
+        fetchSuccess = false;
+        pageText = `HTTP ${response.status}`;
+      } else {
+        pageText = await response.text();
+      }
 
       // Detect login page redirect (page requires re-authentication)
       if (watch.site_cookies && watch.cookie_status === "active") {
@@ -518,9 +920,71 @@ serve(async (req) => {
       fetchSuccess = false;
       pageText = `Fetch error: ${fetchErr.message}`;
     }
+    } // end else (non-serper-primary domains)
+
+    // If serper-primary found a price, inject it
+    if (serperPrimaryPrice !== null) {
+      shopifyPrice = serperPrimaryPrice; // Use the same variable so downstream logic picks it up
+      fetchSuccess = true; // Mark as success so result gets saved
+    }
+
+    // ─── Scrape.do fallback for bot-blocked or unreachable pages ────────────
+    // Skip Scrape.do for domains where it consistently fails (save API credits)
+    const SCRAPE_DO_KEY = Deno.env.get("SCRAPE_DO_API_KEY") ?? "";
+    const skipScrapeDo = serperPrimaryDomains.some(d => fetchDomain.includes(d));
+    if ((!fetchSuccess || pageText === "") && SCRAPE_DO_KEY && timeRemaining() > 12000 && !skipScrapeDo) {
+      try {
+        console.log(`[check-watch] Trying Scrape.do for ${watch.id}`);
+        const sdUrl = `https://api.scrape.do/?token=${SCRAPE_DO_KEY}&url=${encodeURIComponent(fetchUrl)}&render=true&super=true`;
+        const sdRes = await fetch(sdUrl, { signal: AbortSignal.timeout(10000) });
+        if (sdRes.ok) {
+          pageText = await sdRes.text();
+          fetchSuccess = true;
+          console.log(`[check-watch] Scrape.do recovered ${watch.id} (${pageText.length} chars)`);
+        }
+      } catch (sdErr: any) {
+        console.log(`[check-watch] Scrape.do failed (non-critical): ${sdErr.message}`);
+      }
+    }
 
     // Extract current price from raw HTML (structured selectors work best on raw HTML)
-    let currentPrice = fetchSuccess ? extractPrice(pageText) : null;
+    // Use Shopify API price if available, otherwise extract from HTML
+    let currentPrice = ebayPrice ?? shopifyPrice ?? (fetchSuccess ? extractPrice(pageText) : null);
+
+    // ─── Scrape.do retry for JS-heavy sites where price extraction failed ────────────
+    // If we got HTML but couldn't find a price, the page likely renders prices via JavaScript.
+    // Scrape.do with render=true executes JS and returns the fully rendered page.
+    if (currentPrice === null && fetchSuccess && pageText.length > 500 && SCRAPE_DO_KEY && timeRemaining() > 12000 && !skipScrapeDo) {
+      const hasJsFramework = /__NEXT_DATA__|window\.__INITIAL_STATE__|__NUXT__|window\.__APP|react|vue/i.test(pageText.substring(0, 10000));
+      const hasNoStructuredPrice = !/<script[^>]*type="application\/ld\+json"/i.test(pageText) && !/property="(?:og|product):price:amount"/i.test(pageText);
+
+      if (hasJsFramework || hasNoStructuredPrice) {
+        try {
+          console.log(`[check-watch] JS-heavy site, retrying with Scrape.do for ${watch.id}`);
+          const sdUrl = `https://api.scrape.do/?token=${SCRAPE_DO_KEY}&url=${encodeURIComponent(fetchUrl)}&render=true&super=true&wait=3000`;
+          const sdRes = await fetch(sdUrl, { signal: AbortSignal.timeout(12000) });
+          if (sdRes.ok) {
+            const renderedHtml = await sdRes.text();
+            const sdPrice = extractPrice(renderedHtml);
+            if (sdPrice !== null) {
+              currentPrice = sdPrice;
+              pageText = renderedHtml;
+              console.log(`[check-watch] Scrape.do found price $${sdPrice} for ${watch.id}`);
+            } else {
+              console.log(`[check-watch] Scrape.do rendered page but still no price for ${watch.id}`);
+            }
+          }
+        } catch (sdErr: any) {
+          console.log(`[check-watch] Scrape.do JS retry failed: ${sdErr.message}`);
+        }
+      }
+    }
+
+    // Extract seller's claimed "was"/"original" price (for fake discount detection)
+    const wasPrice = fetchSuccess ? extractWasPrice(pageText, currentPrice) : null;
+    if (wasPrice !== null) {
+      console.log(`[check-watch] Detected "was" price: $${wasPrice.toFixed(2)} (current: $${currentPrice?.toFixed(2) ?? "null"}) for ${watch.id}`);
+    }
 
     // Detect coupon/promo codes on the page (only worth doing on e-commerce pages)
     const detectedCoupons = fetchSuccess && pageText.length > 0 ? detectCouponCodes(pageText) : [];
@@ -549,20 +1013,49 @@ serve(async (req) => {
     // Dynamic pricing sites (tickets, flights, hotels) are fully JS-rendered, often block bots,
     // and Serper Shopping API returns unrelated product listings instead of live prices.
     // Use Serper's regular search to find "from $X" snippets for these sites instead.
-    const DYNAMIC_PRICING_HOSTS = [
-      // Ticket marketplaces
-      "stubhub.com", "ticketmaster.com", "seatgeek.com", "vividseats.com", "axs.com",
-      // Flight / travel booking
+    const TICKET_HOSTS = ["stubhub.com", "ticketmaster.com", "seatgeek.com", "vividseats.com", "axs.com", "tickpick.com", "gametime.co", "livenation.com", "eventbrite.com"];
+    const FLIGHT_HOSTS = [
       "kayak.com", "google.com/travel", "expedia.com", "skyscanner.com", "priceline.com",
       "hopper.com", "kiwi.com", "momondo.com", "cheapflights.com", "orbitz.com",
       "southwest.com", "united.com", "delta.com", "aa.com", "jetblue.com",
-      // Hotel booking
-      "booking.com", "hotels.com", "airbnb.com", "vrbo.com",
     ];
+    const HOTEL_PRICING_HOSTS = ["booking.com", "hotels.com", "airbnb.com", "vrbo.com"];
+    const DYNAMIC_PRICING_HOSTS = [...TICKET_HOSTS, ...FLIGHT_HOSTS, ...HOTEL_PRICING_HOSTS];
     const watchHostLower = new URL(fetchUrl).hostname.replace("www.", "").toLowerCase();
     const isDynamicPricingSite = DYNAMIC_PRICING_HOSTS.some((h) => watchHostLower.includes(h));
+    const isTicketSite = TICKET_HOSTS.some((h) => watchHostLower.includes(h));
+    const isFlightSite = FLIGHT_HOSTS.some((h) => watchHostLower.includes(h));
 
-    if (priceConfidence === "none" && currentPrice === null && watch.name && fetchSuccess) {
+    // ─── Ticketmaster Discovery API (free, 5K/day) ────────────
+    const TM_API_KEY = Deno.env.get("TICKETMASTER_API_KEY") ?? "";
+    if (isTicketSite && watchHostLower.includes("ticketmaster") && TM_API_KEY && currentPrice === null && timeRemaining() > 6000) {
+      try {
+        // Try multiple URL patterns: /event/ID, /event/slug-ID, or trailing numeric ID
+        let tmEventId = fetchUrl.match(/event\/([A-Za-z0-9]{10,})/)?.[1]
+          || fetchUrl.match(/event\/[^/]+-([A-Za-z0-9]{10,})/)?.[1]
+          || fetchUrl.match(/\/([A-Z][A-Za-z0-9]{14,})(?:[/?]|$)/)?.[1];
+        if (tmEventId) {
+          const tmRes = await fetch(
+            `https://app.ticketmaster.com/discovery/v2/events/${tmEventId}.json?apikey=${TM_API_KEY}`,
+            { signal: AbortSignal.timeout(5000) }
+          );
+          if (tmRes.ok) {
+            const tmData = await tmRes.json();
+            const priceRange = tmData.priceRanges?.[0];
+            if (priceRange?.min) {
+              currentPrice = priceRange.min;
+              priceConfidence = "high";
+              console.log(`[check-watch] Ticketmaster API: $${priceRange.min}-$${priceRange.max} for ${watch.id}`);
+            }
+          }
+        }
+      } catch (tmErr: any) {
+        console.log(`[check-watch] Ticketmaster API failed (non-critical): ${tmErr.message}`);
+      }
+    }
+
+    // NOTE: removed fetchSuccess requirement — unreachable pages should still try Serper
+    if (priceConfidence === "none" && currentPrice === null && watch.name) {
       try {
         const SERPER_KEY = Deno.env.get("SERPER_API_KEY") ?? "";
         if (SERPER_KEY) {
@@ -571,7 +1064,38 @@ serve(async (req) => {
           if (isDynamicPricingSite) {
             // For dynamic pricing sites (tickets, flights, hotels): use regular search
             // The Shopping API returns product listings, not live prices for these categories
-            const searchQuery = `${watch.name} site:${watchHostLower} price`;
+
+            // Build more specific search queries for flights/travel/tickets to get accurate prices
+            let searchQuery = `${watch.name} site:${watchHostLower} price`;
+
+            if (isFlightSite) {
+              // Try to extract route from URL (e.g., /flights/LAX-JFK/2026-04-01)
+              const routeMatch = fetchUrl.match(/flights?\/([A-Z]{3})-([A-Z]{3})(?:\/(\d{4}-\d{2}-\d{2}))?/i);
+              if (routeMatch) {
+                const from = routeMatch[1].toUpperCase();
+                const to = routeMatch[2].toUpperCase();
+                const date = routeMatch[3] ?? "";
+                searchQuery = `cheapest flights ${from} to ${to} ${date} price`.trim();
+              }
+            } else if (isTicketSite) {
+              // StubHub URL: /bruno-mars-inglewood-tickets-9-30-2026/event/160628286/
+              // Ticketmaster URL: /event/bruno-mars-tickets/...
+              // SeatGeek URL: /bruno-mars-tickets/...
+              // Extract artist, city, date from URL slug for a targeted search
+              const urlPath = new URL(fetchUrl).pathname;
+
+              // StubHub pattern: /{artist}-{city}-tickets-{date}/event/{id}
+              const stubhubMatch = urlPath.match(/\/([a-z0-9-]+)-tickets(?:-(\d{1,2}-\d{1,2}-\d{4}))?/i);
+              if (stubhubMatch) {
+                const slug = stubhubMatch[1].replace(/-/g, " "); // "bruno-mars-inglewood" → "bruno mars inglewood"
+                const date = stubhubMatch[2]?.replace(/-/g, "/") ?? ""; // "9-30-2026" → "9/30/2026"
+                searchQuery = `${slug} tickets ${date} cheapest price site:${watchHostLower}`.trim();
+              } else {
+                // Generic ticket site: use watch name + "cheapest tickets" for better results
+                searchQuery = `${watch.name} cheapest tickets price site:${watchHostLower}`;
+              }
+            }
+
             const serperRes = await fetch("https://google.serper.dev/search", {
               method: "POST",
               headers: { "X-API-KEY": SERPER_KEY, "Content-Type": "application/json" },
@@ -588,35 +1112,85 @@ serve(async (req) => {
               ].join(" ");
 
               // Match "from $X", "starting at $X", "$X+", "as low as $X" — common in ticket/flight results
+              // Prioritize patterns that indicate the actual fare price
               const dynamicPricePatterns = [
-                /(?:from|starting at|tickets?\s+from|flights?\s+from|as low as|fares?\s+from)\s+\$\s*([\d,]+\.?\d{0,2})/i,
-                /\$\s*([\d,]+\.?\d{0,2})\s*\+/,
-                /(?:lowest|cheapest|min(?:imum)?)\s+(?:price\s+|fare\s+)?\$\s*([\d,]+\.?\d{0,2})/i,
+                /(?:from|starting at|tickets?\s+from|flights?\s+from|as low as|fares?\s+from|prices?\s+from)\s+\$\s*([\d,]+\.?\d{0,2})/i,
+                /(?:lowest|cheapest|min(?:imum)?)\s+(?:price\s+|fare\s+|ticket\s+)?\$\s*([\d,]+\.?\d{0,2})/i,
                 /(?:one[- ]way|round[- ]trip|nonstop)\s+.*?\$\s*([\d,]+\.?\d{0,2})/i,
+                // Ticket-specific: "tickets for $X", "seats from $X", "starting $X each"
+                /(?:tickets?|seats?)\s+(?:for|at|starting)\s+\$\s*([\d,]+\.?\d{0,2})/i,
+                /\$\s*([\d,]+\.?\d{0,2})\s*(?:per ticket|each|per seat)/i,
+                /\$\s*([\d,]+\.?\d{0,2})\s*\+/,
               ];
+
+              // Minimum plausible price for different categories
+              const MIN_FLIGHT_PRICE = 30; // No legit domestic flight costs less than $30
+              const MIN_TICKET_PRICE = 25; // Concert/event tickets rarely under $25 on secondary markets
+              const MIN_HOTEL_PRICE = 20;
+              const minPrice = isFlightSite ? MIN_FLIGHT_PRICE
+                : isTicketSite ? MIN_TICKET_PRICE : MIN_HOTEL_PRICE;
+
+              // Collect ALL candidate prices from snippets using matchAll (not just first match per pattern)
+              const candidatePriceSet = new Set<number>(); // Deduplicate: same price from multiple patterns shouldn't inflate count
+
               for (const pattern of dynamicPricePatterns) {
-                const match = snippets.match(pattern);
-                if (match) {
+                // Use matchAll with global flag to find ALL matches, not just the first
+                const flags = pattern.flags.includes("g") ? pattern.flags : pattern.flags + "g";
+                const globalPattern = new RegExp(pattern.source, flags);
+                for (const match of snippets.matchAll(globalPattern)) {
                   const foundPrice = parseFloat(match[1].replace(/,/g, ""));
-                  if (foundPrice > 1 && foundPrice < 50_000) {
-                    currentPrice = foundPrice;
-                    priceConfidence = "low"; // Dynamic prices are volatile
-                    console.log(`[check-watch] Serper dynamic pricing search: found price $${foundPrice} for ${watch.id}`);
-                    break;
+                  if (foundPrice >= minPrice && foundPrice < 50_000) {
+                    candidatePriceSet.add(foundPrice);
                   }
                 }
               }
 
-              // Fallback: look for any prominent price in snippets
+              // Select best price from deduplicated candidates
+              const uniquePrices = [...candidatePriceSet].sort((a, b) => a - b);
+              if (uniquePrices.length > 0) {
+                if (isTicketSite && uniquePrices.length >= 2) {
+                  // For ticket sites: use the MEDIAN pattern price rather than lowest
+                  // Lowest is often from a different event/section or service fee
+                  // Multiple corroborating prices are more reliable
+                  const medianIdx = Math.floor(uniquePrices.length / 2);
+                  currentPrice = uniquePrices[medianIdx];
+                  priceConfidence = "low";
+                  console.log(`[check-watch] Serper ticket pricing: median $${currentPrice} (from ${uniquePrices.length} unique candidates: $${uniquePrices.join(", $")}) for ${watch.id}`);
+                } else if (isTicketSite && uniquePrices.length === 1) {
+                  // Single price for tickets — use it but mark as very low confidence
+                  currentPrice = uniquePrices[0];
+                  priceConfidence = "low";
+                  console.log(`[check-watch] Serper ticket pricing: single candidate $${currentPrice} for ${watch.id} (low confidence)`);
+                } else {
+                  // For flights: lowest pattern price is usually the "from" price
+                  currentPrice = uniquePrices[0];
+                  priceConfidence = "low";
+                  console.log(`[check-watch] Serper dynamic pricing: found price $${currentPrice} (from ${uniquePrices.length} candidates) for ${watch.id}`);
+                }
+              }
+
+              // Fallback: collect all dollar amounts from snippets, but be much stricter
               if (currentPrice === null) {
-                const priceInSnippet = snippets.match(/\$([\d,]+\.?\d{2})/);
-                if (priceInSnippet) {
-                  const fallbackPrice = parseFloat(priceInSnippet[1].replace(/,/g, ""));
-                  if (fallbackPrice > 10 && fallbackPrice < 50_000) {
-                    currentPrice = fallbackPrice;
-                    priceConfidence = "low";
-                    console.log(`[check-watch] Serper dynamic pricing snippet fallback: $${fallbackPrice} for ${watch.id}`);
-                  }
+                const allPricesInSnippets = [...new Set(
+                  [...snippets.matchAll(/\$([\d,]+\.?\d{0,2})/g)]
+                    .map((m) => parseFloat(m[1].replace(/,/g, "")))
+                    .filter((p) => p >= minPrice && p < 50_000)
+                )].sort((a, b) => a - b);
+
+                // For ticket sites: require at least 2 corroborating raw prices
+                // A single stray dollar amount is unreliable for ticket pricing
+                const minSnippetPrices = isTicketSite ? 2 : 1;
+
+                if (allPricesInSnippets.length >= minSnippetPrices) {
+                  // Use the MEDIAN price rather than the first/lowest
+                  // This avoids picking up fees, ads, or outlier prices
+                  const medianIdx = Math.floor(allPricesInSnippets.length / 2);
+                  const medianPrice = allPricesInSnippets[medianIdx];
+                  currentPrice = medianPrice;
+                  priceConfidence = "low";
+                  console.log(`[check-watch] Serper dynamic pricing snippet median: $${medianPrice} (from ${allPricesInSnippets.length} prices, range $${allPricesInSnippets[0]}-$${allPricesInSnippets[allPricesInSnippets.length - 1]}) for ${watch.id}`);
+                } else if (allPricesInSnippets.length === 1 && isTicketSite) {
+                  console.log(`[check-watch] Serper ticket snippet: skipping single raw price $${allPricesInSnippets[0]} for ${watch.id} (insufficient corroboration)`);
                 }
               }
             }
@@ -714,21 +1288,57 @@ serve(async (req) => {
         console.log(`[check-watch] Using user-confirmed price $${userConfirmedPrice} as baseline for ${watch.id}`);
       }
 
+      // ─── Price Sanity Check: reject implausible prices for dynamic pricing sites ───
+      // If we have a baseline (user-confirmed or last known), reject new prices that are
+      // implausibly different — these are almost always extraction errors (fees, ads, unrelated prices)
+      if (currentPrice !== null && isDynamicPricingSite && priceConfidence !== "high") {
+        const baseline = lastKnownPrice ?? userConfirmedPrice;
+        if (baseline !== null && baseline > 0) {
+          const ratio = currentPrice / baseline;
+
+          // Ticket sites have tighter bounds — prices don't swing as wildly as flights
+          const minRatio = isTicketSite ? 0.30 : 0.20; // Tickets: reject <30% of baseline
+          const maxRatio = isTicketSite ? 3.0 : 5.0;   // Tickets: reject >300% of baseline
+          const warnRatio = isTicketSite ? 0.50 : 0.40;
+
+          if (ratio < minRatio || ratio > maxRatio) {
+            console.log(`[check-watch] Price sanity check FAILED for dynamic site: extracted $${currentPrice.toFixed(2)} vs baseline $${baseline.toFixed(2)} (ratio ${ratio.toFixed(2)}, bounds ${minRatio}-${maxRatio}). Discarding.`);
+            currentPrice = null; // Discard the bad price — will use lastKnownPrice downstream
+            priceConfidence = "none";
+          } else if (ratio < warnRatio) {
+            // Suspicious but not impossible — flag as low confidence
+            console.log(`[check-watch] Price sanity check WARNING: extracted $${currentPrice.toFixed(2)} vs baseline $${baseline.toFixed(2)} (${(ratio * 100).toFixed(0)}%). Keeping but marking low confidence.`);
+            priceConfidence = "low";
+          }
+        }
+      }
+
       // If page content is identical to last check, skip evaluation entirely
       // (Still record the check for price tracking, but avoid expensive AI calls)
       if (contentHash && lastContentHash && contentHash === lastContentHash) {
         const now = new Date().toISOString();
         console.log(`[check-watch] Content unchanged for ${watch.id}, skipping evaluation`);
 
+        // Build descriptive result text based on watch type
+        let unchangedText = "No change detected";
+        if (currentPrice !== null) {
+          unchangedText = `$${currentPrice.toFixed(2)} — no change`;
+        } else if (watch.action_type === "book") {
+          unchangedText = "No availability found";
+        } else if (watch.action_type === "cart") {
+          unchangedText = "Still out of stock";
+        }
+
         await supabase.from("check_results").insert({
           id: crypto.randomUUID(),
           watch_id: watch.id,
           result_data: {
-            text: "No change detected",
+            text: unchangedText,
             content_hash: contentHash,
             price_confidence: priceConfidence,
             ...(detectedCoupons.length > 0 ? { coupon_codes: detectedCoupons } : {}),
             ...(fareHold.available ? { hold_available: true, hold_note: fareHold.note } : {}),
+            ...(wasPrice !== null ? { was_price: wasPrice } : {}),
           },
           changed: false,
           price: currentPrice,
@@ -769,10 +1379,18 @@ serve(async (req) => {
       if (aiPriceMatch) {
         const aiPrice = parseFloat(aiPriceMatch[1].replace(/,/g, ""));
         if (aiPrice > 0.50 && aiPrice < 100_000) {
+          // For dynamic pricing sites, validate AI price against baseline before accepting
+          const baseline = lastKnownPrice ?? userConfirmedPrice;
+          const aiPriceIsPlausible = !isDynamicPricingSite || baseline === null || baseline <= 0 ||
+            (aiPrice / baseline >= 0.20 && aiPrice / baseline <= 5.0);
+
           // If AI found a substantially different price (>5% difference), prefer the AI's contextual understanding
-          if (currentPrice === null || Math.abs(aiPrice - currentPrice) / Math.max(aiPrice, currentPrice) > 0.05) {
+          // BUT only if the price is plausible (not a fee, ad, or unrelated price on the page)
+          if (aiPriceIsPlausible && (currentPrice === null || Math.abs(aiPrice - currentPrice) / Math.max(aiPrice, currentPrice) > 0.05)) {
             console.log(`[check-watch] Price reconciliation: extracted=$${currentPrice?.toFixed(2) ?? "null"}, AI=$${aiPrice.toFixed(2)} — using AI price`);
             currentPrice = aiPrice;
+          } else if (!aiPriceIsPlausible) {
+            console.log(`[check-watch] Price reconciliation: AI price $${aiPrice.toFixed(2)} rejected (implausible vs baseline $${baseline?.toFixed(2)})`);
           }
         }
       }
@@ -796,8 +1414,9 @@ serve(async (req) => {
 
     if (isCheckFailure && !changed) {
       // Auto-fix attempt: use Serper to find a price for the product
+      // Runs for both "Price not found on page" AND "Could not reach page" (site blocking our fetch)
       // Skip Shopping API for ticket marketplaces — it returns unrelated product listings
-      if (resultText === "Price not found on page" && watch.name && !isDynamicPricingSite) {
+      if ((resultText === "Price not found on page" || resultText === "Could not reach page") && watch.name && !isDynamicPricingSite) {
         try {
           const SERPER_KEY = Deno.env.get("SERPER_API_KEY") ?? "";
           if (SERPER_KEY) {
@@ -875,10 +1494,71 @@ serve(async (req) => {
       }
     }
 
+    // ─── Notify on any price decrease if user opted in ────────────
+    if (!changed && watch.notify_any_price_drop && currentPrice !== null && lastKnownPrice !== null && currentPrice < lastKnownPrice) {
+      changed = true;
+      resultText = `Price dropped to $${currentPrice.toFixed(2)} (was $${lastKnownPrice.toFixed(2)})`;
+    }
+
+    // ─── Claude AI fallback: runs when check failed OR price couldn't be extracted ────────────
+    // Broadened trigger: also fires when we fetched the page but found no price (common for JS-heavy sites)
+    const needsClaudeFallback = !autoFixed && !changed && ANTHROPIC_API_KEY && watch.name && timeRemaining() > 8000 &&
+      (isCheckFailure || (currentPrice === null && watch.action_type === "price"));
+    if (needsClaudeFallback) {
+      try {
+        console.log(`[check-watch] Attempting Claude fallback for ${watch.id} (${watch.name})`);
+        const claudeResult = await claudePriceFallback(watch, lastKnownPrice);
+        if (claudeResult !== null) {
+          currentPrice = claudeResult.price;
+          resultText = claudeResult.resultText;
+          autoFixed = true;
+          console.log(`[check-watch] Claude fallback found price $${claudeResult.price} for ${watch.id}`);
+
+          // Re-evaluate condition with Claude's price
+          if (watch.action_type === "price" && lastKnownPrice !== null) {
+            if (claudeResult.price < lastKnownPrice * 0.97) {
+              changed = true;
+              resultText = `Price dropped to $${claudeResult.price.toFixed(2)} (was $${lastKnownPrice.toFixed(2)})`;
+            } else if (watch.notify_any_price_drop && claudeResult.price < lastKnownPrice) {
+              changed = true;
+              resultText = `Price dropped to $${claudeResult.price.toFixed(2)} (was $${lastKnownPrice.toFixed(2)})`;
+            }
+          }
+        }
+      } catch (claudeErr: any) {
+        console.log(`[check-watch] Claude fallback failed (non-critical): ${claudeErr.message}`);
+      }
+    }
+
     // ─── Track consecutive failures & notify on threshold ────────────
     const stillFailing = !autoFixed && isCheckFailure && !changed;
     const prevFailures = watch.consecutive_failures ?? 0;
-    const FAILURE_THRESHOLD = 2;
+    // Daily watches: flag after 1 failure (only checks once/day)
+    // Sub-daily watches (12h, 6h, 4h, 2h): flag after 2 failures
+    const checkFreq = (watch.check_frequency || "Daily").toLowerCase();
+    const FAILURE_THRESHOLD = checkFreq === "daily" ? 1 : 2;
+
+    // ─── Enrich resultText with useful details based on watch type ────────────
+    if (!changed && !isCheckFailure) {
+      if (currentPrice !== null && !resultText.includes("$")) {
+        // Price watch: always show the current price
+        if (lastKnownPrice !== null && Math.abs(currentPrice - lastKnownPrice) < 0.01) {
+          resultText = `$${currentPrice.toFixed(2)} — price unchanged`;
+        } else if (lastKnownPrice !== null) {
+          const diff = currentPrice - lastKnownPrice;
+          const arrow = diff > 0 ? "↑" : "↓";
+          resultText = `$${currentPrice.toFixed(2)} (${arrow} $${Math.abs(diff).toFixed(2)} from last check)`;
+        } else {
+          resultText = `$${currentPrice.toFixed(2)} — tracking started`;
+        }
+      } else if (watch.action_type === "book" && !resultText.includes("available") && !resultText.includes("Available")) {
+        resultText = "Checked — no availability yet";
+      } else if (watch.action_type === "cart" && !resultText.includes("stock")) {
+        resultText = "Checked — still not in stock";
+      } else if (watch.action_type === "notify" && resultText === "Condition not met") {
+        resultText = "Checked — no changes detected";
+      }
+    }
 
     // Store the check result (with content hash for future change detection)
     const now = new Date().toISOString();
@@ -891,6 +1571,7 @@ serve(async (req) => {
         price_confidence: priceConfidence,
         ...(detectedCoupons.length > 0 ? { coupon_codes: detectedCoupons } : {}),
         ...(fareHold.available ? { hold_available: true, hold_note: fareHold.note } : {}),
+        ...(wasPrice !== null ? { was_price: wasPrice } : {}),
       },
       changed: changed,
       price: currentPrice,
@@ -946,20 +1627,84 @@ serve(async (req) => {
       updateData.consecutive_failures = newFailures;
       updateData.last_error = resultText;
 
-      // Notify exactly once when crossing the threshold
-      if (newFailures >= FAILURE_THRESHOLD && !watch.needs_attention) {
+      // Auto-pause: after 30+ consecutive failures, stop checking entirely
+      if (newFailures >= 30) {
+        updateData.status = "paused";
         updateData.needs_attention = true;
-        console.log(`[check-watch] Watch ${watch.id} needs attention after ${newFailures} failures`);
+        updateData.last_error = "Paused: this site has blocked automated checks after 30+ attempts. You can update the URL or restart the watch.";
+        console.log(`[check-watch] Auto-pausing ${watch.id} after ${newFailures} consecutive failures`);
         try {
           await supabase.functions.invoke("notify-user", {
-            body: {
-              watch_id: watch.id,
-              user_id: watch.user_id,
-              notification_type: "needs_attention",
-            },
+            body: { watch_id: watch.id, user_id: watch.user_id, notification_type: "auto_paused" },
           });
-        } catch {
-          console.error("[check-watch] Failed to send needs_attention notification");
+        } catch { /* non-critical */ }
+      }
+
+      // Log failure details for analytics and debugging
+      try {
+        const domain = new URL(fetchUrl).hostname.replace("www.", "");
+        const methodsTried: string[] = ["direct"];
+        if (SCRAPE_DO_KEY) methodsTried.push("scrape.do");
+        if (watch.name) methodsTried.push("serper");
+        if (ANTHROPIC_API_KEY) methodsTried.push("claude");
+        await supabase.from("watch_failures").insert({
+          watch_id: watch.id,
+          domain,
+          failure_type: resultText.startsWith("HTTP") ? "http_error" : resultText.includes("Could not reach") ? "unreachable" : "price_not_found",
+          http_status: resultText.match(/HTTP (\d+)/)?.[1] ? parseInt(resultText.match(/HTTP (\d+)/)[1]) : null,
+          error_message: resultText.substring(0, 500),
+          method_tried: methodsTried,
+        });
+      } catch { /* non-critical logging */ }
+
+      // Auto-resolve: when failures cross threshold, try to find a working URL automatically
+      // Skip if already needs_attention (avoid expensive re-resolve on every check)
+      if (newFailures >= FAILURE_THRESHOLD && newFailures < 30 && !watch.needs_attention && timeRemaining() > 8000) {
+        console.log(`[check-watch] Auto-resolve: attempting to fix ${watch.id} (${watch.name}) after ${newFailures} failures`);
+
+        const autoFixResult = await attemptAutoResolve(watch, supabase);
+
+        if (autoFixResult.resolved) {
+          // Auto-fix succeeded! Update the URL and reset failures
+          console.log(`[check-watch] Auto-resolve succeeded for ${watch.id}: new URL = ${autoFixResult.newUrl}`);
+          updateData.url = autoFixResult.newUrl;
+          updateData.consecutive_failures = 0;
+          updateData.last_error = null;
+          updateData.needs_attention = false;
+
+          // Log the auto-fix as an activity
+          try {
+            await supabase.from("activities").insert({
+              id: crypto.randomUUID(),
+              user_id: watch.user_id,
+              watch_id: watch.id,
+              icon: "wrench.and.screwdriver",
+              icon_color_name: "accent",
+              label: "Watch auto-fixed by Steward",
+              subtitle: `${watch.name} · URL updated automatically`,
+              created_at: new Date().toISOString(),
+            });
+          } catch { /* non-critical */ }
+
+          // Trigger an immediate re-check with the new URL
+          try {
+            await supabase.functions.invoke("check-watch", { body: { watch_id: watch.id } });
+          } catch { /* non-critical */ }
+        } else {
+          // Auto-fix failed — flag for user attention
+          updateData.needs_attention = true;
+          console.log(`[check-watch] Auto-resolve failed for ${watch.id}, flagging needs_attention`);
+          try {
+            await supabase.functions.invoke("notify-user", {
+              body: {
+                watch_id: watch.id,
+                user_id: watch.user_id,
+                notification_type: "needs_attention",
+              },
+            });
+          } catch {
+            console.error("[check-watch] Failed to send needs_attention notification");
+          }
         }
       }
     } else if (prevFailures > 0 || watch.needs_attention) {
@@ -1082,18 +1827,33 @@ async function evaluateConditionAsync(
   );
   if (priceMatch) {
     const targetPrice = parseFloat(priceMatch[1].replace(/,/g, ""));
-    const currentPrice = extractPrice(pageText);
+    // Prefer the already-extracted price from raw HTML (more accurate than plain text extraction)
+    const currentPrice = currentExtractedPrice ?? extractPrice(pageText);
     if (currentPrice !== null) {
       // Sanity check: if we have a previous price, reject implausible drops (>70%)
-      if (lastKnownPrice !== null && lastKnownPrice > 0) {
-        const dropPct = (lastKnownPrice - currentPrice) / lastKnownPrice;
+      const baseline = lastKnownPrice ?? (currentExtractedPrice !== null && currentExtractedPrice !== currentPrice ? currentExtractedPrice : null);
+      if (baseline !== null && baseline > 0) {
+        const dropPct = (baseline - currentPrice) / baseline;
         if (dropPct > 0.70) {
-          console.log(`[check-watch] Suspicious price drop: $${lastKnownPrice.toFixed(2)} → $${currentPrice.toFixed(2)} (${(dropPct * 100).toFixed(0)}% drop). Likely extraction error.`);
+          console.log(`[check-watch] Suspicious price drop: $${baseline.toFixed(2)} → $${currentPrice.toFixed(2)} (${(dropPct * 100).toFixed(0)}% drop). Likely extraction error.`);
           return {
             changed: false,
-            resultText: `Current price: $${lastKnownPrice.toFixed(2)} (verifying)`,
+            resultText: `Current price: $${baseline.toFixed(2)} (verifying)`,
           };
         }
+      }
+      // Additional sanity: if extracted price is < 15% of the target price,
+      // it's almost certainly wrong (e.g., $20 when target is $200)
+      if (targetPrice > 0 && currentPrice < targetPrice * 0.15) {
+        console.log(`[check-watch] Implausible price $${currentPrice.toFixed(2)} is <15% of target $${targetPrice.toFixed(2)}. Likely extraction error.`);
+        const fallbackPrice = lastKnownPrice ?? currentExtractedPrice;
+        if (fallbackPrice !== null) {
+          return {
+            changed: false,
+            resultText: `Current price: $${fallbackPrice.toFixed(2)} (verifying)`,
+          };
+        }
+        return { changed: false, resultText: "Price not found on page" };
       }
       if (currentPrice < targetPrice) {
         return {
@@ -1115,7 +1875,8 @@ async function evaluateConditionAsync(
   );
   if (priceAboveMatch) {
     const targetPrice = parseFloat(priceAboveMatch[1].replace(/,/g, ""));
-    const currentPrice = extractPrice(pageText);
+    // Prefer the already-extracted price from raw HTML (more accurate than plain text extraction)
+    const currentPrice = currentExtractedPrice ?? extractPrice(pageText);
     if (currentPrice !== null) {
       // Sanity check: reject implausible jumps (>300% increase)
       if (lastKnownPrice !== null && lastKnownPrice > 0) {
@@ -1142,11 +1903,55 @@ async function evaluateConditionAsync(
     return { changed: false, resultText: "Price not found on page" };
   }
 
-  // 3) Stock/availability: "Back in stock", "available", "in stock"
+  // 3) Booking/reservation availability — check BEFORE stock to avoid misclassifying
+  //    "Availability on March 20" as a stock check (since "available" is a substring of "availability")
+  const isBookingCondition =
+    condLower.includes("availability") ||
+    condLower.includes("reservation") ||
+    condLower.includes("opens up") ||
+    condLower.includes("spot opens") ||
+    condLower.includes("slot opens") ||
+    condLower.includes("campsite") ||
+    condLower.includes("campground") ||
+    condLower.includes("appointment") ||
+    condLower.includes("table for") ||
+    condLower.includes("booking");
+
+  if (isBookingCondition) {
+    // For booking/reservation sites, look for positive availability signals
+    const availabilitySignals = [
+      "available", "book now", "reserve", "select date", "open spot",
+      "add to cart", "book this", "check availability", "spots left",
+      "sites available", "choose a date", "pick a time", "select a site",
+      "book a site", "make a reservation",
+    ];
+    const unavailabilitySignals = [
+      "sold out", "fully booked", "no availability", "not available",
+      "unavailable", "no sites", "no spots", "no openings", "waitlist",
+      "all reserved", "no dates", "closed", "permit required",
+      "no results", "nothing available", "no campsites",
+    ];
+
+    const hasPositive = availabilitySignals.some(s => textLower.includes(s));
+    const hasNegative = unavailabilitySignals.some(s => textLower.includes(s));
+
+    if (hasPositive && !hasNegative) {
+      return { changed: true, resultText: "Availability detected! Spots or dates appear open." };
+    }
+    if (hasNegative && !hasPositive) {
+      return { changed: false, resultText: "Not available yet — fully booked or no openings" };
+    }
+    // Ambiguous — fall through to AI evaluation
+  }
+
+  // 3b) Stock/availability (product-focused): "Back in stock", "in stock"
+  //     Only match if NOT already handled as a booking condition above
   if (
-    condLower.includes("in stock") ||
-    condLower.includes("back in stock") ||
-    condLower.includes("available")
+    !isBookingCondition && (
+      condLower.includes("in stock") ||
+      condLower.includes("back in stock") ||
+      condLower.includes("available")
+    )
   ) {
     const stockStatus = detectStockStatus(textLower);
 
@@ -1188,7 +1993,7 @@ async function evaluateConditionAsync(
   // 6) For price/cart type watches that didn't match regex patterns above,
   //    don't fall through to expensive AI — just report price if available
   if (actionType === "price") {
-    const price = extractPrice(pageText);
+    const price = currentExtractedPrice ?? extractPrice(pageText);
     if (price !== null) {
       return { changed: false, resultText: `Current price: $${price.toFixed(2)}` };
     }
@@ -1656,6 +2461,29 @@ function extractPrice(text: string): number | null {
     }
   }
 
+  // 0d) eBay-specific: target the primary price element, NOT the "was" price
+  const isEbay = /ebay\.(com|co\.|ca|de|fr|it|es)/i.test(text);
+  if (isEbay) {
+    const ebayPricePatterns = [
+      // eBay's primary price: <div class=x-price-primary>...<span class=ux-textspans>US $89.99</span>
+      /x-price-primary[^>]*>[\s\S]{0,300}?(?:US\s+)?\$\s*([\d,]+\.?\d{0,2})/i,
+      // eBay "bin-price" (Buy It Now price)
+      /x-bin-price[^>]*>[\s\S]{0,500}?(?:US\s+)?\$\s*([\d,]+\.?\d{0,2})/i,
+      // eBay itemprop price
+      /itemprop="price"[^>]*content="([\d,]+\.?\d{0,2})"/i,
+      // Non-strikethrough ux-textspans with price (first occurrence that isn't in a STRIKETHROUGH)
+      /class="?ux-textspans"?[^>]*>(?:US\s+)?\$\s*([\d,]+\.?\d{0,2})/i,
+    ];
+
+    for (const pattern of ebayPricePatterns) {
+      const match = text.match(pattern);
+      if (match) {
+        const price = parseFloat(match[1].replace(/,/g, ""));
+        if (price > 0.50 && price < 100_000) return price;
+      }
+    }
+  }
+
   // 1) Try structured price selectors common on e-commerce sites
   const structuredPatterns = [
     /priceAmount[^>]*>\s*\$?\s*([\d,]+\.?\d{0,2})/i,
@@ -1677,12 +2505,16 @@ function extractPrice(text: string): number | null {
 
   // 2) Look for prices with dollar sign that have surrounding product context
   //    e.g. near "price", "cost", "now", "sale", "buy"
+  //    EXCLUDE prices near "was", "original", "list price", "regular", "compare at", "MSRP", "strikethrough"
   const contextPattern = /(?:price|cost|now|sale|buy|pay)[^$]{0,40}\$([\d,]+\.\d{2})/gi;
+  const wasPattern = /(?:was|original|list\s+price|regular|compare\s+at|msrp|retail|strikethrough|rrp)[^$]{0,30}\$([\d,]+\.\d{2})/gi;
+  const wasPrices = new Set([...text.matchAll(wasPattern)].map(m => parseFloat(m[1].replace(/,/g, ""))));
   const contextMatches = [...text.matchAll(contextPattern)];
-  if (contextMatches.length > 0) {
-    const price = parseFloat(contextMatches[0][1].replace(/,/g, ""));
-    if (price > 0.50 && price < 100_000) return price;
+  for (const match of contextMatches) {
+    const price = parseFloat(match[1].replace(/,/g, ""));
+    if (price > 0.50 && price < 100_000 && !wasPrices.has(price)) return price;
   }
+  // If all context matches were "was" prices, fall through to frequency
 
   // 3) Fallback: collect all $X.XX prices (require cents for precision)
   //    and return the most frequently occurring one (likely the main product price)
@@ -1716,6 +2548,76 @@ function extractPrice(text: string): number | null {
   return bestPrice;
 }
 
+/**
+ * Extracts the seller's claimed "was" / "original" / "list" price from the page.
+ * This is the crossed-out price shown next to the current price.
+ * Returns null if no "was" price is found or if it equals the current price.
+ */
+function extractWasPrice(text: string, currentPrice: number | null): number | null {
+  const candidates: number[] = [];
+
+  // eBay: STRIKETHROUGH class — require $ sign to avoid matching item numbers
+  const strikethroughMatches = text.matchAll(
+    /STRIKETHROUGH[^>]*>(?:US\s+)?\$\s*([\d,]+\.?\d{0,2})/gi
+  );
+  for (const m of strikethroughMatches) {
+    const p = parseFloat(m[1].replace(/,/g, ""));
+    if (p > 0.50 && p < 100_000) candidates.push(p);
+  }
+
+  // HTML <del> or <s> tags wrapping a price (common across many sites)
+  const delMatches = text.matchAll(
+    /<(?:del|s)\b[^>]*>[^<]*?\$\s*([\d,]+\.?\d{0,2})[^<]*<\/(?:del|s)>/gi
+  );
+  for (const m of delMatches) {
+    const p = parseFloat(m[1].replace(/,/g, ""));
+    if (p > 0.50 && p < 100_000) candidates.push(p);
+  }
+
+  // "Was $X" / "Original price: $X" / "List price: $X" / "MSRP: $X" / "Compare at $X"
+  // Require $ sign to avoid matching random numbers
+  const wasMatches = text.matchAll(
+    /(?:was|original\s+price|list\s+price|msrp|compare\s+at|regular\s+price|rrp)[:\s]+(?:US\s+)?\$\s*([\d,]+\.?\d{0,2})/gi
+  );
+  for (const m of wasMatches) {
+    const p = parseFloat(m[1].replace(/,/g, ""));
+    if (p > 0.50 && p < 100_000) candidates.push(p);
+  }
+
+  // Amazon: "List Price" field — only on Amazon pages, with tight proximity (100 chars max)
+  // to avoid matching "List Price" in JSON-LD that then scans thousands of chars to find a random $
+  const isAmazonPage = /amazon\.(com|co\.|ca|de|fr|it|es)/i.test(text);
+  if (isAmazonPage) {
+    const amazonListPrice = text.match(
+      /(?:list\s*Price|strikeprice)[^$]{0,100}\$\s*([\d,]+\.?\d{0,2})/i
+    );
+    if (amazonListPrice) {
+      const p = parseFloat(amazonListPrice[1].replace(/,/g, ""));
+      if (p > 0.50 && p < 100_000) candidates.push(p);
+    }
+  }
+
+  if (candidates.length === 0) return null;
+
+  // Sanity check: "was" price must be within 3x of current price.
+  // A real "was" price is typically 10-60% higher. Anything beyond 3x (200% markup)
+  // is almost certainly a false match (item number, unrelated price, etc.)
+  const plausible = currentPrice !== null && currentPrice > 0
+    ? candidates.filter(p => p > currentPrice && p <= currentPrice * 3)
+    : candidates.filter(p => p > 0);
+
+  if (plausible.length === 0) return null;
+
+  // Return the highest plausible "was" price that's different from the current price
+  const sorted = plausible.sort((a, b) => b - a);
+  for (const p of sorted) {
+    if (currentPrice === null || Math.abs(p - currentPrice) > 0.01) {
+      return p;
+    }
+  }
+  return null;
+}
+
 // deno-lint-ignore no-explicit-any
 function findPriceInJsonLd(obj: any): number | null {
   if (Array.isArray(obj)) {
@@ -1743,4 +2645,1401 @@ function findPriceInJsonLd(obj: any): number | null {
     }
   }
   return null;
+}
+
+// ────────────────────────────────────────────────────────────────
+// Claude AI Price Fallback — last resort when page fetch + Serper fail
+// Uses Serper web search to find current price info, then Claude to extract it
+// ────────────────────────────────────────────────────────────────
+
+async function claudePriceFallback(
+  watch: any,
+  lastKnownPrice: number | null
+): Promise<{ price: number; resultText: string } | null> {
+  const SERPER_KEY = Deno.env.get("SERPER_API_KEY") ?? "";
+  if (!SERPER_KEY) return null;
+
+  // Step 1: Search for the product's current price via Serper
+  const searchQuery = `${watch.name} current price`;
+  let searchContext = "";
+
+  try {
+    const searchRes = await fetch("https://google.serper.dev/search", {
+      method: "POST",
+      headers: { "X-API-KEY": SERPER_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ q: searchQuery, num: 5 }),
+      signal: AbortSignal.timeout(5000),
+    });
+
+    if (searchRes.ok) {
+      const data = await searchRes.json();
+
+      // Collect relevant snippets from organic + shopping results
+      const snippets: string[] = [];
+
+      if (data.answerBox?.answer) snippets.push(`Answer: ${data.answerBox.answer}`);
+      if (data.answerBox?.snippet) snippets.push(`Snippet: ${data.answerBox.snippet}`);
+
+      for (const r of (data.organic ?? []).slice(0, 3)) {
+        if (r.snippet) snippets.push(`${r.title}: ${r.snippet}`);
+      }
+
+      for (const r of (data.shopping ?? []).slice(0, 5)) {
+        const price = r.price || "";
+        snippets.push(`${r.title} — ${price} (${r.source || "store"})`);
+      }
+
+      searchContext = snippets.join("\n");
+    }
+  } catch {
+    return null;
+  }
+
+  if (!searchContext) return null;
+
+  // Step 2: Ask Claude to extract the current price from search results
+  try {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 100,
+        system: "You extract product prices from search results. Respond ONLY with a JSON object: {\"price\": NUMBER} where NUMBER is the current price as a float. If you cannot determine a price, respond {\"price\": null}. No other text.",
+        messages: [
+          {
+            role: "user",
+            content: `Product: ${watch.name}\nURL: ${watch.url}\n${lastKnownPrice ? `Last known price: $${lastKnownPrice.toFixed(2)}` : ""}\n\nSearch results:\n${searchContext.substring(0, 4000)}\n\nWhat is the current price?`,
+          },
+        ],
+      }),
+    });
+
+    if (!response.ok) return null;
+
+    const result = await response.json();
+    const text = result.content?.[0]?.text ?? "";
+
+    // Parse the JSON response
+    const match = text.match(/\{\s*"price"\s*:\s*([\d.]+)\s*\}/);
+    if (!match) return null;
+
+    const price = parseFloat(match[1]);
+    if (isNaN(price) || price <= 0.50 || price > 100_000) return null;
+
+    return {
+      price,
+      resultText: `$${price.toFixed(2)} (via AI search)`,
+    };
+  } catch {
+    return null;
+  }
+}
+
+// ────────────────────────────────────────────────────────────────
+// Flights Sky API — flight/hotel/car price lookup via RapidAPI
+// ────────────────────────────────────────────────────────────────
+
+async function checkFlightWatch(
+  watch: any,
+  supabase: any
+): Promise<Record<string, unknown> | null> {
+  const RAPIDAPI_KEY = Deno.env.get("RAPIDAPI_KEY") ?? "";
+  if (!RAPIDAPI_KEY) return null;
+
+  const host = "flights-sky.p.rapidapi.com";
+  const headers: Record<string, string> = {
+    "x-rapidapi-key": RAPIDAPI_KEY,
+    "x-rapidapi-host": host,
+  };
+
+  try {
+    // Extract flight route from URL or condition
+    // Google Flights: /travel/flights/search?tfs=...
+    // Kayak: /flights/LAX-NRT/2026-04-15
+    // Condition: "Flight from LAX to Tokyo under $800"
+    const condLower = (watch.condition || "").toLowerCase();
+    const urlLower = (watch.url || "").toLowerCase();
+
+    // Try to extract origin/destination from condition
+    const routeMatch = condLower.match(
+      /(?:flight|fly|flying)\s+(?:from\s+)?([a-z]{3,})\s+(?:to\s+)([a-z]{3,})/i
+    );
+    // Try Kayak-style URL: /flights/LAX-NRT/
+    const kayakMatch = urlLower.match(/\/flights\/([a-z]{3})-([a-z]{3})/i);
+
+    let origin = routeMatch?.[1] || kayakMatch?.[1] || null;
+    let destination = routeMatch?.[2] || kayakMatch?.[2] || null;
+
+    if (!origin || !destination) {
+      // Can't extract route — fall through to standard check
+      return null;
+    }
+
+    origin = origin.toUpperCase();
+    destination = destination.toUpperCase();
+
+    // Step 1: Auto-complete to get entity IDs
+    const originRes = await fetch(
+      `https://${host}/flights/auto-complete?query=${origin}`,
+      { headers, signal: AbortSignal.timeout(5000) }
+    );
+    const destRes = await fetch(
+      `https://${host}/flights/auto-complete?query=${destination}`,
+      { headers, signal: AbortSignal.timeout(5000) }
+    );
+
+    if (!originRes.ok || !destRes.ok) return null;
+
+    const originData = await originRes.json();
+    const destData = await destRes.json();
+
+    const originId = originData.data?.[0]?.presentation?.id
+      || originData.data?.[0]?.entityId
+      || originData.data?.[0]?.id;
+    const destId = destData.data?.[0]?.presentation?.id
+      || destData.data?.[0]?.entityId
+      || destData.data?.[0]?.id;
+
+    if (!originId || !destId) {
+      console.log(`[check-watch] Flights Sky auto-complete failed: origin=${origin}(${originId}), dest=${destination}(${destId})`);
+      return null;
+    }
+
+    // Extract date from URL or use next week as default
+    const dateMatch = urlLower.match(/(\d{4}-\d{2}-\d{2})/);
+    const departDate = dateMatch?.[1]
+      || new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0];
+
+    // Step 2: Search flights
+    const searchRes = await fetch(
+      `https://${host}/flights/search-one-way?fromEntityId=${originId}&toEntityId=${destId}&departDate=${departDate}`,
+      { headers, signal: AbortSignal.timeout(10000) }
+    );
+
+    if (!searchRes.ok) return null;
+
+    const searchData = await searchRes.json();
+    const itineraries = searchData.data?.itineraries || [];
+
+    if (itineraries.length === 0) return null;
+
+    // Extract lowest price
+    let lowestPrice: number | null = null;
+    for (const itin of itineraries.slice(0, 10)) {
+      const raw = itin.price?.raw || itin.price?.formatted;
+      if (raw) {
+        const price = typeof raw === "number" ? raw : parseFloat(String(raw).replace(/[^0-9.]/g, ""));
+        if (price > 0 && (lowestPrice === null || price < lowestPrice)) {
+          lowestPrice = price;
+        }
+      }
+    }
+
+    if (lowestPrice === null) return null;
+
+    console.log(`[check-watch] Flights Sky: $${lowestPrice} for ${origin}→${destination} (${watch.id})`);
+
+    // Get last known price for comparison
+    let lastKnownPrice: number | null = null;
+    try {
+      const { data: lastCheck } = await supabase
+        .from("check_results")
+        .select("price")
+        .eq("watch_id", watch.id)
+        .order("checked_at", { ascending: false })
+        .limit(1)
+        .single();
+      if (lastCheck?.price != null) {
+        lastKnownPrice = parseFloat(lastCheck.price);
+      }
+    } catch { /* first check */ }
+
+    // Determine if condition is met
+    let changed = false;
+    let resultText = `$${lowestPrice.toFixed(2)} (${origin}→${destination})`;
+
+    // Check against explicit target price in condition
+    const targetMatch = condLower.match(
+      /(?:below|under|less\s+than|drops?\s+(?:below|under|to))\s+\$?([\d,]+\.?\d*)/
+    );
+    if (targetMatch) {
+      const target = parseFloat(targetMatch[1].replace(/,/g, ""));
+      if (lowestPrice <= target) {
+        changed = true;
+        resultText = `Flight dropped to $${lowestPrice.toFixed(2)} (target: $${target})`;
+      }
+    } else if (lastKnownPrice !== null && lowestPrice < lastKnownPrice * 0.95) {
+      // No explicit target: trigger if price dropped 5%+
+      changed = true;
+      resultText = `Flight dropped to $${lowestPrice.toFixed(2)} (was $${lastKnownPrice.toFixed(2)})`;
+    }
+
+    // Notify on any price drop if enabled
+    if (!changed && watch.notify_any_price_drop && lastKnownPrice !== null && lowestPrice < lastKnownPrice) {
+      changed = true;
+      resultText = `Flight price dropped to $${lowestPrice.toFixed(2)} (was $${lastKnownPrice.toFixed(2)})`;
+    }
+
+    // Store check result
+    const now = new Date().toISOString();
+    await supabase.from("check_results").insert({
+      id: crypto.randomUUID(),
+      watch_id: watch.id,
+      result_data: { text: resultText, source: "flights-sky-api" },
+      changed,
+      price: lowestPrice,
+      checked_at: now,
+    });
+
+    // Update watch
+    const updateData: Record<string, unknown> = { last_checked: now };
+    if (changed) {
+      updateData.triggered = true;
+      updateData.status = "triggered";
+      updateData.change_note = resultText;
+    }
+    await supabase.from("watches").update(updateData).eq("id", watch.id);
+
+    // Notify if triggered
+    if (changed) {
+      try {
+        await supabase.functions.invoke("notify-user", {
+          body: { watch_id: watch.id, user_id: watch.user_id, action_url: watch.url },
+        });
+      } catch { /* non-critical */ }
+    }
+
+    return {
+      watch_id: watch.id,
+      changed,
+      result_text: resultText,
+      price: lowestPrice,
+      checked_at: now,
+      source: "flights-sky-api",
+    };
+  } catch (err: any) {
+    console.log(`[check-watch] Flights Sky API failed: ${err.message}`);
+    return null; // Fall through to standard check
+  }
+}
+
+// ────────────────────────────────────────────────────────────────
+// Hotel Watch — booking119 API (Data Bridge)
+// Uses /api/v1/hotels/searchDestination + searchHotels
+// ────────────────────────────────────────────────────────────────
+
+async function checkHotelWatch(
+  watch: any,
+  supabase: any
+): Promise<Record<string, unknown> | null> {
+  const RAPIDAPI_KEY = Deno.env.get("RAPIDAPI_KEY") ?? "";
+  if (!RAPIDAPI_KEY) return null;
+
+  const host = "booking119.p.rapidapi.com";
+  const headers: Record<string, string> = {
+    "x-rapidapi-key": RAPIDAPI_KEY,
+    "x-rapidapi-host": host,
+    "Content-Type": "application/json",
+  };
+
+  try {
+    const condLower = (watch.condition || "").toLowerCase();
+    const urlLower = (watch.url || "").toLowerCase();
+
+    // Extract destination from condition or watch name
+    let destination = "";
+    // Try "hotel in [city]" or "stay in [city]" or "hotel at [city]"
+    const destMatch = condLower.match(/(?:hotel|stay|accommodation|lodging)\s+(?:in|at|near)\s+([a-z\s,]+?)(?:\s+(?:under|below|less|from|for|check|arrive|depart|\d))/i)
+      ?? condLower.match(/(?:hotel|stay)\s+(?:in|at|near)\s+([a-z\s,]+)/i);
+    if (destMatch) destination = destMatch[1].trim();
+
+    // Try watch name
+    if (!destination) {
+      const nameMatch = (watch.name || "").match(/(?:hotel|stay)\s+(?:in|at|near)\s+([a-z\s,]+)/i);
+      if (nameMatch) destination = nameMatch[1].trim();
+    }
+
+    // Try extracting city from URL (booking.com/hotel/us/los-angeles-...)
+    if (!destination) {
+      const urlMatch = urlLower.match(/booking\.com\/hotel\/[a-z]{2}\/([a-z-]+)/);
+      if (urlMatch) destination = urlMatch[1].replace(/-/g, " ");
+    }
+
+    // Fallback: use watch name without "hotel" prefix
+    if (!destination) {
+      destination = (watch.name || "").replace(/hotel|watch|price|track/gi, "").trim();
+    }
+
+    if (!destination) {
+      console.log(`[check-watch] Hotel: could not extract destination for ${watch.id}`);
+      return null;
+    }
+
+    // Extract dates from condition
+    let checkinDate = "";
+    let checkoutDate = "";
+    const dateMatches = condLower.match(/(\w+\s+\d{1,2})\s+(?:to|through|-)\s+(\w+\s+\d{1,2})/i);
+    if (dateMatches) {
+      const currentYear = new Date().getFullYear();
+      const tryParse = (s: string) => {
+        const d = new Date(`${s}, ${currentYear}`);
+        if (!isNaN(d.getTime())) {
+          if (d < new Date()) d.setFullYear(currentYear + 1);
+          return d.toISOString().split("T")[0];
+        }
+        return "";
+      };
+      checkinDate = tryParse(dateMatches[1]);
+      checkoutDate = tryParse(dateMatches[2]);
+    }
+
+    // Fallback: next week, 2 nights
+    if (!checkinDate) {
+      const nextWeek = new Date(Date.now() + 7 * 86400000);
+      checkinDate = nextWeek.toISOString().split("T")[0];
+      checkoutDate = new Date(nextWeek.getTime() + 2 * 86400000).toISOString().split("T")[0];
+    }
+    if (!checkoutDate) {
+      checkoutDate = new Date(new Date(checkinDate).getTime() + 2 * 86400000).toISOString().split("T")[0];
+    }
+
+    console.log(`[check-watch] Hotel search: "${destination}", ${checkinDate} to ${checkoutDate} for ${watch.id}`);
+
+    // Step 1: Search destination to get dest_id
+    const destRes = await fetch(
+      `https://${host}/api/v1/hotels/searchDestination?query=${encodeURIComponent(destination)}`,
+      { headers, signal: AbortSignal.timeout(8000) }
+    );
+    if (!destRes.ok) {
+      console.log(`[check-watch] Hotel searchDestination HTTP ${destRes.status}`);
+      return null;
+    }
+    const destData = await destRes.json();
+    const destinations = destData.data ?? [];
+    if (destinations.length === 0) {
+      console.log(`[check-watch] Hotel: no destination found for "${destination}"`);
+      return null;
+    }
+    const destId = destinations[0].dest_id;
+    const destType = destinations[0].dest_type ?? "city";
+    const destLabel = destinations[0].label ?? destination;
+
+    // Step 2: Search hotels
+    const hotelRes = await fetch(
+      `https://${host}/api/v1/hotels/searchHotels?dest_id=${destId}&search_type=${destType}&arrival_date=${checkinDate}&departure_date=${checkoutDate}&adults=2&currency_code=USD`,
+      { headers, signal: AbortSignal.timeout(12000) }
+    );
+    if (!hotelRes.ok) {
+      console.log(`[check-watch] Hotel searchHotels HTTP ${hotelRes.status}`);
+      return null;
+    }
+    const hotelData = await hotelRes.json();
+    const hotels = hotelData.data?.hotels ?? [];
+    if (hotels.length === 0) {
+      console.log(`[check-watch] Hotel: no results for dest_id=${destId}`);
+      return null;
+    }
+
+    // Find cheapest hotel
+    let cheapestPrice: number | null = null;
+    let cheapestName = "";
+    let cheapestStars = 0;
+
+    // Check if user wants a specific hotel (by name in condition/watch name)
+    const wantedHotel = (() => {
+      const text = (watch.name + " " + watch.condition).toLowerCase();
+      const brands = ["marriott", "hilton", "hyatt", "holiday inn", "best western", "radisson", "sheraton", "westin", "ritz", "four seasons", "fairmont"];
+      return brands.find(b => text.includes(b)) || null;
+    })();
+
+    for (const hotel of hotels) {
+      const prop = hotel.property ?? {};
+      const grossPrice = prop.priceBreakdown?.grossPrice?.value;
+      if (!grossPrice || grossPrice <= 0) continue;
+
+      // If user wants a specific brand, filter
+      if (wantedHotel) {
+        const hotelName = (prop.name || "").toLowerCase();
+        if (!hotelName.includes(wantedHotel)) continue;
+      }
+
+      if (cheapestPrice === null || grossPrice < cheapestPrice) {
+        cheapestPrice = grossPrice;
+        cheapestName = prop.name ?? "Hotel";
+        cheapestStars = prop.accuratePropertyClass ?? 0;
+      }
+    }
+
+    if (cheapestPrice === null) {
+      // If filtering by brand found nothing, try without filter
+      if (wantedHotel) {
+        for (const hotel of hotels) {
+          const prop = hotel.property ?? {};
+          const grossPrice = prop.priceBreakdown?.grossPrice?.value;
+          if (!grossPrice || grossPrice <= 0) continue;
+          if (cheapestPrice === null || grossPrice < cheapestPrice) {
+            cheapestPrice = grossPrice;
+            cheapestName = prop.name ?? "Hotel";
+            cheapestStars = prop.accuratePropertyClass ?? 0;
+          }
+        }
+      }
+      if (cheapestPrice === null) return null;
+    }
+
+    const starsLabel = cheapestStars > 0 ? ` (${cheapestStars}★)` : "";
+    const brandLabel = wantedHotel ? ` — ${wantedHotel.charAt(0).toUpperCase() + wantedHotel.slice(1)}` : "";
+
+    console.log(`[check-watch] Hotel: $${cheapestPrice.toFixed(2)} — ${cheapestName}${starsLabel} in ${destLabel} (${watch.id})`);
+
+    // Get last known price
+    let lastKnownPrice: number | null = null;
+    try {
+      const { data: lastCheck } = await supabase
+        .from("check_results")
+        .select("price")
+        .eq("watch_id", watch.id)
+        .order("checked_at", { ascending: false })
+        .limit(1)
+        .single();
+      if (lastCheck?.price != null) lastKnownPrice = parseFloat(lastCheck.price);
+    } catch { /* first check */ }
+
+    // Determine if condition is met
+    let changed = false;
+    let resultText = `$${cheapestPrice.toFixed(2)}/night — ${cheapestName}${starsLabel}`;
+
+    const targetMatch = condLower.match(/(?:below|under|less\s+than|drops?\s+(?:below|under|to))\s+\$?([\d,]+\.?\d*)/);
+    if (targetMatch) {
+      const target = parseFloat(targetMatch[1].replace(/,/g, ""));
+      if (cheapestPrice <= target) {
+        changed = true;
+        resultText = `Hotel dropped to $${cheapestPrice.toFixed(2)}/night (target: $${target})${brandLabel}`;
+      }
+    } else if (lastKnownPrice !== null && cheapestPrice < lastKnownPrice * 0.95) {
+      changed = true;
+      resultText = `Hotel dropped to $${cheapestPrice.toFixed(2)}/night (was $${lastKnownPrice.toFixed(2)})${brandLabel}`;
+    }
+
+    if (!changed && watch.notify_any_price_drop && lastKnownPrice !== null && cheapestPrice < lastKnownPrice) {
+      changed = true;
+      resultText = `Hotel price dropped to $${cheapestPrice.toFixed(2)}/night (was $${lastKnownPrice.toFixed(2)})${brandLabel}`;
+    }
+
+    // Store result
+    const now = new Date().toISOString();
+    await supabase.from("check_results").insert({
+      id: crypto.randomUUID(),
+      watch_id: watch.id,
+      result_data: { text: resultText, source: "booking119-hotels", hotelName: cheapestName, destination: destLabel, totalHotels: hotels.length },
+      changed,
+      price: cheapestPrice,
+      checked_at: now,
+    });
+
+    const updateData: Record<string, unknown> = {
+      last_checked: now, last_price: cheapestPrice, last_result_text: resultText,
+      consecutive_failures: 0, last_error: null,
+    };
+    if (changed) {
+      updateData.triggered = true;
+      updateData.status = "triggered";
+      updateData.change_note = resultText;
+    }
+    await supabase.from("watches").update(updateData).eq("id", watch.id);
+
+    if (changed) {
+      try {
+        await supabase.functions.invoke("notify-user", {
+          body: { watch_id: watch.id, user_id: watch.user_id, action_url: watch.url },
+        });
+      } catch { /* non-critical */ }
+    }
+
+    return { watch_id: watch.id, changed, result_text: resultText, price: cheapestPrice, checked_at: now, source: "booking119-hotels" };
+  } catch (err: any) {
+    console.log(`[check-watch] Hotel API failed: ${err.message}`);
+    return null;
+  }
+}
+
+// ────────────────────────────────────────────────────────────────
+// Flight Watch — booking119 API (Data Bridge)
+// Uses /api/v1/flights/searchFlights with richer airline data
+// ────────────────────────────────────────────────────────────────
+
+async function checkFlightWatchBooking119(
+  watch: any,
+  supabase: any
+): Promise<Record<string, unknown> | null> {
+  const RAPIDAPI_KEY = Deno.env.get("RAPIDAPI_KEY") ?? "";
+  if (!RAPIDAPI_KEY) return null;
+
+  const host = "booking119.p.rapidapi.com";
+  const headers: Record<string, string> = {
+    "x-rapidapi-key": RAPIDAPI_KEY,
+    "x-rapidapi-host": host,
+    "Content-Type": "application/json",
+  };
+
+  try {
+    const condLower = (watch.condition || "").toLowerCase();
+    const urlLower = (watch.url || "").toLowerCase();
+
+    // Extract origin/destination from condition or URL
+    // Condition: "Flight from LAX to JFK under $300"
+    const routeMatch = condLower.match(/(?:flight|fly|flying)\s+(?:from\s+)?([a-z]{3,})\s+(?:to\s+)([a-z]{3,})/i);
+    // Kayak URL: /flights/LAX-JFK/2026-04-15
+    const kayakMatch = urlLower.match(/\/flights\/([a-z]{3})-([a-z]{3})/i);
+    // Google Flights: encoded in URL params (complex, skip)
+
+    let origin = routeMatch?.[1] || kayakMatch?.[1] || null;
+    let destination = routeMatch?.[2] || kayakMatch?.[2] || null;
+
+    if (!origin || !destination) {
+      // Try extracting airport codes from condition (3 uppercase letters)
+      const codes = (watch.condition || "").match(/\b([A-Z]{3})\b/g);
+      if (codes && codes.length >= 2) {
+        origin = codes[0];
+        destination = codes[1];
+      }
+    }
+
+    if (!origin || !destination) {
+      console.log(`[check-watch] booking119 flights: can't extract route for ${watch.id}`);
+      return null; // Fall through to flights-sky API
+    }
+
+    origin = origin.toUpperCase();
+    destination = destination.toUpperCase();
+
+    // Extract date
+    const dateMatch = (watch.condition || watch.url || "").match(/(\d{4}-\d{2}-\d{2})/);
+    const departDate = dateMatch?.[1] || new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0];
+
+    console.log(`[check-watch] booking119 flights: ${origin}→${destination} on ${departDate} for ${watch.id}`);
+
+    // Search flights using booking119
+    const searchRes = await fetch(
+      `https://${host}/api/v1/flights/searchFlights?fromId=${origin}.AIRPORT&toId=${destination}.AIRPORT&departDate=${departDate}&adults=1&cabinClass=ECONOMY&currency_code=USD`,
+      { headers, signal: AbortSignal.timeout(12000) }
+    );
+
+    if (!searchRes.ok) {
+      console.log(`[check-watch] booking119 flights HTTP ${searchRes.status}`);
+      return null;
+    }
+
+    const searchData = await searchRes.json();
+    const offers = searchData.data?.flightOffers ?? [];
+
+    if (offers.length === 0) {
+      console.log(`[check-watch] booking119 flights: no offers for ${origin}→${destination}`);
+      return null;
+    }
+
+    // Find cheapest flight
+    let lowestPrice: number | null = null;
+    let cheapestAirline = "";
+    let cheapestDuration = "";
+
+    for (const offer of offers) {
+      const total = offer.priceBreakdown?.total;
+      if (!total) continue;
+      const price = (total.units ?? 0) + (total.nanos ?? 0) / 1e9;
+      if (price <= 0) continue;
+
+      if (lowestPrice === null || price < lowestPrice) {
+        lowestPrice = price;
+        // Extract airline from first segment
+        const seg = offer.segments?.[0];
+        const leg = seg?.legs?.[0];
+        cheapestAirline = leg?.carriersData?.[0]?.name ?? "";
+        const totalSec = seg?.totalTime ?? 0;
+        cheapestDuration = `${Math.floor(totalSec / 3600)}h${Math.floor((totalSec % 3600) / 60)}m`;
+      }
+    }
+
+    if (lowestPrice === null) return null;
+
+    const airlineLabel = cheapestAirline ? ` (${cheapestAirline})` : "";
+    const durationLabel = cheapestDuration ? `, ${cheapestDuration}` : "";
+
+    console.log(`[check-watch] booking119 flights: $${lowestPrice.toFixed(2)}${airlineLabel} ${origin}→${destination}${durationLabel} (${watch.id})`);
+
+    // Get last known price
+    let lastKnownPrice: number | null = null;
+    try {
+      const { data: lastCheck } = await supabase
+        .from("check_results")
+        .select("price")
+        .eq("watch_id", watch.id)
+        .order("checked_at", { ascending: false })
+        .limit(1)
+        .single();
+      if (lastCheck?.price != null) lastKnownPrice = parseFloat(lastCheck.price);
+    } catch { /* first check */ }
+
+    let changed = false;
+    let resultText = `$${lowestPrice.toFixed(2)} — ${origin}→${destination}${airlineLabel}${durationLabel}`;
+
+    const targetMatch = condLower.match(/(?:below|under|less\s+than|drops?\s+(?:below|under|to))\s+\$?([\d,]+\.?\d*)/);
+    if (targetMatch) {
+      const target = parseFloat(targetMatch[1].replace(/,/g, ""));
+      if (lowestPrice <= target) {
+        changed = true;
+        resultText = `Flight dropped to $${lowestPrice.toFixed(2)} (target: $${target})${airlineLabel}`;
+      }
+    } else if (lastKnownPrice !== null && lowestPrice < lastKnownPrice * 0.95) {
+      changed = true;
+      resultText = `Flight dropped to $${lowestPrice.toFixed(2)} (was $${lastKnownPrice.toFixed(2)})${airlineLabel}`;
+    }
+
+    if (!changed && watch.notify_any_price_drop && lastKnownPrice !== null && lowestPrice < lastKnownPrice) {
+      changed = true;
+      resultText = `Flight price dropped to $${lowestPrice.toFixed(2)} (was $${lastKnownPrice.toFixed(2)})${airlineLabel}`;
+    }
+
+    const now = new Date().toISOString();
+    await supabase.from("check_results").insert({
+      id: crypto.randomUUID(),
+      watch_id: watch.id,
+      result_data: { text: resultText, source: "booking119-flights", airline: cheapestAirline, route: `${origin}-${destination}`, totalOffers: offers.length },
+      changed,
+      price: lowestPrice,
+      checked_at: now,
+    });
+
+    const updateData: Record<string, unknown> = {
+      last_checked: now, last_price: lowestPrice, last_result_text: resultText,
+      consecutive_failures: 0, last_error: null,
+    };
+    if (changed) {
+      updateData.triggered = true;
+      updateData.status = "triggered";
+      updateData.change_note = resultText;
+    }
+    await supabase.from("watches").update(updateData).eq("id", watch.id);
+
+    if (changed) {
+      try {
+        await supabase.functions.invoke("notify-user", {
+          body: { watch_id: watch.id, user_id: watch.user_id, action_url: watch.url },
+        });
+      } catch { /* non-critical */ }
+    }
+
+    return { watch_id: watch.id, changed, result_text: resultText, price: lowestPrice, checked_at: now, source: "booking119-flights" };
+  } catch (err: any) {
+    console.log(`[check-watch] booking119 flights failed: ${err.message}`);
+    return null; // Fall through to flights-sky
+  }
+}
+
+// ────────────────────────────────────────────────────────────────
+// Car Rental API — Flights Scraper Real-Time (vibapidev)
+// Uses /cars/search endpoint for real-time car rental pricing
+// ────────────────────────────────────────────────────────────────
+
+async function checkCarRentalWatch(
+  watch: any,
+  supabase: any
+): Promise<Record<string, unknown> | null> {
+  const RAPIDAPI_KEY = Deno.env.get("RAPIDAPI_KEY") ?? "";
+  if (!RAPIDAPI_KEY) return null;
+
+  const host = "flights-scraper-real-time.p.rapidapi.com";
+  const headers: Record<string, string> = {
+    "x-rapidapi-key": RAPIDAPI_KEY,
+    "x-rapidapi-host": host,
+  };
+
+  try {
+    const condLower = (watch.condition || "").toLowerCase();
+    const urlLower = (watch.url || "").toLowerCase();
+    const watchName = (watch.name || "").toLowerCase();
+
+    // Extract location from URL or condition
+    // Hertz URL: hertz.com/rentacar/reservation/... with location codes
+    // Kayak URL: kayak.com/cars/LAX/2026-04-15/2026-04-17
+    // Condition: "Car rental from LAX April 15-17"
+    let pickUpLocation = "";
+    let dropOffLocation = "";
+    let pickUpDate = "";
+    let dropOffDate = "";
+
+    // Try Kayak-style URL: /cars/LAX/2026-04-15/2026-04-17
+    const kayakCarMatch = urlLower.match(/\/cars\/([a-z\s]+)\/(\d{4}-\d{2}-\d{2})\/(\d{4}-\d{2}-\d{2})/i);
+    if (kayakCarMatch) {
+      pickUpLocation = kayakCarMatch[1];
+      pickUpDate = kayakCarMatch[2];
+      dropOffDate = kayakCarMatch[3];
+      dropOffLocation = pickUpLocation;
+    }
+
+    // Try extracting from condition: "from LAX" or "at LAX"
+    if (!pickUpLocation) {
+      const locMatch = condLower.match(/(?:from|at|pickup|pick up|location)\s+([a-z\s]{2,30})/i);
+      if (locMatch) pickUpLocation = locMatch[1].trim();
+    }
+
+    // Try extracting from watch name or condition
+    if (!pickUpLocation) {
+      // Look for airport codes (3 uppercase letters)
+      const codeMatch = (watch.condition || watch.name || "").match(/\b([A-Z]{3})\b/);
+      if (codeMatch) pickUpLocation = codeMatch[1];
+    }
+
+    // Try extracting from URL hostname — e.g., hertz.com means user is looking at Hertz
+    if (!pickUpLocation) {
+      // Extract city from condition like "Hertz from lax and drop off lax"
+      const fromToMatch = condLower.match(/from\s+([a-z\s]+?)(?:\s+and|\s+to|\s+drop)/i);
+      if (fromToMatch) pickUpLocation = fromToMatch[1].trim();
+    }
+
+    // Extract dates from condition
+    if (!pickUpDate) {
+      const dateMatches = (watch.condition || "").match(/(\w+\s+\d{1,2})\s+(?:to|through|-)\s+(\w+\s+\d{1,2})/i);
+      if (dateMatches) {
+        // Parse "April 30 to May 2" style dates
+        const currentYear = new Date().getFullYear();
+        const tryParseDate = (s: string) => {
+          const d = new Date(`${s}, ${currentYear}`);
+          if (!isNaN(d.getTime())) {
+            // If date is in the past, try next year
+            if (d < new Date()) d.setFullYear(currentYear + 1);
+            return d.toISOString().split("T")[0];
+          }
+          return "";
+        };
+        pickUpDate = tryParseDate(dateMatches[1]);
+        dropOffDate = tryParseDate(dateMatches[2]);
+      }
+    }
+
+    // Fallback dates: next week, 3 days
+    if (!pickUpDate) {
+      const nextWeek = new Date(Date.now() + 7 * 86400000);
+      pickUpDate = nextWeek.toISOString().split("T")[0];
+      dropOffDate = new Date(nextWeek.getTime() + 3 * 86400000).toISOString().split("T")[0];
+    }
+    if (!dropOffDate) {
+      dropOffDate = new Date(new Date(pickUpDate).getTime() + 3 * 86400000).toISOString().split("T")[0];
+    }
+    if (!dropOffLocation) dropOffLocation = pickUpLocation;
+
+    if (!pickUpLocation) {
+      console.log(`[check-watch] Car rental: could not extract location for ${watch.id}`);
+      return null;
+    }
+
+    console.log(`[check-watch] Car rental search: ${pickUpLocation}, ${pickUpDate} to ${dropOffDate} for ${watch.id}`);
+
+    // Search for car rentals
+    const params = new URLSearchParams({
+      pickUpLocation,
+      dropOffLocation,
+      pickUpDate,
+      dropOffDate,
+      pickUpTime: "10:00",
+      dropOffTime: "10:00",
+    });
+
+    const searchRes = await fetch(`https://${host}/cars/search?${params}`, {
+      headers,
+      signal: AbortSignal.timeout(12000),
+    });
+
+    if (!searchRes.ok) {
+      console.log(`[check-watch] Car rental API HTTP ${searchRes.status} for ${watch.id}`);
+      return null;
+    }
+
+    const searchData = await searchRes.json();
+
+    // Extract cheapest price from aggregates
+    let cheapestPrice: number | null = null;
+    const categories = searchData.data?.aggregates?.carCategories ?? [];
+    for (const cat of categories) {
+      if (cat.priceFrom && (cheapestPrice === null || cat.priceFrom < cheapestPrice)) {
+        cheapestPrice = cat.priceFrom;
+      }
+    }
+
+    // Also check matches for specific provider pricing (e.g., if user wants Hertz specifically)
+    const matches = searchData.data?.matches ?? [];
+    let bestMatch: any = null;
+    const wantedProvider = (() => {
+      const text = (watch.name + " " + watch.condition + " " + watch.url).toLowerCase();
+      const providers = ["hertz", "enterprise", "avis", "budget", "national", "sixt", "dollar", "thrifty", "alamo"];
+      return providers.find(p => text.includes(p)) || null;
+    })();
+
+    for (const m of matches.slice(0, 50)) {
+      const price = m.vehicle?.price?.amount ?? m.vehicle?.driveAwayPrice?.amount;
+      if (!price || price <= 0) continue;
+
+      // If user wants a specific provider, filter for it
+      if (wantedProvider) {
+        const supplierId = m.route?.pickUpDepotId;
+        const supplierData = searchData.data?.suppliers ?? {};
+        const depots = searchData.data?.depots ?? {};
+        const depot = depots[supplierId];
+        const supplierName = depot?.supplierName || supplierData[depot?.supplierId]?.name || "";
+        if (!supplierName.toLowerCase().includes(wantedProvider)) continue;
+      }
+
+      if (!bestMatch || price < (bestMatch.vehicle?.price?.amount ?? Infinity)) {
+        bestMatch = m;
+      }
+    }
+
+    // Use provider-specific price if available, otherwise cheapest overall
+    const matchPrice = bestMatch?.vehicle?.price?.amount ?? bestMatch?.vehicle?.driveAwayPrice?.amount;
+    const finalPrice = matchPrice ?? cheapestPrice;
+
+    if (finalPrice === null) {
+      console.log(`[check-watch] Car rental: no pricing found for ${watch.id}`);
+      return null;
+    }
+
+    const vehicleName = bestMatch?.vehicle?.makeAndModel ?? "Car rental";
+    const providerLabel = wantedProvider ? ` (${wantedProvider.charAt(0).toUpperCase() + wantedProvider.slice(1)})` : "";
+    const totalCars = searchData.pageHeading ?? "";
+
+    console.log(`[check-watch] Car rental: $${finalPrice} for ${vehicleName}${providerLabel} — ${pickUpLocation} ${pickUpDate} to ${dropOffDate} (${watch.id})`);
+
+    // Get last known price
+    let lastKnownPrice: number | null = null;
+    try {
+      const { data: lastCheck } = await supabase
+        .from("check_results")
+        .select("price")
+        .eq("watch_id", watch.id)
+        .order("checked_at", { ascending: false })
+        .limit(1)
+        .single();
+      if (lastCheck?.price != null) {
+        lastKnownPrice = parseFloat(lastCheck.price);
+      }
+    } catch { /* first check */ }
+
+    // Determine if condition is met
+    let changed = false;
+    let resultText = `$${finalPrice.toFixed(2)} — ${vehicleName}${providerLabel} (${pickUpLocation})`;
+
+    // Check against explicit target price
+    const targetMatch = condLower.match(
+      /(?:below|under|less\s+than|drops?\s+(?:below|under|to))\s+\$?([\d,]+\.?\d*)/
+    );
+    if (targetMatch) {
+      const target = parseFloat(targetMatch[1].replace(/,/g, ""));
+      if (finalPrice <= target) {
+        changed = true;
+        resultText = `Car rental dropped to $${finalPrice.toFixed(2)} (target: $${target})${providerLabel}`;
+      }
+    } else if (lastKnownPrice !== null && finalPrice < lastKnownPrice * 0.95) {
+      // No explicit target: trigger if price dropped 5%+
+      changed = true;
+      resultText = `Car rental dropped to $${finalPrice.toFixed(2)} (was $${lastKnownPrice.toFixed(2)})${providerLabel}`;
+    }
+
+    // Notify on any price drop if enabled
+    if (!changed && watch.notify_any_price_drop && lastKnownPrice !== null && finalPrice < lastKnownPrice) {
+      changed = true;
+      resultText = `Car rental price dropped to $${finalPrice.toFixed(2)} (was $${lastKnownPrice.toFixed(2)})${providerLabel}`;
+    }
+
+    // Store check result
+    const now = new Date().toISOString();
+    await supabase.from("check_results").insert({
+      id: crypto.randomUUID(),
+      watch_id: watch.id,
+      result_data: { text: resultText, source: "car-rental-api", totalCars, provider: wantedProvider },
+      changed,
+      price: finalPrice,
+      checked_at: now,
+    });
+
+    // Update watch
+    const updateData: Record<string, unknown> = {
+      last_checked: now,
+      last_price: finalPrice,
+      last_result_text: resultText,
+      consecutive_failures: 0,
+      last_error: null,
+    };
+    if (changed) {
+      updateData.triggered = true;
+      updateData.status = "triggered";
+      updateData.change_note = resultText;
+    }
+    await supabase.from("watches").update(updateData).eq("id", watch.id);
+
+    // Notify if triggered
+    if (changed) {
+      try {
+        await supabase.functions.invoke("notify-user", {
+          body: { watch_id: watch.id, user_id: watch.user_id, action_url: watch.url },
+        });
+      } catch { /* non-critical */ }
+    }
+
+    return {
+      watch_id: watch.id,
+      changed,
+      result_text: resultText,
+      price: finalPrice,
+      checked_at: now,
+      source: "car-rental-api",
+    };
+  } catch (err: any) {
+    console.log(`[check-watch] Car rental API failed: ${err.message}`);
+    return null; // Fall through to standard check
+  }
+}
+
+// ────────────────────────────────────────────────────────────────
+// Recreation.gov Native API — free campsite availability check
+// Uses the undocumented but stable availability endpoint
+// ────────────────────────────────────────────────────────────────
+
+async function checkCampgroundWatch(
+  watch: any,
+  supabase: any
+): Promise<Record<string, unknown> | null> {
+  try {
+    const RECGOV_KEY = Deno.env.get("RECREATION_GOV_API_KEY") ?? "";
+
+    // Extract campground ID from URL: /camping/campsites/{siteId} or /camping/campgrounds/{campgroundId}
+    const campgroundMatch = watch.url.match(/campgrounds\/(\d+)/);
+    const campsiteMatch = watch.url.match(/campsites\/(\d+)/);
+
+    if (!campgroundMatch && !campsiteMatch) return null;
+
+    const now = new Date();
+    const startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    const dateStr = startDate.toISOString().split(".")[0] + ".000Z";
+
+    // Common headers for Recreation.gov API
+    const recHeaders: Record<string, string> = {
+      "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+    };
+    if (RECGOV_KEY) {
+      recHeaders["apikey"] = RECGOV_KEY;
+    }
+
+    let available = false;
+    let availableCount = 0;
+    let resultText = "";
+
+    if (campgroundMatch) {
+      // Campground-level: check all sites
+      const campgroundId = campgroundMatch[1];
+      const apiUrl = `https://www.recreation.gov/api/camps/availability/campground/${campgroundId}/month?start_date=${dateStr}`;
+
+      const res = await fetch(apiUrl, {
+        headers: recHeaders,
+        signal: AbortSignal.timeout(8000),
+      });
+
+      if (!res.ok) return null;
+
+      const data = await res.json();
+      const campsites = data.campsites || {};
+
+      // Count available dates across all sites
+      for (const [siteId, siteData] of Object.entries(campsites) as any) {
+        const availabilities = siteData.availabilities || {};
+        for (const [date, status] of Object.entries(availabilities)) {
+          if (status === "Available") {
+            available = true;
+            availableCount++;
+          }
+        }
+      }
+
+      const siteCount = Object.keys(campsites).length;
+      resultText = available
+        ? `${availableCount} available date(s) found across ${siteCount} sites`
+        : `No availability found across ${siteCount} sites`;
+
+    } else if (campsiteMatch) {
+      // Individual campsite: check the parent campground for this site
+      const siteId = campsiteMatch[1];
+
+      // First, get campsite details to find campground ID
+      const detailUrl = `https://www.recreation.gov/api/camps/campsites/${siteId}`;
+      const detailRes = await fetch(detailUrl, {
+        headers: recHeaders,
+        signal: AbortSignal.timeout(5000),
+      });
+
+      if (!detailRes.ok) return null;
+      const detailData = await detailRes.json();
+      const campgroundId = detailData.campsite?.parent_asset_id || detailData.campsite?.facility_id;
+      if (!campgroundId) return null;
+
+      // Check availability for the campground
+      const apiUrl = `https://www.recreation.gov/api/camps/availability/campground/${campgroundId}/month?start_date=${dateStr}`;
+      const res = await fetch(apiUrl, {
+        headers: recHeaders,
+        signal: AbortSignal.timeout(8000),
+      });
+
+      if (!res.ok) return null;
+      const data = await res.json();
+
+      // Look for this specific site
+      const siteData = data.campsites?.[siteId];
+      if (siteData) {
+        const availabilities = siteData.availabilities || {};
+        const availDates: string[] = [];
+        for (const [date, status] of Object.entries(availabilities)) {
+          if (status === "Available") {
+            available = true;
+            availDates.push(new Date(date).toLocaleDateString("en-US", { month: "short", day: "numeric" }));
+          }
+        }
+        resultText = available
+          ? `Available on: ${availDates.slice(0, 5).join(", ")}${availDates.length > 5 ? ` (+${availDates.length - 5} more)` : ""}`
+          : `Site ${siteId} has no availability this month`;
+      } else {
+        resultText = `Site ${siteId} not found in campground ${campgroundId}`;
+      }
+    }
+
+    // Determine if condition is met (availability detected = triggered)
+    const changed = available;
+
+    console.log(`[check-watch] Recreation.gov API: ${resultText} for ${watch.id}`);
+
+    // Store check result
+    const checkedAt = new Date().toISOString();
+    await supabase.from("check_results").insert({
+      id: crypto.randomUUID(),
+      watch_id: watch.id,
+      result_data: { text: resultText, source: "recreation-gov-api" },
+      changed,
+      checked_at: checkedAt,
+    });
+
+    // Update watch
+    const updateData: Record<string, unknown> = { last_checked: checkedAt };
+    if (changed) {
+      updateData.triggered = true;
+      updateData.status = "triggered";
+      updateData.change_note = resultText;
+      updateData.action_url = watch.url;
+    } else if (watch.triggered) {
+      // Availability gone — un-trigger
+      updateData.triggered = false;
+      updateData.status = "watching";
+      updateData.change_note = null;
+    }
+    // Reset failure counter on successful API call
+    updateData.consecutive_failures = 0;
+    updateData.last_error = null;
+    updateData.needs_attention = false;
+
+    await supabase.from("watches").update(updateData).eq("id", watch.id);
+
+    // Notify if availability found
+    if (changed) {
+      try {
+        await supabase.functions.invoke("notify-user", {
+          body: { watch_id: watch.id, user_id: watch.user_id, action_url: watch.url },
+        });
+      } catch { /* non-critical */ }
+    }
+
+    return {
+      watch_id: watch.id,
+      changed,
+      result_text: resultText,
+      checked_at: checkedAt,
+      source: "recreation-gov-api",
+    };
+  } catch (err: any) {
+    console.log(`[check-watch] Recreation.gov API failed: ${err.message}`);
+    return null;
+  }
+}
+
+// ────────────────────────────────────────────────────────────────
+// Resy API — restaurant reservation availability check
+// Uses the unofficial but stable Resy REST API (read-only, no auth token needed)
+// ────────────────────────────────────────────────────────────────
+
+const RESY_API_KEY = "VbWk7s3L4KiK5fzlO7JD3Q5EYolJI7n5";
+
+async function checkResyWatch(
+  watch: any,
+  supabase: any
+): Promise<Record<string, unknown> | null> {
+  try {
+    const resyHeaders: Record<string, string> = {
+      "Authorization": `ResyAPI api_key="${RESY_API_KEY}"`,
+      "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+      "Origin": "https://resy.com",
+      "Referer": "https://resy.com/",
+    };
+
+    // Step 1: Extract venue slug from URL
+    // Resy URLs: resy.com/cities/{city}/{venue-slug}?date=...&seats=...
+    const urlObj = new URL(watch.url);
+    const pathParts = urlObj.pathname.split("/").filter(Boolean);
+    let venueSlug = "";
+    if (pathParts[0] === "cities" && pathParts.length >= 3) {
+      venueSlug = pathParts[2];
+    } else {
+      venueSlug = pathParts[pathParts.length - 1] || "";
+    }
+
+    if (!venueSlug) {
+      console.log(`[check-watch] Resy: could not extract venue slug from ${watch.url}`);
+      return null;
+    }
+
+    // Step 2: Get venue_id by searching
+    let venueId: number | null = null;
+    let venueName = watch.name || venueSlug.replace(/-/g, " ");
+
+    try {
+      const searchQuery = venueSlug.replace(/-/g, " ");
+      const searchRes = await fetch("https://api.resy.com/3/venuesearch/search", {
+        method: "POST",
+        headers: {
+          ...resyHeaders,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: `query=${encodeURIComponent(searchQuery)}&geo=${encodeURIComponent('{"latitude":0,"longitude":0}')}&types=${encodeURIComponent('["venue"]')}`,
+        signal: AbortSignal.timeout(5000),
+      });
+
+      if (searchRes.ok) {
+        const searchData = await searchRes.json();
+        const hits = searchData.search?.hits ?? [];
+        const match = hits.find((h: any) =>
+          h.url_slug === venueSlug ||
+          h.name?.toLowerCase().includes(searchQuery.toLowerCase())
+        ) ?? hits[0];
+
+        if (match) {
+          venueId = match.id?.resy ?? match.objectID ?? null;
+          if (typeof venueId === "string") venueId = parseInt(venueId);
+          venueName = match.name || venueName;
+        }
+      }
+    } catch (searchErr: any) {
+      console.log(`[check-watch] Resy search failed: ${searchErr.message}`);
+    }
+
+    if (!venueId) {
+      console.log(`[check-watch] Resy: could not resolve venue_id for "${venueSlug}"`);
+      return null;
+    }
+
+    // Step 3: Extract date and party size
+    const condLower = (watch.condition || "").toLowerCase();
+
+    let day = urlObj.searchParams.get("date") || urlObj.searchParams.get("day");
+    let partySize = parseInt(urlObj.searchParams.get("seats") || urlObj.searchParams.get("party_size") || "0");
+
+    if (!day) {
+      const dateMatch = condLower.match(/(\d{4}-\d{2}-\d{2})/);
+      day = dateMatch?.[1] ?? new Date(Date.now() + 86400000).toISOString().split("T")[0];
+    }
+    if (!partySize || partySize < 1) {
+      const sizeMatch = condLower.match(/(\d+)\s*(?:guest|people|person|seat|party)/);
+      partySize = parseInt(sizeMatch?.[1] || "2");
+      if (partySize < 1 || partySize > 20) partySize = 2;
+    }
+
+    // Step 4: Check availability
+    const findUrl = `https://api.resy.com/4/find?venue_id=${venueId}&day=${day}&party_size=${partySize}&lat=0&long=0`;
+
+    const findRes = await fetch(findUrl, {
+      headers: resyHeaders,
+      signal: AbortSignal.timeout(8000),
+    });
+
+    if (!findRes.ok) {
+      console.log(`[check-watch] Resy /4/find returned ${findRes.status}`);
+      return null;
+    }
+
+    const findData = await findRes.json();
+    const venues = findData.results?.venues ?? [];
+    const slots = venues[0]?.slots ?? [];
+
+    // Step 5: Parse results
+    const available = slots.length > 0;
+    let resultText: string;
+
+    if (available) {
+      const times = slots.slice(0, 5).map((s: any) => {
+        const start = s.date?.start || "";
+        const timePart = start.split(" ")[1]?.substring(0, 5) || "";
+        const type = s.config?.type || "";
+        if (!timePart) return type || "Available";
+        const [h, m] = timePart.split(":").map(Number);
+        const ampm = h >= 12 ? "PM" : "AM";
+        const h12 = h > 12 ? h - 12 : h === 0 ? 12 : h;
+        return `${h12}:${String(m).padStart(2, "0")} ${ampm}${type ? ` (${type})` : ""}`;
+      });
+
+      resultText = `${slots.length} table${slots.length > 1 ? "s" : ""} available at ${venueName}: ${times.join(", ")}${slots.length > 5 ? ` +${slots.length - 5} more` : ""}`;
+    } else {
+      resultText = `No tables available at ${venueName} for ${partySize} on ${day}`;
+    }
+
+    const changed = available;
+    console.log(`[check-watch] Resy API: ${resultText} (${watch.id})`);
+
+    // Step 6: Store check result
+    const checkedAt = new Date().toISOString();
+    await supabase.from("check_results").insert({
+      id: crypto.randomUUID(),
+      watch_id: watch.id,
+      result_data: {
+        text: resultText,
+        source: "resy-api",
+        slots_count: slots.length,
+        venue_id: venueId,
+        venue_name: venueName,
+        search_date: day,
+        party_size: partySize,
+      },
+      changed,
+      checked_at: checkedAt,
+    });
+
+    // Step 7: Update watch
+    const updateData: Record<string, unknown> = { last_checked: checkedAt };
+    if (changed) {
+      updateData.triggered = true;
+      updateData.status = "triggered";
+      updateData.change_note = resultText;
+      updateData.action_url = watch.url;
+    } else if (watch.triggered) {
+      updateData.triggered = false;
+      updateData.status = "watching";
+      updateData.change_note = null;
+    }
+    updateData.consecutive_failures = 0;
+    updateData.last_error = null;
+    updateData.needs_attention = false;
+
+    await supabase.from("watches").update(updateData).eq("id", watch.id);
+
+    // Notify if availability found
+    if (changed) {
+      try {
+        await supabase.functions.invoke("notify-user", {
+          body: { watch_id: watch.id, user_id: watch.user_id, action_url: watch.url },
+        });
+      } catch { /* non-critical */ }
+    }
+
+    return {
+      watch_id: watch.id,
+      changed,
+      result_text: resultText,
+      checked_at: checkedAt,
+      source: "resy-api",
+      slots_count: slots.length,
+    };
+  } catch (err: any) {
+    console.log(`[check-watch] Resy API failed: ${err.message}`);
+    return null;
+  }
+}
+
+// ────────────────────────────────────────────────────────────────
+// Auto-Resolve — automatically find a working URL when a watch breaks
+// Uses Serper search + Claude to find an alternative product page
+// ────────────────────────────────────────────────────────────────
+
+async function attemptAutoResolve(
+  watch: any,
+  supabase: any
+): Promise<{ resolved: boolean; newUrl?: string }> {
+  const SERPER_KEY = Deno.env.get("SERPER_API_KEY") ?? "";
+  if (!SERPER_KEY || !watch.name) return { resolved: false };
+
+  try {
+    // Step 1: Search for the product by name to find working URLs
+    const searchQuery = `${watch.name} ${watch.condition || ""}`.trim();
+    const searchRes = await fetch("https://google.serper.dev/search", {
+      method: "POST",
+      headers: { "X-API-KEY": SERPER_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ q: searchQuery, num: 5 }),
+      signal: AbortSignal.timeout(5000),
+    });
+
+    if (!searchRes.ok) return { resolved: false };
+
+    const searchData = await searchRes.json();
+    const results = searchData.organic ?? [];
+
+    if (results.length === 0) return { resolved: false };
+
+    // Step 2: Try to find a result from the SAME domain as the original watch
+    const originalHost = new URL(watch.url).hostname.replace("www.", "").toLowerCase();
+
+    // Priority 1: Same domain match
+    for (const r of results) {
+      try {
+        const resultHost = new URL(r.link).hostname.replace("www.", "").toLowerCase();
+        if (resultHost.includes(originalHost) || originalHost.includes(resultHost)) {
+          // Found a same-domain result — verify it's reachable
+          const verifyRes = await fetch(r.link, {
+            method: "HEAD",
+            headers: { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36" },
+            redirect: "follow",
+            signal: AbortSignal.timeout(5000),
+          });
+          if (verifyRes.ok) {
+            console.log(`[auto-resolve] Same-domain match: ${r.link}`);
+            return { resolved: true, newUrl: r.link };
+          }
+        }
+      } catch { continue; }
+    }
+
+    // Priority 2: If same domain not found, try the top result from any domain
+    // But only for product/price watches (not reservations/tickets — those are site-specific)
+    if (watch.action_type === "price" || watch.action_type === "cart") {
+      for (const r of results.slice(0, 3)) {
+        try {
+          const verifyRes = await fetch(r.link, {
+            method: "HEAD",
+            headers: { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36" },
+            redirect: "follow",
+            signal: AbortSignal.timeout(5000),
+          });
+          if (verifyRes.ok) {
+            // Skip non-retail domains
+            const host = new URL(r.link).hostname.toLowerCase();
+            const skipDomains = ["google.com", "youtube.com", "wikipedia.org", "reddit.com", "pinterest.com", "facebook.com"];
+            if (skipDomains.some(d => host.includes(d))) continue;
+
+            console.log(`[auto-resolve] Cross-domain match: ${r.link}`);
+            return { resolved: true, newUrl: r.link };
+          }
+        } catch { continue; }
+      }
+    }
+
+    return { resolved: false };
+  } catch (err: any) {
+    console.log(`[auto-resolve] Failed: ${err.message}`);
+    return { resolved: false };
+  }
 }
