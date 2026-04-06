@@ -163,82 +163,95 @@ struct ChatDrawer: View {
             let allText: String = chatVM.messages.map { $0.text.lowercased() }.joined(separator: " ")
 
             let browseURL: URL? = {
-                // ─── 1. Check for specific brand/site mentions first ───
-                // Car rental brands
-                let carRentalBrands: [(keywords: [String], url: String)] = [
+                // Use RECENT messages (last 4) for context, not full history
+                // This prevents early category chips (e.g. "Camping") from overriding
+                // when the user shifted topics (e.g. to concert tickets)
+                let recentMessages = chatVM.messages.suffix(4)
+                let recentText = recentMessages.map { $0.text.lowercased() }.joined(separator: " ")
+
+                // ─── 1. Check for specific brand/site mentions in recent context ───
+                let brands: [(keywords: [String], url: String)] = [
+                    // Car rental brands
                     (["hertz"], "https://www.hertz.com"),
                     (["enterprise"], "https://www.enterprise.com"),
                     (["avis"], "https://www.avis.com"),
-                    (["budget"], "https://www.budget.com"),
-                    (["national"], "https://www.nationalcar.com"),
+                    (["budget rental", "budget car"], "https://www.budget.com"),
+                    (["national car", "nationalcar"], "https://www.nationalcar.com"),
                     (["sixt"], "https://www.sixt.com"),
                     (["turo"], "https://turo.com"),
-                ]
-                for brand in carRentalBrands {
-                    if brand.keywords.contains(where: { allText.contains($0) }) {
-                        return URL(string: brand.url)
-                    }
-                }
-
-                // Hotel brands
-                let hotelBrands: [(keywords: [String], url: String)] = [
+                    // Hotel brands
                     (["marriott", "bonvoy"], "https://www.marriott.com"),
                     (["hilton"], "https://www.hilton.com"),
                     (["hyatt"], "https://www.hyatt.com"),
                     (["airbnb"], "https://www.airbnb.com"),
                     (["vrbo"], "https://www.vrbo.com"),
-                ]
-                for brand in hotelBrands {
-                    if brand.keywords.contains(where: { allText.contains($0) }) {
-                        return URL(string: brand.url)
-                    }
-                }
-
-                // Airline brands
-                let airlineBrands: [(keywords: [String], url: String)] = [
+                    // Airline brands
                     (["southwest", "wanna get away"], "https://www.southwest.com"),
-                    (["delta"], "https://www.delta.com"),
-                    (["united"], "https://www.united.com"),
-                    (["american airlines", "aa.com"], "https://www.aa.com"),
+                    (["delta air", "delta flight"], "https://www.delta.com"),
+                    (["united air", "united flight"], "https://www.united.com"),
+                    (["american airlines"], "https://www.aa.com"),
                     (["jetblue"], "https://www.jetblue.com"),
-                    (["spirit"], "https://www.spirit.com"),
-                    (["frontier"], "https://www.flyfrontier.com"),
+                    (["spirit air", "spirit flight"], "https://www.spirit.com"),
+                    (["frontier air", "frontier flight"], "https://www.flyfrontier.com"),
                     (["alaska air"], "https://www.alaskaair.com"),
+                    // Ticket sites
+                    (["stubhub"], "https://www.stubhub.com"),
+                    (["seatgeek"], "https://www.seatgeek.com"),
                 ]
-                for brand in airlineBrands {
-                    if brand.keywords.contains(where: { allText.contains($0) }) {
+                for brand in brands {
+                    if brand.keywords.contains(where: { recentText.contains($0) }) {
                         return URL(string: brand.url)
                     }
                 }
 
-                // ─── 2. Fall back to category detection ───
-                if allText.contains("camping") || allText.contains("campground") || allText.contains("campsite") {
-                    return URL(string: "https://www.recreation.gov")
-                }
-                if allText.contains("reservation") || allText.contains("restaurant") || allText.contains("table for") || allText.contains("resy") || allText.contains("opentable") {
-                    return URL(string: "https://resy.com")
-                }
-                if allText.contains("ticket") || allText.contains("concert") || allText.contains("event") || allText.contains("show") {
+                // ─── 2. Smart search URL from recent context ───
+                // Extract the most specific recent user message for building a search query
+                let lastUserMsg = recentMessages.last(where: { $0.role == .user })?.text ?? ""
+                let lastUserLower = lastUserMsg.lowercased()
+
+                // Tickets/events — build Ticketmaster search with event details
+                if recentText.contains("ticket") || recentText.contains("concert") || recentText.contains("event") || recentText.contains("show") || recentText.contains("game") {
+                    let query = lastUserMsg
+                        .replacingOccurrences(of: "(?i)browse.*find.*it|ticket[s]?\\s*(for)?|watch\\s*(for)?|i want|can you|please", with: "", options: .regularExpression)
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !query.isEmpty, let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
+                        return URL(string: "https://www.ticketmaster.com/search?q=\(encoded)")
+                    }
                     return URL(string: "https://www.ticketmaster.com")
                 }
-                // Car rental (generic — no specific brand mentioned)
-                if allText.contains("car rental") || allText.contains("rental car") || allText.contains("rent a car") {
-                    return URL(string: "https://www.google.com/travel/explore")
-                }
-                // Hotel (generic)
-                if allText.contains("hotel") || allText.contains("stay") || allText.contains("lodging") || allText.contains("accommodation") {
-                    return URL(string: "https://www.google.com/travel/hotels")
-                }
-                // Flight (generic)
-                if allText.contains("flight") || allText.contains("fly") || allText.contains("airfare") {
-                    return URL(string: "https://www.google.com/travel/flights")
+
+                // Restaurant reservations
+                if recentText.contains("reservation") || recentText.contains("restaurant") || recentText.contains("table for") || recentText.contains("resy") || recentText.contains("opentable") {
+                    return URL(string: "https://resy.com")
                 }
 
-                // ─── 3. Default: Google search with conversation context ───
-                // Build a smart search query from the last user message
-                let lastUserMsg = chatVM.messages.last(where: { $0.role == .user })?.text ?? ""
+                // Camping
+                if recentText.contains("camping") || recentText.contains("campground") || recentText.contains("campsite") || recentText.contains("recreation.gov") {
+                    let query = lastUserMsg
+                        .replacingOccurrences(of: "(?i)browse.*find.*it|camp(ing|ground|site)?\\s*(at|for)?|watch\\s*(for)?|availability", with: "", options: .regularExpression)
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !query.isEmpty, let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
+                        return URL(string: "https://www.recreation.gov/search?q=\(encoded)")
+                    }
+                    return URL(string: "https://www.recreation.gov")
+                }
+
+                // Car rental (generic)
+                if recentText.contains("car rental") || recentText.contains("rental car") || recentText.contains("rent a car") {
+                    return URL(string: "https://www.kayak.com/cars")
+                }
+                // Hotel (generic)
+                if recentText.contains("hotel") || recentText.contains("stay") || recentText.contains("lodging") || recentText.contains("accommodation") {
+                    return URL(string: "https://www.kayak.com/hotels")
+                }
+                // Flight (generic)
+                if recentText.contains("flight") || recentText.contains("fly") || recentText.contains("airfare") {
+                    return URL(string: "https://www.kayak.com/flights")
+                }
+
+                // ─── 3. Default: Google search with last user message ───
                 let query: String = !lastUserMsg.isEmpty ? lastUserMsg : (watchVM.selectedWatch?.name ?? "product")
-                let encoded: String = query.addingPercentEncoding(withAllowedCharacters: CharacterSet.urlQueryAllowed) ?? query
+                let encoded: String = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
                 return URL(string: "https://www.google.com/search?q=\(encoded)")
             }()
             if let url = browseURL { browserItem = BrowserItem(url: url) }
