@@ -205,31 +205,61 @@ struct ChatDrawer: View {
                 }
 
                 // ─── 2. Smart search URL from recent context ───
-                // Extract the most specific recent user message for building a search query
+                // Use the AI's LAST RESPONSE to extract parsed details (event name, venue, etc.)
+                // The AI already did the hard work of understanding the user's intent
+                let lastAIMsg = recentMessages.last(where: { $0.role == .assistant })?.text ?? ""
                 let lastUserMsg = recentMessages.last(where: { $0.role == .user })?.text ?? ""
-                let lastUserLower = lastUserMsg.lowercased()
 
-                // Tickets/events — build Ticketmaster search with event details
-                if recentText.contains("ticket") || recentText.contains("concert") || recentText.contains("event") || recentText.contains("show") || recentText.contains("game") {
-                    let query = lastUserMsg
-                        .replacingOccurrences(of: "(?i)browse.*find.*it|ticket[s]?\\s*(for)?|watch\\s*(for)?|i want|can you|please", with: "", options: .regularExpression)
+                // Helper: extract a smart search query from the AI's response
+                // The AI typically says things like "The Chicks concert at Yaamava' Resort"
+                // or "Carbone in NYC" — this is much better than the raw user message
+                func extractSearchQuery(from aiResponse: String, userMsg: String, category: String) -> String {
+                    // Try to extract specific names from AI response
+                    // Pattern: look for quoted names, or text after "The" / "at" / "for" / "in"
+                    let ai = aiResponse
+                    let patterns: [String] = [
+                        // "The Chicks concert at Yaamava' Resort & Casino"
+                        "(?:Got it!|Perfect!|I'll|Let me).*?\\b((?:[A-Z][a-z']+(?:\\s+(?:&|and|at|the|in|vs|vs\\.))?\\s*)+(?:[A-Z][a-z']+|[A-Z]+)(?:\\s+(?:Resort|Casino|Arena|Center|Stadium|Theatre|Theater|Garden|Hall|Park|Club|Lounge)(?:\\s*&?\\s*\\w+)?)?)",
+                    ]
+                    for pattern in patterns {
+                        if let match = ai.range(of: pattern, options: .regularExpression) {
+                            let extracted = String(ai[match])
+                                .replacingOccurrences(of: "(?i)^(got it!?|perfect!?|i'll|let me)\\s*", with: "", options: .regularExpression)
+                                .trimmingCharacters(in: .whitespacesAndNewlines)
+                                .components(separatedBy: ".").first ?? ""
+                            if extracted.count > 3 && extracted.count < 100 {
+                                return extracted.trimmingCharacters(in: .punctuationCharacters.union(.whitespaces))
+                            }
+                        }
+                    }
+                    // Fallback: clean up the user message
+                    return userMsg
+                        .replacingOccurrences(of: "(?i)browse.*find.*it|this is for|i want|can you|please|watch for|track|monitor", with: "", options: .regularExpression)
+                        .replacingOccurrences(of: "(?i)^(a |an |the |some )", with: "", options: .regularExpression)
                         .trimmingCharacters(in: .whitespacesAndNewlines)
+                }
+
+                // Tickets/events — build Ticketmaster search with event details from AI
+                if recentText.contains("ticket") || recentText.contains("concert") || recentText.contains("event") || recentText.contains("show") || recentText.contains("game") {
+                    let query = extractSearchQuery(from: lastAIMsg, userMsg: lastUserMsg, category: "tickets")
                     if !query.isEmpty, let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
                         return URL(string: "https://www.ticketmaster.com/search?q=\(encoded)")
                     }
                     return URL(string: "https://www.ticketmaster.com")
                 }
 
-                // Restaurant reservations
+                // Restaurant reservations — use AI's parsed restaurant name
                 if recentText.contains("reservation") || recentText.contains("restaurant") || recentText.contains("table for") || recentText.contains("resy") || recentText.contains("opentable") {
+                    let query = extractSearchQuery(from: lastAIMsg, userMsg: lastUserMsg, category: "restaurant")
+                    if !query.isEmpty, let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
+                        return URL(string: "https://resy.com/cities?query=\(encoded)")
+                    }
                     return URL(string: "https://resy.com")
                 }
 
-                // Camping
+                // Camping — use AI's parsed campground name
                 if recentText.contains("camping") || recentText.contains("campground") || recentText.contains("campsite") || recentText.contains("recreation.gov") {
-                    let query = lastUserMsg
-                        .replacingOccurrences(of: "(?i)browse.*find.*it|camp(ing|ground|site)?\\s*(at|for)?|watch\\s*(for)?|availability", with: "", options: .regularExpression)
-                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                    let query = extractSearchQuery(from: lastAIMsg, userMsg: lastUserMsg, category: "camping")
                     if !query.isEmpty, let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
                         return URL(string: "https://www.recreation.gov/search?q=\(encoded)")
                     }
@@ -249,8 +279,9 @@ struct ChatDrawer: View {
                     return URL(string: "https://www.kayak.com/flights")
                 }
 
-                // ─── 3. Default: Google search with last user message ───
-                let query: String = !lastUserMsg.isEmpty ? lastUserMsg : (watchVM.selectedWatch?.name ?? "product")
+                // ─── 3. Default: Google search with AI's understanding ───
+                let smartQuery = extractSearchQuery(from: lastAIMsg, userMsg: lastUserMsg, category: "general")
+                let query: String = !smartQuery.isEmpty ? smartQuery : (watchVM.selectedWatch?.name ?? "product")
                 let encoded: String = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
                 return URL(string: "https://www.google.com/search?q=\(encoded)")
             }()
