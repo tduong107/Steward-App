@@ -846,6 +846,8 @@ serve(async (req) => {
     // Fetch the URL content
     let pageText = "";
     let fetchSuccess = true;
+    // Detailed per-method logging for failure diagnostics
+    const methodLog: Array<{ method: string; status: string; error?: string; duration_ms: number; price_found?: number }> = [];
 
     // Method memory: if a non-direct method worked last time, skip direct fetch to save time
     const preferredMethod = watch.preferred_fetch_method;
@@ -938,6 +940,7 @@ serve(async (req) => {
     const SCRAPE_DO_KEY = Deno.env.get("SCRAPE_DO_API_KEY") ?? "";
     const skipScrapeDo = serperPrimaryDomains.some(d => fetchDomain.includes(d));
     if ((!fetchSuccess || pageText === "") && SCRAPE_DO_KEY && timeRemaining() > 12000 && !skipScrapeDo) {
+      const sdStart = Date.now();
       try {
         console.log(`[check-watch] Trying Scrape.do for ${watch.id}`);
         const sdUrl = `https://api.scrape.do/?token=${SCRAPE_DO_KEY}&url=${encodeURIComponent(fetchUrl)}&render=true&super=true`;
@@ -945,11 +948,17 @@ serve(async (req) => {
         if (sdRes.ok) {
           pageText = await sdRes.text();
           fetchSuccess = true;
+          methodLog.push({ method: "scrape_do", status: "ok", duration_ms: Date.now() - sdStart });
           console.log(`[check-watch] Scrape.do recovered ${watch.id} (${pageText.length} chars)`);
+        } else {
+          methodLog.push({ method: "scrape_do", status: "failed", error: `HTTP ${sdRes.status}`, duration_ms: Date.now() - sdStart });
         }
       } catch (sdErr: any) {
-        console.log(`[check-watch] Scrape.do failed (non-critical): ${sdErr.message}`);
+        methodLog.push({ method: "scrape_do", status: "error", error: sdErr.message, duration_ms: Date.now() - sdStart });
+        console.log(`[check-watch] Scrape.do failed: ${sdErr.message}`);
       }
+    } else if (!skipScrapeDo && (!fetchSuccess || pageText === "")) {
+      methodLog.push({ method: "scrape_do", status: "skipped", error: !SCRAPE_DO_KEY ? "no_api_key" : "timeout_budget", duration_ms: 0 });
     }
 
     // Extract current price from raw HTML (structured selectors work best on raw HTML)
@@ -1416,138 +1425,36 @@ serve(async (req) => {
       resultText.startsWith("Error:");
 
     let autoFixed = false;
-    let fixedVia: string | null = null; // Track which method worked for domain_routing
+    let fixedVia: string | null = null;
 
-    if (isCheckFailure && !changed) {
-      // Auto-fix attempt: use Serper to find a price for the product
-      // Runs for both "Price not found on page" AND "Could not reach page" (site blocking our fetch)
-      // Skip Shopping API for ticket marketplaces — it returns unrelated product listings
-      if ((resultText === "Price not found on page" || resultText === "Could not reach page") && watch.name && !isDynamicPricingSite) {
-        try {
-          const SERPER_KEY = Deno.env.get("SERPER_API_KEY") ?? "";
-          if (SERPER_KEY) {
-            const serperRes = await fetch("https://google.serper.dev/shopping", {
-              method: "POST",
-              headers: { "X-API-KEY": SERPER_KEY, "Content-Type": "application/json" },
-              body: JSON.stringify({ q: watch.name, num: 5 }),
-              signal: AbortSignal.timeout(5000),
-            });
-            if (serperRes.ok) {
-              const serperData = await serperRes.json();
-              const items = serperData.shopping ?? [];
-              const pageUnreachable = resultText === "Could not reach page";
-              // Priority 1: same-domain result (most accurate)
-              // Priority 2: any retailer (when page is unreachable — better than nothing)
-              let bestPrice: number | null = null;
-              let bestSource = "";
-              let bestUrl = "";
-              let isCrossDomain = false;
-              for (const item of items) {
-                try {
-                  const serperPrice = parseShoppingPrice(item.price);
-                  if (serperPrice === null) continue;
-                  const itemHost = new URL(item.link ?? "").hostname.replace("www.", "");
-                  if (itemHost.includes(watchHostLower) || watchHostLower.includes(itemHost)) {
-                    // Same domain — use immediately
-                    bestPrice = serperPrice;
-                    bestSource = itemHost;
-                    bestUrl = item.link ?? "";
-                    isCrossDomain = false;
-                    break;
-                  } else if (pageUnreachable && bestPrice === null) {
-                    // Cross-domain — only use when original site is unreachable
-                    bestPrice = serperPrice;
-                    bestSource = itemHost;
-                    bestUrl = item.link ?? "";
-                    isCrossDomain = true;
-                  }
-                } catch { /* skip bad items */ }
-              }
-              if (bestPrice !== null) {
-                currentPrice = bestPrice;
-                resultText = `$${bestPrice.toFixed(2)} (via ${bestSource})`;
-                autoFixed = true;
-                fixedVia = "serper_shopping";
-                console.log(`[check-watch] Auto-fix: found price $${bestPrice} via Serper (${bestSource}) for ${watch.id}`);
-                // Save cross-domain alternative as a suggestion for the user
-                if (isCrossDomain && bestUrl) {
-                  updateData.alt_source_url = bestUrl;
-                  updateData.alt_source_domain = bestSource;
-                  updateData.alt_source_price = bestPrice;
-                  updateData.alt_source_found_at = new Date().toISOString();
-                  console.log(`[check-watch] Saved alt source suggestion: ${bestSource} at $${bestPrice} for ${watch.id}`);
-                }
-                // Re-evaluate condition with the found price
-                const condLower = watch.condition.toLowerCase();
-                const priceThresholdMatch = condLower.match(
-                  /price\s+(?:drops?\s+)?(?:below|under|less\s+than)\s+\$?([\d,]+\.?\d*)/
-                );
-                if (priceThresholdMatch) {
-                  const threshold = parseFloat(priceThresholdMatch[1].replace(/,/g, ""));
-                  if (bestPrice < threshold) {
-                    changed = true;
-                    resultText = `Price dropped to $${bestPrice.toFixed(2)} (below $${threshold})`;
-                  }
-                }
-              }
-            }
-          }
-        } catch (serperErr) {
-          console.log(`[check-watch] Serper auto-fix failed (non-critical): ${serperErr.message}`);
-        }
-      }
+    // Log the initial direct fetch result
+    methodLog.push({
+      method: skipDirectFetch ? "direct (skipped)" : "direct",
+      status: fetchSuccess ? "ok" : "failed",
+      error: fetchSuccess ? undefined : resultText,
+      duration_ms: Date.now() - funcStartTime,
+    });
 
-      // Auto-fix attempt: retry with desktop User-Agent for unreachable pages
-      if (resultText === "Could not reach page" && !autoFixed) {
-        try {
-          const retryRes = await fetch(fetchUrl, {
-            headers: {
-              ...fetchHeaders,
-              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            },
-            redirect: "follow",
-            signal: AbortSignal.timeout(10000),
-          });
-          if (retryRes.ok) {
-            const retryText = await retryRes.text();
-            const retryPlain = stripHtml(retryText);
-            const retryPrice = extractPrice(retryText);
-            const retryEval = await evaluateConditionAsync(
-              watch.condition, retryPlain, true, lastKnownPrice, watch.action_type, retryPrice
-            );
-            changed = retryEval.changed;
-            resultText = retryEval.resultText;
-            currentPrice = retryPrice;
-            autoFixed = true;
-            fixedVia = "direct_desktop_ua";
-            console.log(`[check-watch] Auto-fix: desktop UA retry succeeded for ${watch.id}`);
-          }
-        } catch (retryErr) {
-          console.log(`[check-watch] Desktop UA retry failed (non-critical): ${retryErr.message}`);
-        }
-      }
-    }
+    // Fallback chain — ordered to maximize chance of fixing the ORIGINAL request:
+    // 1. Claude AI (searches for price in context of original product)
+    // 2. Desktop UA retry (retry direct fetch with different browser fingerprint)
+    // 3. Serper Shopping (find price from any retailer — may be cross-domain)
 
-    // ─── Notify on any price decrease if user opted in ────────────
-    if (!changed && watch.notify_any_price_drop && currentPrice !== null && lastKnownPrice !== null && currentPrice < lastKnownPrice) {
-      changed = true;
-      resultText = `Price dropped to $${currentPrice.toFixed(2)} (was $${lastKnownPrice.toFixed(2)})`;
-    }
+    const needsFallback = (isCheckFailure || (currentPrice === null && watch.action_type === "price")) && !changed;
 
-    // ─── Claude AI fallback: runs when check failed OR price couldn't be extracted ────────────
-    // Broadened trigger: also fires when we fetched the page but found no price (common for JS-heavy sites)
-    const needsClaudeFallback = !autoFixed && !changed && ANTHROPIC_API_KEY && watch.name && timeRemaining() > 8000 &&
-      (isCheckFailure || (currentPrice === null && watch.action_type === "price"));
-    if (needsClaudeFallback) {
+    // ─── Fallback 1: Claude AI (Serper search → Claude extracts price) ────────────
+    if (needsFallback && !autoFixed && ANTHROPIC_API_KEY && watch.name && timeRemaining() > 8000) {
+      const claudeStart = Date.now();
       try {
-        console.log(`[check-watch] Attempting Claude fallback for ${watch.id} (${watch.name})`);
+        console.log(`[check-watch] Fallback 1 — Claude AI for ${watch.id} (${watch.name})`);
         const claudeResult = await claudePriceFallback(watch, lastKnownPrice);
         if (claudeResult !== null) {
           currentPrice = claudeResult.price;
           resultText = claudeResult.resultText;
           autoFixed = true;
           fixedVia = "claude";
-          console.log(`[check-watch] Claude fallback found price $${claudeResult.price} for ${watch.id}`);
+          methodLog.push({ method: "claude", status: "ok", duration_ms: Date.now() - claudeStart, price_found: claudeResult.price });
+          console.log(`[check-watch] Claude found price $${claudeResult.price} for ${watch.id}`);
 
           // Re-evaluate condition with Claude's price
           if (watch.action_type === "price" && lastKnownPrice !== null) {
@@ -1559,10 +1466,122 @@ serve(async (req) => {
               resultText = `Price dropped to $${claudeResult.price.toFixed(2)} (was $${lastKnownPrice.toFixed(2)})`;
             }
           }
+        } else {
+          methodLog.push({ method: "claude", status: "no_price", duration_ms: Date.now() - claudeStart });
         }
       } catch (claudeErr: any) {
-        console.log(`[check-watch] Claude fallback failed (non-critical): ${claudeErr.message}`);
+        methodLog.push({ method: "claude", status: "error", error: claudeErr.message, duration_ms: Date.now() - claudeStart });
+        console.log(`[check-watch] Claude fallback failed: ${claudeErr.message}`);
       }
+    }
+
+    // ─── Fallback 2: Desktop UA retry (different browser fingerprint) ────────────
+    if (needsFallback && !autoFixed && resultText === "Could not reach page" && timeRemaining() > 10000) {
+      const uaStart = Date.now();
+      try {
+        console.log(`[check-watch] Fallback 2 — Desktop UA retry for ${watch.id}`);
+        const retryRes = await fetch(fetchUrl, {
+          headers: {
+            ...fetchHeaders,
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          },
+          redirect: "follow",
+          signal: AbortSignal.timeout(10000),
+        });
+        if (retryRes.ok) {
+          const retryText = await retryRes.text();
+          const retryPlain = stripHtml(retryText);
+          const retryPrice = extractPrice(retryText);
+          const retryEval = await evaluateConditionAsync(
+            watch.condition, retryPlain, true, lastKnownPrice, watch.action_type, retryPrice
+          );
+          changed = retryEval.changed;
+          resultText = retryEval.resultText;
+          currentPrice = retryPrice;
+          autoFixed = true;
+          fixedVia = "direct_desktop_ua";
+          methodLog.push({ method: "desktop_ua", status: "ok", duration_ms: Date.now() - uaStart, price_found: retryPrice ?? undefined });
+          console.log(`[check-watch] Desktop UA retry succeeded for ${watch.id}`);
+        } else {
+          methodLog.push({ method: "desktop_ua", status: "failed", error: `HTTP ${retryRes.status}`, duration_ms: Date.now() - uaStart });
+        }
+      } catch (retryErr: any) {
+        methodLog.push({ method: "desktop_ua", status: "error", error: retryErr.message, duration_ms: Date.now() - uaStart });
+        console.log(`[check-watch] Desktop UA retry failed: ${retryErr.message}`);
+      }
+    }
+
+    // ─── Fallback 3: Serper Shopping (cross-retailer price lookup) ────────────
+    if (needsFallback && !autoFixed && watch.name && !isDynamicPricingSite) {
+      const serperStart = Date.now();
+      try {
+        const SERPER_KEY = Deno.env.get("SERPER_API_KEY") ?? "";
+        if (SERPER_KEY && timeRemaining() > 5000) {
+          console.log(`[check-watch] Fallback 3 — Serper Shopping for ${watch.id} (${watch.name})`);
+          const serperRes = await fetch("https://google.serper.dev/shopping", {
+            method: "POST",
+            headers: { "X-API-KEY": SERPER_KEY, "Content-Type": "application/json" },
+            body: JSON.stringify({ q: watch.name, num: 5 }),
+            signal: AbortSignal.timeout(5000),
+          });
+          if (serperRes.ok) {
+            const serperData = await serperRes.json();
+            const items = serperData.shopping ?? [];
+            const pageUnreachable = resultText === "Could not reach page";
+            let bestPrice: number | null = null;
+            let bestSource = "";
+            let bestUrl = "";
+            let isCrossDomain = false;
+            for (const item of items) {
+              try {
+                const serperPrice = parseShoppingPrice(item.price);
+                if (serperPrice === null) continue;
+                const itemHost = new URL(item.link ?? "").hostname.replace("www.", "");
+                if (itemHost.includes(watchHostLower) || watchHostLower.includes(itemHost)) {
+                  bestPrice = serperPrice; bestSource = itemHost; bestUrl = item.link ?? ""; isCrossDomain = false;
+                  break;
+                } else if (pageUnreachable && bestPrice === null) {
+                  bestPrice = serperPrice; bestSource = itemHost; bestUrl = item.link ?? ""; isCrossDomain = true;
+                }
+              } catch { /* skip bad items */ }
+            }
+            if (bestPrice !== null) {
+              currentPrice = bestPrice;
+              resultText = `$${bestPrice.toFixed(2)} (via ${bestSource})`;
+              autoFixed = true;
+              fixedVia = "serper_shopping";
+              methodLog.push({ method: "serper_shopping", status: "ok", duration_ms: Date.now() - serperStart, price_found: bestPrice });
+              console.log(`[check-watch] Serper Shopping found $${bestPrice} via ${bestSource} for ${watch.id}`);
+              if (isCrossDomain && bestUrl) {
+                updateData.alt_source_url = bestUrl;
+                updateData.alt_source_domain = bestSource;
+                updateData.alt_source_price = bestPrice;
+                updateData.alt_source_found_at = new Date().toISOString();
+                console.log(`[check-watch] Saved alt source: ${bestSource} at $${bestPrice}`);
+              }
+              const condLower = watch.condition.toLowerCase();
+              const priceThresholdMatch = condLower.match(/price\s+(?:drops?\s+)?(?:below|under|less\s+than)\s+\$?([\d,]+\.?\d*)/);
+              if (priceThresholdMatch) {
+                const threshold = parseFloat(priceThresholdMatch[1].replace(/,/g, ""));
+                if (bestPrice < threshold) { changed = true; resultText = `Price dropped to $${bestPrice.toFixed(2)} (below $${threshold})`; }
+              }
+            } else {
+              methodLog.push({ method: "serper_shopping", status: "no_match", duration_ms: Date.now() - serperStart });
+            }
+          } else {
+            methodLog.push({ method: "serper_shopping", status: "failed", error: `HTTP ${serperRes.status}`, duration_ms: Date.now() - serperStart });
+          }
+        }
+      } catch (serperErr: any) {
+        methodLog.push({ method: "serper_shopping", status: "error", error: serperErr.message, duration_ms: Date.now() - serperStart });
+        console.log(`[check-watch] Serper Shopping failed: ${serperErr.message}`);
+      }
+    }
+
+    // ─── Notify on any price decrease if user opted in ────────────
+    if (!changed && watch.notify_any_price_drop && currentPrice !== null && lastKnownPrice !== null && currentPrice < lastKnownPrice) {
+      changed = true;
+      resultText = `Price dropped to $${currentPrice.toFixed(2)} (was $${lastKnownPrice.toFixed(2)})`;
     }
 
     // ─── Track consecutive failures & notify on threshold ────────────
@@ -1681,13 +1700,10 @@ serve(async (req) => {
         } catch { /* non-critical */ }
       }
 
-      // Log failure details for analytics and debugging
+      // Log failure details with per-method breakdown for debugging
       try {
         const domain = new URL(fetchUrl).hostname.replace("www.", "");
-        const methodsTried: string[] = ["direct"];
-        if (SCRAPE_DO_KEY) methodsTried.push("scrape.do");
-        if (watch.name) methodsTried.push("serper");
-        if (ANTHROPIC_API_KEY) methodsTried.push("claude");
+        const methodsTried = methodLog.map(m => m.method);
         await supabase.from("watch_failures").insert({
           watch_id: watch.id,
           domain,
@@ -1695,6 +1711,7 @@ serve(async (req) => {
           http_status: resultText.match(/HTTP (\d+)/)?.[1] ? parseInt(resultText.match(/HTTP (\d+)/)[1]) : null,
           error_message: resultText.substring(0, 500),
           method_tried: methodsTried,
+          method_details: methodLog,
         });
       } catch { /* non-critical logging */ }
 
