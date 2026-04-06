@@ -114,7 +114,11 @@ enum ShareAPIService {
         guard let httpResponse = response as? HTTPURLResponse,
               (200..<300).contains(httpResponse.statusCode) else {
             let errorText = String(data: data, encoding: .utf8) ?? "Unknown error"
-            throw ShareError.apiError("Create watch failed: \(errorText)")
+            // Map technical errors to user-friendly messages
+            if errorText.contains("JWT expired") || errorText.contains("PGRST303") {
+                throw ShareError.apiError("Your session has expired. Tap Try Again — if that doesn't work, open the Steward app to refresh your login, then come back and share again.")
+            }
+            throw ShareError.apiError("Something went wrong creating the watch. Tap Try Again, or open the Steward app and try sharing again.\n\nDetails: \(errorText)")
         }
     }
 
@@ -140,6 +144,40 @@ enum ShareAPIService {
 
         let (_, _) = try await URLSession.shared.data(for: request)
         // Fire-and-forget — we don't need to wait for the result
+    }
+
+    /// Counts the user's existing watches via Supabase
+    static func countWatches(userId: String) async throws -> Int {
+        var url = URLComponents(string: "\(supabaseURL)/rest/v1/watches")!
+        url.queryItems = [
+            URLQueryItem(name: "user_id", value: "eq.\(userId)"),
+            URLQueryItem(name: "select", value: "id"),
+        ]
+
+        var request = URLRequest(url: url.url!)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(accessToken ?? anonKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("exact", forHTTPHeaderField: "Prefer")
+        request.timeoutInterval = 10
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        // Check Content-Range header for exact count
+        if let httpResponse = response as? HTTPURLResponse,
+           let contentRange = httpResponse.value(forHTTPHeaderField: "Content-Range"),
+           let totalStr = contentRange.split(separator: "/").last,
+           let total = Int(totalStr) {
+            return total
+        }
+
+        // Fallback: count the returned array
+        if let items = try? JSONDecoder().decode([[String: String]].self, from: data) {
+            return items.count
+        }
+
+        return 0
     }
 
     // MARK: - Errors
@@ -175,6 +213,7 @@ struct ShareWatchDTO: Codable {
     let check_frequency: String
     let preferred_check_time: String?
     let notify_channels: String
+    let response_mode: String     // "notify", "quickLink", or "stewardActs"
     let triggered: Bool
     let image_url: String?
     let created_at: String
@@ -185,6 +224,10 @@ struct ShareWatchDTO: Codable {
     let cookie_status: String?    // "active" or "expired"
 
     // Multi-source search watch fields
-    let watch_mode: String        // "url" (default) or "search"
+    let watch_mode: String        // "url", "search", "camping", "ticket", or "travel"
     let search_query: String?     // Product search query for search-mode watches
+    let ticket_meta: String?      // JSON string for ticket metadata (tm_event_id, etc.)
+    let travel_meta: String?      // JSON string for travel metadata (flight/hotel/car)
+    let resy_meta: String?        // JSON string for Resy metadata (venue_id, date, party_size)
+    let camping_meta: String?     // JSON string for camping metadata (facility_id, dates)
 }
