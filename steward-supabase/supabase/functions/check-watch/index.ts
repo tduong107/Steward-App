@@ -3306,15 +3306,25 @@ async function checkFlightWatchBooking119(
     origin = origin.toUpperCase();
     destination = destination.toUpperCase();
 
-    // Extract date
-    const dateMatch = (watch.condition || watch.url || "").match(/(\d{4}-\d{2}-\d{2})/);
-    const departDate = dateMatch?.[1] || new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0];
+    // Extract departure date — check URL first (most reliable), then condition, then default
+    // Kayak URL format: /flights/LAX-JFK/2026-04-30 or /flights/LAX-JFK/2026-04-30/2026-05-05 (round trip)
+    const urlDateMatch = (watch.url || "").match(/\/flights\/[A-Za-z]{3}-[A-Za-z]{3}\/(\d{4}-\d{2}-\d{2})/);
+    const condDateMatch = (watch.condition || "").match(/(\d{4}-\d{2}-\d{2})/);
+    const departDate = urlDateMatch?.[1] || condDateMatch?.[1] || new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0];
 
-    console.log(`[check-watch] booking119 flights: ${origin}→${destination} on ${departDate} for ${watch.id}`);
+    // Extract return date for round trips (second date in URL)
+    const returnDateMatch = (watch.url || "").match(/\/flights\/[A-Za-z]{3}-[A-Za-z]{3}\/\d{4}-\d{2}-\d{2}\/(\d{4}-\d{2}-\d{2})/);
+    const returnDate = returnDateMatch?.[1] || null;
+
+    console.log(`[check-watch] booking119 flights: ${origin}→${destination} on ${departDate}${returnDate ? ` return ${returnDate}` : ""} for ${watch.id}`);
 
     // Search flights using booking119
+    let flightSearchUrl = `https://${host}/api/v1/flights/searchFlights?fromId=${origin}.AIRPORT&toId=${destination}.AIRPORT&departDate=${departDate}&adults=1&cabinClass=ECONOMY&currency_code=USD`;
+    if (returnDate) {
+      flightSearchUrl += `&returnDate=${returnDate}`;
+    }
     const searchRes = await fetch(
-      `https://${host}/api/v1/flights/searchFlights?fromId=${origin}.AIRPORT&toId=${destination}.AIRPORT&departDate=${departDate}&adults=1&cabinClass=ECONOMY&currency_code=USD`,
+      flightSearchUrl,
       { headers, signal: AbortSignal.timeout(12000) }
     );
 
