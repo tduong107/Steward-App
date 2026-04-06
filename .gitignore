@@ -26,7 +26,7 @@ Pods/
 
 # Swift Package Manager
 .build/
-Package.resolved
+# Package.resolved is committed for Xcode Cloud builds
 
 # Supabase
 steward-supabase/.env
