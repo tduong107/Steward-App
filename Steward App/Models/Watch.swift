@@ -62,6 +62,31 @@ enum ActionType: String, Codable, CaseIterable {
     }
 }
 
+/// What Steward does when a watch triggers.
+enum ResponseMode: String, Codable, CaseIterable, Identifiable {
+    case notify     = "notify"
+    case quickLink  = "quickLink"
+    case stewardActs = "stewardActs"
+
+    var id: String { rawValue }
+
+    var requiredTier: SubscriptionTier {
+        switch self {
+        case .notify:      return .free
+        case .quickLink:   return .pro
+        case .stewardActs: return .premium
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .notify:      return "Notify Me"
+        case .quickLink:   return "Notify + Quick Link"
+        case .stewardActs: return "Steward Acts"
+        }
+    }
+}
+
 @Model
 final class Watch {
     // Static formatters (DateFormatter is expensive to create — reuse across instances)
@@ -97,12 +122,21 @@ final class Watch {
     var lastError: String?
     var needsAttention: Bool = false
 
+    // Alternative source suggestion (when original site is unreachable but found elsewhere)
+    var altSourceUrl: String?
+    var altSourceDomain: String?
+    var altSourcePrice: Double?
+    var altSourceFoundAt: Date?
+
     // Action enhancement — coupon code detected on the page when triggered
     var couponCode: String?
 
     // Auto-act: execute action server-side when condition is met (Premium feature)
     var autoActEnabled: Bool = false
     var spendingLimit: Double?
+
+    // Notify on any price decrease (not just when target/threshold met)
+    var notifyAnyPriceDrop: Bool = false
 
     var actionType: ActionType {
         get { ActionType(rawValue: actionTypeRaw) ?? .notify }

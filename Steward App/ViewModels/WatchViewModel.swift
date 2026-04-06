@@ -34,13 +34,35 @@ final class WatchViewModel {
     var isSyncing = false
     var syncError: String?
 
+    // Downgrade enforcement
+    var overLimitCount: Int = 0  // How many watches over the limit
+    var watchesNeedingFrequencyDowngrade: [Watch] = []  // Watches with too-high frequency
+
     // Savings milestones
     var savingsCalculation: SavingsCalculation = .empty
     var isLoadingSavings = false
     var allPriceHistories: [UUID: [PricePoint]] = [:]
+    var dealInsights: [UUID: DealInsight] = [:]
+
+    /// Price-related watches (reusable across screens)
+    var priceWatches: [Watch] {
+        watches.filter { watch in
+            watch.actionType == .price ||
+            watch.condition.lowercased().contains("price") ||
+            watch.actionLabel.lowercased().contains("price")
+        }
+    }
+
+    // Weekly stats (fetched from Supabase)
+    var weeklyCheckCount: Int = 0
+    var weeklyTriggerCount: Int = 0
+    var isLoadingWeeklyStats = false
 
     // Cached filtered collections (updated in fetchLocalWatches to avoid recomputing in every SwiftUI body)
     var triggeredWatches: [Watch] = []
+
+    // Review prompt state
+    var reviewPromptDismissed = false
 
     private var modelContext: ModelContext?
     private var auth: AuthManager?
@@ -175,6 +197,10 @@ final class WatchViewModel {
                     existing.consecutiveFailures = dto.consecutiveFailures
                     existing.lastError = dto.lastError
                     existing.needsAttention = dto.needsAttention
+                    existing.altSourceUrl = dto.altSourceUrl
+                    existing.altSourceDomain = dto.altSourceDomain
+                    existing.altSourcePrice = dto.altSourcePrice
+                    existing.altSourceFoundAt = dto.altSourceFoundAt
                 } else {
                     // New remote watch — insert
                     context.insert(Watch(from: dto))
@@ -230,11 +256,65 @@ final class WatchViewModel {
         // Load savings data after sync completes
         await loadSavings()
 
+        // Fetch weekly check stats
+        await loadWeeklyStats()
+
         // Backfill product images for watches missing them
         backfillMissingImages()
 
-        // Resolve placeholder watch names (created via Share Extension with just a domain)
-        await resolveWatchNames()
+        // Enforce tier limits (downgrade frequency, flag over-limit)
+        enforceTierLimits()
+    }
+
+    // MARK: - Tier Enforcement
+
+    /// Checks if the user's watches exceed their current tier's limits.
+    /// - Downgrades frequencies that are too high for the tier (auto-saves to cloud)
+    /// - Sets `overLimitCount` so UI can show a banner
+    private func enforceTierLimits() {
+        let currentTier = subscriptionManager?.currentTier ?? .free
+        let maxWatches = currentTier.maxWatches
+
+        // 1. Flag over-limit watches
+        overLimitCount = max(0, watches.count - maxWatches)
+
+        // 2. Find watches with frequencies above the tier's allowance
+        var needsDowngrade: [Watch] = []
+        let maxAllowedFrequency: CheckFrequency = {
+            switch currentTier {
+            case .premium: return .every2h
+            case .pro: return .every12h
+            case .free: return .daily
+            }
+        }()
+
+        for watch in watches {
+            if let freq = CheckFrequency.from(string: watch.checkFrequency) {
+                if !currentTier.includes(freq.requiredTier) {
+                    needsDowngrade.append(watch)
+                }
+            }
+        }
+        watchesNeedingFrequencyDowngrade = needsDowngrade
+
+        // 3. Auto-downgrade frequencies (silently fix them)
+        if !needsDowngrade.isEmpty {
+            let newFrequency = maxAllowedFrequency.rawValue
+            Task {
+                for watch in needsDowngrade {
+                    watch.checkFrequency = newFrequency
+                    // Sync to cloud
+                    if let userId = auth?.currentUserId {
+                        let dto = watch.toDTO(userId: userId)
+                        try? await supabase?.updateWatch(dto)
+                    }
+                }
+                try? modelContext?.save()
+                #if DEBUG
+                print("[WatchViewModel] Downgraded \(needsDowngrade.count) watches to \(newFrequency)")
+                #endif
+            }
+        }
     }
 
     // MARK: - Savings
@@ -281,7 +361,33 @@ final class WatchViewModel {
             priceHistories: priceHistories
         )
 
+        // Compute deal insights for each watch (reused by savings tab)
+        var insights: [UUID: DealInsight] = [:]
+        for (watchId, history) in priceHistories {
+            if history.count >= 2 {
+                insights[watchId] = DealAnalyzer.analyze(history: history)
+            }
+        }
+        dealInsights = insights
+
         isLoadingSavings = false
+    }
+
+    // MARK: - Weekly Stats
+
+    func loadWeeklyStats() async {
+        guard let supabase else { return }
+        isLoadingWeeklyStats = true
+        do {
+            let stats = try await supabase.fetchWeeklyCheckStats()
+            weeklyCheckCount = stats.total
+            weeklyTriggerCount = stats.triggered
+        } catch {
+            #if DEBUG
+            print("[WatchViewModel] Failed to load weekly stats: \(error)")
+            #endif
+        }
+        isLoadingWeeklyStats = false
     }
 
     // MARK: - Image Backfill
@@ -312,207 +418,6 @@ final class WatchViewModel {
         backgroundTasks.append(task)
     }
 
-    // MARK: - Watch Name Resolution
-
-    /// Resolves placeholder watch names created by the Share Extension.
-    /// The Share Extension saves watches with just the domain name (e.g. "rei.com")
-    /// because mobile app URLs are unreliable for name extraction. This method
-    /// fetches the actual page, extracts the real product name, and updates the watch.
-    private func resolveWatchNames() async {
-        let watchesNeedingNames = watches.filter { watch in
-            guard let host = URL(string: watch.url)?.host?.replacingOccurrences(of: "www.", with: "") else { return false }
-            // Watch name matches the domain — it's a placeholder from Share Extension
-            return watch.name.lowercased() == host.lowercased()
-                || watch.name.lowercased() == "www.\(host.lowercased())"
-        }
-        guard !watchesNeedingNames.isEmpty else { return }
-
-        #if DEBUG
-        print("[WatchViewModel] Resolving names for \(watchesNeedingNames.count) watch(es)")
-        #endif
-
-        for watch in watchesNeedingNames {
-            guard let result = await resolveWatchURL(for: watch.url) else { continue }
-
-            var didChange = false
-
-            // Update URL if it resolved to a different (better) URL
-            if let resolvedURL = result.resolvedURL, resolvedURL != watch.url {
-                watch.url = resolvedURL
-                didChange = true
-                #if DEBUG
-                print("[WatchViewModel] Resolved watch URL: \(resolvedURL)")
-                #endif
-            }
-
-            // Update name if we extracted one
-            if let resolvedName = result.name {
-                watch.name = resolvedName
-                didChange = true
-                #if DEBUG
-                print("[WatchViewModel] Resolved watch name: \(resolvedName)")
-                #endif
-            }
-
-            if didChange {
-                try? modelContext?.save()
-
-                // Push update to Supabase
-                if let userId = auth?.currentUserId {
-                    let dto = watch.toDTO(userId: userId)
-                    try? await supabase?.updateWatch(dto)
-                }
-            }
-        }
-
-        // Refresh UI after updates
-        if !watchesNeedingNames.isEmpty {
-            fetchLocalWatches()
-        }
-    }
-
-    /// Result of resolving a watch URL — contains the final resolved URL and extracted product name.
-    private struct ResolvedWatch {
-        let resolvedURL: String?
-        let name: String?
-    }
-
-    /// Fetches a URL (with desktop User-Agent, following redirects) and returns
-    /// both the final resolved URL and the extracted product name.
-    /// Tries the original URL first to follow short-link redirects, then falls back
-    /// to the desktop-normalized URL if the original fails.
-    private func resolveWatchURL(for urlString: String) async -> ResolvedWatch? {
-        guard let originalURL = URL(string: urlString) else { return nil }
-
-        let desktopUA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-
-        // Step 1: Fetch the ORIGINAL URL first.
-        // Mobile short links (e.g. mobile.rei.com/AkCd/xyz) only resolve on their original domain.
-        // Changing the subdomain before fetching would break the short link path.
-        var request = URLRequest(url: originalURL)
-        request.httpMethod = "GET"
-        request.timeoutInterval = 10
-        request.setValue(desktopUA, forHTTPHeaderField: "User-Agent")
-
-        var html: String?
-        var resolvedURL: String?
-
-        if let (data, response) = try? await URLSession.shared.data(for: request) {
-            html = String(data: data, encoding: .utf8)
-            if let finalURL = response.url?.absoluteString, finalURL != urlString {
-                // Don't use the resolved URL if it's just a homepage redirect
-                // (app deep links like mobile.rei.com/AkCd/xyz → www.rei.com/ are useless)
-                if !Self.isHomepageRedirect(resolved: finalURL, original: urlString) {
-                    resolvedURL = finalURL
-                } else {
-                    // Homepage redirect means the HTML is the homepage too — discard it
-                    html = nil
-                    #if DEBUG
-                    print("[WatchViewModel] Detected homepage redirect: \(urlString) → \(finalURL) — keeping original URL")
-                    #endif
-                }
-            }
-        }
-
-        // Step 2: If the original failed, try the desktop-normalized URL as fallback
-        if html == nil || html?.count ?? 0 < 200 {
-            let desktopURLString = Self.normalizeToDesktopURL(urlString)
-            if desktopURLString != urlString, let desktopURL = URL(string: desktopURLString) {
-                var fallbackRequest = URLRequest(url: desktopURL)
-                fallbackRequest.httpMethod = "GET"
-                fallbackRequest.timeoutInterval = 10
-                fallbackRequest.setValue(desktopUA, forHTTPHeaderField: "User-Agent")
-
-                if let (data, response) = try? await URLSession.shared.data(for: fallbackRequest) {
-                    html = String(data: data, encoding: .utf8)
-                    if let finalURL = response.url?.absoluteString, finalURL != urlString {
-                        if !Self.isHomepageRedirect(resolved: finalURL, original: urlString) {
-                            resolvedURL = finalURL
-                        } else {
-                            html = nil
-                        }
-                    }
-                }
-            }
-        }
-
-        guard let pageHTML = html else { return nil }
-
-        // Extract og:title or <title>
-        var resolvedName: String?
-        let patterns = [
-            "property=\"og:title\"\\s+content=\"([^\"]+)\"",
-            "content=\"([^\"]+)\"\\s+property=\"og:title\"",
-            "<title[^>]*>([^<]+)</title>"
-        ]
-        for pattern in patterns {
-            if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
-               let match = regex.firstMatch(in: pageHTML, range: NSRange(pageHTML.startIndex..., in: pageHTML)),
-               let range = Range(match.range(at: 1), in: pageHTML) {
-                let title = String(pageHTML[range]).trimmingCharacters(in: .whitespacesAndNewlines)
-                if !title.isEmpty && !Self.isGenericTitle(title) {
-                    resolvedName = title
-                    break
-                }
-            }
-        }
-
-        // Only return if we found at least something useful
-        guard resolvedURL != nil || resolvedName != nil else { return nil }
-        return ResolvedWatch(resolvedURL: resolvedURL, name: resolvedName)
-    }
-
-    /// Converts mobile URLs to desktop for better page fetching.
-    private static func normalizeToDesktopURL(_ urlString: String) -> String {
-        guard var components = URLComponents(string: urlString),
-              let host = components.host?.lowercased() else { return urlString }
-        if host.hasPrefix("mobile.") {
-            components.host = "www." + host.dropFirst("mobile.".count)
-        } else if host.hasPrefix("m.") {
-            components.host = "www." + host.dropFirst("m.".count)
-        } else if host.hasPrefix("amp.") {
-            components.host = "www." + host.dropFirst("amp.".count)
-        }
-        return components.url?.absoluteString ?? urlString
-    }
-
-    /// Returns true if the redirect lost all path specificity — i.e. the original
-    /// URL had a meaningful path but the resolved URL is just a homepage ("/").
-    /// This happens with app deep links (e.g. mobile.rei.com/AkCd/xyz → www.rei.com/).
-    private static func isHomepageRedirect(resolved: String, original: String) -> Bool {
-        guard let resolvedURL = URL(string: resolved),
-              let originalURL = URL(string: original) else { return false }
-        let resolvedPath = resolvedURL.path
-        let originalPath = originalURL.path
-        let resolvedIsHomepage = resolvedPath.isEmpty || resolvedPath == "/"
-        let originalHadPath = !originalPath.isEmpty && originalPath != "/"
-        return resolvedIsHomepage && originalHadPath
-    }
-
-    /// Checks if a page title is generic (site tagline, redirect page, etc.)
-    private static func isGenericTitle(_ title: String) -> Bool {
-        let lower = title.lowercased()
-        // Redirect / loading pages
-        let bad = ["launching app", "loading", "redirect", "please wait",
-                   "checking your browser", "page not found", "404",
-                   "access denied", "sign in", "log in", "captcha",
-                   "download the app", "open in app"]
-        if bad.contains(where: { lower.contains($0) }) { return true }
-        // Site-wide taglines: "Brand – Long marketing tagline..."
-        for sep in [" – ", " | ", " - ", ": "] {
-            if let r = lower.range(of: sep) {
-                let after = lower[r.upperBound...].trimmingCharacters(in: .whitespaces)
-                if after.count > 30 { return true }
-            }
-        }
-        // Marketing keywords
-        let marketing = ["official site", "online shopping", "free shipping",
-                         "top-brand", "top brand", "for all your", "best deals"]
-        if marketing.contains(where: { lower.contains($0) }) { return true }
-        if lower.count <= 2 { return true }
-        return false
-    }
-
     // MARK: - Watch Management
 
     /// Whether the user can add another watch under their current tier
@@ -522,12 +427,18 @@ final class WatchViewModel {
     }
 
     func addWatch(_ watch: Watch) {
-        guard let context = modelContext, let userId = auth?.currentUserId else { return }
+        guard let context = modelContext, let userId = auth?.currentUserId else {
+            #if DEBUG
+            print("[WatchViewModel] addWatch failed: modelContext=\(modelContext == nil ? "nil" : "ok"), userId=\(auth?.currentUserId?.uuidString ?? "nil")")
+            #endif
+            syncError = modelContext == nil ? "Unable to save watch — please restart the app" : "Please sign in to create a watch"
+            return
+        }
 
         // Check watch limit — show paywall if over the tier's max
-        let maxWatches = subscriptionManager?.currentTier.maxWatches ?? 3
+        let currentTier = subscriptionManager?.currentTier ?? .free
+        let maxWatches = currentTier.maxWatches
         if !canAddWatch {
-            let currentTier = subscriptionManager?.currentTier ?? .free
             let highlightTier: SubscriptionTier = currentTier == .free ? .pro : .premium
             subscriptionManager?.presentPaywall(
                 highlighting: highlightTier,
@@ -809,7 +720,76 @@ final class WatchViewModel {
         try? context.save()
         fetchLocalWatches()
 
-        // Sync the fix to Supabase
+        // Log the fix as an activity
+        let fixActivity = ActivityItem(
+            icon: "wrench.and.screwdriver",
+            iconColorName: "accent",
+            label: "Watch URL fixed by AI",
+            subtitle: "\(watch.name) · New URL applied",
+            time: "Just now"
+        )
+        logActivity(fixActivity, watchId: watch.id)
+
+        // Sync the fix to Supabase, then trigger an immediate check
+        Task {
+            guard let supabase = self.supabase, let auth = self.auth, let userId = auth.currentUserId else { return }
+            let dto = watch.toDTO(userId: userId)
+            try? await supabase.updateWatch(dto)
+
+            // Trigger immediate check so the user sees results right away
+            try? await supabase.triggerCheck(watchId: watch.id)
+
+            // Refresh data after check completes
+            await syncFromCloud(force: true)
+        }
+    }
+
+    // MARK: - Alternative Source Actions
+
+    /// Switch watch to the alternative source URL
+    func switchToAltSource(_ watch: Watch) {
+        guard let context = modelContext, let altUrl = watch.altSourceUrl else { return }
+        let oldDomain = URL(string: watch.url)?.host ?? "original site"
+        let newDomain = watch.altSourceDomain ?? "alternative"
+
+        watch.url = altUrl
+        watch.consecutiveFailures = 0
+        watch.lastError = nil
+        watch.needsAttention = false
+        watch.altSourceUrl = nil
+        watch.altSourceDomain = nil
+        watch.altSourcePrice = nil
+        watch.altSourceFoundAt = nil
+        try? context.save()
+        fetchLocalWatches()
+
+        logActivity(ActivityItem(
+            icon: "arrow.right.arrow.left",
+            iconColorName: "accent",
+            label: "Switched to \(newDomain)",
+            subtitle: "\(watch.name) · was tracking \(oldDomain)",
+            time: "Just now"
+        ), watchId: watch.id)
+
+        Task {
+            guard let supabase = self.supabase, let auth = self.auth, let userId = auth.currentUserId else { return }
+            let dto = watch.toDTO(userId: userId)
+            try? await supabase.updateWatch(dto)
+            try? await supabase.triggerCheck(watchId: watch.id)
+            await syncFromCloud(force: true)
+        }
+    }
+
+    /// Dismiss the alternative source suggestion (user wants to keep original)
+    func dismissAltSource(_ watch: Watch) {
+        guard let context = modelContext else { return }
+        watch.altSourceUrl = nil
+        watch.altSourceDomain = nil
+        watch.altSourcePrice = nil
+        watch.altSourceFoundAt = nil
+        try? context.save()
+        fetchLocalWatches()
+
         Task {
             guard let supabase = self.supabase, let auth = self.auth, let userId = auth.currentUserId else { return }
             let dto = watch.toDTO(userId: userId)
@@ -876,6 +856,8 @@ final class WatchViewModel {
                 actionState = .done
             }
 
+            incrementCompletedActionCount()
+
             let activity = ActivityItem(
                 icon: "checkmark",
                 iconColorName: "accent",
@@ -892,5 +874,39 @@ final class WatchViewModel {
     func dismissAction() {
         actionModalWatch = nil
         actionState = .idle
+        reviewPromptDismissed = false
+    }
+
+    // MARK: - Review Prompt
+
+    var shouldShowReviewPrompt: Bool {
+        guard !reviewPromptDismissed else { return false }
+        let defaults = UserDefaults.standard
+        guard !defaults.bool(forKey: "hasLeftReview") else { return false }
+        guard defaults.integer(forKey: "completedActionCount") >= 3 else { return false }
+        guard defaults.integer(forKey: "reviewPromptDismissals") < 2 else { return false }
+        let last = defaults.double(forKey: "lastReviewPromptDate")
+        if last > 0 {
+            let daysSince = (Date().timeIntervalSince1970 - last) / 86400
+            guard daysSince >= 60 else { return false }
+        }
+        return true
+    }
+
+    func markReviewLeft() {
+        UserDefaults.standard.set(true, forKey: "hasLeftReview")
+        UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "lastReviewPromptDate")
+    }
+
+    func markReviewDismissed() {
+        let count = UserDefaults.standard.integer(forKey: "reviewPromptDismissals") + 1
+        UserDefaults.standard.set(count, forKey: "reviewPromptDismissals")
+        UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "lastReviewPromptDate")
+        reviewPromptDismissed = true
+    }
+
+    private func incrementCompletedActionCount() {
+        let count = UserDefaults.standard.integer(forKey: "completedActionCount") + 1
+        UserDefaults.standard.set(count, forKey: "completedActionCount")
     }
 }

@@ -17,6 +17,8 @@ final class ActivityItem {
         switch iconColorName {
         case "accent": return Theme.accent
         case "blue": return Theme.blue
+        case "red": return Theme.red
+        case "gold": return Theme.gold
         case "inkLight": return Theme.inkLight
         default: return Theme.inkLight
         }

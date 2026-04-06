@@ -28,6 +28,10 @@ export interface Watch {
   consecutive_failures: number
   last_error: string | null
   needs_attention: boolean
+  alt_source_url: string | null
+  alt_source_domain: string | null
+  alt_source_price: number | null
+  alt_source_found_at: string | null
   auto_act: boolean
   spending_limit: number | null
   response_mode: ResponseMode

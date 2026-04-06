@@ -159,27 +159,85 @@ struct ChatDrawer: View {
         // "Browse & find it" / "Find the link myself" opens in-app browser
         let isBrowse: Bool = lower.contains("browse & find it") || lower.contains("find the link myself") || lower.contains("find it myself")
         if isBrowse {
-            // Determine category from conversation context to open the right site
-            let userMessages: [String] = chatVM.messages
-                .filter { $0.role == .user }
-                .map { $0.text.lowercased() }
+            // Gather ALL conversation text (user + steward) for full context
+            let allText: String = chatVM.messages.map { $0.text.lowercased() }.joined(separator: " ")
+
             let browseURL: URL? = {
-                // Check if any user message indicates a specific category
-                let allText: String = userMessages.joined(separator: " ")
+                // ─── 1. Check for specific brand/site mentions first ───
+                // Car rental brands
+                let carRentalBrands: [(keywords: [String], url: String)] = [
+                    (["hertz"], "https://www.hertz.com"),
+                    (["enterprise"], "https://www.enterprise.com"),
+                    (["avis"], "https://www.avis.com"),
+                    (["budget"], "https://www.budget.com"),
+                    (["national"], "https://www.nationalcar.com"),
+                    (["sixt"], "https://www.sixt.com"),
+                    (["turo"], "https://turo.com"),
+                ]
+                for brand in carRentalBrands {
+                    if brand.keywords.contains(where: { allText.contains($0) }) {
+                        return URL(string: brand.url)
+                    }
+                }
+
+                // Hotel brands
+                let hotelBrands: [(keywords: [String], url: String)] = [
+                    (["marriott", "bonvoy"], "https://www.marriott.com"),
+                    (["hilton"], "https://www.hilton.com"),
+                    (["hyatt"], "https://www.hyatt.com"),
+                    (["airbnb"], "https://www.airbnb.com"),
+                    (["vrbo"], "https://www.vrbo.com"),
+                ]
+                for brand in hotelBrands {
+                    if brand.keywords.contains(where: { allText.contains($0) }) {
+                        return URL(string: brand.url)
+                    }
+                }
+
+                // Airline brands
+                let airlineBrands: [(keywords: [String], url: String)] = [
+                    (["southwest", "wanna get away"], "https://www.southwest.com"),
+                    (["delta"], "https://www.delta.com"),
+                    (["united"], "https://www.united.com"),
+                    (["american airlines", "aa.com"], "https://www.aa.com"),
+                    (["jetblue"], "https://www.jetblue.com"),
+                    (["spirit"], "https://www.spirit.com"),
+                    (["frontier"], "https://www.flyfrontier.com"),
+                    (["alaska air"], "https://www.alaskaair.com"),
+                ]
+                for brand in airlineBrands {
+                    if brand.keywords.contains(where: { allText.contains($0) }) {
+                        return URL(string: brand.url)
+                    }
+                }
+
+                // ─── 2. Fall back to category detection ───
                 if allText.contains("camping") || allText.contains("campground") || allText.contains("campsite") {
                     return URL(string: "https://www.recreation.gov")
                 }
-                if allText.contains("reservation") || allText.contains("restaurant") || allText.contains("table for") || allText.contains("resy") {
+                if allText.contains("reservation") || allText.contains("restaurant") || allText.contains("table for") || allText.contains("resy") || allText.contains("opentable") {
                     return URL(string: "https://resy.com")
                 }
-                if allText.contains("ticket") || allText.contains("concert") || allText.contains("event") {
+                if allText.contains("ticket") || allText.contains("concert") || allText.contains("event") || allText.contains("show") {
                     return URL(string: "https://www.ticketmaster.com")
                 }
-                if allText.contains("flight") || allText.contains("travel") || allText.contains("hotel") {
+                // Car rental (generic — no specific brand mentioned)
+                if allText.contains("car rental") || allText.contains("rental car") || allText.contains("rent a car") {
+                    return URL(string: "https://www.google.com/travel/explore")
+                }
+                // Hotel (generic)
+                if allText.contains("hotel") || allText.contains("stay") || allText.contains("lodging") || allText.contains("accommodation") {
+                    return URL(string: "https://www.google.com/travel/hotels")
+                }
+                // Flight (generic)
+                if allText.contains("flight") || allText.contains("fly") || allText.contains("airfare") {
                     return URL(string: "https://www.google.com/travel/flights")
                 }
-                // Default: Google search for the product/query
-                let query: String = watchVM.selectedWatch?.name ?? "product"
+
+                // ─── 3. Default: Google search with conversation context ───
+                // Build a smart search query from the last user message
+                let lastUserMsg = chatVM.messages.last(where: { $0.role == .user })?.text ?? ""
+                let query: String = !lastUserMsg.isEmpty ? lastUserMsg : (watchVM.selectedWatch?.name ?? "product")
                 let encoded: String = query.addingPercentEncoding(withAllowedCharacters: CharacterSet.urlQueryAllowed) ?? query
                 return URL(string: "https://www.google.com/search?q=\(encoded)")
             }()
@@ -917,20 +975,6 @@ struct TypingIndicator: View {
 struct BrowserItem: Identifiable {
     let id = UUID()
     let url: URL
-}
-
-// MARK: - Pulse Animation for Recording Indicator
-
-private struct PulseModifier: ViewModifier {
-    @State private var isPulsing = false
-
-    func body(content: Content) -> some View {
-        content
-            .scaleEffect(isPulsing ? 1.3 : 1.0)
-            .opacity(isPulsing ? 0.6 : 1.0)
-            .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: isPulsing)
-            .onAppear { isPulsing = true }
-    }
 }
 
 // MARK: - Flow Layout

@@ -472,28 +472,29 @@ struct OnboardingFlowB: View {
                 Spacer().frame(height: 24)
 
                 // Steps illustration
-                VStack(spacing: 0) {
+                VStack(alignment: .leading, spacing: 0) {
                     shareStep(number: 1, title: "Find anything in Safari or Chrome", subtitle: "A product page, a flight, a rental listing.")
+                        .frame(maxWidth: .infinity, alignment: .leading)
 
                     // Arrow connector
                     Text("↓")
                         .font(.system(size: 14))
                         .foregroundStyle(mint.opacity(0.3))
                         .padding(.vertical, 2)
-                        .padding(.leading, 27)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .frame(width: 26 + 14 + 14, alignment: .center) // align with step circle (padding + circle + spacing)
 
                     shareStep(number: 2, title: "Tap Share, then Steward", subtitle: "It lives right in your iOS Share Sheet.")
+                        .frame(maxWidth: .infinity, alignment: .leading)
 
                     // Arrow connector
                     Text("↓")
                         .font(.system(size: 14))
                         .foregroundStyle(mint.opacity(0.3))
                         .padding(.vertical, 2)
-                        .padding(.leading, 27)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .frame(width: 26 + 14 + 14, alignment: .center)
 
                     shareStep(number: 3, title: "Steward opens ready to watch it", subtitle: "The link is already loaded. Just tell it what to look for.")
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .padding(.horizontal, 20)
 

@@ -41,6 +41,12 @@ struct PaywallScreen: View {
                     .foregroundStyle(Theme.inkMid)
                 }
             }
+            .task {
+                // Ensure products are loaded when paywall appears (handles slow startup, errors, iPad timing)
+                if subscriptionManager.products.isEmpty && !subscriptionManager.isLoadingProducts {
+                    await subscriptionManager.loadProducts()
+                }
+            }
             .overlay {
                 if subscriptionManager.isPurchasing {
                     purchasingOverlay
@@ -104,12 +110,13 @@ struct PaywallScreen: View {
                 .tracking(0.8)
 
             VStack(alignment: .leading, spacing: 6) {
-                comparisonRow("Up to 3 watches", included: true)
-                comparisonRow("Watches once per day", included: true)
+                comparisonRow("Up to 3 trackers", included: true)
+                comparisonRow("Checks once per day", included: true)
                 comparisonRow("Push notifications", included: true)
+                comparisonRow("AI chat setup", included: true)
+                comparisonRow("Notify + Quick Link", included: false)
                 comparisonRow("Faster watch frequencies", included: false)
                 comparisonRow("Price insights & deal alerts", included: false)
-                comparisonRow("More watches", included: false)
             }
         }
         .padding(16)
@@ -152,7 +159,7 @@ struct PaywallScreen: View {
                             .foregroundStyle(billingCycle == cycle ? .white : Theme.inkMid)
 
                         if cycle == .yearly {
-                            Text("Save 16%")
+                            Text("Save 33%")
                                 .font(Theme.body(10, weight: .bold))
                                 .foregroundStyle(billingCycle == cycle ? Theme.goldLight : Theme.gold)
                         }
@@ -188,9 +195,11 @@ struct PaywallScreen: View {
             tier: .pro,
             badge: nil,
             features: [
-                "Up to 10 watches",
-                "Watch frequency up to every hour",
-                "Price insights & deal alerts"
+                "Up to 7 trackers",
+                "Check every 12 hours",
+                "Notify + Quick Link",
+                "Price insights & deal alerts",
+                "Email & SMS alerts"
             ],
             product: product,
             highlighted: isHighlighted,
@@ -212,9 +221,11 @@ struct PaywallScreen: View {
             tier: .premium,
             badge: "BEST VALUE",
             features: [
-                "Up to 25 watches",
-                "Watch frequency up to every 5 minutes",
+                "Up to 15 trackers",
+                "Check every 2 hours",
+                "Steward Acts for you",
                 "Everything in Pro included",
+                "Fake deal detection",
                 "Priority support"
             ],
             product: product,
@@ -285,39 +296,133 @@ struct PaywallScreen: View {
                 }
             }
 
-            // Purchase button
-            Button {
-                guard let product else { return }
-                Task {
-                    await subscriptionManager.purchase(product)
-                    if subscriptionManager.currentTier.includes(tier) {
-                        dismiss()
-                    }
-                }
-            } label: {
+            // Purchase button — check exact product match (monthly vs yearly matters)
+            let isExactCurrentProduct = product?.id != nil && product?.id == subscriptionManager.currentProductId
+            let isCurrentTier = subscriptionManager.currentTier == tier
+            let isSameTierDifferentCycle = isCurrentTier && !isExactCurrentProduct
+            let isDowngrade = !isCurrentTier && tier.rank < subscriptionManager.currentTier.rank && subscriptionManager.currentTier != .free
+
+            if isExactCurrentProduct {
+                // Exact current plan (same tier + same billing cycle)
                 HStack {
-                    if subscriptionManager.currentTier.includes(tier) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 14))
-                        Text("Current Plan")
-                            .font(Theme.body(14, weight: .bold))
-                    } else {
-                        Text(product.map { "Subscribe for \($0.displayPrice)" } ?? "Loading…")
-                            .font(Theme.body(14, weight: .bold))
-                    }
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 14))
+                    Text("Current Plan")
+                        .font(Theme.body(14, weight: .bold))
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
-                .foregroundStyle(subscriptionManager.currentTier.includes(tier) ? accentColor : .white)
-                .background(subscriptionManager.currentTier.includes(tier) ? accentLight : accentColor)
+                .foregroundStyle(accentColor)
+                .background(accentLight)
                 .clipShape(RoundedRectangle(cornerRadius: 14))
                 .overlay(
                     RoundedRectangle(cornerRadius: 14)
-                        .stroke(subscriptionManager.currentTier.includes(tier) ? accentMid : Color.clear, lineWidth: 1)
+                        .stroke(accentMid, lineWidth: 1)
                 )
+            } else if isDowngrade {
+                // Lower tier than current — show downgrade option
+                Button {
+                    Task {
+                        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene else { return }
+                        try? await AppStore.showManageSubscriptions(in: windowScene)
+                    }
+                } label: {
+                    HStack {
+                        Image(systemName: "arrow.down.circle")
+                            .font(.system(size: 14))
+                        Text("Downgrade")
+                            .font(Theme.body(14, weight: .bold))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .foregroundStyle(Theme.inkMid)
+                    .background(Theme.bgDeep)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14)
+                            .stroke(Theme.border, lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
+            } else if isSameTierDifferentCycle, let product {
+                // Same tier but different billing cycle (e.g., monthly → yearly)
+                Button {
+                    Task {
+                        await subscriptionManager.purchase(product)
+                        if subscriptionManager.currentProductId == product.id {
+                            dismiss()
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                            .font(.system(size: 12))
+                        Text(billingCycle == .yearly ? "Switch to Yearly & Save" : "Switch to Monthly")
+                            .font(Theme.body(14, weight: .bold))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .foregroundStyle(.white)
+                    .background(accentColor)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                }
+                .buttonStyle(.plain)
+            } else if let product {
+                // Product loaded — show purchase button
+                Button {
+                    Task {
+                        await subscriptionManager.purchase(product)
+                        if subscriptionManager.currentTier.includes(tier) {
+                            dismiss()
+                        }
+                    }
+                } label: {
+                    Text("Subscribe for \(product.displayPrice)")
+                        .font(Theme.body(14, weight: .bold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .foregroundStyle(.white)
+                        .background(accentColor)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                }
+                .buttonStyle(.plain)
+            } else if subscriptionManager.isLoadingProducts {
+                // Still loading products
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .controlSize(.small)
+                        .tint(.white)
+                    Text("Loading prices…")
+                        .font(Theme.body(14, weight: .bold))
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .foregroundStyle(.white.opacity(0.7))
+                .background(accentColor.opacity(0.5))
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+            } else {
+                // Failed to load — show retry
+                Button {
+                    Task { await subscriptionManager.loadProducts() }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 12, weight: .semibold))
+                        Text("Tap to retry")
+                            .font(Theme.body(14, weight: .bold))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .foregroundStyle(accentColor)
+                    .background(accentLight)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14)
+                            .stroke(accentMid, lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
-            .disabled(product == nil || subscriptionManager.currentTier.includes(tier))
         }
         .padding(18)
         .background(Theme.bgCard)
@@ -357,19 +462,27 @@ struct PaywallScreen: View {
         VStack(spacing: 4) {
             if let error = subscriptionManager.errorMessage {
                 Text(error)
-                    .font(Theme.body(11))
+                    .font(Theme.body(12))
                     .foregroundStyle(Theme.red)
                     .multilineTextAlignment(.center)
                     .padding(.bottom, 4)
             }
 
-            Text("Subscriptions auto-renew unless cancelled at least 24 hours before the end of the current period. Manage subscriptions in Settings \u{2192} Apple ID \u{2192} Subscriptions.")
-                .font(Theme.body(10))
-                .foregroundStyle(Theme.inkLight)
+            Text("Subscriptions auto-renew unless cancelled at least 24 hours before the end of the current period. Payment is charged to your Apple ID account. Manage or cancel anytime in Settings \u{2192} Apple ID \u{2192} Subscriptions.")
+                .font(Theme.body(12))
+                .foregroundStyle(Theme.inkMid)
                 .multilineTextAlignment(.center)
-                .lineSpacing(2)
+                .lineSpacing(3)
+
+            HStack(spacing: 16) {
+                Link("Terms of Use (EULA)", destination: URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!)
+                Link("Privacy Policy", destination: URL(string: "https://www.joinsteward.app/privacy")!)
+            }
+            .font(Theme.body(12, weight: .medium))
+            .tint(Theme.accent)
+            .padding(.top, 4)
         }
-        .padding(.horizontal, 32)
+        .padding(.horizontal, 24)
         .padding(.top, 16)
     }
 

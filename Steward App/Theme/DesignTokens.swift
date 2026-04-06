@@ -86,3 +86,28 @@ extension Color {
         self.init(red: r, green: g, blue: b)
     }
 }
+
+extension Theme {
+    /// Formats a price as a currency string using the user's selected currency
+    /// Maps a color name string (from DealRating.colorName) to a Theme color
+    static func colorFor(_ name: String) -> Color {
+        switch name {
+        case "accent": return accent
+        case "green": return green
+        case "gold": return gold
+        case "orange": return gold
+        case "red": return red
+        case "blue": return blue
+        default: return inkMid
+        }
+    }
+
+    static func formatPrice(_ price: Double) -> String {
+        let code = UserDefaults.standard.string(forKey: "currencyCode") ?? "USD"
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = code
+        formatter.maximumFractionDigits = price.truncatingRemainder(dividingBy: 1) == 0 ? 0 : 2
+        return formatter.string(from: NSNumber(value: price)) ?? "$\(String(format: "%.2f", price))"
+    }
+}

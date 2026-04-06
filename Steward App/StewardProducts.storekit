@@ -1,0 +1,111 @@
+{
+  "identifier" : "E1F3A5B7-9C2D-4E6F-8A1B-3D5E7F9A2C4D",
+  "type" : "com.apple.product-type.storekit",
+  "version" : {
+    "major" : 4,
+    "minor" : 0
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "steward.pro.group",
+      "localizations" : [
+        {
+          "description" : "Steward subscription plans",
+          "displayName" : "Steward Pro",
+          "locale" : "en_US"
+        }
+      ],
+      "name" : "Steward Pro",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [],
+          "codeOffers" : [],
+          "displayPrice" : "9.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "premium.month.001",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "15 watches, 2-hour checks, auto-execute actions, priority support",
+              "displayName" : "Steward Premium Monthly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "steward.premium.month",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Steward Premium Monthly",
+          "subscriptionGroupID" : "steward.pro.group",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : []
+        },
+        {
+          "adHocOffers" : [],
+          "codeOffers" : [],
+          "displayPrice" : "79.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "premium.year.001",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "15 watches, 2-hour checks, auto-execute actions, priority support — annual",
+              "displayName" : "Steward Premium Yearly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "steward.premium.year",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Steward Premium Yearly",
+          "subscriptionGroupID" : "steward.pro.group",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : []
+        },
+        {
+          "adHocOffers" : [],
+          "codeOffers" : [],
+          "displayPrice" : "4.99",
+          "familyShareable" : false,
+          "groupNumber" : 2,
+          "internalID" : "pro.month.001",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "7 watches, 12-hour checks, price insights & deal alerts",
+              "displayName" : "Steward Pro Monthly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "steward.pro.month",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Steward Pro Monthly",
+          "subscriptionGroupID" : "steward.pro.group",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : []
+        },
+        {
+          "adHocOffers" : [],
+          "codeOffers" : [],
+          "displayPrice" : "39.99",
+          "familyShareable" : false,
+          "groupNumber" : 2,
+          "internalID" : "pro.year.001",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "7 watches, 12-hour checks, price insights & deal alerts — annual",
+              "displayName" : "Steward Pro Yearly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "steward.pro.year",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Steward Pro Yearly",
+          "subscriptionGroupID" : "steward.pro.group",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : []
+        }
+      ]
+    }
+  ]
+}

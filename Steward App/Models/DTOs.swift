@@ -37,10 +37,17 @@ struct WatchDTO: Codable, Identifiable, Sendable {
     var lastError: String?
     var needsAttention: Bool
 
+    // Alternative source suggestion
+    var altSourceUrl: String?
+    var altSourceDomain: String?
+    var altSourcePrice: Double?
+    var altSourceFoundAt: Date?
+
     // Action enhancement fields
     var couponCode: String?
     var autoAct: Bool
     var spendingLimit: Double?
+    var notifyAnyPriceDrop: Bool
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -66,9 +73,14 @@ struct WatchDTO: Codable, Identifiable, Sendable {
         case consecutiveFailures = "consecutive_failures"
         case lastError = "last_error"
         case needsAttention = "needs_attention"
+        case altSourceUrl = "alt_source_url"
+        case altSourceDomain = "alt_source_domain"
+        case altSourcePrice = "alt_source_price"
+        case altSourceFoundAt = "alt_source_found_at"
         case couponCode = "coupon_code"
         case autoAct = "auto_act"
         case spendingLimit = "spending_limit"
+        case notifyAnyPriceDrop = "notify_any_price_drop"
     }
 
     // Explicit memberwise init (required because we provide a custom Decodable init)
@@ -80,7 +92,10 @@ struct WatchDTO: Codable, Identifiable, Sendable {
          siteCookies: String? = nil, cookieDomain: String? = nil, cookieStatus: String? = nil,
          watchMode: String = "url", searchQuery: String? = nil,
          consecutiveFailures: Int = 0, lastError: String? = nil, needsAttention: Bool = false,
-         couponCode: String? = nil, autoAct: Bool = false, spendingLimit: Double? = nil) {
+         altSourceUrl: String? = nil, altSourceDomain: String? = nil,
+         altSourcePrice: Double? = nil, altSourceFoundAt: Date? = nil,
+         couponCode: String? = nil, autoAct: Bool = false, spendingLimit: Double? = nil,
+         notifyAnyPriceDrop: Bool = false) {
         self.id = id; self.userId = userId; self.emoji = emoji; self.name = name
         self.url = url; self.condition = condition; self.actionLabel = actionLabel
         self.actionType = actionType; self.status = status; self.checkFrequency = checkFrequency
@@ -91,8 +106,10 @@ struct WatchDTO: Codable, Identifiable, Sendable {
         self.cookieStatus = cookieStatus; self.watchMode = watchMode
         self.searchQuery = searchQuery; self.consecutiveFailures = consecutiveFailures
         self.lastError = lastError; self.needsAttention = needsAttention
+        self.altSourceUrl = altSourceUrl; self.altSourceDomain = altSourceDomain
+        self.altSourcePrice = altSourcePrice; self.altSourceFoundAt = altSourceFoundAt
         self.couponCode = couponCode; self.autoAct = autoAct
-        self.spendingLimit = spendingLimit
+        self.spendingLimit = spendingLimit; self.notifyAnyPriceDrop = notifyAnyPriceDrop
     }
 
     // Custom decoder: use decodeIfPresent with defaults for new columns
@@ -125,9 +142,14 @@ struct WatchDTO: Codable, Identifiable, Sendable {
         consecutiveFailures = try c.decodeIfPresent(Int.self, forKey: .consecutiveFailures) ?? 0
         lastError = try c.decodeIfPresent(String.self, forKey: .lastError)
         needsAttention = try c.decodeIfPresent(Bool.self, forKey: .needsAttention) ?? false
+        altSourceUrl = try c.decodeIfPresent(String.self, forKey: .altSourceUrl)
+        altSourceDomain = try c.decodeIfPresent(String.self, forKey: .altSourceDomain)
+        altSourcePrice = try c.decodeIfPresent(Double.self, forKey: .altSourcePrice)
+        altSourceFoundAt = try c.decodeIfPresent(Date.self, forKey: .altSourceFoundAt)
         couponCode = try c.decodeIfPresent(String.self, forKey: .couponCode)
         autoAct = try c.decodeIfPresent(Bool.self, forKey: .autoAct) ?? false
         spendingLimit = try c.decodeIfPresent(Double.self, forKey: .spendingLimit)
+        notifyAnyPriceDrop = try c.decodeIfPresent(Bool.self, forKey: .notifyAnyPriceDrop) ?? false
     }
 }
 
@@ -204,6 +226,7 @@ struct ProfileDTO: Codable, Sendable {
     var displayName: String?
     var deviceToken: String?
     var phoneNumber: String?
+    var notificationEmail: String?
     var spendingLimit: Double?
     var autoActDefault: Bool?
 
@@ -212,6 +235,7 @@ struct ProfileDTO: Codable, Sendable {
         case displayName = "display_name"
         case deviceToken = "device_token"
         case phoneNumber = "phone_number"
+        case notificationEmail = "notification_email"
         case spendingLimit = "spending_limit"
         case autoActDefault = "auto_act_default"
     }

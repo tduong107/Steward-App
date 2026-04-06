@@ -1,524 +1,469 @@
 import SwiftUI
+import Combine
 
-/// Flow A — First App Open (pre-auth)
-/// 4 slides: Hero → What It Does → How It Works → CTA
+/// Flow A — Pre-auth onboarding
+/// 3 auto-cycling pages with a single centralized timer
 struct OnboardingFlowA: View {
     @State private var currentPage = 0
-    var onFinish: () -> Void  // called when user taps Sign Up / Sign In or skips
+    @State private var cycleId = UUID() // Changes on each page transition to cancel stale animations
+    var onFinish: (_ wantsSignIn: Bool) -> Void
 
-    // Brand colours
     private let deepForest = Color(hex: "0F2018")
-    private let forestMid  = Color(hex: "1C3D2E")
-    private let forestLight = Color(hex: "243D30")
     private let stewardGreen = Color(hex: "2A5C45")
     private let mint = Color(hex: "6EE7B7")
     private let cream = Color(hex: "F7F6F3")
+    private let gold = Color(hex: "F59E0B")
+    private let totalPages = 3
 
-    private let totalPages = 4
+    // Page durations: page 1 is driven by typewriter callback, pages 2 & 3 by timer
+    private let pageDurations: [Double] = [99, 5.5, 5.5] // page 0 = effectively infinite (typewriter drives it)
 
     var body: some View {
         ZStack {
-            // Background
             deepForest.ignoresSafeArea()
 
-            // Page content
             TabView(selection: $currentPage) {
-                heroSlide.tag(0)
-                whatItDoesSlide.tag(1)
-                howItWorksSlide.tag(2)
-                ctaSlide.tag(3)
+                monitorPage.tag(0)
+                pricePage.tag(1)
+                notifPage.tag(2)
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
-            .animation(.easeInOut(duration: 0.35), value: currentPage)
+            .animation(.easeInOut(duration: 0.6), value: currentPage)
 
-            // Dots + buttons overlay
-            VStack {
+            // Bottom
+            VStack(spacing: 0) {
                 Spacer()
+                LinearGradient(colors: [.clear, deepForest.opacity(0.95), deepForest], startPoint: .top, endPoint: .bottom)
+                    .frame(height: 180).allowsHitTesting(false)
 
-                // Page dots
-                if currentPage < totalPages - 1 {
-                    pageDots
-                        .padding(.bottom, 20)
-                }
-
-                // Navigation buttons
-                if currentPage < totalPages - 1 {
-                    primaryButton(currentPage == 0 ? "Get started →" : "Continue →") {
-                        withAnimation { currentPage += 1 }
-                    }
-                    .padding(.horizontal, 28)
-
-                    if currentPage == 0 {
-                        Button("Skip intro") {
-                            withAnimation { currentPage = totalPages - 1 }
+                VStack(spacing: 10) {
+                    HStack(spacing: 8) {
+                        ForEach(0..<totalPages, id: \.self) { i in
+                            Capsule()
+                                .fill(i == currentPage ? mint : cream.opacity(0.2))
+                                .frame(width: i == currentPage ? 24 : 8, height: 8)
+                                .animation(.easeOut(duration: 0.3), value: currentPage)
                         }
-                        .font(.system(size: 13))
-                        .foregroundStyle(.white.opacity(0.35))
-                        .padding(.top, 8)
+                    }
+                    .padding(.bottom, 20)
+
+                    Button { onFinish(false) } label: {
+                        Text("Create Account").font(.system(size: 15, weight: .bold)).foregroundStyle(deepForest)
+                            .frame(maxWidth: 340).frame(height: 54).background(mint)
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                    }
+                    Button { onFinish(true) } label: {
+                        Text("Sign in").font(.system(size: 15, weight: .bold)).foregroundStyle(cream)
+                            .frame(maxWidth: 340).frame(height: 54)
+                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(cream.opacity(0.15), lineWidth: 1.5))
                     }
                 }
+                .padding(.horizontal, 28).padding(.bottom, 40)
             }
-            .padding(.bottom, 50)
+        }
+        .onAppear { scheduleAdvance() }
+        .onChange(of: currentPage) { _, _ in
+            cycleId = UUID()
+            scheduleAdvance()
         }
     }
 
-    // MARK: - Slide 1: Hero
+    private func scheduleAdvance() {
+        let id = cycleId
+        let delay = pageDurations[currentPage]
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            guard cycleId == id else { return } // Stale — user swiped or page already changed
+            withAnimation { currentPage = (currentPage + 1) % totalPages }
+        }
+    }
 
-    private var heroSlide: some View {
+    // MARK: - Page 1: Monitor Anything
+
+    private var monitorPage: some View {
         ZStack {
-            // Radial glow
-            RadialGradient(
-                colors: [stewardGreen.opacity(0.45), .clear],
-                center: .init(x: 0.5, y: 0.35),
-                startRadius: 0,
-                endRadius: 200
-            )
-            .ignoresSafeArea()
-
-            // Secondary glow top-right
-            RadialGradient(
-                colors: [mint.opacity(0.08), .clear],
-                center: .init(x: 0.8, y: 0.1),
-                startRadius: 0,
-                endRadius: 200
-            )
-            .ignoresSafeArea()
-
-            // Breathing rings
-            breathingRings
-
+            RadialGradient(colors: [stewardGreen.opacity(0.55), .clear], center: .init(x: 0.25, y: 0.35), startRadius: 0, endRadius: 300).ignoresSafeArea()
             VStack(spacing: 0) {
-                Spacer().frame(height: 150)
-
-                // App icon
-                StewardLogo(size: 120)
-                    .shadow(color: stewardGreen.opacity(0.8), radius: 30)
-                    .shadow(color: mint.opacity(0.3), radius: 8)
-
-                Spacer().frame(height: 50)
-
-                // Content
-                VStack(spacing: 14) {
-                    Text("YOUR PERSONAL AI CONCIERGE")
-                        .font(.system(size: 11, weight: .medium))
-                        .tracking(2.5)
-                        .foregroundStyle(mint.opacity(0.8))
-
-                    VStack(spacing: 4) {
-                        Text("Never miss a")
-                            .font(Theme.serif(38, weight: .bold))
-                            .foregroundStyle(cream)
-                        Text("deal")
-                            .font(Font.custom("Georgia-BoldItalic", size: 38))
-                            .foregroundStyle(mint)
-                        + Text(" or restock")
-                            .font(Theme.serif(38, weight: .bold))
-                            .foregroundStyle(cream)
-                    }
-                    .multilineTextAlignment(.center)
-
-                    Text("Steward keeps an eye on the things you want. Price drops, restocks, sold-out items. You just wait for the tap on your shoulder.")
-                        .font(.system(size: 15, weight: .light))
-                        .lineSpacing(4)
-                        .foregroundStyle(cream.opacity(0.6))
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 12)
-                }
-                .padding(.horizontal, 32)
-
-                Spacer()
-            }
-        }
-    }
-
-    // MARK: - Slide 2: What It Does
-
-    private var whatItDoesSlide: some View {
-        ZStack {
-            RadialGradient(
-                colors: [stewardGreen.opacity(0.3), .clear],
-                center: .init(x: 0.8, y: 0.3),
-                startRadius: 0,
-                endRadius: 200
-            )
-            .ignoresSafeArea()
-
-            VStack(alignment: .leading, spacing: 0) {
-                Spacer().frame(height: 72)
-
-                // Header
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("WHAT STEWARD DOES")
-                        .font(.system(size: 11, weight: .medium))
-                        .tracking(2.2)
-                        .foregroundStyle(mint.opacity(0.7))
-
-                    Text("Your wishlist,\non autopilot")
-                        .font(Theme.serif(28, weight: .bold))
-                        .foregroundStyle(cream)
-                        .lineSpacing(4)
-                }
-                .padding(.horizontal, 32)
-
-                Spacer().frame(height: 32)
-
-                // Feature cards
-                VStack(spacing: 12) {
-                    featureCard(emoji: "📉", title: "Price Drop Alerts", body: "Pick a target price. Steward watches. You get pinged the second it drops.")
-                    featureCard(emoji: "🔔", title: "Back in Stock", body: "Sold out? Steward waits patiently. You get the tap the moment it is back.")
-                    featureCard(emoji: "💸", title: "Cashback and Coupons", body: "Savings show up at checkout like magic. No coupon hunting required.")
-                    featureCard(emoji: "✈️", title: "Any Website", body: "Shoes, flights, rentals, concert tickets. If it lives on the web, Steward can watch it.")
-                }
-                .padding(.horizontal, 24)
-
-                Spacer()
-            }
-        }
-    }
-
-    // MARK: - Slide 3: How It Works
-
-    private var howItWorksSlide: some View {
-        ZStack {
-            RadialGradient(
-                colors: [stewardGreen.opacity(0.25), .clear],
-                center: .init(x: 0.2, y: 0.7),
-                startRadius: 0,
-                endRadius: 250
-            )
-            .ignoresSafeArea()
-
-            VStack(alignment: .leading, spacing: 0) {
-                Spacer().frame(height: 72)
-
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("HOW IT WORKS")
-                        .font(.system(size: 11, weight: .medium))
-                        .tracking(2.2)
-                        .foregroundStyle(mint.opacity(0.7))
-
-                    Text("Set up a watch\nin seconds")
-                        .font(Theme.serif(28, weight: .bold))
-                        .foregroundStyle(cream)
-                        .lineSpacing(4)
-                }
-                .padding(.horizontal, 32)
-
-                Spacer().frame(height: 36)
-
-                // Steps
-                VStack(spacing: 0) {
-                    stepRow(number: 1, title: "Share or paste a link", body: "Drop any product link into Steward from Safari, Amazon, anywhere.", isLast: false)
-                    stepRow(number: 2, title: "Tell the AI what to watch for", body: "\"Drop it below $80\" or \"tell me when it is back.\" Steward gets it.", isLast: false)
-                    stepRow(number: 3, title: "Steward handles the rest", body: "It checks quietly in the background. When something changes, you will know.", isLast: true)
-                }
-                .padding(.horizontal, 32)
-
-                Spacer().frame(height: 28)
-
-                // Mockup notification card
-                HStack(spacing: 12) {
-                    Text("👟")
-                        .font(.system(size: 22))
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Nike Dunk Low Panda")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(cream)
-                        Text("↓ Dropped to $89 · was $120")
-                            .font(.system(size: 11))
-                            .foregroundStyle(mint.opacity(0.7))
-                    }
-
-                    Spacer()
-
-                    Text("VIEW DEAL")
-                        .font(.system(size: 10, weight: .semibold))
-                        .tracking(0.5)
-                        .foregroundStyle(mint)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(mint.opacity(0.15))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 20)
-                                .stroke(mint.opacity(0.25), lineWidth: 1)
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: 20))
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 14)
-                .background(.white.opacity(0.03))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(.white.opacity(0.07), lineWidth: 1)
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-                .padding(.horizontal, 24)
-
-                Spacer()
-            }
-        }
-    }
-
-    // MARK: - Slide 4: CTA
-
-    private var ctaSlide: some View {
-        ZStack {
-            RadialGradient(
-                colors: [stewardGreen.opacity(0.5), .clear],
-                center: .init(x: 0.5, y: 0.4),
-                startRadius: 0,
-                endRadius: 220
-            )
-            .ignoresSafeArea()
-
-            RadialGradient(
-                colors: [mint.opacity(0.05), .clear],
-                center: .init(x: 0.2, y: 0.8),
-                startRadius: 0,
-                endRadius: 200
-            )
-            .ignoresSafeArea()
-
-            VStack(spacing: 0) {
-                Spacer()
-
-                // Icon
-                StewardLogo(size: 64)
-                    .shadow(color: stewardGreen.opacity(0.9), radius: 20)
-                    .shadow(color: mint.opacity(0.25), radius: 6)
-
-                Spacer().frame(height: 20)
-
-                VStack(spacing: 4) {
-                    Text("Start for ")
-                        .font(Theme.serif(28, weight: .bold))
-                        .foregroundStyle(cream)
-                    + Text("free")
-                        .font(Font.custom("Georgia-BoldItalic", size: 28))
-                        .foregroundStyle(mint)
-                    + Text(",")
-                        .font(Theme.serif(28, weight: .bold))
-                        .foregroundStyle(cream)
-
-                    Text("upgrade anytime")
-                        .font(Theme.serif(28, weight: .bold))
-                        .foregroundStyle(cream)
-                }
+                Spacer().frame(height: 100)
+                (Text("Monitor\n").font(Font.custom("Georgia-Bold", size: 48)).foregroundColor(cream)
+                 + Text("anything").font(Font.custom("Georgia-BoldItalic", size: 48)).foregroundColor(mint))
                 .multilineTextAlignment(.center)
-
-                Spacer().frame(height: 10)
-
-                Text("No credit card needed. Jump in free and upgrade when your wishlist gets bigger.")
-                    .font(.system(size: 13, weight: .light))
-                    .lineSpacing(4)
-                    .foregroundStyle(cream.opacity(0.6))
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 32)
-
-                Spacer().frame(height: 12)
-
-                // Tier cards (vertical layout)
-                VStack(spacing: 6) {
-                    tierCard(icon: "🌱", label: "Free", value: "3 watches · checks once a day", perks: "AI chat setup, price history, activity feed, cashback", highlighted: false)
-                    tierCard(icon: "⚡", label: "Pro", value: "10 watches · checks every hour", perks: "Everything in Free, plus faster checks and more watches", highlighted: false)
-                    tierCard(icon: "✦", label: "Premium", value: "25 watches · every 5 min", perks: "Everything in Pro, plus near real-time checks and more watches", highlighted: true)
+                Text("Prices, restocks, reservations, and more.")
+                    .font(.system(size: 15, weight: .light)).foregroundStyle(cream.opacity(0.6)).padding(.top, 14)
+                Spacer().frame(height: 36)
+                TypewriterCard(mint: mint, cream: cream, deepForest: deepForest, stewardGreen: stewardGreen, isActive: currentPage == 0) {
+                    withAnimation { currentPage = 1 }
                 }
-                .padding(.horizontal, 32)
-
                 Spacer()
-
-                // CTA buttons
-                VStack(spacing: 12) {
-                    primaryButton("Create free account") {
-                        onFinish()
-                    }
-
-                    Button {
-                        onFinish()
-                    } label: {
-                        Text("I already have an account")
-                            .font(.system(size: 14))
-                            .foregroundStyle(.white.opacity(0.5))
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 46)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 14)
-                                    .stroke(.white.opacity(0.12), lineWidth: 1)
-                            )
-                    }
-                }
-                .padding(.horizontal, 28)
-                .padding(.bottom, 50)
             }
+            .padding(.horizontal, 28)
         }
     }
 
-    // MARK: - Reusable Components
+    // MARK: - Page 2: Never Miss a Drop
 
-    private var pageDots: some View {
-        HStack(spacing: 6) {
-            ForEach(0..<totalPages, id: \.self) { i in
-                Capsule()
-                    .fill(i == currentPage ? mint : .white.opacity(0.2))
-                    .frame(width: i == currentPage ? 20 : 6, height: 6)
-                    .animation(.easeOut(duration: 0.3), value: currentPage)
-            }
-        }
-    }
-
-    private func primaryButton(_ label: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(label)
-                .font(.system(size: 15, weight: .semibold))
-                .tracking(0.3)
-                .foregroundStyle(deepForest)
-                .frame(maxWidth: .infinity)
-                .frame(height: 54)
-                .background(mint)
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-        }
-    }
-
-    private func featureCard(emoji: String, title: String, body: String) -> some View {
-        HStack(alignment: .top, spacing: 16) {
-            Text(emoji)
-                .font(.system(size: 18))
-                .frame(width: 40, height: 40)
-                .background(mint.opacity(0.15))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title)
-                    .font(Theme.serif(15, weight: .semibold))
-                    .foregroundStyle(cream)
-
-                Text(body)
-                    .font(.system(size: 12.5, weight: .light))
-                    .lineSpacing(2)
-                    .foregroundStyle(cream.opacity(0.6))
-            }
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 18)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.white.opacity(0.04))
-        .overlay(
-            RoundedRectangle(cornerRadius: 18)
-                .stroke(.white.opacity(0.07), lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 18))
-    }
-
-    private func stepRow(number: Int, title: String, body: String, isLast: Bool) -> some View {
-        HStack(alignment: .top, spacing: 20) {
-            // Number circle only (connector is an overlay to avoid layout differences)
-            Text("\(number)")
-                .font(Theme.serif(13, weight: .semibold))
-                .foregroundStyle(mint)
-                .frame(width: 32, height: 32)
-                .background(stewardGreen)
-                .overlay(
-                    Circle().stroke(mint.opacity(0.3), lineWidth: 1)
-                )
-                .clipShape(Circle())
-
-            // Text
-            VStack(alignment: .leading, spacing: 5) {
-                Text(title)
-                    .font(Theme.serif(16, weight: .semibold))
-                    .foregroundStyle(cream)
-
-                Text(body)
-                    .font(.system(size: 13, weight: .light))
-                    .lineSpacing(2)
-                    .foregroundStyle(cream.opacity(0.6))
-            }
-            .padding(.top, 4)
-        }
-        .overlay(alignment: .topLeading) {
-            // Connector line as overlay — doesn't affect layout
-            if !isLast {
-                Rectangle()
-                    .fill(
-                        LinearGradient(
-                            colors: [mint.opacity(0.2), .clear],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .frame(width: 1, height: 28)
-                    .offset(x: 16, y: 38)
-            }
-        }
-        .padding(.bottom, isLast ? 0 : 8)
-    }
-
-    private func tierCard(icon: String, label: String, value: String, perks: String, highlighted: Bool) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            Text(icon)
-                .font(.system(size: 16))
-                .frame(width: 24, alignment: .center)
-                .padding(.top, 1)
-
-            VStack(alignment: .leading, spacing: 1) {
-                Text(label.uppercased())
-                    .font(.system(size: 9.5, weight: .semibold))
-                    .tracking(1.2)
-                    .foregroundStyle(mint)
-
-                Text(value)
-                    .font(Theme.serif(12.5, weight: .semibold))
-                    .foregroundStyle(cream)
-
-                Text(perks)
-                    .font(.system(size: 10.5, weight: .light))
-                    .lineSpacing(2)
-                    .foregroundStyle(cream.opacity(0.6))
-            }
-        }
-        .padding(.horizontal, 13)
-        .padding(.vertical, 9)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(highlighted ? mint.opacity(0.07) : .white.opacity(0.04))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(highlighted ? mint.opacity(0.22) : .white.opacity(0.08), lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-    }
-
-    private var breathingRings: some View {
+    private var pricePage: some View {
         ZStack {
-            ForEach(0..<4, id: \.self) { i in
-                Circle()
-                    .stroke(mint.opacity(0.08), lineWidth: 1)
-                    .frame(width: CGFloat(200 + i * 70), height: CGFloat(200 + i * 70))
-                    .modifier(BreathingModifier(delay: Double(i) * 0.5))
+            RadialGradient(colors: [stewardGreen.opacity(0.5), .clear], center: .init(x: 0.5, y: 0.4), startRadius: 0, endRadius: 300).ignoresSafeArea()
+            VStack(spacing: 0) {
+                Spacer().frame(height: 100)
+                (Text("Never miss\na ").font(Font.custom("Georgia-Bold", size: 48)).foregroundColor(cream)
+                 + Text("drop").font(Font.custom("Georgia-BoldItalic", size: 48)).foregroundColor(mint))
+                .multilineTextAlignment(.center)
+                Text("Price drops, restocks, and openings.")
+                    .font(.system(size: 15, weight: .light)).foregroundStyle(cream.opacity(0.6)).padding(.top, 14)
+                Spacer().frame(height: 36)
+                PriceCard(mint: mint, cream: cream, gold: gold, stewardGreen: stewardGreen, deepForest: deepForest, isActive: currentPage == 1)
+                Spacer()
             }
+            .padding(.horizontal, 28)
         }
-        .offset(y: -70)
+    }
+
+    // MARK: - Page 3: Steward Does the Watching
+
+    private var notifPage: some View {
+        ZStack {
+            RadialGradient(colors: [stewardGreen.opacity(0.5), .clear], center: .init(x: 0.6, y: 0.3), startRadius: 0, endRadius: 300).ignoresSafeArea()
+            VStack(spacing: 0) {
+                Spacer().frame(height: 100)
+                (Text("Steward does\nthe ").font(Font.custom("Georgia-Bold", size: 48)).foregroundColor(cream)
+                 + Text("watching").font(Font.custom("Georgia-BoldItalic", size: 48)).foregroundColor(mint))
+                .multilineTextAlignment(.center)
+                Text("While you live your life.")
+                    .font(.system(size: 15, weight: .light)).foregroundStyle(cream.opacity(0.6)).padding(.top, 14)
+                Spacer().frame(height: 36)
+                NotifStack(mint: mint, cream: cream, gold: gold, isActive: currentPage == 2)
+                Spacer()
+            }
+            .padding(.horizontal, 28)
+        }
     }
 }
 
-// MARK: - Breathing Animation Modifier
+// MARK: - Page 1: Typewriter Card
 
-private struct BreathingModifier: ViewModifier {
-    let delay: Double
-    @State private var isAnimating = false
+private struct TypewriterCard: View {
+    let mint: Color, cream: Color, deepForest: Color, stewardGreen: Color
+    let isActive: Bool
+    var onConfirmComplete: (() -> Void)? = nil
 
-    func body(content: Content) -> some View {
-        content
-            .scaleEffect(isAnimating ? 1.03 : 1.0)
-            .opacity(isAnimating ? 1.0 : 0.5)
-            .onAppear {
-                withAnimation(
-                    .easeInOut(duration: 4)
-                    .repeatForever(autoreverses: true)
-                    .delay(delay)
-                ) {
-                    isAnimating = true
+    @State private var displayText = ""
+    @State private var phraseIndex = 0
+    @State private var phase: Phase = .idle
+    @State private var taskId = UUID()
+
+    enum Phase { case idle, typing, paused, confirming }
+
+    private let phrases = [
+        "nike.com/dunk-low-panda",
+        "resy.com/cities/la/bestia",
+        "recreation.gov/camping",
+        "google.com/flights/NYC-TYO",
+        "ticketmaster.com/bad-bunny"
+    ]
+
+    var body: some View {
+        ZStack {
+            // Input layer
+            HStack(spacing: 0) {
+                Text(displayText)
+                    .font(.system(size: 14, design: .monospaced))
+                    .foregroundStyle(cream)
+                    .lineLimit(1)
+
+                if phase == .typing {
+                    Rectangle().fill(mint).frame(width: 2, height: 17)
+                        .opacity(1)
+                }
+
+                Spacer()
+
+                Circle().fill(mint).frame(width: 34, height: 34)
+                    .overlay(Image(systemName: "arrow.up").font(.system(size: 14, weight: .bold)).foregroundStyle(deepForest))
+                    .scaleEffect(phase == .paused ? 1.15 : 1.0)
+                    .shadow(color: phase == .paused ? mint.opacity(0.5) : .clear, radius: 10)
+            }
+            .padding(16)
+            .opacity(phase == .confirming ? 0 : 1)
+
+            // Confirm layer
+            HStack(spacing: 12) {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 14, weight: .bold)).foregroundStyle(deepForest)
+                    .frame(width: 36, height: 36).background(mint).clipShape(Circle())
+                    .scaleEffect(phase == .confirming ? 1 : 0)
+
+                Text("Now watching!")
+                    .font(.system(size: 15, weight: .semibold)).foregroundStyle(mint)
+                    .opacity(phase == .confirming ? 1 : 0)
+                    .offset(x: phase == .confirming ? 0 : -10)
+            }
+            .opacity(phase == .confirming ? 1 : 0)
+        }
+        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: phase)
+        .frame(maxWidth: 340)
+        .background(
+            ZStack {
+                RoundedRectangle(cornerRadius: 18).fill(Color.white.opacity(0.04))
+                    .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.white.opacity(0.08), lineWidth: 1))
+                    .opacity(phase == .confirming ? 0 : 1)
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(LinearGradient(colors: [stewardGreen.opacity(0.95), Color(hex: "1C3D2E").opacity(0.92)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .overlay(RoundedRectangle(cornerRadius: 18).stroke(mint.opacity(0.25), lineWidth: 1))
+                    .opacity(phase == .confirming ? 1 : 0)
+            }
+            .animation(.easeInOut(duration: 0.3), value: phase)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .onChange(of: isActive) { _, active in
+            if active { startCycle() } else { cancelCycle() }
+        }
+        .onAppear { if isActive { startCycle() } }
+    }
+
+    private func cancelCycle() {
+        taskId = UUID()
+        phase = .idle
+        displayText = ""
+    }
+
+    private func startCycle() {
+        cancelCycle()
+        let id = UUID()
+        taskId = id
+        phase = .typing
+        typeNext(phrase: phrases[phraseIndex], index: 0, id: id)
+    }
+
+    private func typeNext(phrase: String, index: Int, id: UUID) {
+        guard taskId == id else { return }
+        if index > phrase.count { return }
+
+        if index == phrase.count {
+            phase = .paused
+            after(0.5, id: id) {
+                phase = .confirming
+                // Advance page after showing confirmation
+                after(1.0, id: id) {
+                    onConfirmComplete?()
+                    // Reset for next time this page becomes active
+                    after(0.5, id: id) {
+                        phraseIndex = (phraseIndex + 1) % phrases.count
+                        cancelCycle()
+                    }
                 }
             }
+            return
+        }
+
+        displayText = String(phrase.prefix(index + 1))
+        after(Double.random(in: 0.03...0.06), id: id) {
+            typeNext(phrase: phrase, index: index + 1, id: id)
+        }
+    }
+
+    private func after(_ delay: Double, id: UUID, action: @escaping () -> Void) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            guard taskId == id else { return }
+            action()
+        }
+    }
+}
+
+// MARK: - Page 2: Price Drop Card
+
+private struct PriceCard: View {
+    let mint: Color, cream: Color, gold: Color, stewardGreen: Color, deepForest: Color
+    let isActive: Bool
+
+    @State private var showDrop = false
+    @State private var showBadge = false
+    @State private var showNotif = false
+    @State private var chartProgress: CGFloat = 0
+    @State private var animId = UUID()
+
+    // Price going DOWN over time: starts high ($120 area), drops to low ($89 area)
+    private let pts: [CGFloat] = [65, 62, 58, 60, 55, 50, 45, 38, 35, 28, 15]
+
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            // Card content
+            VStack(alignment: .leading, spacing: 0) {
+                HStack {
+                    Text("PRICE WATCH").font(.system(size: 10, weight: .semibold)).tracking(1.5).foregroundStyle(mint.opacity(0.5))
+                    Spacer()
+                    if showBadge {
+                        Text("SAVE 26%").font(.system(size: 9, weight: .heavy)).foregroundStyle(gold)
+                            .padding(.horizontal, 10).padding(.vertical, 3)
+                            .background(gold.opacity(0.15)).overlay(Capsule().stroke(gold.opacity(0.3), lineWidth: 1)).clipShape(Capsule())
+                            .transition(.scale.combined(with: .opacity))
+                    }
+                }
+
+                HStack(spacing: 10) {
+                    Text("👟").font(.system(size: 24))
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Nike Dunk Low Panda").font(.system(size: 13, weight: .medium)).foregroundStyle(cream)
+                        Text("nike.com").font(.system(size: 11)).foregroundStyle(cream.opacity(0.4))
+                    }
+                }.padding(.top, 10)
+
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    Text(showDrop ? "$89" : "$120")
+                        .font(Font.custom("Georgia-Bold", size: 34)).foregroundStyle(mint)
+                        .contentTransition(.numericText()).animation(.easeInOut(duration: 0.5), value: showDrop)
+                    if showDrop {
+                        Text("$120").font(.system(size: 15)).foregroundStyle(cream.opacity(0.3)).strikethrough().transition(.opacity)
+                    }
+                }.padding(.top, 8)
+
+                // Chart
+                GeometryReader { geo in
+                    let w = geo.size.width
+                    let h: CGFloat = 80
+                    let step = w / CGFloat(pts.count - 1)
+                    ZStack(alignment: .bottomLeading) {
+                        Path { p in
+                            p.move(to: CGPoint(x: 0, y: h - pts[0]))
+                            for i in 1..<pts.count { p.addLine(to: CGPoint(x: step * CGFloat(i), y: h - pts[i])) }
+                            p.addLine(to: CGPoint(x: w, y: h)); p.addLine(to: CGPoint(x: 0, y: h)); p.closeSubpath()
+                        }
+                        .fill(LinearGradient(colors: [mint.opacity(0.25), mint.opacity(0)], startPoint: .top, endPoint: .bottom))
+                        .opacity(Double(chartProgress))
+
+                        Path { p in
+                            p.move(to: CGPoint(x: 0, y: h - pts[0]))
+                            for i in 1..<pts.count { p.addLine(to: CGPoint(x: step * CGFloat(i), y: h - pts[i])) }
+                        }
+                        .trim(from: 0, to: chartProgress)
+                        .stroke(mint, style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
+                    }
+                }
+                .frame(height: 80).padding(.top, 8)
+
+                HStack {
+                    ForEach(["Jan", "Feb", "Mar", "Apr", "Now"], id: \.self) { l in
+                        Text(l).font(.system(size: 10)).foregroundStyle(cream.opacity(0.3))
+                        if l != "Now" { Spacer() }
+                    }
+                }.padding(.top, 6)
+            }
+            .padding(20)
+
+            // Price dropped overlay — covers bottom half of card
+            if showNotif {
+                priceDropOverlay
+            }
+        }
+        .background(Color.white.opacity(0.04))
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.white.opacity(0.08), lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .frame(maxWidth: 340)
+        .onChange(of: isActive) { _, active in
+            if active { run() } else { reset() }
+        }
+        .onAppear { if isActive { run() } }
+    }
+
+    private var priceDropOverlay: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "bell.fill")
+                .font(.system(size: 20))
+                .foregroundStyle(mint)
+
+            Text("Price dropped!")
+                .font(.system(size: 17, weight: .bold))
+                .foregroundStyle(.white)
+
+            Text("Nike Dunk Low is now $89")
+                .font(.system(size: 14))
+                .foregroundStyle(.white.opacity(0.85))
+
+            HStack(spacing: 6) {
+                Text("Tap to buy now")
+                    .font(.system(size: 15, weight: .bold))
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 13, weight: .bold))
+            }
+            .foregroundStyle(deepForest)
+            .padding(.horizontal, 24)
+            .padding(.vertical, 12)
+            .background(mint)
+            .clipShape(Capsule())
+            .padding(.top, 4)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 24)
+        .background(
+            LinearGradient(colors: [stewardGreen, Color(hex: "1C3D2E")], startPoint: .top, endPoint: .bottom)
+        )
+        .transition(.move(edge: .bottom).combined(with: .opacity))
+    }
+
+    private func run() {
+        reset()
+        let id = UUID(); animId = id
+        withAnimation(.easeInOut(duration: 2.2)) { chartProgress = 1.0 }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) { guard animId == id else { return }; withAnimation { showDrop = true } }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.1) { guard animId == id else { return }; withAnimation(.spring(response: 0.4)) { showBadge = true } }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { guard animId == id else { return }; withAnimation(.easeOut(duration: 0.4)) { showNotif = true } }
+    }
+
+    private func reset() {
+        animId = UUID(); showDrop = false; showBadge = false; showNotif = false; chartProgress = 0
+    }
+}
+
+// MARK: - Page 3: Notification Stack
+
+private struct NotifStack: View {
+    let mint: Color, cream: Color, gold: Color
+    let isActive: Bool
+
+    @State private var show: [Bool] = [false, false, false, false]
+    @State private var animId = UUID()
+
+    var body: some View {
+        VStack(spacing: 8) {
+            row(emoji: "🏕", title: "Campsite Available!", desc: "Upper Pines, Yosemite · Jun 14-16", badge: "Book now", bc: Color(hex: "34D399"), hl: true, vis: show[0])
+            row(emoji: "🍽", title: "Reservation Open", desc: "Fri 7pm at Bestia · 2 guests", badge: "Open!", bc: mint, hl: false, vis: show[1])
+            row(emoji: "✈️", title: "Flight Price Dropped", desc: "LAX → Tokyo $489 (was $720)", badge: "↓ $231", bc: gold, hl: false, vis: show[2])
+            row(emoji: "🎫", title: "Tickets Available", desc: "Bad Bunny · Sat 8pm · Floor seats", badge: "Get tix", bc: mint, hl: false, vis: show[3])
+        }
+        .frame(maxWidth: 340)
+        .onChange(of: isActive) { _, active in
+            if active { animateIn() } else { animId = UUID(); show = [false, false, false, false] }
+        }
+    }
+
+    private func animateIn() {
+        let id = UUID(); animId = id; show = [false, false, false, false]
+        for i in 0..<4 {
+            let delay = 0.3 + Double(i) * 0.3
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                guard animId == id else { return }
+                withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) { show[i] = true }
+            }
+        }
+    }
+
+    private func row(emoji: String, title: String, desc: String, badge: String, bc: Color, hl: Bool, vis: Bool) -> some View {
+        HStack(spacing: 12) {
+            Text(emoji).font(.system(size: 22))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.system(size: 13, weight: .semibold)).foregroundStyle(cream)
+                Text(desc).font(.system(size: 11.5)).foregroundStyle(cream.opacity(0.5))
+            }
+            Spacer()
+            Text(badge).font(.system(size: 9, weight: .bold)).foregroundStyle(bc)
+                .padding(.horizontal, 8).padding(.vertical, 3)
+                .background(bc.opacity(0.15)).overlay(Capsule().stroke(bc.opacity(0.3), lineWidth: 1)).clipShape(Capsule())
+        }
+        .padding(14)
+        .background(hl ? mint.opacity(0.07) : Color.white.opacity(0.04))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(hl ? mint.opacity(0.2) : Color.white.opacity(0.08), lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .opacity(vis ? 1 : 0)
+        .offset(x: vis ? 0 : 60)
     }
 }

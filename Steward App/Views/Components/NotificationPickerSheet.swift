@@ -2,11 +2,22 @@ import SwiftUI
 
 struct NotificationPickerSheet: View {
     @Binding var notifyChannels: String
+    var watch: Watch? = nil
+    var onSaveWatch: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
+    @Environment(AuthManager.self) private var authManager
 
     // Parse channels from comma-separated string
     private var selectedChannels: Set<String> {
         Set(notifyChannels.split(separator: ",").map { String($0) })
+    }
+
+    private var hasEmail: Bool {
+        authManager.effectiveEmail != nil
+    }
+
+    private var hasPhone: Bool {
+        authManager.effectivePhone != nil
     }
 
     private func toggle(_ channel: String) {
@@ -48,17 +59,81 @@ struct NotificationPickerSheet: View {
                             subtitle: "Get notified instantly on your device"
                         )
 
-                        Divider()
-                            .padding(.leading, 56)
+                        if hasEmail {
+                            Divider()
+                                .padding(.leading, 56)
 
-                        channelRow(
-                            channel: "email",
-                            icon: "envelope.fill",
-                            title: "Email",
-                            subtitle: "Receive a detailed email alert"
-                        )
+                            channelRow(
+                                channel: "email",
+                                icon: "envelope.fill",
+                                title: "Email",
+                                subtitle: authManager.effectiveEmail ?? "Receive a detailed email alert"
+                            )
+                        }
+
+                        if hasPhone {
+                            Divider()
+                                .padding(.leading, 56)
+
+                            channelRow(
+                                channel: "sms",
+                                icon: "message.fill",
+                                title: "SMS",
+                                subtitle: authManager.effectivePhone ?? "Get a text message when triggered"
+                            )
+                        }
                     }
                     .padding(.horizontal, 24)
+
+                    // Price drop notification toggle (only for price watches)
+                    if let watch, watch.actionType == .price {
+                        VStack(spacing: 0) {
+                            Divider().padding(.horizontal, 24).padding(.vertical, 8)
+
+                            Toggle(isOn: Binding(
+                                get: { watch.notifyAnyPriceDrop },
+                                set: { newValue in
+                                    watch.notifyAnyPriceDrop = newValue
+                                    onSaveWatch?()
+                                }
+                            )) {
+                                HStack(spacing: 12) {
+                                    Image(systemName: "arrow.down.circle.fill")
+                                        .font(.system(size: 16))
+                                        .foregroundStyle(Theme.accent)
+                                        .frame(width: 32, height: 32)
+                                        .background(Theme.accentLight)
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Notify on any price drop")
+                                            .font(Theme.body(14, weight: .medium))
+                                            .foregroundStyle(Theme.ink)
+
+                                        Text("Alert even for small decreases")
+                                            .font(Theme.body(11))
+                                            .foregroundStyle(Theme.inkLight)
+                                    }
+                                }
+                            }
+                            .tint(Theme.accent)
+                            .padding(.horizontal, 24)
+                        }
+                    }
+
+                    if !hasEmail || !hasPhone {
+                        HStack(spacing: 8) {
+                            Image(systemName: "info.circle")
+                                .font(.system(size: 13))
+                                .foregroundStyle(Theme.inkLight)
+
+                            Text("Add your \(!hasEmail && !hasPhone ? "email and phone number" : !hasEmail ? "email" : "phone number") in Settings to unlock more notification channels.")
+                                .font(Theme.body(11))
+                                .foregroundStyle(Theme.inkLight)
+                        }
+                        .padding(.horizontal, 24)
+                        .padding(.top, 16)
+                    }
 
                     // Info
                     HStack(spacing: 8) {
@@ -71,7 +146,7 @@ struct NotificationPickerSheet: View {
                             .foregroundStyle(Theme.inkLight)
                     }
                     .padding(.horizontal, 24)
-                    .padding(.top, 16)
+                    .padding(.top, hasEmail || hasPhone ? 16 : 8)
                 }
                 .padding(.bottom, 24)
             }

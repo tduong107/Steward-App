@@ -3,39 +3,49 @@ import SwiftData
 
 struct RootView: View {
     @Environment(AuthManager.self) private var authManager
-    @AppStorage("hasSeenOnboardingA") private var hasSeenOnboardingA = false
     @AppStorage("hasSeenOnboardingB") private var hasSeenOnboardingB = false
+    @State private var authInitialMode: AuthScreen.AuthMode = .signUp
+    @State private var showAuth = false
 
     var body: some View {
         Group {
             if authManager.isLoading {
                 SplashScreen()
-            } else if !hasSeenOnboardingA && !authManager.isAuthenticated {
-                // Flow A: First time opening the app (not signed in)
-                OnboardingFlowA {
+            } else if !authManager.isAuthenticated && !showAuth {
+                // Not logged in — show onboarding (every time, not just first launch)
+                OnboardingFlowA { wantsSignIn in
+                    authInitialMode = wantsSignIn ? .signIn : .signUp
                     withAnimation(.easeInOut(duration: 0.4)) {
-                        hasSeenOnboardingA = true
+                        showAuth = true
                     }
                 }
                 .transition(.opacity)
+            } else if !authManager.isAuthenticated && showAuth {
+                // User tapped sign up/sign in from onboarding
+                AuthScreen(initialMode: authInitialMode)
+                    .transition(.opacity)
             } else if authManager.isAuthenticated && !hasSeenOnboardingB {
-                // Flow B: First time signing in
+                // First time signing in — show tutorial
                 OnboardingFlowB {
                     withAnimation(.easeInOut(duration: 0.4)) {
                         hasSeenOnboardingB = true
                     }
                 }
                 .transition(.opacity)
-            } else if authManager.isAuthenticated {
-                ContentView()
             } else {
-                AuthScreen()
+                ContentView()
             }
         }
         .animation(.easeInOut(duration: 0.4), value: authManager.isAuthenticated)
         .animation(.easeInOut(duration: 0.3), value: authManager.isLoading)
-        .animation(.easeInOut(duration: 0.4), value: hasSeenOnboardingA)
+        .animation(.easeInOut(duration: 0.4), value: showAuth)
         .animation(.easeInOut(duration: 0.4), value: hasSeenOnboardingB)
+        .onChange(of: authManager.isAuthenticated) { _, isAuth in
+            if isAuth {
+                // Reset so onboarding shows again on next sign-out
+                showAuth = false
+            }
+        }
         .task {
             await authManager.initialize()
         }

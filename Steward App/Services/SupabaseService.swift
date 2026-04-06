@@ -95,6 +95,37 @@ final class SupabaseService {
             .value
     }
 
+    /// Fetches aggregate weekly check stats across all of a user's watches.
+    /// Returns (totalChecks, triggeredChecks) for the past 7 days.
+    /// Uses server-side counting to avoid the default 1,000 row limit and minimize data transfer.
+    func fetchWeeklyCheckStats() async throws -> (total: Int, triggered: Int) {
+        let calendar = Calendar.current
+        let startDate = calendar.date(byAdding: .day, value: -7, to: Date()) ?? Date()
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        let startDateStr = formatter.string(from: startDate)
+
+        // Use head: true with count: .exact to get server-side counts without fetching rows.
+        // This avoids Supabase's default 1,000 row limit and is much more efficient.
+        async let totalResponse = SupabaseConfig.client
+            .from("check_results")
+            .select("*", head: true, count: .exact)
+            .gte("checked_at", value: startDateStr)
+            .execute()
+
+        async let triggeredResponse = SupabaseConfig.client
+            .from("check_results")
+            .select("*", head: true, count: .exact)
+            .gte("checked_at", value: startDateStr)
+            .eq("changed", value: true)
+            .execute()
+
+        let (totalResult, triggeredResult) = try await (totalResponse, triggeredResponse)
+        let total = totalResult.count ?? 0
+        let triggered = triggeredResult.count ?? 0
+        return (total: total, triggered: triggered)
+    }
+
     /// Stores a user-confirmed price as the initial check_result for a price watch
     func createInitialPricePoint(watchId: UUID, price: Double) async throws {
         let now = ISO8601DateFormatter().string(from: Date())

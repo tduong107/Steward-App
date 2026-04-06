@@ -154,7 +154,7 @@ final class ChatViewModel {
                 withAnimation(.spring(response: 0.3)) {
                     messages.append(ChatMessage(
                         role: .steward,
-                        text: "✅ Watch URL has been updated and the warning has been cleared! Go back to check it out.",
+                        text: "✅ Watch URL has been updated and the warning has been cleared! Steward is running a check now — you'll see the latest price in your watch history shortly.",
                         suggestions: ["That's all for now"]
                     ))
                 }
@@ -573,7 +573,7 @@ final class ChatViewModel {
 
         // 8. If it's a proposal, override suggestions with confirm/deny buttons
         if isProposal {
-            suggestions = ["Yes, set it up! ✅", "No, let me change something"]
+            suggestions = ["Yes, create it!", "Change something", "Cancel"]
         }
 
         return ParsedResponse(
@@ -650,109 +650,54 @@ final class ChatViewModel {
         return text + "\n\n[URL_CONTEXT: I resolved the URLs for you. Here's what I found:\n\(context)\nUse this info to understand what the user is referring to. Use the ORIGINAL URL the user provided for the watch, not the resolved one.]"
     }
 
-    /// Resolves a URL (follows redirects) and fetches the page title + price info.
-    /// Fetches the original URL first to follow short-link redirects, then falls back
-    /// to the desktop-normalized URL if the original fails.
+    /// Resolves a URL (follows redirects) and fetches the page title + price info
     private func resolveAndFetchMetadata(url: URL) async -> String? {
-        let desktopUA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-
-        // Step 1: Try the ORIGINAL URL first — mobile short links only resolve on their original domain
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
-        request.setValue(desktopUA, forHTTPHeaderField: "User-Agent")
-
-        var html = ""
-        var finalURL = url
+        // Mimic a real browser to avoid blocks
+        request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1", forHTTPHeaderField: "User-Agent")
 
         do {
             let (data, response) = try await Self.metadataSession.data(for: request)
-            html = String(data: data, encoding: .utf8) ?? ""
-            let responseURL = response.url ?? url
 
-            // Don't use the resolved URL if it's just a homepage redirect
-            // (app deep links like mobile.rei.com/AkCd/xyz → www.rei.com/ are useless)
-            if Self.isHomepageRedirect(resolved: responseURL, original: url) {
-                html = ""  // Discard homepage HTML
-                #if DEBUG
-                print("[ChatViewModel] Detected homepage redirect: \(url) → \(responseURL) — keeping original URL")
-                #endif
-            } else {
-                finalURL = responseURL
+            let finalURL = response.url ?? url
+            let html = String(data: data, encoding: .utf8) ?? ""
+
+            // Extract page title
+            let title = extractTitle(from: html)
+            // Extract price if visible
+            let price = extractPrice(from: html)
+
+            // Store detected price for use in watch creation
+            if let priceStr = price,
+               let numericStr = priceStr.replacingOccurrences(of: "[^0-9.]", with: "", options: .regularExpression) as String?,
+               let priceVal = Double(numericStr), priceVal > 0 {
+                lastDetectedPrice = priceVal
             }
 
-            // Step 2: If the original returned very little content, try the desktop-normalized URL
-            if html.count < 200 {
-                let normalizedURL = Self.normalizeToDesktopURL(url)
-                if normalizedURL != url {
-                    var fallbackRequest = URLRequest(url: normalizedURL)
-                    fallbackRequest.httpMethod = "GET"
-                    fallbackRequest.setValue(desktopUA, forHTTPHeaderField: "User-Agent")
-                    if let (fbData, fbResponse) = try? await Self.metadataSession.data(for: fallbackRequest) {
-                        let fbHTML = String(data: fbData, encoding: .utf8) ?? ""
-                        let fbFinalURL = fbResponse.url ?? normalizedURL
-                        if fbHTML.count > html.count && !Self.isHomepageRedirect(resolved: fbFinalURL, original: url) {
-                            html = fbHTML
-                            finalURL = fbFinalURL
-                        }
-                    }
-                }
+            var result = "URL: \(url.absoluteString)"
+            if finalURL.absoluteString != url.absoluteString {
+                result += " → resolves to: \(finalURL.absoluteString)"
             }
+            if let title = title {
+                result += " | Page title: \"\(title)\""
+            }
+            if let price = price {
+                result += " | Price found: \(price)"
+            }
+
+            // Try to identify the website
+            if let host = finalURL.host {
+                result += " | Website: \(host)"
+            }
+
+            return result
         } catch {
-            // If original fails entirely, try normalized URL as fallback
-            let normalizedURL = Self.normalizeToDesktopURL(url)
-            if normalizedURL != url {
-                var fallbackRequest = URLRequest(url: normalizedURL)
-                fallbackRequest.httpMethod = "GET"
-                fallbackRequest.setValue(desktopUA, forHTTPHeaderField: "User-Agent")
-                if let (fbData, fbResponse) = try? await Self.metadataSession.data(for: fallbackRequest) {
-                    let fbFinalURL = fbResponse.url ?? normalizedURL
-                    html = String(data: fbData, encoding: .utf8) ?? ""
-                    if !Self.isHomepageRedirect(resolved: fbFinalURL, original: url) {
-                        finalURL = fbFinalURL
-                    }
-                } else {
-                    #if DEBUG
-                    print("[ChatViewModel] Failed to resolve URL: \(url) — \(error.localizedDescription)")
-                    #endif
-                    return nil
-                }
-            } else {
-                #if DEBUG
-                print("[ChatViewModel] Failed to resolve URL: \(url) — \(error.localizedDescription)")
-                #endif
-                return nil
-            }
+            #if DEBUG
+            print("[ChatViewModel] Failed to resolve URL: \(url) — \(error.localizedDescription)")
+            #endif
+            return nil
         }
-
-        // Extract page title
-        let title = extractTitle(from: html)
-        // Extract price if visible
-        let price = extractPrice(from: html)
-
-        // Store detected price for use in watch creation
-        if let priceStr = price,
-           let numericStr = priceStr.replacingOccurrences(of: "[^0-9.]", with: "", options: .regularExpression) as String?,
-           let priceVal = Double(numericStr), priceVal > 0 {
-            lastDetectedPrice = priceVal
-        }
-
-        var result = "URL: \(url.absoluteString)"
-        if finalURL.absoluteString != url.absoluteString {
-            result += " → resolves to: \(finalURL.absoluteString)"
-        }
-        if let title = title {
-            result += " | Page title: \"\(title)\""
-        }
-        if let price = price {
-            result += " | Price found: \(price)"
-        }
-
-        // Try to identify the website
-        if let host = finalURL.host {
-            result += " | Website: \(host)"
-        }
-
-        return result
     }
 
     /// Extracts the <title> or og:title from HTML
@@ -900,15 +845,29 @@ final class ChatViewModel {
     // MARK: - Create Watch from AI JSON
 
     private func createWatchFromJSON(_ json: String) {
-        guard let data = json.data(using: .utf8) else { return }
+        // Clean up common AI JSON quirks
+        var cleaned = json.trimmingCharacters(in: .whitespacesAndNewlines)
+        if cleaned.hasPrefix("```") {
+            cleaned = cleaned
+                .replacingOccurrences(of: "^```(?:json)?\\s*", with: "", options: .regularExpression)
+                .replacingOccurrences(of: "\\s*```$", with: "", options: .regularExpression)
+        }
+        cleaned = cleaned.replacingOccurrences(of: ",\\s*([}\\]])", with: "$1", options: .regularExpression)
+        cleaned = cleaned.replacingOccurrences(of: "\u{201C}", with: "\"")
+            .replacingOccurrences(of: "\u{201D}", with: "\"")
+
+        guard let data = cleaned.data(using: .utf8) else {
+            showWatchCreationError("I had trouble reading the watch data. Let me try again — what would you like to watch?")
+            return
+        }
 
         struct WatchPayload: Codable {
-            let emoji: String
+            let emoji: String?
             let name: String
             let url: String
-            let condition: String
-            let actionLabel: String
-            let actionType: String
+            let condition: String?
+            let actionLabel: String?
+            let actionType: String?
             let checkFrequency: String?
             let imageURL: String?
             let watchMode: String?
@@ -917,7 +876,7 @@ final class ChatViewModel {
 
         do {
             let payload = try JSONDecoder().decode(WatchPayload.self, from: data)
-            let actionType = ActionType(rawValue: payload.actionType) ?? .notify
+            let actionType = ActionType(rawValue: payload.actionType ?? "notify") ?? .notify
 
             // Ensure URL has a protocol
             var url = payload.url
@@ -931,17 +890,22 @@ final class ChatViewModel {
                 ?? "Daily"
 
             let watch = Watch(
-                emoji: payload.emoji,
+                emoji: payload.emoji ?? "👀",
                 name: payload.name,
                 url: url,
-                condition: payload.condition,
-                actionLabel: payload.actionLabel,
+                condition: payload.condition ?? "Any change",
+                actionLabel: payload.actionLabel ?? actionType.displayName,
                 actionType: actionType,
                 checkFrequency: frequency,
                 imageURL: payload.imageURL,
                 watchMode: payload.watchMode ?? "url",
                 searchQuery: payload.searchQuery
             )
+
+            // Apply global "notify on any price drop" default for price watches
+            if actionType == .price {
+                watch.notifyAnyPriceDrop = UserDefaults.standard.bool(forKey: "notifyAnyPriceDrop")
+            }
 
             // If no image was provided by the AI, try to fetch og:image from the URL
             if payload.imageURL == nil || payload.imageURL?.isEmpty == true {
@@ -995,8 +959,20 @@ final class ChatViewModel {
             }
         } catch {
             #if DEBUG
-            print("[ChatViewModel] Failed to parse watch JSON: \(error)")
+            print("[ChatViewModel] Failed to parse watch JSON: \(error)\nRaw JSON: \(cleaned)")
             #endif
+            showWatchCreationError("I had trouble creating that watch. Could you try describing what you'd like to watch again?")
+        }
+    }
+
+    /// Shows an error message in the chat when watch creation fails
+    private func showWatchCreationError(_ text: String) {
+        withAnimation(.spring(response: 0.3)) {
+            messages.append(ChatMessage(
+                role: .steward,
+                text: text,
+                suggestions: ["Try again", "Watch something else"]
+            ))
         }
     }
 
@@ -1039,38 +1015,5 @@ final class ChatViewModel {
             #endif
             return nil
         }
-    }
-
-    // MARK: - URL Normalization
-
-    /// Converts mobile URLs to their desktop equivalents for better page content
-    static func normalizeToDesktopURL(_ url: URL) -> URL {
-        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: true),
-              var host = components.host?.lowercased() else {
-            return url
-        }
-
-        // Convert mobile subdomains to www
-        let mobilePatterns = ["mobile.", "m.", "amp."]
-        for pattern in mobilePatterns {
-            if host.hasPrefix(pattern) {
-                host = "www." + host.dropFirst(pattern.count)
-                break
-            }
-        }
-
-        components.host = host
-        return components.url ?? url
-    }
-
-    /// Returns true if the redirect lost all path specificity — the original URL
-    /// had a meaningful path but the resolved URL is just a homepage ("/").
-    /// This happens with app deep links (e.g. mobile.rei.com/AkCd/xyz → www.rei.com/).
-    private static func isHomepageRedirect(resolved: URL, original: URL) -> Bool {
-        let resolvedPath = resolved.path
-        let originalPath = original.path
-        let resolvedIsHomepage = resolvedPath.isEmpty || resolvedPath == "/"
-        let originalHadPath = !originalPath.isEmpty && originalPath != "/"
-        return resolvedIsHomepage && originalHadPath
     }
 }

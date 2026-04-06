@@ -43,7 +43,7 @@ actor AIService {
                 } else {
                     contentBlocks.append([
                         "type": "text",
-                        "text": "What's in this screenshot? Help me set up a watch for it."
+                        "text": "Here's a screenshot. Can you tell what this is and help me set up a watch for it?"
                     ])
                 }
                 return ["role": msg.role, "content": contentBlocks] as [String: Any]

@@ -4,13 +4,16 @@ struct HomeScreen: View {
     @Environment(WatchViewModel.self) private var viewModel
     @Environment(SubscriptionManager.self) private var subscriptionManager
     @Environment(NotificationManager.self) private var notificationManager
+    @Environment(AuthManager.self) private var authManager
 
     // Default frequency
     @AppStorage("defaultCheckFrequency") private var defaultCheckFrequency = "Daily"
+    @AppStorage("isDarkMode") private var isDarkMode = false
+    @AppStorage("appLanguage") private var appLanguage = "en"
     @State private var showFrequencyPicker = false
 
     // Category filter
-    @State private var selectedCategory: ActionType? = nil
+    @State private var selectedCategory: WatchCategory? = nil
 
     // Bulk delete
     @State private var isEditMode = false
@@ -22,13 +25,13 @@ struct HomeScreen: View {
     @State private var showCelebration = false
     @State private var celebrationMilestone: SavingsMilestone?
 
-    // Tutorial
-    @AppStorage("hasSeenOnboardingB") private var hasSeenOnboardingB = false
-    @AppStorage("hasCompletedTutorialWatch") private var hasCompletedTutorialWatch = false
-    @AppStorage("hasCompletedTutorialNotifs") private var hasCompletedTutorialNotifs = false
+    // Tutorial checklist
+    @AppStorage("hasCompletedTutorialWatch") private var hasCompletedWatch = false
+    @AppStorage("hasCompletedTutorialNotifs") private var hasCompletedNotifs = false
+    @AppStorage("hasCompletedTutorialPhone") private var hasCompletedPhone = false
     @AppStorage("hasDismissedTutorial") private var hasDismissedTutorial = false
     @State private var showTutorialCongrats = false
-    @State private var tutorialCongratsStep: TutorialStep?
+    @State private var congratsStep: TutorialStep = .firstWatch
 
     var body: some View {
         ZStack {
@@ -36,7 +39,34 @@ struct HomeScreen: View {
                 VStack(alignment: .leading, spacing: 0) {
                     headerSection
                     chatPromptBar
-                    tutorialCard
+
+                    // Tutorial checklist for new users
+                    if shouldShowTutorial {
+                        TutorialChecklist(
+                            onOpenChat: {
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                    viewModel.isChatOpen = true
+                                }
+                            },
+                            onShowCongrats: { step in
+                                congratsStep = step
+                                withAnimation { showTutorialCongrats = true }
+                            },
+                            onDismiss: {
+                                withAnimation { hasDismissedTutorial = true }
+                            }
+                        )
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 16)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
+
+                    // Over-limit banner (downgrade enforcement)
+                    if viewModel.overLimitCount > 0 {
+                        overLimitBanner
+                    }
+
+                    stewardSummaryCard
                     triggeredAlerts
                     priceInsightsCard
                     categoryFilterBar
@@ -73,54 +103,32 @@ struct HomeScreen: View {
             }
 
             // Tutorial congrats overlay
-            if showTutorialCongrats, let step = tutorialCongratsStep {
+            if showTutorialCongrats {
                 TutorialCongratsOverlay(
-                    step: step,
-                    isFinalStep: hasCompletedTutorialWatch && hasCompletedTutorialNotifs,
+                    step: congratsStep,
+                    isFinalStep: congratsStep == .allComplete,
                     onDismiss: {
-                        withAnimation {
-                            showTutorialCongrats = false
-                            tutorialCongratsStep = nil
-                        }
-                        // Auto-dismiss tutorial card after allComplete or when both done
-                        if step == .allComplete || (hasCompletedTutorialWatch && hasCompletedTutorialNotifs) {
-                            withAnimation(.easeOut(duration: 0.3)) {
+                        withAnimation { showTutorialCongrats = false }
+                        // Auto-dismiss checklist after "all complete"
+                        if congratsStep == .allComplete {
+                            withAnimation(.easeOut(duration: 0.4).delay(0.3)) {
                                 hasDismissedTutorial = true
                             }
                         }
                     }
                 )
                 .transition(.opacity)
-                .zIndex(1000)
-            }
-        }
-        .onChange(of: viewModel.savingsCalculation.totalSavings) { _, _ in
-            checkForNewMilestone()
-        }
-        .onChange(of: viewModel.watches.count) { oldCount, newCount in
-            // Detect first watch creation (0 → 1+)
-            if oldCount == 0 && newCount > 0 && !hasCompletedTutorialWatch && shouldShowTutorial {
-                hasCompletedTutorialWatch = true
-                tutorialCongratsStep = hasCompletedTutorialNotifs ? .allComplete : .firstWatch
-                withAnimation(.spring(response: 0.4)) {
-                    showTutorialCongrats = true
-                }
+                .zIndex(998)
             }
         }
         .onAppear {
-            // Auto-complete steps if user already has watches or notifications
-            if shouldShowTutorial {
-                if !hasCompletedTutorialWatch && !viewModel.watches.isEmpty {
-                    hasCompletedTutorialWatch = true
-                }
-                if !hasCompletedTutorialNotifs && notificationManager.isPermissionGranted {
-                    hasCompletedTutorialNotifs = true
-                }
-                // Auto-dismiss if both already done
-                if hasCompletedTutorialWatch && hasCompletedTutorialNotifs {
-                    hasDismissedTutorial = true
-                }
-            }
+            autoCompleteTutorialSteps()
+        }
+        .onChange(of: viewModel.watches.count) { _, _ in
+            autoCompleteTutorialSteps()
+        }
+        .onChange(of: viewModel.savingsCalculation.totalSavings) { _, _ in
+            checkForNewMilestone()
         }
         .sheet(isPresented: $showFrequencyPicker) {
             FrequencyPickerSheet(selectedFrequency: $defaultCheckFrequency)
@@ -140,6 +148,52 @@ struct HomeScreen: View {
         }
     }
 
+    // MARK: - Tutorial
+
+    private var shouldShowTutorial: Bool {
+        !hasDismissedTutorial
+    }
+
+    private var allTutorialDone: Bool {
+        hasCompletedWatch && hasCompletedNotifs && (hasCompletedPhone || hasUserPhone)
+    }
+
+    private var hasUserPhone: Bool {
+        if let p = authManager.effectivePhone, !p.isEmpty { return true }
+        return false
+    }
+
+    /// Auto-complete tutorial steps based on actual app state and show congrats
+    private func autoCompleteTutorialSteps() {
+        let wasWatchDone = hasCompletedWatch
+        let wasNotifsDone = hasCompletedNotifs
+
+        if !hasCompletedWatch && !viewModel.watches.isEmpty {
+            hasCompletedWatch = true
+        }
+        if !hasCompletedNotifs && notificationManager.isPermissionGranted {
+            hasCompletedNotifs = true
+        }
+        if !hasCompletedPhone && hasUserPhone {
+            hasCompletedPhone = true
+        }
+
+        // Show congrats if a step just completed
+        if !wasWatchDone && hasCompletedWatch {
+            let step: TutorialStep = allTutorialDone ? .allComplete : .firstWatch
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                congratsStep = step
+                withAnimation { showTutorialCongrats = true }
+            }
+        } else if !wasNotifsDone && hasCompletedNotifs {
+            let step: TutorialStep = allTutorialDone ? .allComplete : .notifications
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                congratsStep = step
+                withAnimation { showTutorialCongrats = true }
+            }
+        }
+    }
+
     // MARK: - Milestone Detection
 
     private func checkForNewMilestone() {
@@ -153,35 +207,76 @@ struct HomeScreen: View {
         }
     }
 
-    // MARK: - Tutorial
+    // MARK: - Over-Limit Banner
 
-    private var shouldShowTutorial: Bool {
-        hasSeenOnboardingB && !hasDismissedTutorial
-    }
+    private var overLimitBanner: some View {
+        let currentTier = subscriptionManager.currentTier
+        let maxWatches = currentTier.maxWatches
+        let excess = viewModel.overLimitCount
 
-    @ViewBuilder
-    private var tutorialCard: some View {
-        if shouldShowTutorial && !(hasCompletedTutorialWatch && hasCompletedTutorialNotifs) {
-            TutorialChecklist(
-                onOpenChat: {
-                    viewModel.isChatOpen = true
-                },
-                onShowCongrats: { step in
-                    tutorialCongratsStep = step
-                    withAnimation(.spring(response: 0.4)) {
-                        showTutorialCongrats = true
-                    }
-                },
-                onDismiss: {
-                    withAnimation(.easeOut(duration: 0.3)) {
-                        hasDismissedTutorial = true
-                    }
+        return VStack(spacing: 10) {
+            HStack(spacing: 12) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 18))
+                    .foregroundStyle(.white)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("You have \(excess) extra watch\(excess == 1 ? "" : "es")")
+                        .font(Theme.body(13, weight: .semibold))
+                        .foregroundStyle(.white)
+
+                    Text("Your \(currentTier.displayName) plan allows \(maxWatches) watches. Remove \(excess) to stay within your plan, or upgrade.")
+                        .font(Theme.body(11))
+                        .foregroundStyle(.white.opacity(0.8))
+                        .lineLimit(3)
                 }
+
+                Spacer()
+            }
+            .padding(14)
+            .background(
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(Color.red.opacity(0.85))
             )
-            .padding(.horizontal, 24)
-            .padding(.bottom, 16)
-            .transition(.move(edge: .top).combined(with: .opacity))
+
+            HStack(spacing: 10) {
+                Button {
+                    // Scroll to watches so user can delete
+                    isEditMode = true
+                } label: {
+                    Text("Select watches to remove")
+                        .font(Theme.body(12, weight: .semibold))
+                        .foregroundStyle(Color.red)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(Color.red.opacity(0.1))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(Color.red.opacity(0.3), lineWidth: 1)
+                        )
+                }
+
+                Button {
+                    let highlightTier: SubscriptionTier = currentTier == .free ? .pro : .premium
+                    subscriptionManager.presentPaywall(
+                        highlighting: highlightTier,
+                        reason: "Upgrade to keep all your watches."
+                    )
+                } label: {
+                    Text("Upgrade")
+                        .font(Theme.body(12, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(Theme.accent)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+            }
         }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 12)
+        .transition(.opacity.combined(with: .move(edge: .top)))
     }
 
     // MARK: - Header
@@ -204,21 +299,65 @@ struct HomeScreen: View {
 
             Spacer()
 
+            // Dark/light mode toggle
+            Button {
+                withAnimation(.spring(response: 0.3)) { isDarkMode.toggle() }
+            } label: {
+                Image(systemName: isDarkMode ? "moon.fill" : "sun.max.fill")
+                    .font(.system(size: 14))
+                    .foregroundStyle(Theme.ink)
+                    .frame(width: 34, height: 34)
+                    .background(Theme.bgCard)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Theme.border, lineWidth: 1)
+                    )
+            }
+            .accessibilityLabel(isDarkMode ? "Switch to light mode" : "Switch to dark mode")
+
+            // Language picker
+            Menu {
+                ForEach(AppLanguage.allCases) { lang in
+                    Button {
+                        appLanguage = lang.rawValue
+                    } label: {
+                        HStack {
+                            Text(lang.displayName)
+                            if lang.rawValue == appLanguage {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+            } label: {
+                Image(systemName: "globe")
+                    .font(.system(size: 14))
+                    .foregroundStyle(Theme.ink)
+                    .frame(width: 34, height: 34)
+                    .background(Theme.bgCard)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Theme.border, lineWidth: 1)
+                    )
+            }
+            .accessibilityLabel("Change language")
+
+            // Notifications bell
             Button(action: { viewModel.selectedTab = .activity }) {
                 ZStack(alignment: .topTrailing) {
                     Image(systemName: "bell")
-                        .font(.system(size: 16))
+                        .font(.system(size: 14))
                         .foregroundStyle(Theme.ink)
-                        .frame(width: 38, height: 38)
+                        .frame(width: 34, height: 34)
                         .background(Theme.bgCard)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 12)
+                            RoundedRectangle(cornerRadius: 10)
                                 .stroke(Theme.border, lineWidth: 1)
                         )
-                        .shadow(color: .black.opacity(0.04), radius: 8, y: 4)
 
-                    // Badge for triggered watches
                     if !viewModel.triggeredWatches.isEmpty {
                         Text("\(viewModel.triggeredWatches.count)")
                             .font(.system(size: 10, weight: .bold))
@@ -271,6 +410,121 @@ struct HomeScreen: View {
         .padding(.bottom, 20)
     }
 
+    // MARK: - Steward Summary Card
+
+    /// Formats minutes into a readable time string
+    private func formatTimeSaved(_ minutes: Int) -> String {
+        if minutes < 60 {
+            return "\(minutes) min"
+        } else {
+            let hours = minutes / 60
+            let mins = minutes % 60
+            return mins > 0 ? "\(hours)h \(mins)m" : "\(hours)h"
+        }
+    }
+
+    @ViewBuilder
+    private var stewardSummaryCard: some View {
+        let potentialSavings = viewModel.savingsCalculation.totalSavings
+        let checks = viewModel.weeklyCheckCount
+        let triggers = viewModel.weeklyTriggerCount
+        let activeCount = viewModel.watches.filter { $0.status == .watching }.count
+        // Each automated check replaces ~1 min of manual work:
+        // opening the site (~15s), waiting to load (~10s), finding info (~20s), noting it (~15s)
+        let minutesSaved = checks
+
+        if activeCount > 0 || checks > 0 {
+            VStack(spacing: 12) {
+                // Headline
+                HStack(spacing: 8) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 14))
+                        .foregroundStyle(Theme.accent)
+
+                    Text("Steward is working for you")
+                        .font(Theme.body(14, weight: .bold))
+                        .foregroundStyle(Theme.ink)
+
+                    Spacer()
+                }
+
+                // Stats row
+                HStack(spacing: 0) {
+                    VStack(spacing: 2) {
+                        Text("\(checks)")
+                            .font(Theme.body(16, weight: .bold))
+                            .foregroundStyle(Theme.accent)
+                        Text("Checks\nlast 7 days")
+                            .font(Theme.body(9))
+                            .foregroundStyle(Theme.inkLight)
+                            .multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity)
+
+                    if minutesSaved > 0 {
+                        Rectangle().fill(Theme.border).frame(width: 1, height: 28)
+
+                        VStack(spacing: 2) {
+                            Text("~\(formatTimeSaved(minutesSaved))")
+                                .font(Theme.body(16, weight: .bold))
+                                .foregroundStyle(Theme.accent)
+                            Text("Time\nsaved")
+                                .font(Theme.body(9))
+                                .foregroundStyle(Theme.inkLight)
+                                .multilineTextAlignment(.center)
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+
+                    Rectangle().fill(Theme.border).frame(width: 1, height: 28)
+
+                    VStack(spacing: 2) {
+                        Text("\(triggers)")
+                            .font(Theme.body(16, weight: .bold))
+                            .foregroundStyle(Theme.gold)
+                        Text("Triggers\nlast 7 days")
+                            .font(Theme.body(9))
+                            .foregroundStyle(Theme.inkLight)
+                            .multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity)
+
+                    if potentialSavings > 0 {
+                        Rectangle().fill(Theme.border).frame(width: 1, height: 28)
+
+                        VStack(spacing: 2) {
+                            Text(Theme.formatPrice(potentialSavings))
+                                .font(Theme.body(14, weight: .bold))
+                                .foregroundStyle(Theme.green)
+                            Text("Potential\nsavings")
+                                .font(Theme.body(9))
+                                .foregroundStyle(Theme.inkLight)
+                                .multilineTextAlignment(.center)
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                }
+
+                // Context line
+                if checks > 0 {
+                    Text("\(checks) automated checks in the last 7 days — that's ~\(formatTimeSaved(minutesSaved)) you didn't spend manually browsing")
+                        .font(Theme.body(11))
+                        .foregroundStyle(Theme.inkLight)
+                }
+            }
+            .padding(16)
+            .background(Theme.bgCard)
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(Theme.border, lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.04), radius: 8, y: 4)
+            .padding(.horizontal, 24)
+            .padding(.bottom, 16)
+        }
+    }
+
     // MARK: - Triggered Alerts
 
     @ViewBuilder
@@ -305,7 +559,7 @@ struct HomeScreen: View {
             if subscriptionManager.currentTier.hasPriceInsights {
                 // Unlocked — full access
                 Button {
-                    viewModel.showPriceInsights = true
+                    viewModel.selectedTab = .savings
                 } label: {
                     HStack(spacing: 12) {
                         Image(systemName: "chart.line.downtrend.xyaxis")
@@ -459,14 +713,14 @@ struct HomeScreen: View {
 
     // MARK: - Category Filter Bar
 
-    private var availableCategories: [ActionType] {
-        let types = Set(viewModel.watches.map { $0.actionType })
-        return ActionType.allCases.filter { types.contains($0) }
+    private var availableCategories: [WatchCategory] {
+        let categories = Set(viewModel.watches.map { WatchCategory.from(watch: $0) })
+        return WatchCategory.allCases.filter { categories.contains($0) }
     }
 
     private var filteredWatches: [Watch] {
         guard let category = selectedCategory else { return viewModel.watches }
-        return viewModel.watches.filter { $0.actionType == category }
+        return viewModel.watches.filter { WatchCategory.from(watch: $0) == category }
     }
 
     @ViewBuilder
@@ -483,7 +737,7 @@ struct HomeScreen: View {
 
                     // Category pills
                     ForEach(availableCategories, id: \.self) { category in
-                        filterPill(label: category.displayName, icon: category.iconName, isSelected: selectedCategory == category) {
+                        filterPill(label: category.rawValue, icon: category.icon, isSelected: selectedCategory == category) {
                             withAnimation(.spring(response: 0.3)) {
                                 selectedCategory = category
                             }
@@ -554,8 +808,12 @@ struct HomeScreen: View {
                         Text("\(filteredWatches.count) of \(viewModel.watches.count)")
                             .font(Theme.body(12))
                             .foregroundStyle(Theme.inkLight)
-                    } else {
+                    } else if subscriptionManager.currentTier.maxWatches < Int.max {
                         Text("\(viewModel.watches.count)/\(subscriptionManager.currentTier.maxWatches) watches")
+                            .font(Theme.body(12))
+                            .foregroundStyle(Theme.inkLight)
+                    } else {
+                        Text("\(viewModel.watches.count) watching")
                             .font(Theme.body(12))
                             .foregroundStyle(Theme.inkLight)
                     }
@@ -724,5 +982,87 @@ private struct TriggeredAlertCard: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Review triggered watch: \(watch.name)")
+    }
+}
+
+// MARK: - Watch Category (user-facing filter)
+
+enum WatchCategory: String, CaseIterable, Hashable {
+    case product = "Product"
+    case travel = "Travel"
+    case reservation = "Reservation"
+    case tickets = "Tickets"
+    case camping = "Camping"
+    case general = "General"
+
+    var icon: String {
+        switch self {
+        case .product: return "bag.fill"
+        case .travel: return "airplane"
+        case .reservation: return "calendar"
+        case .tickets: return "ticket.fill"
+        case .camping: return "tent.fill"
+        case .general: return "eye.fill"
+        }
+    }
+
+    /// Determine category from a watch's properties.
+    /// Priority: Product (by action type) > Camping > Travel > Reservation > Tickets > Product (by URL) > General
+    static func from(watch: Watch) -> WatchCategory {
+        let urlLower = watch.url.lowercased()
+        let condLower = watch.condition.lowercased()
+
+        // Product — check action type FIRST (most reliable signal)
+        // A price/cart watch is always a product, regardless of URL or condition text
+        if watch.actionType == .price || watch.actionType == .cart || watch.watchMode == "search" {
+            return .product
+        }
+
+        // Camping (URL-based)
+        if urlLower.contains("recreation.gov") || urlLower.contains("reservecalifornia") ||
+           condLower.contains("campsite") || condLower.contains("campground") {
+            return .camping
+        }
+
+        // Travel (URL-based)
+        if urlLower.contains("kayak.com") || urlLower.contains("google.com/travel") ||
+           urlLower.contains("skyscanner") || urlLower.contains("airbnb") ||
+           urlLower.contains("booking.com") || urlLower.contains("expedia") ||
+           condLower.contains("flight") || condLower.contains("hotel") {
+            return .travel
+        }
+
+        // Reservation (URL-based only — don't match condition text to avoid false positives)
+        if urlLower.contains("resy.com") || urlLower.contains("opentable") ||
+           urlLower.contains("yelp.com/reservations") || urlLower.contains("tock.com") {
+            return .reservation
+        }
+
+        // Tickets (URL-based)
+        if urlLower.contains("ticketmaster") || urlLower.contains("stubhub") ||
+           urlLower.contains("seatgeek") || urlLower.contains("eventbrite") ||
+           urlLower.contains("vividseats") || urlLower.contains("tickpick") ||
+           urlLower.contains("gametime") || urlLower.contains("livenation") ||
+           condLower.contains("ticket") {
+            return .tickets
+        }
+
+        // Product by URL (shopping domains)
+        if urlLower.contains("amazon.com") || urlLower.contains("walmart.com") ||
+           urlLower.contains("target.com") || urlLower.contains("bestbuy.com") ||
+           urlLower.contains("ebay.com") || urlLower.contains("shopify") ||
+           urlLower.contains("nike.com") || urlLower.contains("birkenstock") ||
+           urlLower.contains("rei.com") || urlLower.contains("nordstrom") {
+            return .product
+        }
+
+        // Booking by condition (fallback)
+        if watch.actionType == .book {
+            if condLower.contains("campsite") || condLower.contains("campground") { return .camping }
+            if condLower.contains("table for") || condLower.contains("reservation") { return .reservation }
+            return .reservation
+        }
+
+        return .general
     }
 }

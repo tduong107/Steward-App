@@ -155,11 +155,15 @@ struct DetailScreen: View {
                         watch.notifyChannels = newValue
                         try? viewModel.saveAndSync(watch)
                     }
-                )
+                ),
+                watch: watch,
+                onSaveWatch: { try? viewModel.saveAndSync(watch) }
             )
             .presentationDetents([.medium])
         }
         .task {
+            // Force sync to get latest needs_attention state from Supabase
+            await viewModel.syncFromCloud(force: true)
             await loadCheckResults()
             if showsPriceChart {
                 await loadPriceHistory()
@@ -303,6 +307,11 @@ struct DetailScreen: View {
                 warningBanner
             }
 
+            // Alternative source suggestion
+            if watch.altSourceUrl != nil && watch.altSourceDomain != nil {
+                altSourceBanner
+            }
+
             // Change banner
             if watch.triggered {
                 changeBanner
@@ -361,10 +370,10 @@ struct DetailScreen: View {
             // Share card
             shareCard
 
+            recentChecks
+
             // Delete watch
             deleteWatchButton
-
-            recentChecks
         }
         .padding(.horizontal, 24)
         .padding(.top, 16)
@@ -544,6 +553,83 @@ struct DetailScreen: View {
         .padding(.bottom, 6)
     }
 
+    // MARK: - Alternative Source Banner
+
+    private var altSourceBanner: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.triangle.2.circlepath")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.accent)
+
+                Text("FOUND ON ANOTHER SITE")
+                    .font(Theme.body(11, weight: .bold))
+                    .foregroundStyle(Theme.accent)
+                    .tracking(0.5)
+            }
+
+            if let domain = watch.altSourceDomain, let price = watch.altSourcePrice {
+                Text("\(watch.name) is available on \(domain) for $\(String(format: "%.2f", price))")
+                    .font(Theme.body(14, weight: .semibold))
+                    .foregroundStyle(Theme.ink)
+            }
+
+            Text("Would you like to switch to tracking this source instead?")
+                .font(Theme.body(12))
+                .foregroundStyle(Theme.inkMid)
+
+            HStack(spacing: 8) {
+                Button {
+                    viewModel.switchToAltSource(watch)
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.right.arrow.left")
+                            .font(.system(size: 12))
+                        Text("Switch")
+                            .font(Theme.body(13, weight: .semibold))
+                    }
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(Theme.accent)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    viewModel.dismissAltSource(watch)
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 12))
+                        Text("Keep current")
+                            .font(Theme.body(13, weight: .semibold))
+                    }
+                    .foregroundStyle(Theme.accent)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(Theme.accentLight)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Theme.accent.opacity(0.4), lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .background(Theme.accentLight)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(Theme.accent.opacity(0.3), lineWidth: 1)
+        )
+        .padding(.bottom, 6)
+    }
+
     // MARK: - Action Button
 
     private var actionButton: some View {
@@ -645,111 +731,225 @@ struct DetailScreen: View {
 
     @ViewBuilder
     private var autoActSection: some View {
-        if watch.actionType.isActionable {
-            let isPremium = subscriptionManager.currentTier.hasAutoAct
+        let isPremium = subscriptionManager.currentTier.hasAutoAct
 
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: "bolt.fill")
+                    .font(.system(size: 12))
+                    .foregroundStyle(isPremium ? Theme.accent : Theme.inkLight)
+                    .frame(width: 28, height: 28)
+                    .background(isPremium ? Theme.accentLight : Theme.bgDeep)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                Text("When Triggered")
+                    .font(Theme.body(14, weight: .semibold))
+                    .foregroundStyle(Theme.ink)
+
+                Spacer()
+
+                if !isPremium {
+                    Text("Premium")
+                        .font(Theme.body(10, weight: .bold))
+                        .foregroundStyle(Theme.gold)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Theme.gold.opacity(0.12))
+                        .clipShape(Capsule())
+                }
+            }
+
+            // Action options specific to this watch type
+            VStack(spacing: 0) {
+                // For Free users: show "Notify Me"
+                // For Pro+ users: show "Notify + Quick Link" (replaces basic notify since it's strictly better)
+                if subscriptionManager.currentTier.hasQuickLink && watch.actionType != .notify {
+                    autoActOption(
+                        icon: "link",
+                        title: "Notify + Quick Link",
+                        subtitle: "Notification with a direct link to take action",
+                        isSelected: !watch.autoActEnabled,
+                        isAvailable: true
+                    ) {
+                        watch.autoActEnabled = false
+                        try? viewModel.saveAndSync(watch)
+                    }
+                } else {
+                    autoActOption(
+                        icon: "bell.fill",
+                        title: "Notify Me",
+                        subtitle: "Send a push notification",
+                        isSelected: !watch.autoActEnabled,
+                        isAvailable: true
+                    ) {
+                        watch.autoActEnabled = false
+                        try? viewModel.saveAndSync(watch)
+                    }
+
+                    // Show Quick Link as locked option for Free users
+                    if watch.actionType != .notify {
+                        Divider().foregroundStyle(Theme.border).padding(.leading, 44)
+
+                        autoActOption(
+                            icon: "link",
+                            title: "Notify + Quick Link",
+                            subtitle: "Notification with a direct link to take action",
+                            isSelected: false,
+                            isAvailable: false,
+                            tierBadge: "Pro"
+                        ) {
+                            subscriptionManager.presentPaywall(highlighting: .pro, reason: "Quick Link is a Pro feature")
+                        }
+                    }
+                }
+
+                if watch.actionType != .notify {
+                    Divider().foregroundStyle(Theme.border).padding(.leading, 44)
+                }
+
+                // Auto-Act — only available on supported retailers
+                switch watch.actionType {
+                case .price, .cart:
+                    let canAutoAct: Bool = autoActSupportedForURL(watch.url)
+                    autoActOption(
+                        icon: "cart.badge.plus",
+                        title: "Auto Add to Cart",
+                        subtitle: canAutoAct
+                            ? "Steward adds to cart automatically"
+                            : "Coming soon for this store",
+                        isSelected: watch.autoActEnabled,
+                        isAvailable: isPremium && canAutoAct,
+                        tierBadge: "Premium"
+                    ) {
+                        if !canAutoAct { return }
+                        if isPremium {
+                            watch.autoActEnabled = true
+                            try? viewModel.saveAndSync(watch)
+                        } else {
+                            subscriptionManager.presentPaywall(highlighting: .premium, reason: "Auto-Act is a Premium feature")
+                        }
+                    }
+                case .book:
+                    autoActOption(
+                        icon: "calendar.badge.plus",
+                        title: "Auto Book",
+                        subtitle: "Coming soon",
+                        isSelected: false,
+                        isAvailable: false
+                    ) { }
+                case .form:
+                    autoActOption(
+                        icon: "doc.badge.plus",
+                        title: "Auto Fill & Submit",
+                        subtitle: "Coming soon",
+                        isSelected: false,
+                        isAvailable: false
+                    ) { }
+                case .notify:
+                    EmptyView()
+                }
+            }
+            .background(Theme.bgDeep.opacity(0.5))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+
+        }
+        .padding(16)
+        .background(Theme.bgCard)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Theme.border, lineWidth: 1)
+        )
+    }
+
+    private func autoActOption(icon: String, title: String, subtitle: String, isSelected: Bool, isAvailable: Bool, tierBadge: String? = nil, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Image(systemName: icon)
+                    .font(.system(size: 14))
+                    .foregroundStyle(isAvailable ? (isSelected ? Theme.accent : Theme.inkMid) : Theme.inkLight.opacity(0.5))
+                    .frame(width: 28)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text(title)
+                            .font(Theme.body(13, weight: .medium))
+                            .foregroundStyle(isAvailable ? Theme.ink : Theme.inkLight.opacity(0.5))
+
+                        if let badge = tierBadge, !isAvailable {
+                            Text(badge)
+                                .font(Theme.body(9, weight: .bold))
+                                .foregroundStyle(badge == "Pro" ? Theme.accent.opacity(0.7) : Theme.gold.opacity(0.7))
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 2)
+                                .background(badge == "Pro" ? Theme.accent.opacity(0.1) : Theme.gold.opacity(0.1))
+                                .clipShape(Capsule())
+                        }
+                    }
+
+                    Text(subtitle)
+                        .font(Theme.body(11))
+                        .foregroundStyle(isAvailable ? Theme.inkLight : Theme.inkLight.opacity(0.3))
+                }
+
+                Spacer()
+
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 18))
+                    .foregroundStyle(isSelected ? Theme.accent : (isAvailable ? Theme.borderMid : Theme.borderMid.opacity(0.3)))
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 12)
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// Whether the watch's URL is on a retailer that supports server-side cart-add.
+    /// Currently: Amazon, Target, Walmart, Best Buy, and Shopify stores.
+    private func autoActSupportedForURL(_ url: String) -> Bool {
+        let lower = url.lowercased()
+        let supportedDomains = ["amazon.com", "target.com", "walmart.com", "bestbuy.com", "myshopify.com", "shopify.com"]
+        return supportedDomains.contains { lower.contains($0) }
+    }
+
+    // MARK: - Price Drop Notify Section
+
+    @ViewBuilder
+    private var priceDropNotifySection: some View {
+        if watch.actionType == .price {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 8) {
-                    Image(systemName: "bolt.fill")
+                    Image(systemName: "arrow.down.circle.fill")
                         .font(.system(size: 12))
-                        .foregroundStyle(isPremium ? Theme.accent : Theme.inkLight)
+                        .foregroundStyle(Theme.accent)
                         .frame(width: 28, height: 28)
-                        .background(isPremium ? Theme.accentLight : Theme.bgDeep)
+                        .background(Theme.accentLight)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
 
-                    Text("Auto-Act")
+                    Text("Price Alerts")
                         .font(Theme.body(14, weight: .semibold))
                         .foregroundStyle(Theme.ink)
 
                     Spacer()
-
-                    if !isPremium {
-                        Text("Premium")
-                            .font(Theme.body(10, weight: .bold))
-                            .foregroundStyle(Theme.gold)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(Theme.gold.opacity(0.12))
-                            .clipShape(Capsule())
-                    }
                 }
 
-                if isPremium {
-                    Toggle(isOn: Binding(
-                        get: { watch.autoActEnabled },
-                        set: { newValue in
-                            watch.autoActEnabled = newValue
-                            try? viewModel.saveAndSync(watch)
-                        }
-                    )) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Auto-act when condition met")
-                                .font(Theme.body(13, weight: .medium))
-                                .foregroundStyle(Theme.ink)
-                            Text("Steward will add to cart or take action automatically")
-                                .font(Theme.body(11))
-                                .foregroundStyle(Theme.inkLight)
-                        }
+                Toggle(isOn: Binding(
+                    get: { watch.notifyAnyPriceDrop },
+                    set: { newValue in
+                        watch.notifyAnyPriceDrop = newValue
+                        try? viewModel.saveAndSync(watch)
                     }
-                    .tint(Theme.accent)
-
-                    if watch.autoActEnabled {
-                        HStack(spacing: 8) {
-                            Text("Only under")
-                                .font(Theme.body(12))
-                                .foregroundStyle(Theme.inkMid)
-
-                            Text("$")
-                                .font(Theme.body(13, weight: .semibold))
-                                .foregroundStyle(Theme.ink)
-
-                            TextField("No limit", text: Binding(
-                                get: {
-                                    if let limit = watch.spendingLimit {
-                                        return String(format: "%.0f", limit)
-                                    }
-                                    return ""
-                                },
-                                set: { newValue in
-                                    let trimmed = newValue.trimmingCharacters(in: .whitespaces)
-                                    if trimmed.isEmpty {
-                                        watch.spendingLimit = nil
-                                    } else if let parsed = Double(trimmed), parsed > 0 {
-                                        watch.spendingLimit = parsed
-                                    }
-                                }
-                            ))
-                            .font(Theme.body(13, weight: .semibold))
+                )) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Notify on any price drop")
+                            .font(Theme.body(13, weight: .medium))
                             .foregroundStyle(Theme.ink)
-                            .keyboardType(.decimalPad)
-                            .frame(width: 80)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 6)
-                            .background(Theme.bgDeep)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                            .onSubmit {
-                                try? viewModel.saveAndSync(watch)
-                            }
-
-                            Spacer()
-                        }
-                    }
-                } else {
-                    Text("Upgrade to Premium to have Steward automatically take action when your condition is met.")
-                        .font(Theme.body(12))
-                        .foregroundStyle(Theme.inkLight)
-
-                    Button {
-                        subscriptionManager.presentPaywall(
-                            highlighting: .premium,
-                            reason: "Auto-Act is a Premium feature"
-                        )
-                    } label: {
-                        Text("Upgrade to Premium")
-                            .font(Theme.body(12, weight: .semibold))
-                            .foregroundStyle(Theme.gold)
+                        Text("Alert me whenever the price decreases, even by a small amount")
+                            .font(Theme.body(11))
+                            .foregroundStyle(Theme.inkLight)
                     }
                 }
+                .tint(Theme.accent)
             }
             .padding(16)
             .background(Theme.bgCard)
@@ -763,46 +963,71 @@ struct DetailScreen: View {
 
     // MARK: - Visit Website
 
+    @State private var urlCopied = false
+
     private var visitWebsiteCard: some View {
-        Button {
-            showBrowser = true
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "globe")
-                    .font(.system(size: 16))
-                    .foregroundStyle(Theme.accent)
-                    .frame(width: 36, height: 36)
-                    .background(Theme.accentLight)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
+        HStack(spacing: 8) {
+            Button {
+                showBrowser = true
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "globe")
+                        .font(.system(size: 16))
+                        .foregroundStyle(Theme.accent)
+                        .frame(width: 36, height: 36)
+                        .background(Theme.accentLight)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Visit Website")
-                        .font(Theme.body(13, weight: .semibold))
-                        .foregroundStyle(Theme.ink)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Visit Website")
+                            .font(Theme.body(13, weight: .semibold))
+                            .foregroundStyle(Theme.ink)
 
-                    Text(watch.url)
-                        .font(Theme.body(11))
-                        .foregroundStyle(Theme.inkLight)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
+                        Text(watch.url)
+                            .font(Theme.body(11))
+                            .foregroundStyle(Theme.inkLight)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "arrow.up.right")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Theme.accentMid)
                 }
-
-                Spacer()
-
-                Image(systemName: "arrow.up.right")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(Theme.accentMid)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(Theme.bgCard)
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(Theme.accentMid, lineWidth: 1)
+                )
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(Theme.bgCard)
-            .clipShape(RoundedRectangle(cornerRadius: 14))
-            .overlay(
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(Theme.accentMid, lineWidth: 1)
-            )
+            .buttonStyle(.plain)
+
+            // Copy URL button
+            Button {
+                UIPasteboard.general.string = watch.url
+                withAnimation(.spring(response: 0.3)) { urlCopied = true }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                    withAnimation { urlCopied = false }
+                }
+            } label: {
+                Image(systemName: urlCopied ? "checkmark" : "doc.on.doc")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(urlCopied ? Theme.accent : Theme.inkMid)
+                    .frame(width: 44, height: 44)
+                    .background(Theme.bgCard)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14)
+                            .stroke(Theme.border, lineWidth: 1)
+                    )
+            }
+            .buttonStyle(.plain)
         }
-        .buttonStyle(.plain)
         .padding(.top, 4)
     }
 
@@ -908,23 +1133,39 @@ struct DetailScreen: View {
             } else {
                 VStack(spacing: 0) {
                     ForEach(Array(checkResults.enumerated()), id: \.element.id) { index, result in
-                        HStack {
+                        HStack(spacing: 8) {
+                            // Timestamp
                             Text(result.checkedAt.formatted(.relative(presentation: .named)))
-                                .font(Theme.body(12))
+                                .font(Theme.body(11))
                                 .foregroundStyle(Theme.inkMid)
+                                .frame(width: 80, alignment: .leading)
+
+                            // Price badge (if available)
+                            if let price = result.price, price > 0 {
+                                Text(Theme.formatPrice(price))
+                                    .font(Theme.body(12, weight: .semibold))
+                                    .foregroundStyle(result.changed ? Theme.accent : Theme.ink)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 3)
+                                    .background(result.changed ? Theme.accentLight : Theme.bgDeep)
+                                    .clipShape(Capsule())
+                            }
 
                             Spacer()
 
-                            let isError = result.resultText == "Price not found on page" ||
-                                result.resultText == "Could not reach page" ||
-                                result.resultText.hasPrefix("Error:")
+                            // Status text
+                            let isError = result.resultText.contains("not found") ||
+                                result.resultText.contains("Could not reach") ||
+                                result.resultText.hasPrefix("Error:") ||
+                                result.resultText.hasPrefix("HTTP")
 
                             Text(result.resultText)
-                                .font(Theme.body(12, weight: result.changed ? .semibold : .regular))
+                                .font(Theme.body(11, weight: result.changed ? .semibold : .regular))
                                 .foregroundStyle(result.changed ? Theme.accent : isError ? Theme.gold : Theme.inkLight)
-                                .lineLimit(1)
+                                .lineLimit(2)
+                                .multilineTextAlignment(.trailing)
                         }
-                        .padding(.vertical, 11)
+                        .padding(.vertical, 10)
 
                         if index < checkResults.count - 1 {
                             Divider().foregroundStyle(Theme.border)

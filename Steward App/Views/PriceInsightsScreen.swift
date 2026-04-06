@@ -10,13 +10,31 @@ struct PriceInsightsScreen: View {
     @State private var priceData: [UUID: [PricePoint]] = [:]
     @State private var dealInsights: [UUID: DealInsight] = [:]
     @State private var isLoading = true
+    @State private var sortBy: PriceSortOption = .name
+
+    enum PriceSortOption: String, CaseIterable {
+        case name = "Name"
+        case priceAsc = "Price Low"
+        case priceDesc = "Price High"
+        case bestDeal = "Best Deal"
+    }
 
     /// Only price-related watches
     private var priceWatches: [Watch] {
-        viewModel.watches.filter { watch in
+        let filtered = viewModel.watches.filter { watch in
             watch.actionType == .price ||
             watch.condition.lowercased().contains("price") ||
             watch.actionLabel.lowercased().contains("price")
+        }
+        switch sortBy {
+        case .name:
+            return filtered.sorted { $0.name < $1.name }
+        case .priceAsc:
+            return filtered.sorted { (priceData[$0.id]?.last?.price ?? 0) < (priceData[$1.id]?.last?.price ?? 0) }
+        case .priceDesc:
+            return filtered.sorted { (priceData[$0.id]?.last?.price ?? 0) > (priceData[$1.id]?.last?.price ?? 0) }
+        case .bestDeal:
+            return filtered.sorted { (dealInsights[$0.id]?.rating.rank ?? 0) > (dealInsights[$1.id]?.rating.rank ?? 0) }
         }
     }
 
@@ -30,6 +48,33 @@ struct PriceInsightsScreen: View {
             VStack(alignment: .leading, spacing: 16) {
                 // Header summary
                 summaryCard
+
+                // Sort options
+                if !priceWatches.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(PriceSortOption.allCases, id: \.self) { option in
+                                Button {
+                                    withAnimation(.spring(response: 0.3)) { sortBy = option }
+                                } label: {
+                                    Text(option.rawValue)
+                                        .font(Theme.body(12, weight: .semibold))
+                                        .foregroundStyle(sortBy == option ? .white : Theme.inkMid)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 6)
+                                        .background(sortBy == option ? Theme.accent : Theme.bgCard)
+                                        .clipShape(Capsule())
+                                        .overlay(
+                                            Capsule()
+                                                .stroke(sortBy == option ? Color.clear : Theme.border, lineWidth: 1)
+                                        )
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.horizontal, 24)
+                    }
+                }
 
                 if isLoading {
                     loadingState
@@ -205,9 +250,12 @@ struct PriceInsightsScreen: View {
     private func compactChart(points: [PricePoint]) -> some View {
         let minPrice = (points.map(\.price).min() ?? 0) * 0.97
         let maxPrice = (points.map(\.price).max() ?? 100) * 1.03
-        let priceChange = points.count >= 2
-            ? ((points.last!.price - points.first!.price) / points.first!.price) * 100
-            : 0.0
+        let priceChange: Double = {
+            guard points.count >= 2,
+                  let first = points.first, let last = points.last,
+                  first.price > 0 else { return 0.0 }
+            return ((last.price - first.price) / first.price) * 100
+        }()
         let chartColor: Color = priceChange >= 0 ? Theme.red : Theme.accent
 
         return VStack(alignment: .leading, spacing: 8) {

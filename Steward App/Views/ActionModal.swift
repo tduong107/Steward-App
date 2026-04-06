@@ -1,9 +1,11 @@
 import SwiftUI
 import UIKit
+import StoreKit
 
 struct ActionModal: View {
     let watch: Watch
     @Environment(WatchViewModel.self) private var viewModel
+    @Environment(\.requestReview) private var requestReview
     @State private var showActionBrowser = false
     @State private var couponCopied = false
 
@@ -294,20 +296,37 @@ struct ActionModal: View {
                 // Smart Rewatch Suggestions
                 rewatchSuggestions
 
-                Button {
-                    viewModel.dismissAction()
-                } label: {
-                    Text("Back to home")
-                        .font(Theme.body(14, weight: .bold))
-                        .foregroundStyle(Theme.accent)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(Theme.accentLight)
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 14)
-                                .stroke(Theme.accentMid, lineWidth: 1)
-                        )
+                // Review prompt (shown after 3+ completed actions)
+                if viewModel.shouldShowReviewPrompt {
+                    reviewPromptCard
+                }
+
+                // Action completed — offer to delete or go back
+                VStack(spacing: 10) {
+                    Button {
+                        viewModel.dismissAction()
+                    } label: {
+                        Text("Back to home")
+                            .font(Theme.body(14, weight: .bold))
+                            .foregroundStyle(Theme.accent)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(Theme.accentLight)
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .stroke(Theme.accentMid, lineWidth: 1)
+                            )
+                    }
+
+                    Button {
+                        viewModel.removeWatch(watch)
+                        viewModel.dismissAction()
+                    } label: {
+                        Text("Done — delete this watch")
+                            .font(Theme.body(13, weight: .medium))
+                            .foregroundStyle(Theme.inkMid)
+                    }
                 }
                 .padding(.horizontal, 24)
                 .padding(.bottom, 40)
@@ -461,6 +480,66 @@ struct ActionModal: View {
                 actionType: .notify
             ),
         ]
+    }
+
+    // MARK: - Review Prompt Card
+
+    private var reviewPromptCard: some View {
+        VStack(spacing: 12) {
+            Text("Enjoying Steward?")
+                .font(Theme.body(14, weight: .semibold))
+                .foregroundStyle(Theme.ink)
+
+            Text("We'd love your feedback on the App Store")
+                .font(Theme.body(12))
+                .foregroundStyle(Theme.inkLight)
+
+            HStack(spacing: 10) {
+                Button {
+                    withAnimation(.spring(response: 0.3)) {
+                        viewModel.markReviewDismissed()
+                    }
+                } label: {
+                    Text("Not really")
+                        .font(Theme.body(13, weight: .medium))
+                        .foregroundStyle(Theme.inkMid)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(Theme.bg)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(Theme.border, lineWidth: 1)
+                        )
+                }
+
+                Button {
+                    viewModel.markReviewLeft()
+                    requestReview()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "star.fill")
+                            .font(.system(size: 11))
+                        Text("Yes!")
+                            .font(Theme.body(13, weight: .bold))
+                    }
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(Theme.accent)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+            }
+        }
+        .padding(16)
+        .background(Theme.accentLight.opacity(0.5))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(Theme.accent.opacity(0.2), lineWidth: 1)
+        )
+        .padding(.horizontal, 24)
+        .transition(.opacity.combined(with: .scale(scale: 0.95)))
     }
 
     // MARK: - Info Row

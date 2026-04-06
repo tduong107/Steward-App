@@ -38,7 +38,7 @@ struct CelebrationOverlay: View {
 
                 // Savings amount
                 VStack(spacing: 4) {
-                    Text("You've saved")
+                    Text("Potential savings reached")
                         .font(Theme.body(13))
                         .foregroundStyle(.white.opacity(0.7))
 
@@ -48,7 +48,7 @@ struct CelebrationOverlay: View {
                         .scaleEffect(showAmount ? 1 : 0.5)
                         .opacity(showAmount ? 1 : 0)
 
-                    Text("across your price watches")
+                    Text("tracked by your Steward")
                         .font(Theme.body(13))
                         .foregroundStyle(.white.opacity(0.7))
                 }

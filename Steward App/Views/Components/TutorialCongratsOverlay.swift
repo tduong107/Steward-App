@@ -12,6 +12,7 @@ struct TutorialCongratsOverlay: View {
         switch step {
         case .firstWatch: return "🎉"
         case .notifications: return "🔔"
+        case .phoneAdded: return "📱"
         case .allComplete: return "🎊"
         }
     }
@@ -20,20 +21,22 @@ struct TutorialCongratsOverlay: View {
         switch step {
         case .firstWatch: return "First watch created!"
         case .notifications: return "Notifications enabled!"
+        case .phoneAdded: return "SMS alerts activated!"
         case .allComplete: return "You're all set!"
         }
     }
 
     private var subtitle: String {
         switch step {
-        case .firstWatch: return "Steward is now watching the web for you.\nYou'll be notified when something changes."
+        case .firstWatch: return "Steward will check this regularly\nand alert you when something changes."
         case .notifications: return "You'll never miss a price drop\nor restock again."
+        case .phoneAdded: return "You'll get a text the moment\nsomething changes. Fast and reliable."
         case .allComplete: return "Setup complete! Steward is ready to\nwatch the web and keep you updated."
         }
     }
 
     private var buttonLabel: String {
-        step == .allComplete ? "Let's go! 🚀" : "Awesome!"
+        step == .allComplete ? "Explore Steward" : "Awesome!"
     }
 
     private var confettiCount: Int {
@@ -102,6 +105,11 @@ struct TutorialCongratsOverlay: View {
             .frame(maxWidth: 320)
         }
         .onAppear {
+            // Haptic feedback for celebration
+            let generator = UIImpactFeedbackGenerator(style: .heavy)
+            generator.prepare()
+            generator.impactOccurred()
+
             withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
                 showCard = true
                 showEmoji = true

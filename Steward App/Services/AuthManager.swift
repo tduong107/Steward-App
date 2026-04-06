@@ -2,6 +2,7 @@ import Foundation
 import Observation
 import Supabase
 import AuthenticationServices
+import GoogleSignIn
 
 @Observable
 @MainActor
@@ -11,7 +12,24 @@ final class AuthManager {
     var currentUserId: UUID?
     var displayName: String?
     var phoneNumber: String?
+    var notificationEmail: String?
+    var authEmail: String?
+    var authPhone: String?
     var errorMessage: String?
+
+    /// Best available email — notification_email from profile, or auth login email
+    var effectiveEmail: String? {
+        if let e = notificationEmail, !e.isEmpty { return e }
+        if let e = authEmail, !e.isEmpty { return e }
+        return nil
+    }
+
+    /// Best available phone — profile phone_number, or auth login phone
+    var effectivePhone: String? {
+        if let p = phoneNumber, !p.isEmpty { return p }
+        if let p = authPhone, !p.isEmpty { return p }
+        return nil
+    }
 
     // Shared App Group suite for communicating with the Share Extension
     private static let sharedDefaults = UserDefaults(suiteName: "group.Steward.Steward-App")
@@ -23,6 +41,8 @@ final class AuthManager {
             let session = try await SupabaseConfig.client.auth.session
             self.currentUserId = session.user.id
             self.isAuthenticated = true
+            self.authEmail = session.user.email
+            self.authPhone = session.user.phone
 
             // Sync auth token to App Group so Share Extension can use it
             Self.syncTokenToAppGroup(accessToken: session.accessToken, userId: session.user.id)
@@ -37,6 +57,7 @@ final class AuthManager {
                 .value {
                 self.displayName = profile.displayName
                 self.phoneNumber = profile.phoneNumber
+                self.notificationEmail = profile.notificationEmail
             }
         } catch {
             self.isAuthenticated = false
@@ -118,6 +139,7 @@ final class AuthManager {
             .value {
             self.displayName = profile.displayName
             self.phoneNumber = profile.phoneNumber
+            self.notificationEmail = profile.notificationEmail
         }
     }
 
@@ -160,6 +182,88 @@ final class AuthManager {
         }
     }
 
+    // MARK: - Google Sign-In
+
+    /// Signs in with Google using the GoogleSignIn SDK + Supabase signInWithIdToken
+    func signInWithGoogle() async throws {
+        errorMessage = nil
+
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let rootVC = windowScene.windows.first?.rootViewController else {
+            throw AuthError.missingToken
+        }
+
+        let result = try await GIDSignIn.sharedInstance.signIn(withPresenting: rootVC)
+        guard let idToken = result.user.idToken?.tokenString else {
+            throw AuthError.missingToken
+        }
+        let accessToken = result.user.accessToken.tokenString
+
+        let session = try await SupabaseConfig.client.auth.signInWithIdToken(
+            credentials: .init(
+                provider: .google,
+                idToken: idToken,
+                accessToken: accessToken
+            )
+        )
+
+        self.currentUserId = session.user.id
+        self.isAuthenticated = true
+        self.authEmail = session.user.email
+        self.authPhone = session.user.phone
+        Self.syncTokenToAppGroup(accessToken: session.accessToken, userId: session.user.id)
+
+        // Save display name and email from Google profile
+        var profileData: [String: String] = ["id": session.user.id.uuidString]
+        if let fullName = result.user.profile?.name, !fullName.isEmpty {
+            self.displayName = fullName
+            profileData["display_name"] = fullName
+        }
+        // Auto-save Google email as notification email so alerts work immediately
+        if let email = session.user.email, !email.isEmpty {
+            self.notificationEmail = email
+            profileData["notification_email"] = email
+        }
+        if profileData.count > 1 { // more than just "id"
+            _ = try? await SupabaseConfig.client
+                .from("profiles")
+                .upsert(profileData)
+                .execute()
+        }
+
+        await fetchProfile(userId: session.user.id)
+    }
+
+    // MARK: - Forgot Password (Phone OTP)
+
+    /// Sends a password reset OTP to the user's phone number
+    func sendPasswordResetOTP(phone: String) async throws {
+        errorMessage = nil
+        try await SupabaseConfig.client.auth.signInWithOTP(phone: phone)
+    }
+
+    /// Verifies the OTP and resets the user's password
+    func resetPassword(phone: String, otp: String, newPassword: String) async throws {
+        errorMessage = nil
+
+        // Step 1: Verify the OTP to establish a session
+        let response = try await SupabaseConfig.client.auth.verifyOTP(
+            phone: phone,
+            token: otp,
+            type: .sms
+        )
+
+        guard response.session != nil else {
+            throw AuthError.invalidOTP
+        }
+
+        // Step 2: Update the password using the newly established session
+        try await SupabaseConfig.client.auth.update(user: .init(password: newPassword))
+
+        // Sign out after password reset — user needs to sign in with new password
+        await signOut()
+    }
+
     // MARK: - Sign Out
 
     func signOut() async {
@@ -172,10 +276,28 @@ final class AuthManager {
         self.currentUserId = nil
         self.displayName = nil
         self.phoneNumber = nil
+        self.notificationEmail = nil
+        self.authEmail = nil
+        self.authPhone = nil
         Self.clearTokenFromAppGroup()
     }
 
     // MARK: - Profile Helpers
+
+    /// Fetches and populates profile fields from Supabase
+    func fetchProfile(userId: UUID) async {
+        if let profile: ProfileDTO = try? await SupabaseConfig.client
+            .from("profiles")
+            .select()
+            .eq("id", value: userId.uuidString)
+            .single()
+            .execute()
+            .value {
+            self.displayName = profile.displayName
+            self.phoneNumber = profile.phoneNumber
+            self.notificationEmail = profile.notificationEmail
+        }
+    }
 
     /// Saves or updates the user's profile with name and phone number
     private func saveProfile(userId: UUID, name: String, phone: String) async {
@@ -190,6 +312,60 @@ final class AuthManager {
                 "phone_number": phone
             ])
             .execute()
+    }
+
+    // MARK: - Notification Contact Methods
+
+    func saveNotificationEmail(_ email: String) async {
+        guard let userId = currentUserId else { return }
+        self.notificationEmail = email
+        _ = try? await SupabaseConfig.client
+            .from("profiles")
+            .update(["notification_email": email])
+            .eq("id", value: userId.uuidString)
+            .execute()
+    }
+
+    func clearNotificationEmail() async {
+        guard let userId = currentUserId else { return }
+        self.notificationEmail = nil
+        _ = try? await SupabaseConfig.client
+            .from("profiles")
+            .update(["notification_email": ""])
+            .eq("id", value: userId.uuidString)
+            .execute()
+    }
+
+    func savePhoneNumber(_ phone: String) async {
+        guard let userId = currentUserId else { return }
+        self.phoneNumber = phone
+        _ = try? await SupabaseConfig.client
+            .from("profiles")
+            .update(["phone_number": phone])
+            .eq("id", value: userId.uuidString)
+            .execute()
+    }
+
+    // MARK: - Account Deletion
+
+    func deleteAccount() async throws {
+        guard let userId = currentUserId else { return }
+
+        // Delete profile data from Supabase (RLS will scope to user's own data)
+        _ = try? await SupabaseConfig.client
+            .from("watches")
+            .delete()
+            .eq("user_id", value: userId.uuidString)
+            .execute()
+
+        _ = try? await SupabaseConfig.client
+            .from("profiles")
+            .delete()
+            .eq("id", value: userId.uuidString)
+            .execute()
+
+        // Sign out and clear local state
+        await signOut()
     }
 
     // MARK: - App Group Token Sync (for Share Extension)

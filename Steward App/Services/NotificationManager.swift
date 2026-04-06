@@ -59,18 +59,29 @@ final class NotificationManager: NSObject {
         print("[NotificationManager] APNs token: \(token)")
         #endif
 
-        // Store token in Supabase
+        // Store token in Supabase (retry up to 3 times on failure)
         Task {
-            do {
-                try await supabase?.updateDeviceToken(token)
-                #if DEBUG
-                print("[NotificationManager] Token saved to Supabase")
-                #endif
-            } catch {
-                #if DEBUG
-                print("[NotificationManager] Failed to save token: \(error)")
-                #endif
+            var lastError: Error?
+            for attempt in 1...3 {
+                do {
+                    try await supabase?.updateDeviceToken(token)
+                    #if DEBUG
+                    print("[NotificationManager] Token saved to Supabase")
+                    #endif
+                    return
+                } catch {
+                    lastError = error
+                    #if DEBUG
+                    print("[NotificationManager] Token save attempt \(attempt) failed: \(error)")
+                    #endif
+                    if attempt < 3 {
+                        try? await Task.sleep(for: .seconds(Double(attempt) * 2))
+                    }
+                }
             }
+            #if DEBUG
+            print("[NotificationManager] Token save failed after 3 attempts: \(lastError?.localizedDescription ?? "unknown")")
+            #endif
         }
     }
 
@@ -78,5 +89,26 @@ final class NotificationManager: NSObject {
         #if DEBUG
         print("[NotificationManager] Failed to register: \(error)")
         #endif
+    }
+
+    // MARK: - Quiet Hours
+
+    /// Whether the current time falls within the user's quiet hours window.
+    /// Used to suppress local notifications; server-side suppression uses the profile fields.
+    var isInQuietHours: Bool {
+        let defaults = UserDefaults.standard
+        guard defaults.bool(forKey: "quietHoursEnabled") else { return false }
+
+        let startHour = Int(defaults.double(forKey: "quietHoursStart"))
+        let endHour = Int(defaults.double(forKey: "quietHoursEnd"))
+        let currentHour = Calendar.current.component(.hour, from: Date())
+
+        if startHour <= endHour {
+            // Same-day range (e.g., 9 AM → 5 PM)
+            return currentHour >= startHour && currentHour < endHour
+        } else {
+            // Overnight range (e.g., 10 PM → 7 AM)
+            return currentHour >= startHour || currentHour < endHour
+        }
     }
 }

@@ -1440,6 +1440,8 @@ serve(async (req) => {
               // Priority 2: any retailer (when page is unreachable — better than nothing)
               let bestPrice: number | null = null;
               let bestSource = "";
+              let bestUrl = "";
+              let isCrossDomain = false;
               for (const item of items) {
                 try {
                   const serperPrice = parseShoppingPrice(item.price);
@@ -1449,11 +1451,15 @@ serve(async (req) => {
                     // Same domain — use immediately
                     bestPrice = serperPrice;
                     bestSource = itemHost;
+                    bestUrl = item.link ?? "";
+                    isCrossDomain = false;
                     break;
                   } else if (pageUnreachable && bestPrice === null) {
                     // Cross-domain — only use when original site is unreachable
                     bestPrice = serperPrice;
                     bestSource = itemHost;
+                    bestUrl = item.link ?? "";
+                    isCrossDomain = true;
                   }
                 } catch { /* skip bad items */ }
               }
@@ -1463,6 +1469,14 @@ serve(async (req) => {
                 autoFixed = true;
                 fixedVia = "serper_shopping";
                 console.log(`[check-watch] Auto-fix: found price $${bestPrice} via Serper (${bestSource}) for ${watch.id}`);
+                // Save cross-domain alternative as a suggestion for the user
+                if (isCrossDomain && bestUrl) {
+                  updateData.alt_source_url = bestUrl;
+                  updateData.alt_source_domain = bestSource;
+                  updateData.alt_source_price = bestPrice;
+                  updateData.alt_source_found_at = new Date().toISOString();
+                  console.log(`[check-watch] Saved alt source suggestion: ${bestSource} at $${bestPrice} for ${watch.id}`);
+                }
                 // Re-evaluate condition with the found price
                 const condLower = watch.condition.toLowerCase();
                 const priceThresholdMatch = condLower.match(
@@ -1745,8 +1759,12 @@ serve(async (req) => {
     if (fixedVia) {
       updateData.preferred_fetch_method = fixedVia;
     } else if (!stillFailing && !autoFixed && fetchSuccess) {
-      // Direct fetch worked — remember that
+      // Direct fetch worked — remember that, and clear any stale alt source suggestion
       updateData.preferred_fetch_method = "direct";
+      updateData.alt_source_url = null;
+      updateData.alt_source_domain = null;
+      updateData.alt_source_price = null;
+      updateData.alt_source_found_at = null;
     }
 
     const { error: updateError } = await supabase

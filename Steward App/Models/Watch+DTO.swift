@@ -34,6 +34,11 @@ extension Watch {
         self.couponCode = dto.couponCode
         self.autoActEnabled = dto.autoAct
         self.spendingLimit = dto.spendingLimit
+        self.notifyAnyPriceDrop = dto.notifyAnyPriceDrop
+        self.altSourceUrl = dto.altSourceUrl
+        self.altSourceDomain = dto.altSourceDomain
+        self.altSourcePrice = dto.altSourcePrice
+        self.altSourceFoundAt = dto.altSourceFoundAt
     }
 
     /// Convert to DTO for uploading to Supabase
@@ -62,9 +67,14 @@ extension Watch {
             consecutiveFailures: self.consecutiveFailures,
             lastError: self.lastError,
             needsAttention: self.needsAttention,
+            altSourceUrl: self.altSourceUrl,
+            altSourceDomain: self.altSourceDomain,
+            altSourcePrice: self.altSourcePrice,
+            altSourceFoundAt: self.altSourceFoundAt,
             couponCode: self.couponCode,
             autoAct: self.autoActEnabled,
-            spendingLimit: self.spendingLimit
+            spendingLimit: self.spendingLimit,
+            notifyAnyPriceDrop: self.notifyAnyPriceDrop
         )
     }
 }

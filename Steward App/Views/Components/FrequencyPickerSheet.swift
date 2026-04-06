@@ -159,7 +159,7 @@ struct FrequencyPickerSheet: View {
                     .foregroundStyle(Theme.ink)
             }
 
-            Text("Pro checks every hour for just $1.99/mo. Premium checks every 5 min for $3.99/mo. Never miss a price drop or restock again!")
+            Text("Pro checks every 12 hours for just $4.99/mo. Premium checks every 2 hours for $9.99/mo. Never miss a price drop or restock again!")
                 .font(Theme.body(12))
                 .foregroundStyle(Theme.inkMid)
                 .lineSpacing(3)
@@ -168,7 +168,7 @@ struct FrequencyPickerSheet: View {
                 Button {
                     subscriptionManager.presentPaywall(highlighting: .pro)
                 } label: {
-                    Text("Go Pro · $1.99")
+                    Text("Go Pro · $4.99")
                         .font(Theme.body(13, weight: .bold))
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
@@ -180,7 +180,7 @@ struct FrequencyPickerSheet: View {
                 Button {
                     subscriptionManager.presentPaywall(highlighting: .premium)
                 } label: {
-                    Text("Premium · $3.99")
+                    Text("Premium · $9.99")
                         .font(Theme.body(13, weight: .bold))
                         .foregroundStyle(Theme.ink)
                         .frame(maxWidth: .infinity)

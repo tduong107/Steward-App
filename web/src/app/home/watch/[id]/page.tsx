@@ -341,6 +341,59 @@ export default function WatchDetailPage() {
         </div>
       )}
 
+      {/* Alternative source suggestion */}
+      {watch.alt_source_url && watch.alt_source_domain && (
+        <div className="rounded-[var(--radius-md)] bg-[var(--color-accent-light)] p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-[var(--color-accent)]">
+              Found on another site
+            </span>
+          </div>
+          <p className="text-sm font-medium text-[var(--color-ink)] mb-1">
+            {watch.name} is available on {watch.alt_source_domain}
+            {watch.alt_source_price != null && ` for $${watch.alt_source_price.toFixed(2)}`}
+          </p>
+          <p className="text-xs text-[var(--color-ink-mid)] mb-3">
+            Would you like to switch to tracking this source instead?
+          </p>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              onClick={() =>
+                handleUpdate({
+                  url: watch.alt_source_url!,
+                  consecutive_failures: 0,
+                  last_error: null,
+                  needs_attention: false,
+                  alt_source_url: null,
+                  alt_source_domain: null,
+                  alt_source_price: null,
+                  alt_source_found_at: null,
+                })
+              }
+              disabled={actionLoading}
+            >
+              Switch to {watch.alt_source_domain}
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() =>
+                handleUpdate({
+                  alt_source_url: null,
+                  alt_source_domain: null,
+                  alt_source_price: null,
+                  alt_source_found_at: null,
+                })
+              }
+              disabled={actionLoading}
+            >
+              Keep current
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Details grid */}
       <Card>
         <CardContent>

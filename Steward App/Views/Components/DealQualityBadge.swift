@@ -90,7 +90,7 @@ struct DealQualityBadge: View {
     }
 
     private func formatPrice(_ price: Double) -> String {
-        "$\(String(format: "%.2f", price))"
+        Theme.formatPrice(price)
     }
 }
 

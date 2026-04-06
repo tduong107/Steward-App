@@ -39,9 +39,6 @@ struct ContentView: View {
                             DetailScreen(watch: watch)
                         }
                     }
-                    .navigationDestination(isPresented: $viewModel.showPriceInsights) {
-                        PriceInsightsScreen()
-                    }
                 }
 
                 CustomTabBar(
@@ -55,9 +52,6 @@ struct ContentView: View {
                         if viewModel.showDetail {
                             viewModel.showDetail = false
                             viewModel.selectedWatch = nil
-                        }
-                        if viewModel.showPriceInsights {
-                            viewModel.showPriceInsights = false
                         }
                     }
                 )
@@ -83,9 +77,6 @@ struct ContentView: View {
             if viewModel.showDetail {
                 viewModel.showDetail = false
                 viewModel.selectedWatch = nil
-            }
-            if viewModel.showPriceInsights {
-                viewModel.showPriceInsights = false
             }
         }
         .preferredColorScheme(isDarkMode ? .dark : .light)

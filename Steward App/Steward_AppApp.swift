@@ -1,6 +1,8 @@
 import SwiftUI
 import SwiftData
 import Supabase
+import UserNotifications
+import GoogleSignIn
 
 @main
 struct Steward_AppApp: App {
@@ -29,6 +31,10 @@ struct Steward_AppApp: App {
                     }
                 }
                 .onOpenURL { url in
+                    // Handle Google Sign-In callback
+                    if GIDSignIn.sharedInstance.handle(url) {
+                        return
+                    }
                     // Handle steward://watch/XXXXXX deep links
                     guard url.scheme == "steward",
                           url.host == "watch",
@@ -43,11 +49,20 @@ struct Steward_AppApp: App {
                     if newPhase == .active {
                         checkForSharedURL()
                         refreshSharedToken()
+                        // Clear badge when app becomes active
+                        UNUserNotificationCenter.current().setBadgeCount(0)
                     }
                 }
                 .task {
                     notificationManager.configure(supabase: supabaseService)
                     await notificationManager.checkCurrentStatus()
+                    // Auto-request permission if authenticated but never asked
+                    if authManager.isAuthenticated && !notificationManager.isPermissionGranted {
+                        let settings = await UNUserNotificationCenter.current().notificationSettings()
+                        if settings.authorizationStatus == .notDetermined {
+                            await notificationManager.requestPermission()
+                        }
+                    }
                     await subscriptionManager.loadProducts()
                     await subscriptionManager.checkEntitlements()
                 }
