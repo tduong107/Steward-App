@@ -847,8 +847,13 @@ serve(async (req) => {
     let pageText = "";
     let fetchSuccess = true;
 
-    // Skip direct fetch for serper-primary domains (they always block)
-    if (serperPrimaryDomains.some(d => fetchDomain.includes(d))) {
+    // Method memory: if a non-direct method worked last time, skip direct fetch to save time
+    const preferredMethod = watch.preferred_fetch_method;
+    const skipDirectFetch = serperPrimaryDomains.some(d => fetchDomain.includes(d)) ||
+      (preferredMethod && preferredMethod !== "direct" && preferredMethod !== "direct_desktop_ua");
+
+    if (skipDirectFetch) {
+      if (preferredMethod) console.log(`[check-watch] Skipping direct fetch for ${watch.id} — preferred method is ${preferredMethod}`);
       fetchSuccess = false;
       pageText = "";
     } else {
@@ -1411,6 +1416,7 @@ serve(async (req) => {
       resultText.startsWith("Error:");
 
     let autoFixed = false;
+    let fixedVia: string | null = null; // Track which method worked for domain_routing
 
     if (isCheckFailure && !changed) {
       // Auto-fix attempt: use Serper to find a price for the product
@@ -1429,33 +1435,46 @@ serve(async (req) => {
             if (serperRes.ok) {
               const serperData = await serperRes.json();
               const items = serperData.shopping ?? [];
-              // Look for a result from the same domain
+              const pageUnreachable = resultText === "Could not reach page";
+              // Priority 1: same-domain result (most accurate)
+              // Priority 2: any retailer (when page is unreachable — better than nothing)
+              let bestPrice: number | null = null;
+              let bestSource = "";
               for (const item of items) {
                 try {
+                  const serperPrice = parseShoppingPrice(item.price);
+                  if (serperPrice === null) continue;
                   const itemHost = new URL(item.link ?? "").hostname.replace("www.", "");
                   if (itemHost.includes(watchHostLower) || watchHostLower.includes(itemHost)) {
-                    const serperPrice = parseShoppingPrice(item.price);
-                    if (serperPrice !== null) {
-                      currentPrice = serperPrice;
-                      resultText = `$${serperPrice.toFixed(2)} (via product search)`;
-                      autoFixed = true;
-                      console.log(`[check-watch] Auto-fix: found price $${serperPrice} via Serper for ${watch.id}`);
-                      // Re-evaluate condition with the found price
-                      const condLower = watch.condition.toLowerCase();
-                      const priceThresholdMatch = condLower.match(
-                        /price\s+(?:drops?\s+)?(?:below|under|less\s+than)\s+\$?([\d,]+\.?\d*)/
-                      );
-                      if (priceThresholdMatch) {
-                        const threshold = parseFloat(priceThresholdMatch[1].replace(/,/g, ""));
-                        if (serperPrice < threshold) {
-                          changed = true;
-                          resultText = `Price dropped to $${serperPrice.toFixed(2)} (below $${threshold})`;
-                        }
-                      }
-                      break;
-                    }
+                    // Same domain — use immediately
+                    bestPrice = serperPrice;
+                    bestSource = itemHost;
+                    break;
+                  } else if (pageUnreachable && bestPrice === null) {
+                    // Cross-domain — only use when original site is unreachable
+                    bestPrice = serperPrice;
+                    bestSource = itemHost;
                   }
                 } catch { /* skip bad items */ }
+              }
+              if (bestPrice !== null) {
+                currentPrice = bestPrice;
+                resultText = `$${bestPrice.toFixed(2)} (via ${bestSource})`;
+                autoFixed = true;
+                fixedVia = "serper_shopping";
+                console.log(`[check-watch] Auto-fix: found price $${bestPrice} via Serper (${bestSource}) for ${watch.id}`);
+                // Re-evaluate condition with the found price
+                const condLower = watch.condition.toLowerCase();
+                const priceThresholdMatch = condLower.match(
+                  /price\s+(?:drops?\s+)?(?:below|under|less\s+than)\s+\$?([\d,]+\.?\d*)/
+                );
+                if (priceThresholdMatch) {
+                  const threshold = parseFloat(priceThresholdMatch[1].replace(/,/g, ""));
+                  if (bestPrice < threshold) {
+                    changed = true;
+                    resultText = `Price dropped to $${bestPrice.toFixed(2)} (below $${threshold})`;
+                  }
+                }
               }
             }
           }
@@ -1486,6 +1505,7 @@ serve(async (req) => {
             resultText = retryEval.resultText;
             currentPrice = retryPrice;
             autoFixed = true;
+            fixedVia = "direct_desktop_ua";
             console.log(`[check-watch] Auto-fix: desktop UA retry succeeded for ${watch.id}`);
           }
         } catch (retryErr) {
@@ -1512,6 +1532,7 @@ serve(async (req) => {
           currentPrice = claudeResult.price;
           resultText = claudeResult.resultText;
           autoFixed = true;
+          fixedVia = "claude";
           console.log(`[check-watch] Claude fallback found price $${claudeResult.price} for ${watch.id}`);
 
           // Re-evaluate condition with Claude's price
@@ -1718,6 +1739,14 @@ serve(async (req) => {
       updateData.consecutive_failures = 0;
       updateData.last_error = null;
       updateData.needs_attention = false;
+    }
+
+    // Remember which method worked so next check tries it first
+    if (fixedVia) {
+      updateData.preferred_fetch_method = fixedVia;
+    } else if (!stillFailing && !autoFixed && fetchSuccess) {
+      // Direct fetch worked — remember that
+      updateData.preferred_fetch_method = "direct";
     }
 
     const { error: updateError } = await supabase
@@ -2665,10 +2694,28 @@ async function claudePriceFallback(
   const SERPER_KEY = Deno.env.get("SERPER_API_KEY") ?? "";
   if (!SERPER_KEY) return null;
 
-  // Step 1: Search for the product's current price via Serper
+  // Step 1: Search for the product's current price via both Serper Shopping AND web search
   const searchQuery = `${watch.name} current price`;
   let searchContext = "";
 
+  // 1a: Serper Shopping API (most reliable for prices)
+  try {
+    const shoppingRes = await fetch("https://google.serper.dev/shopping", {
+      method: "POST",
+      headers: { "X-API-KEY": SERPER_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ q: watch.name, num: 5 }),
+      signal: AbortSignal.timeout(5000),
+    });
+    if (shoppingRes.ok) {
+      const shoppingData = await shoppingRes.json();
+      for (const r of (shoppingData.shopping ?? []).slice(0, 5)) {
+        const price = r.price || "";
+        searchContext += `${r.title} — ${price} (${r.source || "store"})\n`;
+      }
+    }
+  } catch { /* non-critical */ }
+
+  // 1b: Serper web search (organic snippets + answer boxes)
   try {
     const searchRes = await fetch("https://google.serper.dev/search", {
       method: "POST",

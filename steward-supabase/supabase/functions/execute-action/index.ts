@@ -85,6 +85,16 @@ serve(async (req) => {
       executed = result.success;
       executionNote = result.note;
     }
+    // Shopify stores: cart add via variant URL
+    else if (urlLower.includes("/cart/") && (urlLower.includes("myshopify.com") || urlLower.includes("shopify"))) {
+      const result = await executeGenericCartAdd(actionUrl, watch, "Shopify");
+      executed = result.success;
+      executionNote = result.note;
+    }
+    // Unsupported retailer
+    else {
+      executionNote = "Unsupported retailer for auto-action";
+    }
 
     // Update watch with execution result
     const now = new Date().toISOString();
@@ -146,8 +156,9 @@ serve(async (req) => {
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
-    console.error(`[execute-action] Unhandled error: ${err.message}`);
-    return new Response(JSON.stringify({ error: err.message, executed: false }), {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`[execute-action] Unhandled error: ${message}`);
+    return new Response(JSON.stringify({ error: message, executed: false }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -206,7 +217,7 @@ async function executeAmazonCartAdd(
 
     return { success: false, note: "Could not confirm cart addition" };
   } catch (err) {
-    return { success: false, note: `Request failed: ${err.message}` };
+    return { success: false, note: `Request failed: ${(err as Error).message}` };
   }
 }
 
@@ -259,7 +270,7 @@ async function executeGenericCartAdd(
 
     return { success: false, note: `${retailer} cart add did not confirm — use deep link instead` };
   } catch (err) {
-    return { success: false, note: `${retailer} request failed: ${err.message}` };
+    return { success: false, note: `${retailer} request failed: ${(err as Error).message}` };
   }
 }
 
