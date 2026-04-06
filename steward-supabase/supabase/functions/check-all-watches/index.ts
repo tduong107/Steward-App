@@ -43,7 +43,9 @@ serve(async (req) => {
       .from("watches")
       .select("id, user_id, check_frequency, last_checked, preferred_check_time, triggered, status, consecutive_failures, needs_attention")
       .in("status", ["watching", "triggered"])
-      .or("consecutive_failures.lt.30,consecutive_failures.is.null");
+      // Safety net: paused watches are excluded by status filter above,
+      // but also skip anything with 24+ failures (max pause threshold for 2h watches)
+      .or("consecutive_failures.lt.24,consecutive_failures.is.null");
 
     // ─── Tier enforcement: cap frequency based on user's subscription tier ───
     // Build a map of user_id → subscription_tier

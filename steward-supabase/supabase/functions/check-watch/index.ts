@@ -1627,12 +1627,18 @@ serve(async (req) => {
       updateData.consecutive_failures = newFailures;
       updateData.last_error = resultText;
 
-      // Auto-pause: after 30+ consecutive failures, stop checking entirely
-      if (newFailures >= 30) {
+      // Auto-pause: after ~2 days of consecutive failures, stop checking entirely
+      // Daily=2, 12h=4, 6h=8, 4h=12, 2h=24 (all equal ~48 hours of failures)
+      const PAUSE_THRESHOLD: Record<string, number> = {
+        "daily": 2, "every 12 hours": 4, "every 6 hours": 8,
+        "every 4 hours": 12, "every 2 hours": 24,
+      };
+      const pauseAt = PAUSE_THRESHOLD[checkFreq] ?? 2;
+      if (newFailures >= pauseAt) {
         updateData.status = "paused";
         updateData.needs_attention = true;
-        updateData.last_error = "Paused: this site has blocked automated checks after 30+ attempts. You can update the URL or restart the watch.";
-        console.log(`[check-watch] Auto-pausing ${watch.id} after ${newFailures} consecutive failures`);
+        updateData.last_error = "Paused: unable to reach this page after 2 days of attempts. You can update the URL or restart the watch.";
+        console.log(`[check-watch] Auto-pausing ${watch.id} after ${newFailures} consecutive failures (threshold: ${pauseAt})`);
         try {
           await supabase.functions.invoke("notify-user", {
             body: { watch_id: watch.id, user_id: watch.user_id, notification_type: "auto_paused" },
@@ -1659,7 +1665,7 @@ serve(async (req) => {
 
       // Auto-resolve: when failures cross threshold, try to find a working URL automatically
       // Skip if already needs_attention (avoid expensive re-resolve on every check)
-      if (newFailures >= FAILURE_THRESHOLD && newFailures < 30 && !watch.needs_attention && timeRemaining() > 8000) {
+      if (newFailures >= FAILURE_THRESHOLD && newFailures < pauseAt && !watch.needs_attention && timeRemaining() > 8000) {
         console.log(`[check-watch] Auto-resolve: attempting to fix ${watch.id} (${watch.name}) after ${newFailures} failures`);
 
         const autoFixResult = await attemptAutoResolve(watch, supabase);
