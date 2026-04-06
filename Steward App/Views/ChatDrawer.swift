@@ -166,7 +166,7 @@ struct ChatDrawer: View {
                 // Use RECENT messages (last 4) for context, not full history
                 // This prevents early category chips (e.g. "Camping") from overriding
                 // when the user shifted topics (e.g. to concert tickets)
-                let recentMessages = chatVM.messages.suffix(4)
+                let recentMessages = Array(chatVM.messages.suffix(4))
                 let recentText = recentMessages.map { $0.text.lowercased() }.joined(separator: " ")
 
                 // ─── 1. Check for specific brand/site mentions in recent context ───
@@ -207,7 +207,7 @@ struct ChatDrawer: View {
                 // ─── 2. Smart search URL from recent context ───
                 // Use the AI's LAST RESPONSE to extract parsed details (event name, venue, etc.)
                 // The AI already did the hard work of understanding the user's intent
-                let lastAIMsg = recentMessages.last(where: { $0.role == .assistant })?.text ?? ""
+                let lastAIMsg = recentMessages.last(where: { $0.role == .steward })?.text ?? ""
                 let lastUserMsg = recentMessages.last(where: { $0.role == .user })?.text ?? ""
 
                 // Helper: extract a smart search query from the AI's response
