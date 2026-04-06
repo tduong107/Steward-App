@@ -64,6 +64,8 @@ struct ShareExtensionView: View {
         let actionType: String
         let checkFrequency: String
         let imageURL: String?
+        var watchMode: String = "url"       // "url" or "search"
+        var searchQuery: String? = nil      // Product name for search-mode watches
     }
 
     struct ChatMessage: Identifiable, Equatable {
@@ -526,7 +528,9 @@ struct ShareExtensionView: View {
             condition: buildFinalCondition(base: info.condition),
             actionType: info.actionType,
             checkFrequency: proposalFrequency,
-            imageURL: info.imageURL
+            imageURL: info.imageURL,
+            watchMode: info.watchMode,
+            searchQuery: info.searchQuery
         )
     }
 
@@ -558,7 +562,7 @@ struct ShareExtensionView: View {
                 HStack(spacing: 8) {
                     Text(info.emoji)
                         .font(.system(size: 20))
-                    Text(watchTypeLabel(for: info.actionType))
+                    Text(info.watchMode == "search" ? "Best Price Anywhere" : watchTypeLabel(for: info.actionType))
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(.white)
                 }
@@ -731,15 +735,13 @@ struct ShareExtensionView: View {
         if isPaidUser {
             options += [
                 (label: "12h", value: "Every 12 hours"),
-                (label: "6h", value: "Every 6 hours"),
-                (label: "1h", value: "Every hour"),
             ]
         }
         if isPremiumUser {
             options += [
-                (label: "30m", value: "Every 30 min"),
-                (label: "15m", value: "Every 15 min"),
-                (label: "5m", value: "Every 5 min"),
+                (label: "6h", value: "Every 6 hours"),
+                (label: "4h", value: "Every 4 hours"),
+                (label: "2h", value: "Every 2 hours"),
             ]
         }
         return options
@@ -913,6 +915,22 @@ struct ShareExtensionView: View {
                 SuggestionChip(icon: "bell.fill", label: "Any Changes",
                               subtitle: "Monitor for any page updates", type: "notify"),
             ]
+        case .booking:
+            return [
+                SuggestionChip(icon: "calendar", label: "Track Availability",
+                              subtitle: "Watch for open slots or dates", type: "book"),
+                SuggestionChip(icon: "tag.fill", label: "Price Changes",
+                              subtitle: "Get notified of pricing updates", type: "price"),
+                SuggestionChip(icon: "bell.fill", label: "Any Changes",
+                              subtitle: "Monitor for any page updates", type: "notify"),
+            ]
+        case .camping:
+            return [
+                SuggestionChip(icon: "tent.fill", label: "Campsite Availability",
+                              subtitle: "Watch for open campsites", type: "book"),
+                SuggestionChip(icon: "bell.fill", label: "Any Changes",
+                              subtitle: "Monitor for any updates", type: "notify"),
+            ]
         case .ticketing:
             return [
                 SuggestionChip(icon: "ticket.fill", label: "Ticket Availability",
@@ -926,6 +944,8 @@ struct ShareExtensionView: View {
             return [
                 SuggestionChip(icon: "tag.fill", label: "Price Drop",
                               subtitle: "Get notified when price decreases", type: "price"),
+                SuggestionChip(icon: "storefront.fill", label: "Best Price Anywhere",
+                              subtitle: "Track lowest price across all stores", type: "search"),
                 SuggestionChip(icon: "cart.fill", label: "Back in Stock",
                               subtitle: "Know when it's available again", type: "cart"),
                 SuggestionChip(icon: "bell.fill", label: "Any Changes",
@@ -935,6 +955,8 @@ struct ShareExtensionView: View {
             return [
                 SuggestionChip(icon: "tag.fill", label: "Price Drop",
                               subtitle: "Get notified when price decreases", type: "price"),
+                SuggestionChip(icon: "storefront.fill", label: "Best Price Anywhere",
+                              subtitle: "Track lowest price across all stores", type: "search"),
                 SuggestionChip(icon: "cart.fill", label: "Back in Stock",
                               subtitle: "Know when it's available again", type: "cart"),
                 SuggestionChip(icon: "bell.fill", label: "Any Changes",
@@ -1005,6 +1027,41 @@ struct ShareExtensionView: View {
             }
         }
         return nil
+    }
+
+    /// Builds a search query for "Best Price Anywhere" watches.
+    /// Extracts a product name from the page title (stripping store suffixes) or URL slug.
+    private func buildSearchQuery() -> String {
+        // Prefer page title — strip common store suffixes like " | Amazon.com", " - Target", " : Walmart"
+        if let title = pageTitle, !isGenericPageTitle(title) {
+            let separators = [" | ", " - ", " — ", " – ", " : ", " · "]
+            var cleaned = title
+            for sep in separators {
+                if let range = cleaned.range(of: sep, options: .backwards) {
+                    let suffix = String(cleaned[range.upperBound...]).lowercased()
+                    // Only strip if the suffix looks like a store name (short, or contains known domains)
+                    let storePatterns = ["amazon", "target", "walmart", "best buy", "bestbuy",
+                                        "ebay", "costco", "rei", "home depot", "lowes", "wayfair",
+                                        "newegg", "b&h", "sephora", "ulta", "nordstrom", "macy",
+                                        ".com", "shop", "store", "official"]
+                    if suffix.count < 30 || storePatterns.contains(where: { suffix.contains($0) }) {
+                        cleaned = String(cleaned[..<range.lowerBound])
+                    }
+                }
+            }
+            let trimmed = cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty && trimmed.count > 3 {
+                return trimmed
+            }
+        }
+
+        // Fallback: use URL path name
+        if let pathName = urlPathName, pathName.count > 3 {
+            return pathName
+        }
+
+        // Last resort: use the display host
+        return displayHost
     }
 
     // MARK: - URL Extraction
@@ -1547,6 +1604,23 @@ struct ShareExtensionView: View {
             condition = "Any changes on this event page"
             actionType = "notify"
 
+        // Search mode — Best Price Anywhere
+        case ("search", _):
+            emoji = "🏷️"
+            condition = "Best price drops across all stores"
+            actionType = "price"
+            let searchQuery = buildSearchQuery()
+            return WatchInfo(
+                emoji: emoji,
+                name: name,
+                condition: condition,
+                actionType: actionType,
+                checkFrequency: "Daily",
+                imageURL: nil,
+                watchMode: "search",
+                searchQuery: searchQuery
+            )
+
         // General / ecommerce fallbacks
         case ("price", _):
             emoji = "💰"
@@ -1625,14 +1699,19 @@ struct ShareExtensionView: View {
             check_frequency: info.checkFrequency,
             preferred_check_time: preferredTime,
             notify_channels: "push",
+            response_mode: UserDefaults(suiteName: "group.Steward.Steward-App")?.string(forKey: "defaultResponseMode") ?? "notify",
             triggered: false,
             image_url: info.imageURL,
             created_at: now,
             site_cookies: cookiesJSON,
             cookie_domain: cookieDomain,
             cookie_status: cookiesJSON != nil ? "active" : nil,
-            watch_mode: "url",
-            search_query: nil
+            watch_mode: info.watchMode,
+            search_query: info.searchQuery,
+            ticket_meta: nil,
+            travel_meta: nil,
+            resy_meta: nil,
+            camping_meta: nil
         )
 
         do {
@@ -1649,7 +1728,18 @@ struct ShareExtensionView: View {
             try? await Task.sleep(for: .seconds(1.5))
             onComplete(sharedURL)
         } catch {
-            withAnimation { phase = .error(error.localizedDescription) }
+            let raw = error.localizedDescription.lowercased()
+            let friendly: String
+            if raw.contains("jwt expired") || raw.contains("pgrst303") || raw.contains("token") && raw.contains("expired") {
+                friendly = "Your session has expired. Tap Try Again — if it persists, open Steward to refresh your login."
+            } else if raw.contains("offline") || raw.contains("internet") || raw.contains("timed out") || raw.contains("timeout") {
+                friendly = "No internet connection. Check your network and try again."
+            } else if raw.contains("not authorized") || raw.contains("unauthorized") || raw.contains("401") {
+                friendly = "You're not signed in. Open Steward to sign in, then try sharing again."
+            } else {
+                friendly = "Couldn't create the watch. Tap Try Again — if it persists, open Steward and try sharing again."
+            }
+            withAnimation { phase = .error(friendly) }
         }
     }
 

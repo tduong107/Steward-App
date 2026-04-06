@@ -247,7 +247,7 @@ final class WatchViewModel {
             purgeOrphanedActivities()
             fetchLocalActivities()
         } catch {
-            syncError = error.localizedDescription
+            syncError = ErrorHelper.friendlyMessage(for: error, context: .sync)
         }
 
         lastSyncTime = Date()
@@ -511,7 +511,7 @@ final class WatchViewModel {
                     }
                 }
             } catch {
-                syncError = "Failed to sync watch: \(error.localizedDescription)"
+                syncError = ErrorHelper.friendlyMessage(for: error, context: .sync)
             }
         }
     }
@@ -604,7 +604,7 @@ final class WatchViewModel {
             do {
                 try await supabase?.deleteWatch(id: watchId)
             } catch {
-                syncError = "Failed to delete from cloud: \(error.localizedDescription)"
+                syncError = ErrorHelper.friendlyMessage(for: error, context: .sync)
             }
         }
     }

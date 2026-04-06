@@ -239,7 +239,7 @@ final class SubscriptionManager {
                 errorMessage = "An unexpected result occurred."
             }
         } catch {
-            errorMessage = "Purchase failed: \(error.localizedDescription)"
+            errorMessage = ErrorHelper.friendlyMessage(for: error, context: .purchase)
             #if DEBUG
             print("[SubscriptionManager] Purchase error: \(error)")
             #endif
@@ -258,7 +258,7 @@ final class SubscriptionManager {
             try await AppStore.sync()
             await checkEntitlements()
         } catch {
-            errorMessage = "Could not restore purchases: \(error.localizedDescription)"
+            errorMessage = ErrorHelper.friendlyMessage(for: error, context: .purchase)
         }
 
         isPurchasing = false

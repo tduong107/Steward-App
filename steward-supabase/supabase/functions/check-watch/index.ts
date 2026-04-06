@@ -522,6 +522,18 @@ serve(async (req) => {
       // Fall through to standard check if API fails
     }
 
+    // ─── OpenTable: use availability API ────────────
+    if (watch.url?.includes("opentable.com")) {
+      const otResult = await checkOpenTableWatch(watch, supabase);
+      if (otResult) {
+        return new Response(JSON.stringify(otResult), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      // Fall through to standard check if API fails
+    }
+
     // ─── Flight watches: try booking119 API first, fallback to Flights Sky ────
     const urlLowerForRoute = (watch.url || "").toLowerCase();
     const FLIGHT_ROUTE_HOSTS = [
@@ -4056,6 +4068,172 @@ async function checkResyWatch(
   } catch (err: any) {
     console.log(`[check-watch] Resy API failed: ${err.message}`);
     return null;
+  }
+}
+
+// ────────────────────────────────────────────────────────────────
+// OpenTable Availability Check via GraphQL API
+// ────────────────────────────────────────────────────────────────
+
+async function checkOpenTableWatch(
+  watch: any,
+  supabase: any
+): Promise<Record<string, unknown> | null> {
+  try {
+    // Extract restaurant ID from URL: /restaurant/profile/1044943 or /r/restaurant-name?restref=1044943
+    const urlStr = watch.url || "";
+    let restaurantId = "";
+    const profileMatch = urlStr.match(/\/profile\/(\d+)/);
+    const restrefMatch = urlStr.match(/restref=(\d+)/);
+    const ridMatch = urlStr.match(/\/r\/[^?]+.*?rid=(\d+)/i);
+    restaurantId = profileMatch?.[1] || restrefMatch?.[1] || ridMatch?.[1] || "";
+
+    if (!restaurantId) {
+      // Try to extract from URL path: opentable.com/r/restaurant-name-city
+      // We need the restref ID which may not be in the URL — try fetching the page
+      console.log(`[check-watch] OpenTable: no restaurant ID found in URL for ${watch.id}`);
+      return null; // Fall through to generic scraping
+    }
+
+    // Parse date, time, and party size from condition
+    const condLower = (watch.condition || "").toLowerCase();
+    const dateMatch = condLower.match(/(\d{4}-\d{2}-\d{2})/) ||
+      condLower.match(/(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\s+(\d{1,2})(?:\s*,?\s*(\d{4}))?/i);
+
+    let reservationDate = "";
+    if (dateMatch) {
+      if (dateMatch[0].includes("-")) {
+        reservationDate = dateMatch[1]; // YYYY-MM-DD format
+      } else {
+        // Parse "Apr 6" / "April 6, 2026" format
+        const months: Record<string, string> = {
+          jan: "01", feb: "02", mar: "03", apr: "04", may: "05", jun: "06",
+          jul: "07", aug: "08", sep: "09", oct: "10", nov: "11", dec: "12",
+        };
+        const mon = months[dateMatch[1].toLowerCase().substring(0, 3)] || "01";
+        const day = (dateMatch[2] || "1").padStart(2, "0");
+        const year = dateMatch[3] || new Date().getFullYear().toString();
+        reservationDate = `${year}-${mon}-${day}`;
+      }
+    }
+    if (!reservationDate) {
+      reservationDate = new Date().toISOString().split("T")[0]; // Default to today
+    }
+
+    const partySizeMatch = condLower.match(/(\d+)\s*(?:guest|people|person|pax|seat|party)/);
+    const partySize = partySizeMatch ? parseInt(partySizeMatch[1]) : 2;
+
+    const timeMatch = condLower.match(/(\d{1,2}):?(\d{2})?\s*(am|pm)/i) ||
+      condLower.match(/around\s+(\d{1,2})\s*(am|pm)?/i);
+    let timeSlot = "19:00"; // Default 7pm
+    if (timeMatch) {
+      let hour = parseInt(timeMatch[1]);
+      const min = timeMatch[2] || "00";
+      const ampm = (timeMatch[3] || "pm").toLowerCase();
+      if (ampm === "pm" && hour < 12) hour += 12;
+      if (ampm === "am" && hour === 12) hour = 0;
+      timeSlot = `${hour.toString().padStart(2, "0")}:${min}`;
+    }
+
+    console.log(`[check-watch] OpenTable: restaurant ${restaurantId}, ${reservationDate} ${timeSlot}, party ${partySize} for ${watch.id}`);
+
+    // Call OpenTable availability API
+    const otRes = await fetch("https://www.opentable.com/dapi/fe/gql", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Origin": "https://www.opentable.com",
+        "Referer": `https://www.opentable.com/restref/client/?restref=${restaurantId}`,
+      },
+      body: JSON.stringify({
+        operationName: "RestaurantsAvailability",
+        variables: {
+          onlyPop: false,
+          requestedDatetime: `${reservationDate}T${timeSlot}`,
+          restaurantIds: [parseInt(restaurantId)],
+          coversCount: partySize,
+          enableFetchTimeslots: true,
+          shouldReturnResults: true,
+        },
+        query: `query RestaurantsAvailability($restaurantIds: [Int!]!, $requestedDatetime: String!, $coversCount: Int!, $onlyPop: Boolean, $enableFetchTimeslots: Boolean, $shouldReturnResults: Boolean!) {
+          availability(restaurantIds: $restaurantIds, requestedDatetime: $requestedDatetime, coversCount: $coversCount, onlyPop: $onlyPop, enableFetchTimeslots: $enableFetchTimeslots, shouldReturnResults: $shouldReturnResults) {
+            restaurantId
+            availableDays { date }
+            timeslots { dateTime type }
+          }
+        }`,
+      }),
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (!otRes.ok) {
+      console.log(`[check-watch] OpenTable API HTTP ${otRes.status} for ${watch.id}`);
+      return null;
+    }
+
+    const otData = await otRes.json();
+    const availability = otData?.data?.availability?.[0];
+    const timeslots = availability?.timeslots ?? [];
+
+    const now = new Date().toISOString();
+    const resultText = timeslots.length > 0
+      ? `${timeslots.length} time slots available on ${reservationDate} for ${partySize} guests`
+      : `No availability on ${reservationDate} for ${partySize} guests`;
+    const changed = timeslots.length > 0;
+
+    // Build action URL that opens the booking page directly
+    const actionUrl = `https://www.opentable.com/restref/client/?restref=${restaurantId}&datetime=${reservationDate}T${timeSlot}&covers=${partySize}`;
+
+    const updateData: Record<string, unknown> = {
+      last_checked: now,
+      last_result_text: resultText,
+      consecutive_failures: 0,
+      last_error: null,
+      needs_attention: false,
+    };
+    if (changed) {
+      updateData.triggered = true;
+      updateData.status = "triggered";
+      updateData.change_note = resultText;
+      updateData.action_url = actionUrl;
+
+      // Notify user
+      try {
+        await supabase.functions.invoke("notify-user", {
+          body: { watch_id: watch.id, user_id: watch.user_id, action_url: actionUrl },
+        });
+      } catch { /* non-critical */ }
+    }
+
+    await supabase.from("watches").update(updateData).eq("id", watch.id);
+
+    try {
+      await supabase.from("check_results").insert({
+        id: crypto.randomUUID(),
+        watch_id: watch.id,
+        checked_at: now,
+        condition_met: changed,
+        changed,
+        result_data: {
+          text: resultText,
+          source: "opentable-api",
+          timeslots: timeslots.slice(0, 5).map((t: any) => t.dateTime),
+          party_size: partySize,
+        },
+      });
+    } catch { /* first check */ }
+
+    return {
+      watch_id: watch.id,
+      changed,
+      result_text: resultText,
+      source: "opentable-api",
+    };
+
+  } catch (err: any) {
+    console.log(`[check-watch] OpenTable check failed for ${watch.id}: ${err.message}`);
+    return null; // Fall through to generic checking
   }
 }
 

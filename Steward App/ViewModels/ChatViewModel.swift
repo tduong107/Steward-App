@@ -335,12 +335,12 @@ final class ChatViewModel {
                 }
 
             } catch {
-                let errorDetail = error.localizedDescription
+                let friendlyMsg = ErrorHelper.friendlyMessage(for: error, context: .chat)
                 withAnimation(.spring(response: 0.3)) {
                     isTyping = false
                     messages.append(ChatMessage(
                         role: .steward,
-                        text: "Sorry, I had trouble connecting. Error: \(errorDetail)"
+                        text: "Sorry, I had trouble connecting. \(friendlyMsg)"
                     ))
                 }
                 #if DEBUG
