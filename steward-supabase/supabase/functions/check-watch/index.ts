@@ -4072,118 +4072,123 @@ async function checkResyWatch(
 }
 
 // ────────────────────────────────────────────────────────────────
-// OpenTable Availability Check via GraphQL API
+// OpenTable Availability Check
+// OpenTable blocks ALL server-side access (API, scraping, GraphQL).
+// Strategy: use Serper search + Claude AI to check availability,
+// and try to find the same restaurant on Resy as an alt source.
 // ────────────────────────────────────────────────────────────────
 
 async function checkOpenTableWatch(
   watch: any,
   supabase: any
 ): Promise<Record<string, unknown> | null> {
-  try {
-    // Extract restaurant ID from URL: /restaurant/profile/1044943 or /r/restaurant-name?restref=1044943
-    const urlStr = watch.url || "";
-    let restaurantId = "";
-    const profileMatch = urlStr.match(/\/profile\/(\d+)/);
-    const restrefMatch = urlStr.match(/restref=(\d+)/);
-    const ridMatch = urlStr.match(/\/r\/[^?]+.*?rid=(\d+)/i);
-    restaurantId = profileMatch?.[1] || restrefMatch?.[1] || ridMatch?.[1] || "";
+  const SERPER_KEY = Deno.env.get("SERPER_API_KEY") ?? "";
+  if (!SERPER_KEY || !ANTHROPIC_API_KEY) return null;
 
-    if (!restaurantId) {
-      // Try to extract from URL path: opentable.com/r/restaurant-name-city
-      // We need the restref ID which may not be in the URL — try fetching the page
-      console.log(`[check-watch] OpenTable: no restaurant ID found in URL for ${watch.id}`);
-      return null; // Fall through to generic scraping
+  try {
+    // Parse reservation details from condition
+    const condLower = (watch.condition || "").toLowerCase();
+    const partySizeMatch = condLower.match(/(\d+)\s*(?:guest|people|person|pax|seat|party|table for)/);
+    const partySize = partySizeMatch ? parseInt(partySizeMatch[1]) : 2;
+
+    // Extract restaurant name from watch name or URL
+    // URL patterns: /r/restaurant-name-city or /restaurant/profile/123
+    const urlStr = watch.url || "";
+    let restaurantName = watch.name || "";
+    if (restaurantName === "www.opentable.com" || !restaurantName) {
+      const slugMatch = urlStr.match(/\/r\/([a-z0-9-]+)/i);
+      if (slugMatch) {
+        restaurantName = slugMatch[1].replace(/-/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase());
+      }
     }
 
-    // Parse date, time, and party size from condition
-    const condLower = (watch.condition || "").toLowerCase();
+    // Parse date
     const dateMatch = condLower.match(/(\d{4}-\d{2}-\d{2})/) ||
       condLower.match(/(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\s+(\d{1,2})(?:\s*,?\s*(\d{4}))?/i);
-
     let reservationDate = "";
     if (dateMatch) {
       if (dateMatch[0].includes("-")) {
-        reservationDate = dateMatch[1]; // YYYY-MM-DD format
+        reservationDate = dateMatch[1];
       } else {
-        // Parse "Apr 6" / "April 6, 2026" format
-        const months: Record<string, string> = {
-          jan: "01", feb: "02", mar: "03", apr: "04", may: "05", jun: "06",
-          jul: "07", aug: "08", sep: "09", oct: "10", nov: "11", dec: "12",
-        };
+        const months: Record<string, string> = { jan:"01",feb:"02",mar:"03",apr:"04",may:"05",jun:"06",jul:"07",aug:"08",sep:"09",oct:"10",nov:"11",dec:"12" };
         const mon = months[dateMatch[1].toLowerCase().substring(0, 3)] || "01";
         const day = (dateMatch[2] || "1").padStart(2, "0");
         const year = dateMatch[3] || new Date().getFullYear().toString();
         reservationDate = `${year}-${mon}-${day}`;
       }
     }
-    if (!reservationDate) {
-      reservationDate = new Date().toISOString().split("T")[0]; // Default to today
-    }
+    if (!reservationDate) reservationDate = new Date().toISOString().split("T")[0];
 
-    const partySizeMatch = condLower.match(/(\d+)\s*(?:guest|people|person|pax|seat|party)/);
-    const partySize = partySizeMatch ? parseInt(partySizeMatch[1]) : 2;
+    console.log(`[check-watch] OpenTable (Serper+Claude): "${restaurantName}" ${reservationDate} party ${partySize} for ${watch.id}`);
 
-    const timeMatch = condLower.match(/(\d{1,2}):?(\d{2})?\s*(am|pm)/i) ||
-      condLower.match(/around\s+(\d{1,2})\s*(am|pm)?/i);
-    let timeSlot = "19:00"; // Default 7pm
-    if (timeMatch) {
-      let hour = parseInt(timeMatch[1]);
-      const min = timeMatch[2] || "00";
-      const ampm = (timeMatch[3] || "pm").toLowerCase();
-      if (ampm === "pm" && hour < 12) hour += 12;
-      if (ampm === "am" && hour === 12) hour = 0;
-      timeSlot = `${hour.toString().padStart(2, "0")}:${min}`;
-    }
-
-    console.log(`[check-watch] OpenTable: restaurant ${restaurantId}, ${reservationDate} ${timeSlot}, party ${partySize} for ${watch.id}`);
-
-    // Call OpenTable availability API
-    const otRes = await fetch("https://www.opentable.com/dapi/fe/gql", {
+    // Strategy 1: Serper search for availability info
+    const searchQuery = `${restaurantName} opentable reservation ${reservationDate} ${partySize} guests availability`;
+    const searchRes = await fetch("https://google.serper.dev/search", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Origin": "https://www.opentable.com",
-        "Referer": `https://www.opentable.com/restref/client/?restref=${restaurantId}`,
-      },
-      body: JSON.stringify({
-        operationName: "RestaurantsAvailability",
-        variables: {
-          onlyPop: false,
-          requestedDatetime: `${reservationDate}T${timeSlot}`,
-          restaurantIds: [parseInt(restaurantId)],
-          coversCount: partySize,
-          enableFetchTimeslots: true,
-          shouldReturnResults: true,
-        },
-        query: `query RestaurantsAvailability($restaurantIds: [Int!]!, $requestedDatetime: String!, $coversCount: Int!, $onlyPop: Boolean, $enableFetchTimeslots: Boolean, $shouldReturnResults: Boolean!) {
-          availability(restaurantIds: $restaurantIds, requestedDatetime: $requestedDatetime, coversCount: $coversCount, onlyPop: $onlyPop, enableFetchTimeslots: $enableFetchTimeslots, shouldReturnResults: $shouldReturnResults) {
-            restaurantId
-            availableDays { date }
-            timeslots { dateTime type }
-          }
-        }`,
-      }),
-      signal: AbortSignal.timeout(10000),
+      headers: { "X-API-KEY": SERPER_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ q: searchQuery, num: 5 }),
+      signal: AbortSignal.timeout(5000),
     });
 
-    if (!otRes.ok) {
-      console.log(`[check-watch] OpenTable API HTTP ${otRes.status} for ${watch.id}`);
+    let searchContext = "";
+    if (searchRes.ok) {
+      const data = await searchRes.json();
+      const snippets: string[] = [];
+      if (data.answerBox?.snippet) snippets.push(data.answerBox.snippet);
+      for (const r of (data.organic ?? []).slice(0, 5)) {
+        if (r.snippet) snippets.push(`${r.title}: ${r.snippet}`);
+      }
+      searchContext = snippets.join("\n");
+    }
+
+    if (!searchContext) {
+      console.log(`[check-watch] OpenTable: Serper returned no results for ${watch.id}`);
       return null;
     }
 
-    const otData = await otRes.json();
-    const availability = otData?.data?.availability?.[0];
-    const timeslots = availability?.timeslots ?? [];
+    // Ask Claude to check availability from search results
+    const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 200,
+        system: "You check restaurant reservation availability from search results. Respond ONLY with JSON: {\"available\": true/false, \"details\": \"brief description of availability\"}. If you can't determine availability, respond {\"available\": false, \"details\": \"Could not determine availability\"}.",
+        messages: [{
+          role: "user",
+          content: `Restaurant: ${restaurantName}\nDate: ${reservationDate}\nParty size: ${partySize}\nCondition: ${watch.condition}\n\nSearch results:\n${searchContext.substring(0, 3000)}\n\nIs this restaurant showing availability for the requested date and party size?`,
+        }],
+      }),
+      signal: AbortSignal.timeout(8000),
+    });
+
+    if (!claudeRes.ok) {
+      console.log(`[check-watch] OpenTable: Claude API HTTP ${claudeRes.status}`);
+      return null;
+    }
+
+    const claudeData = await claudeRes.json();
+    const claudeText = claudeData.content?.[0]?.text ?? "";
+    const jsonMatch = claudeText.match(/\{[\s\S]*?"available"[\s\S]*?\}/);
+
+    let available = false;
+    let details = "Could not determine availability";
+    if (jsonMatch) {
+      try {
+        const parsed = JSON.parse(jsonMatch[0]);
+        available = parsed.available === true;
+        details = parsed.details || details;
+      } catch { /* parse error */ }
+    }
 
     const now = new Date().toISOString();
-    const resultText = timeslots.length > 0
-      ? `${timeslots.length} time slots available on ${reservationDate} for ${partySize} guests`
-      : `No availability on ${reservationDate} for ${partySize} guests`;
-    const changed = timeslots.length > 0;
-
-    // Build action URL that opens the booking page directly
-    const actionUrl = `https://www.opentable.com/restref/client/?restref=${restaurantId}&datetime=${reservationDate}T${timeSlot}&covers=${partySize}`;
+    const resultText = available
+      ? `Available: ${details}`
+      : `Checked — ${details}`;
 
     const updateData: Record<string, unknown> = {
       last_checked: now,
@@ -4192,16 +4197,16 @@ async function checkOpenTableWatch(
       last_error: null,
       needs_attention: false,
     };
-    if (changed) {
+
+    if (available) {
       updateData.triggered = true;
       updateData.status = "triggered";
       updateData.change_note = resultText;
-      updateData.action_url = actionUrl;
+      updateData.action_url = watch.url; // Open original OpenTable page
 
-      // Notify user
       try {
         await supabase.functions.invoke("notify-user", {
-          body: { watch_id: watch.id, user_id: watch.user_id, action_url: actionUrl },
+          body: { watch_id: watch.id, user_id: watch.user_id, action_url: watch.url },
         });
       } catch { /* non-critical */ }
     }
@@ -4213,27 +4218,53 @@ async function checkOpenTableWatch(
         id: crypto.randomUUID(),
         watch_id: watch.id,
         checked_at: now,
-        condition_met: changed,
-        changed,
+        condition_met: available,
+        changed: available,
         result_data: {
           text: resultText,
-          source: "opentable-api",
-          timeslots: timeslots.slice(0, 5).map((t: any) => t.dateTime),
+          source: "opentable-serper-claude",
           party_size: partySize,
+          search_date: reservationDate,
         },
       });
     } catch { /* first check */ }
 
+    // Strategy 2: Try to find this restaurant on Resy as an alternative source
+    if (!available || !watch.alt_source_url) {
+      try {
+        const resySearch = await fetch("https://google.serper.dev/search", {
+          method: "POST",
+          headers: { "X-API-KEY": SERPER_KEY, "Content-Type": "application/json" },
+          body: JSON.stringify({ q: `${restaurantName} resy.com reservation`, num: 3 }),
+          signal: AbortSignal.timeout(5000),
+        });
+        if (resySearch.ok) {
+          const resyData = await resySearch.json();
+          for (const r of (resyData.organic ?? [])) {
+            if (r.link?.includes("resy.com/cities/")) {
+              console.log(`[check-watch] OpenTable: found Resy alternative: ${r.link}`);
+              await supabase.from("watches").update({
+                alt_source_url: r.link,
+                alt_source_domain: "resy.com",
+                alt_source_found_at: now,
+              }).eq("id", watch.id);
+              break;
+            }
+          }
+        }
+      } catch { /* non-critical */ }
+    }
+
     return {
       watch_id: watch.id,
-      changed,
+      changed: available,
       result_text: resultText,
-      source: "opentable-api",
+      source: "opentable-serper-claude",
     };
 
   } catch (err: any) {
     console.log(`[check-watch] OpenTable check failed for ${watch.id}: ${err.message}`);
-    return null; // Fall through to generic checking
+    return null;
   }
 }
 
