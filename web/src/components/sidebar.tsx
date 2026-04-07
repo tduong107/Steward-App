@@ -71,11 +71,11 @@ export function Sidebar({ onChatOpen }: SidebarProps) {
           <Image
             src="/steward-logo.png"
             alt="Steward"
-            width={32}
-            height={32}
-            className="rounded-lg shrink-0"
+            width={36}
+            height={36}
+            className="rounded-xl shrink-0"
           />
-          <span className="text-[17px] font-extrabold text-[var(--color-ink)] tracking-tight">
+          <span className="text-[19px] font-extrabold text-[var(--color-ink)] tracking-tight">
             Steward
           </span>
         </Link>
@@ -85,7 +85,7 @@ export function Sidebar({ onChatOpen }: SidebarProps) {
       <div className="px-3 mb-3.5">
         <button
           onClick={onChatOpen}
-          className="flex w-full items-center gap-2 px-[11px] py-2 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-bg-deep)] text-[13px] text-[var(--color-ink-light)] cursor-pointer transition-all hover:border-[var(--color-border-mid)] hover:bg-[var(--color-bg)]"
+          className="flex w-full items-center gap-2 px-3 py-2.5 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-bg-deep)] text-[14px] text-[var(--color-ink-light)] cursor-pointer transition-all hover:border-[var(--color-border-mid)] hover:bg-[var(--color-bg)]"
           style={{ fontFamily: 'inherit' }}
         >
           <Search size={14} className="shrink-0" />
@@ -109,7 +109,7 @@ export function Sidebar({ onChatOpen }: SidebarProps) {
                 if (isProLocked) { e.preventDefault(); setShowPaywall(true) }
                 setMobileOpen(false)
               }}
-              className={`relative flex items-center gap-2.5 px-3 py-[9px] rounded-[var(--radius-md)] mb-px text-[14px] font-medium cursor-pointer transition-all ${
+              className={`relative flex items-center gap-2.5 px-3 py-[9px] rounded-[var(--radius-md)] mb-px text-[15px] font-medium cursor-pointer transition-all ${
                 active
                   ? 'bg-[var(--color-green-light)] text-[var(--color-accent)] font-semibold'
                   : 'text-[var(--color-ink-mid)] hover:bg-[var(--color-bg-deep)] hover:text-[var(--color-ink)]'
@@ -138,7 +138,7 @@ export function Sidebar({ onChatOpen }: SidebarProps) {
         <Link
           href="/home/settings"
           onClick={() => setMobileOpen(false)}
-          className={`flex items-center gap-2.5 px-3 py-[9px] rounded-[var(--radius-md)] text-[14px] font-medium cursor-pointer transition-all ${
+          className={`flex items-center gap-2.5 px-3 py-[9px] rounded-[var(--radius-md)] text-[15px] font-medium cursor-pointer transition-all ${
             settingsActive
               ? 'bg-[var(--color-green-light)] text-[var(--color-accent)] font-semibold'
               : 'text-[var(--color-ink-mid)] hover:bg-[var(--color-bg-deep)] hover:text-[var(--color-ink)]'
@@ -160,7 +160,7 @@ export function Sidebar({ onChatOpen }: SidebarProps) {
             {initials}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-[13px] font-semibold text-[var(--color-ink)] truncate">
+            <p className="text-[14px] font-semibold text-[var(--color-ink)] truncate">
               {profile?.display_name ?? 'User'}
             </p>
             <p className="text-[11px] font-semibold text-[var(--color-accent)]">

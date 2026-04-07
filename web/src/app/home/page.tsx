@@ -40,7 +40,11 @@ export default function DashboardPage() {
   const isOverLimit = activeWatches.length > limit
   const triggeredWatches = activeWatches.filter((w) => w.triggered)
   const filteredWatches = category
-    ? activeWatches.filter((w) => watchCategory(w) === category)
+    ? activeWatches.filter((w) => {
+        const cat = watchCategory(w)
+        if (category === 'product') return cat === 'product' || cat === 'general' || cat === ''
+        return cat === category
+      })
     : activeWatches
 
   const overLimitCount = Math.max(0, activeWatches.length - limit)
@@ -439,9 +443,18 @@ export default function DashboardPage() {
               >
                 {/* Top: icon + name + badge */}
                 <div className="flex items-start gap-3 mb-2.5">
-                  <div className="w-10 h-10 rounded-[var(--radius-md)] bg-[var(--color-bg-deep)] flex items-center justify-center text-xl shrink-0">
-                    {watch.emoji || '👀'}
-                  </div>
+                  {watch.image_url ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={watch.image_url}
+                      alt=""
+                      className="w-10 h-10 rounded-[var(--radius-md)] object-cover shrink-0 bg-[var(--color-bg-deep)]"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-[var(--radius-md)] bg-[var(--color-bg-deep)] flex items-center justify-center text-xl shrink-0">
+                      {watch.emoji || '👀'}
+                    </div>
+                  )}
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-bold text-[var(--color-ink)] truncate tracking-tight">{watch.name}</div>
                     <div className="text-xs text-[var(--color-ink-mid)] mt-px truncate">{watch.condition || 'Watching'}</div>

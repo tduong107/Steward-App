@@ -1,6 +1,6 @@
 'use client'
 
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { Plus, Bell } from 'lucide-react'
 
 const pageTitles: Record<string, string> = {
@@ -18,6 +18,7 @@ interface TopbarProps {
 
 export function Topbar({ onNewWatch, triggeredCount = 0 }: TopbarProps) {
   const pathname = usePathname()
+  const router = useRouter()
 
   // Match the deepest path first
   const title = Object.entries(pageTitles)
@@ -53,8 +54,11 @@ export function Topbar({ onNewWatch, triggeredCount = 0 }: TopbarProps) {
           New Watch
         </button>
 
-        {/* Notification bell */}
-        <button className="relative w-[34px] h-[34px] rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-bg-card)] flex items-center justify-center cursor-pointer transition-all hover:bg-[var(--color-bg-deep)] hover:border-[var(--color-border-mid)]">
+        {/* Notification bell — navigates to activity */}
+        <button
+          onClick={() => router.push('/home/activity')}
+          className="relative w-[34px] h-[34px] rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-bg-card)] flex items-center justify-center cursor-pointer transition-all hover:bg-[var(--color-bg-deep)] hover:border-[var(--color-border-mid)]"
+        >
           <Bell size={17} className="text-[var(--color-ink-mid)]" />
           {triggeredCount > 0 && (
             <div className="absolute top-[5px] right-[5px] w-[7px] h-[7px] rounded-full bg-[var(--color-red)] border-2 border-white" />
