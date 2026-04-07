@@ -1,10 +1,11 @@
 'use client'
 
-import { Suspense, useEffect, useRef, useState, type ReactNode } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Sidebar } from '@/components/sidebar'
 import { Topbar } from '@/components/topbar'
 import { ChatDrawer } from '@/components/chat-drawer'
+import { CommandPalette } from '@/components/command-palette'
 import { LaunchAnimation } from '@/components/launch-animation'
 import { PaywallDialog } from '@/components/paywall-dialog'
 import { ChatProvider, useChatDrawer } from '@/providers/chat-provider'
@@ -17,9 +18,26 @@ function DashboardLayoutInner({ children }: { children: ReactNode }) {
   const router = useRouter()
   const [showAnimation, setShowAnimation] = useState(false)
   const [showPaywall, setShowPaywall] = useState(false)
+  const [cmdOpen, setCmdOpen] = useState(false)
   const checkedRef = useRef(false)
 
   const triggeredCount = watches.filter(w => w.triggered && w.status !== 'deleted').length
+
+  // ⌘K global shortcut
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setCmdOpen(prev => !prev)
+      }
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [])
+
+  const handleNewWatch = useCallback(() => {
+    setCmdOpen(true)
+  }, [])
 
   useEffect(() => {
     if (checkedRef.current) return
@@ -51,13 +69,13 @@ function DashboardLayoutInner({ children }: { children: ReactNode }) {
 
       <div className="flex h-dvh overflow-hidden bg-[var(--color-bg)]" style={{ fontFamily: 'var(--font-body)' }}>
         {/* Sidebar */}
-        <Sidebar onChatOpen={openChat} />
+        <Sidebar onChatOpen={() => setCmdOpen(true)} />
 
         {/* Main content area */}
         <div className="flex-1 min-w-0 flex flex-col">
           {/* Top bar */}
           <Topbar
-            onNewWatch={openChat}
+            onNewWatch={handleNewWatch}
             triggeredCount={triggeredCount}
           />
 
@@ -72,6 +90,9 @@ function DashboardLayoutInner({ children }: { children: ReactNode }) {
         {/* Chat drawer overlay */}
         <ChatDrawer open={isChatOpen} onClose={closeChat} />
       </div>
+
+      {/* Command palette (⌘K) */}
+      <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} />
 
       <PaywallDialog open={showPaywall} onClose={() => setShowPaywall(false)} />
     </>

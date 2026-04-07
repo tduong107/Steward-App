@@ -245,7 +245,7 @@ export default function SavingsPage() {
       {/* Header */}
       <div>
         <div className="flex items-center gap-2">
-          <h2 className="text-2xl font-semibold font-[var(--font-serif)] text-[var(--color-ink)]">
+          <h2 className="text-2xl font-extrabold tracking-tight text-[var(--color-ink)]">
             Potential Savings
           </h2>
           <span className="text-[var(--color-accent)]">✦</span>
@@ -278,7 +278,7 @@ export default function SavingsPage() {
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--color-ink-mid)]">
                     Potential Savings
                   </p>
-                  <p className="text-2xl font-bold font-[var(--font-serif)] text-[var(--color-accent)]">
+                  <p className="text-2xl font-bold tracking-tight text-[var(--color-accent)]">
                     ${totalSaved.toFixed(2)}
                   </p>
                 </div>
@@ -360,7 +360,7 @@ export default function SavingsPage() {
           {sortedChanges.length > 0 && (
             <>
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold font-[var(--font-serif)] text-[var(--color-ink)]">
+                <h3 className="text-lg font-semibold tracking-tight text-[var(--color-ink)]">
                   Price Changes
                 </h3>
                 {/* Sort dropdown */}

@@ -275,7 +275,7 @@ export default function WatchDetailPage() {
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <h2 className="text-xl font-semibold font-[var(--font-serif)] text-[var(--color-ink)]">
+            <h2 className="text-xl font-semibold tracking-tight text-[var(--color-ink)]">
               {watch.name}
             </h2>
             {watch.triggered && <Badge variant="triggered">Triggered</Badge>}

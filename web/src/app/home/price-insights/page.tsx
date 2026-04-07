@@ -303,7 +303,7 @@ export default function PriceInsightsPage() {
       {/* Header */}
       <div>
         <div className="flex items-center gap-2">
-          <h2 className="text-2xl font-semibold font-[var(--font-serif)] text-[var(--color-ink)]">
+          <h2 className="text-2xl font-extrabold tracking-tight text-[var(--color-ink)]">
             Price Insights
           </h2>
           <BarChart3 size={20} className="text-[var(--color-accent)]" />
@@ -355,7 +355,7 @@ export default function PriceInsightsPage() {
                     <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--color-ink-mid)]">
                       Tracking
                     </p>
-                    <p className="text-2xl font-bold font-[var(--font-serif)] text-[var(--color-ink)]">
+                    <p className="text-2xl font-bold tracking-tight text-[var(--color-ink)]">
                       {summaryStats.trackingCount} price{summaryStats.trackingCount === 1 ? '' : 's'}
                     </p>
                   </div>
@@ -425,7 +425,7 @@ export default function PriceInsightsPage() {
           {/* ── Per-Watch Price Insights (matches iOS priceRows) ── */}
           {insights.length > 0 && (
             <div className="space-y-3">
-              <h3 className="text-lg font-semibold font-[var(--font-serif)] text-[var(--color-ink)]">
+              <h3 className="text-lg font-semibold tracking-tight text-[var(--color-ink)]">
                 Your Watches
               </h3>
 

@@ -4,7 +4,6 @@ import { useMemo, useState } from 'react'
 import { useActivities } from '@/hooks/use-activities'
 import { ActivityTimeline } from '@/components/activity-timeline'
 import { Skeleton } from '@/components/ui/skeleton'
-import { cn } from '@/lib/utils'
 import type { IconColorName } from '@/lib/types'
 
 type FilterKey = 'all' | 'alerts' | 'actions' | 'lifecycle'
@@ -34,32 +33,29 @@ export default function ActivityPage() {
   }, [activities, filter])
 
   return (
-    <div className="space-y-6">
-      {/* Title */}
-      <h2 className="text-2xl font-semibold font-[var(--font-serif)] text-[var(--color-ink)]">
-        Activity
-      </h2>
+    <div className="animate-fade-up">
+      <h1 className="text-2xl font-extrabold tracking-tight text-[var(--color-ink)] mb-1">Activity</h1>
+      <p className="text-[13px] text-[var(--color-ink-mid)] mb-5">Everything happening with your watches</p>
 
-      {/* Filter tabs */}
-      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+      {/* Tab bar */}
+      <div className="flex gap-1.5 mb-5">
         {filterTabs.map((tab) => (
           <button
             key={tab.key}
-            type="button"
             onClick={() => setFilter(tab.key)}
-            className={cn(
-              'shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-colors duration-150',
+            className={`px-4 py-[7px] rounded-[var(--radius-md)] text-[13px] font-medium cursor-pointer transition-all border ${
               filter === tab.key
-                ? 'bg-[var(--color-accent)] text-white'
-                : 'bg-[var(--color-bg-deep)] text-[var(--color-ink-mid)] hover:bg-[var(--color-border)]',
-            )}
+                ? 'bg-[var(--color-ink)] text-white border-transparent shadow-[var(--shadow-xs)]'
+                : 'bg-[var(--color-bg-card)] text-[var(--color-ink-mid)] border-[var(--color-border)] hover:bg-[var(--color-bg-deep)] hover:text-[var(--color-ink)]'
+            }`}
+            style={{ fontFamily: 'inherit' }}
           >
             {tab.label}
           </button>
         ))}
       </div>
 
-      {/* Loading state */}
+      {/* Loading */}
       {loading && (
         <div className="space-y-4">
           {Array.from({ length: 5 }).map((_, i) => (
@@ -74,8 +70,12 @@ export default function ActivityPage() {
         </div>
       )}
 
-      {/* Activity timeline */}
-      {!loading && <ActivityTimeline activities={filtered} />}
+      {/* Timeline */}
+      {!loading && (
+        <div className="bg-[var(--color-bg-card)] rounded-[var(--radius-lg)] border border-[var(--color-border)] overflow-hidden">
+          <ActivityTimeline activities={filtered} />
+        </div>
+      )}
     </div>
   )
 }

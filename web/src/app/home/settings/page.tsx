@@ -227,7 +227,7 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       {/* Title */}
-      <h2 className="text-2xl font-semibold font-[var(--font-serif)] text-[var(--color-ink)]">
+      <h2 className="text-2xl font-extrabold tracking-tight text-[var(--color-ink)]">
         Settings
       </h2>
 
@@ -488,7 +488,7 @@ export default function SettingsPage() {
       <Dialog open={showEmailDialog} onClose={() => setShowEmailDialog(false)}>
         <div className="space-y-4">
           <div>
-            <h3 className="text-lg font-semibold font-[var(--font-serif)] text-[var(--color-ink)]">
+            <h3 className="text-lg font-semibold tracking-tight text-[var(--color-ink)]">
               Add your email
             </h3>
             <p className="mt-1 text-sm text-[var(--color-ink-mid)]">
@@ -523,7 +523,7 @@ export default function SettingsPage() {
       <Dialog open={showPhoneDialog} onClose={() => setShowPhoneDialog(false)}>
         <div className="space-y-4">
           <div>
-            <h3 className="text-lg font-semibold font-[var(--font-serif)] text-[var(--color-ink)]">
+            <h3 className="text-lg font-semibold tracking-tight text-[var(--color-ink)]">
               Add your phone number
             </h3>
             <p className="mt-1 text-sm text-[var(--color-ink-mid)]">
