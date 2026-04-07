@@ -346,7 +346,16 @@ struct DetailScreen: View {
             }
 
             DetailRow(icon: "🎯", label: "Watching for", value: watch.condition)
-            DetailRow(icon: "⚡", label: "AI will", value: watch.actionLabel, highlight: watch.triggered)
+            DetailRow(icon: "⚡", label: "When found", value: {
+                // Show accurate description based on action type
+                switch watch.actionType {
+                case .book: return "Notify when available"
+                case .price: return "Notify on price drop"
+                case .cart: return "Notify when in stock"
+                case .notify: return "Send notification"
+                case .form: return "Notify when open"
+                }
+            }(), highlight: watch.triggered)
             Button { showFrequencyPicker = true } label: {
                 DetailRow(icon: "⏱", label: "Watch frequency", value: watch.checkFrequency, showChevron: true)
             }

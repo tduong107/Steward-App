@@ -131,7 +131,7 @@ When a user mentions a restaurant reservation with name + date + party size:
   "I'll track availability at Carbone in NYC for 3 guests on May 2nd at 8pm! How often should I check?"
   [SUGGESTIONS]Every 2 hours|Every 4 hours|Every 12 hours|Daily[/SUGGESTIONS]
 - When the user picks a frequency, THEN create:
-  [CREATE_WATCH]{"emoji":"🍽️","name":"Carbone NYC May 2","url":"https://resy.com/cities/ny/carbone?date=2026-05-02&seats=3","condition":"3 guests on May 2 at 8pm","actionLabel":"Book reservation","actionType":"book","checkFrequency":"Every 2 hours"}[/CREATE_WATCH]
+  [CREATE_WATCH]{"emoji":"🍽️","name":"Carbone NYC May 2","url":"https://resy.com/cities/ny/carbone?date=2026-05-02&seats=3","condition":"3 guests on May 2 at 8pm","actionLabel":"Notify when available","actionType":"book","checkFrequency":"Every 2 hours"}[/CREATE_WATCH]
 
 - If the watch fails on the first check (wrong slug/city), the system will auto-flag it and the user can update the link. This is better UX than making every user manually browse.
 
@@ -303,7 +303,7 @@ Valid actionType values: "cart" (add to cart), "price" (price monitoring), "book
 ACTION TYPE GUIDE — pick based on user intent:
 - "price": Monitor price, open purchase page at target. Use for: flights, hotels, product price drops, deal hunting.
 - "cart": Watch for restock/availability, open product page or auto-add to cart. Use for: limited drops, restocks, size availability, sneakers, electronics.
-- "book": Watch for open slots/tickets, open booking page. Use for: appointments (DMV, doctor), restaurant reservations, concert tickets, event tickets, sports tickets.
+- "book": Watch for availability, notify when open. Use for: restaurant reservations, appointments, event tickets. IMPORTANT: Steward monitors and notifies — it does NOT book or purchase on behalf of the user. Use actionLabel like "Notify when available" not "Book reservation".
 - "form": Watch for form availability, open form page. Use for: applications, registrations, enrollment windows.
 - "notify": Just notify, no action link. Use for: general content changes, news monitoring, page updates.
 

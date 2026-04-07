@@ -19,7 +19,7 @@ enum ActionType: String, Codable, CaseIterable {
         case .price: return "Price Drop"
         case .cart:  return "Add to Cart"
         case .form:  return "Fill Form"
-        case .book:  return "Book"
+        case .book:  return "Availability"
         case .notify: return "Notify Me"
         }
     }
@@ -45,7 +45,7 @@ enum ActionType: String, Codable, CaseIterable {
         switch self {
         case .price: return "Open & Buy"
         case .cart:  return "Add to Cart"
-        case .book:  return "Open & Book"
+        case .book:  return "Open & Reserve"
         case .form:  return "Open & Fill"
         case .notify: return "View Page"
         }
