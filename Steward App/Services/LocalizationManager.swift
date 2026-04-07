@@ -157,10 +157,7 @@ final class L10n {
 
         // Settings Screen
         "settings.title": "Settings",
-        "settings.subtitle": "Personalise how Steward serves you",
-        "settings.appearance": "Appearance",
         "settings.dark_mode": "Dark mode",
-        "settings.notifications": "Notifications",
         "settings.push": "Push notifications",
         "settings.quiet_hours": "Quiet hours",
         "settings.quiet_hours.desc": "Silence notifications during set hours",
@@ -172,17 +169,14 @@ final class L10n {
         "settings.when_triggered.desc": "Default for new watches",
         "settings.currency": "Currency",
         "settings.language": "Language",
-        "settings.account": "Account",
         "settings.plan": "Plan",
         "settings.restore": "Restore purchases",
         "settings.replay_tour": "Replay welcome tour",
         "settings.privacy": "Privacy Policy",
         "settings.terms": "Terms of Service",
         "settings.sign_out": "Sign Out",
-        "settings.apple_id": "Apple ID account",
 
         // Detail Screen
-        "detail.back": "Back",
         "detail.rename": "Rename",
         "detail.rename_title": "Rename Watch",
         "detail.rename_placeholder": "Watch name",
@@ -211,7 +205,6 @@ final class L10n {
         "detail.ai_will": "AI will",
         "detail.watch_frequency": "Watch frequency",
         "detail.watch_start_time": "Watch start time",
-        "detail.next_watch": "Next watch",
         "detail.notify_via": "Notify via",
         "detail.not_set": "Not set",
         "detail.condition_met_action": "Your condition was met · Tap to %@",
@@ -255,7 +248,6 @@ final class L10n {
         "savings.empty.subtitle": "When Steward detects price changes\non your watches, they'll appear here.",
 
         // Watch Card
-        "watch.tracking_stores": "Tracking across stores",
         "watch.change_detected": "Change detected!",
         "watch.needs_attention": "Needs attention",
 
@@ -414,8 +406,6 @@ final class L10n {
 
         // Settings Screen
         "settings.title": "Ajustes",
-        "settings.subtitle": "Personaliza cómo Steward te sirve",
-        "settings.appearance": "Apariencia",
         "settings.dark_mode": "Modo oscuro",
         "settings.notifications": "Notificaciones",
         "settings.push": "Notificaciones push",
@@ -512,7 +502,6 @@ final class L10n {
         "savings.empty.subtitle": "Cuando Steward detecte cambios de precio\nen tus vigilancias, aparecerán aquí.",
 
         // Watch Card
-        "watch.tracking_stores": "Rastreando en tiendas",
         "watch.change_detected": "¡Cambio detectado!",
         "watch.needs_attention": "Requiere atención",
 
@@ -564,10 +553,7 @@ final class L10n {
 
         // Tier gating
         "tier.locked_reason.quickLink": "Notificar + Enlace Rápido es una función Pro",
-        "settings.appearance": "Apariencia", "settings.notifications": "Notificaciones", "settings.account": "Cuenta", "settings.support": "Soporte",
         "settings.subtitle": "Personaliza cómo Steward te sirve", "settings.email": "Correo", "settings.sms": "SMS",
-        "settings.feedback": "Enviar comentarios", "settings.help": "Obtener ayuda", "settings.apple_id": "Cuenta Apple ID", "settings.delete_account": "Eliminar cuenta",
-        "detail.alt_source": "ENCONTRADO EN OTRO SITIO", "detail.switch": "Cambiar", "detail.keep_current": "Mantener actual", "detail.back": "Atrás", "detail.next_watch": "Próxima revisión",
         "watch.tracking_stores": "Rastreando en tiendas",
         "tier.locked_reason.stewardActs": "Steward Actúa es una función Premium",
     ]
@@ -653,8 +639,6 @@ final class L10n {
 
         // Settings Screen
         "settings.title": "설정",
-        "settings.subtitle": "Steward 맞춤 설정",
-        "settings.appearance": "외관",
         "settings.dark_mode": "다크 모드",
         "settings.notifications": "알림",
         "settings.push": "푸시 알림",
@@ -751,7 +735,6 @@ final class L10n {
         "savings.empty.subtitle": "Steward가 감시 항목에서 가격 변동을\n감지하면 여기에 표시됩니다.",
 
         // Watch Card
-        "watch.tracking_stores": "여러 매장에서 추적 중",
         "watch.change_detected": "변경 감지됨!",
         "watch.needs_attention": "주의 필요",
 
@@ -803,10 +786,7 @@ final class L10n {
 
         // Tier gating
         "tier.locked_reason.quickLink": "알림 + 빠른 링크는 Pro 기능입니다",
-        "settings.appearance": "외관", "settings.notifications": "알림", "settings.account": "계정", "settings.support": "지원",
         "settings.subtitle": "Steward의 서비스 방식을 맞춤 설정하세요", "settings.email": "이메일", "settings.sms": "문자",
-        "settings.feedback": "피드백 보내기", "settings.help": "도움 받기", "settings.apple_id": "Apple ID 계정", "settings.delete_account": "계정 삭제",
-        "detail.alt_source": "다른 사이트에서 발견", "detail.switch": "전환", "detail.keep_current": "현재 유지", "detail.back": "뒤로", "detail.next_watch": "다음 확인",
         "watch.tracking_stores": "여러 매장에서 추적 중",
         "tier.locked_reason.stewardActs": "Steward 자동 실행은 Premium 기능입니다",
     ]
@@ -892,8 +872,6 @@ final class L10n {
 
         // Settings Screen
         "settings.title": "设置",
-        "settings.subtitle": "个性化 Steward 的服务方式",
-        "settings.appearance": "外观",
         "settings.dark_mode": "深色模式",
         "settings.notifications": "通知",
         "settings.push": "推送通知",
@@ -990,7 +968,6 @@ final class L10n {
         "savings.empty.subtitle": "当 Steward 检测到你的监控项\n价格变动时，它们将显示在这里。",
 
         // Watch Card
-        "watch.tracking_stores": "跨店追踪中",
         "watch.change_detected": "检测到变化！",
         "watch.needs_attention": "需要注意",
 
@@ -1042,10 +1019,7 @@ final class L10n {
 
         // Tier gating
         "tier.locked_reason.quickLink": "通知 + 快速链接是 Pro 功能",
-        "settings.appearance": "外观", "settings.notifications": "通知", "settings.account": "账户", "settings.support": "支持",
         "settings.subtitle": "个性化 Steward 为你服务的方式", "settings.email": "邮箱", "settings.sms": "短信",
-        "settings.feedback": "发送反馈", "settings.help": "获取帮助", "settings.apple_id": "Apple ID 账户", "settings.delete_account": "删除账户",
-        "detail.alt_source": "在其他网站找到", "detail.switch": "切换", "detail.keep_current": "保持当前", "detail.back": "返回", "detail.next_watch": "下次检查",
         "watch.tracking_stores": "跨店追踪中",
         "tier.locked_reason.stewardActs": "Steward 自动执行是 Premium 功能",
     ]
@@ -1131,8 +1105,6 @@ final class L10n {
 
         // Settings Screen
         "settings.title": "Cài đặt",
-        "settings.subtitle": "Tùy chỉnh cách Steward phục vụ bạn",
-        "settings.appearance": "Giao diện",
         "settings.dark_mode": "Chế độ tối",
         "settings.notifications": "Thông báo",
         "settings.push": "Thông báo đẩy",
@@ -1229,7 +1201,6 @@ final class L10n {
         "savings.empty.subtitle": "Khi Steward phát hiện biến động giá\ntrong các mục theo dõi, chúng sẽ hiển thị ở đây.",
 
         // Watch Card
-        "watch.tracking_stores": "Đang theo dõi nhiều cửa hàng",
         "watch.change_detected": "Phát hiện thay đổi!",
         "watch.needs_attention": "Cần chú ý",
 
@@ -1281,10 +1252,7 @@ final class L10n {
 
         // Tier gating
         "tier.locked_reason.quickLink": "Thông báo + Liên kết nhanh là tính năng Pro",
-        "settings.appearance": "Giao diện", "settings.notifications": "Thông báo", "settings.account": "Tài khoản", "settings.support": "Hỗ trợ",
         "settings.subtitle": "Tùy chỉnh cách Steward phục vụ bạn", "settings.email": "Email", "settings.sms": "SMS",
-        "settings.feedback": "Gửi phản hồi", "settings.help": "Trợ giúp", "settings.apple_id": "Tài khoản Apple ID", "settings.delete_account": "Xóa tài khoản",
-        "detail.alt_source": "TÌM THẤY Ở TRANG KHÁC", "detail.switch": "Chuyển", "detail.keep_current": "Giữ hiện tại", "detail.back": "Quay lại", "detail.next_watch": "Lần kiểm tra tiếp",
         "watch.tracking_stores": "Đang theo dõi nhiều cửa hàng",
         "tier.locked_reason.stewardActs": "Steward Tự động là tính năng Premium",
     ]
@@ -1370,8 +1338,6 @@ final class L10n {
 
         // Settings Screen
         "settings.title": "Réglages",
-        "settings.subtitle": "Personnalisez comment Steward vous sert",
-        "settings.appearance": "Apparence",
         "settings.dark_mode": "Mode sombre",
         "settings.notifications": "Notifications",
         "settings.push": "Notifications push",
@@ -1468,7 +1434,6 @@ final class L10n {
         "savings.empty.subtitle": "Quand Steward détecte des variations de prix\nsur vos surveillances, elles apparaîtront ici.",
 
         // Watch Card
-        "watch.tracking_stores": "Suivi multi-boutiques",
         "watch.change_detected": "Changement détecté !",
         "watch.needs_attention": "Attention requise",
 
@@ -1520,10 +1485,7 @@ final class L10n {
 
         // Tier gating
         "tier.locked_reason.quickLink": "Notifier + Lien rapide est une fonctionnalité Pro",
-        "settings.appearance": "Apparence", "settings.notifications": "Notifications", "settings.account": "Compte", "settings.support": "Support",
         "settings.subtitle": "Personnalisez votre expérience Steward", "settings.email": "E-mail", "settings.sms": "SMS",
-        "settings.feedback": "Envoyer un avis", "settings.help": "Aide", "settings.apple_id": "Compte Apple ID", "settings.delete_account": "Supprimer le compte",
-        "detail.alt_source": "TROUVÉ SUR UN AUTRE SITE", "detail.switch": "Changer", "detail.keep_current": "Garder actuel", "detail.back": "Retour", "detail.next_watch": "Prochain contrôle",
         "watch.tracking_stores": "Suivi dans les magasins",
         "tier.locked_reason.stewardActs": "Steward Agit est une fonctionnalité Premium",
     ]
@@ -1609,8 +1571,6 @@ final class L10n {
 
         // Settings Screen
         "settings.title": "تنظیمات",
-        "settings.subtitle": "شخصی‌سازی نحوه خدمت‌رسانی Steward",
-        "settings.appearance": "ظاهر",
         "settings.dark_mode": "حالت تاریک",
         "settings.notifications": "اعلان‌ها",
         "settings.push": "اعلان‌های فوری",
@@ -1707,7 +1667,6 @@ final class L10n {
         "savings.empty.subtitle": "وقتی Steward تغییرات قیمت را\nدر نظارت‌های شما شناسایی کند، اینجا نمایش داده می‌شوند.",
 
         // Watch Card
-        "watch.tracking_stores": "ردیابی در فروشگاه‌ها",
         "watch.change_detected": "تغییر شناسایی شد!",
         "watch.needs_attention": "نیاز به توجه",
 
@@ -1759,10 +1718,7 @@ final class L10n {
 
         // Tier gating
         "tier.locked_reason.quickLink": "اطلاع + لینک سریع یک قابلیت Pro است",
-        "settings.appearance": "ظاهر", "settings.notifications": "اعلان‌ها", "settings.account": "حساب", "settings.support": "پشتیبانی",
         "settings.subtitle": "نحوه خدمت Steward به شما را شخصی‌سازی کنید", "settings.email": "ایمیل", "settings.sms": "پیامک",
-        "settings.feedback": "ارسال بازخورد", "settings.help": "کمک", "settings.apple_id": "حساب Apple ID", "settings.delete_account": "حذف حساب",
-        "detail.alt_source": "در سایت دیگری یافت شد", "detail.switch": "تغییر", "detail.keep_current": "حفظ فعلی", "detail.back": "بازگشت", "detail.next_watch": "بررسی بعدی",
         "watch.tracking_stores": "پیگیری در فروشگاه‌ها",
         "tier.locked_reason.stewardActs": "اقدام Steward یک قابلیت Premium است",
     ]
