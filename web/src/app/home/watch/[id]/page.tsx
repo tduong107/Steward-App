@@ -317,7 +317,12 @@ export default function WatchDetailPage() {
               rel="noopener noreferrer"
               className="shrink-0"
             >
-              <Button size="sm">{watch.action_label || 'Take Action'}</Button>
+              <Button size="sm">
+                {watch.action_type === 'book' ? 'Open & Reserve'
+                  : watch.action_type === 'price' ? 'Open & Buy'
+                  : watch.action_type === 'cart' ? 'Open & Add to Cart'
+                  : 'View Page'}
+              </Button>
             </a>
           )}
         </div>
@@ -408,16 +413,19 @@ export default function WatchDetailPage() {
               </p>
             </div>
 
-            {/* Action */}
+            {/* When found */}
             <div>
               <p className="text-xs font-medium uppercase tracking-wider text-[var(--color-ink-light)]">
-                Action
+                When found
               </p>
               <div className="mt-1 flex items-center gap-2">
                 <span className="text-sm text-[var(--color-ink)]">
-                  {watch.action_label}
+                  {watch.action_type === 'book' ? 'Notify when available'
+                    : watch.action_type === 'price' ? 'Notify on price drop'
+                    : watch.action_type === 'cart' ? 'Notify when in stock'
+                    : watch.action_type === 'form' ? 'Notify when open'
+                    : 'Send notification'}
                 </span>
-                <Badge variant="secondary">{watch.action_type}</Badge>
               </div>
             </div>
 
