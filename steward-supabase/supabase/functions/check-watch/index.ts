@@ -92,7 +92,6 @@ function generateActionURL(watch: any, pageHtml?: string): string | null {
 
   // ── Resy: pre-filled booking link ──
   if (urlLower.includes("resy.com")) {
-    // Already has date/seats params, just return as-is
     return url;
   }
 
@@ -102,6 +101,15 @@ function generateActionURL(watch: any, pageHtml?: string): string | null {
     if (profileMatch) {
       return `https://www.opentable.com/restref/client/?restref=${profileMatch[1]}`;
     }
+  }
+
+  // ── Recreation.gov: link to availability page ──
+  if (urlLower.includes("recreation.gov")) {
+    const campgroundMatch = url.match(/campgrounds\/(\d+)/);
+    if (campgroundMatch) {
+      return `https://www.recreation.gov/camping/campgrounds/${campgroundMatch[1]}/availability`;
+    }
+    return url;
   }
 
   // ── StubHub: append price filter from condition ──
@@ -3932,13 +3940,24 @@ async function checkCampgroundWatch(
       checked_at: checkedAt,
     });
 
+    // Build smart booking URL for Recreation.gov
+    const campgroundId = campgroundMatch?.[1] || "";
+    const siteId = campsiteMatch?.[1] || "";
+    let bookingUrl = watch.url;
+    if (siteId) {
+      // Direct link to specific campsite booking page
+      bookingUrl = `https://www.recreation.gov/camping/campsites/${siteId}`;
+    } else if (campgroundId) {
+      bookingUrl = `https://www.recreation.gov/camping/campgrounds/${campgroundId}/availability`;
+    }
+
     // Update watch
     const updateData: Record<string, unknown> = { last_checked: checkedAt };
     if (changed) {
       updateData.triggered = true;
       updateData.status = "triggered";
       updateData.change_note = resultText;
-      updateData.action_url = watch.url;
+      updateData.action_url = bookingUrl;
     } else if (watch.triggered) {
       // Availability gone — un-trigger
       updateData.triggered = false;
@@ -3956,7 +3975,7 @@ async function checkCampgroundWatch(
     if (changed) {
       try {
         await supabase.functions.invoke("notify-user", {
-          body: { watch_id: watch.id, user_id: watch.user_id, action_url: watch.url },
+          body: { watch_id: watch.id, user_id: watch.user_id, action_url: bookingUrl },
         });
       } catch { /* non-critical */ }
     }

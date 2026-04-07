@@ -251,9 +251,9 @@ export default function WatchDetailPage() {
   }
 
   const responseModeLabel: Record<string, string> = {
-    notify: 'Notify only',
-    quickLink: 'Quick Link',
-    stewardActs: 'Steward Acts',
+    notify: 'Notify Me',
+    quickLink: 'Notify + Quick Link',
+    stewardActs: 'Auto Add to Cart',
   }
 
   return (
@@ -464,10 +464,10 @@ export default function WatchDetailPage() {
               </p>
             </div>
 
-            {/* Response mode */}
+            {/* When triggered */}
             <div>
               <p className="text-xs font-medium uppercase tracking-wider text-[var(--color-ink-light)]">
-                Response Mode
+                When Triggered
               </p>
               <div className="mt-1 flex items-center gap-1.5">
                 <Zap className="h-3.5 w-3.5 text-[var(--color-ink-mid)]" />
