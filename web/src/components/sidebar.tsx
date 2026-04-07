@@ -68,15 +68,13 @@ export function Sidebar({ onChatOpen }: SidebarProps) {
       {/* Logo + Brand */}
       <div className="flex items-center gap-[11px] px-[18px] pt-[22px] pb-3">
         <Link href="/" className="flex items-center gap-[11px] transition-opacity hover:opacity-80">
-          <div
-            className="w-[30px] h-[30px] rounded-[var(--radius-sm)] flex items-center justify-center text-white font-extrabold text-[15px]"
-            style={{
-              background: 'linear-gradient(135deg, #059669 0%, #34D399 50%, #6EE7B7 100%)',
-              boxShadow: '0 2px 8px rgba(5,150,105,0.3)',
-            }}
-          >
-            S
-          </div>
+          <Image
+            src="/steward-logo.png"
+            alt="Steward"
+            width={32}
+            height={32}
+            className="rounded-lg shrink-0"
+          />
           <span className="text-[17px] font-extrabold text-[var(--color-ink)] tracking-tight">
             Steward
           </span>
@@ -111,7 +109,7 @@ export function Sidebar({ onChatOpen }: SidebarProps) {
                 if (isProLocked) { e.preventDefault(); setShowPaywall(true) }
                 setMobileOpen(false)
               }}
-              className={`relative flex items-center gap-2.5 px-3 py-[9px] rounded-[var(--radius-md)] mb-px text-[13.5px] font-medium cursor-pointer transition-all ${
+              className={`relative flex items-center gap-2.5 px-3 py-[9px] rounded-[var(--radius-md)] mb-px text-[14px] font-medium cursor-pointer transition-all ${
                 active
                   ? 'bg-[var(--color-green-light)] text-[var(--color-accent)] font-semibold'
                   : 'text-[var(--color-ink-mid)] hover:bg-[var(--color-bg-deep)] hover:text-[var(--color-ink)]'
@@ -140,7 +138,7 @@ export function Sidebar({ onChatOpen }: SidebarProps) {
         <Link
           href="/home/settings"
           onClick={() => setMobileOpen(false)}
-          className={`flex items-center gap-2.5 px-3 py-[9px] rounded-[var(--radius-md)] text-[13.5px] font-medium cursor-pointer transition-all ${
+          className={`flex items-center gap-2.5 px-3 py-[9px] rounded-[var(--radius-md)] text-[14px] font-medium cursor-pointer transition-all ${
             settingsActive
               ? 'bg-[var(--color-green-light)] text-[var(--color-accent)] font-semibold'
               : 'text-[var(--color-ink-mid)] hover:bg-[var(--color-bg-deep)] hover:text-[var(--color-ink)]'
@@ -184,7 +182,7 @@ export function Sidebar({ onChatOpen }: SidebarProps) {
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className="hidden md:flex w-[240px] shrink-0 flex-col bg-[var(--color-bg-card)] border-r border-[var(--color-border)] h-dvh sticky top-0 z-20">
+      <aside className="hidden md:flex w-[264px] shrink-0 flex-col bg-[var(--color-bg-card)] border-r border-[var(--color-border)] h-dvh sticky top-0 z-20">
         {sidebarContent}
       </aside>
 

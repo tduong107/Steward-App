@@ -45,18 +45,38 @@ export function watchCategory(watch: Watch): string {
     case 'travel':
       return 'travel'
     default: {
-      // Infer from action_type for url-mode watches
+      // Infer from URL first (most reliable), then action_type
+      const url = (watch.url || '').toLowerCase()
+      const cond = (watch.condition || '').toLowerCase()
+
+      // Travel: flights, hotels, car rentals
+      const travelHosts = ['kayak.com', 'google.com/travel', 'expedia.com', 'skyscanner.com', 'priceline.com', 'hopper.com', 'southwest.com', 'united.com', 'delta.com', 'aa.com', 'jetblue.com', 'booking.com', 'hotels.com', 'marriott.com', 'hilton.com', 'hertz.com', 'enterprise.com', 'avis.com']
+      if (travelHosts.some(h => url.includes(h)) || cond.includes('flight') || cond.includes('hotel') || cond.includes('car rental')) {
+        return 'travel'
+      }
+
+      // Reservations: restaurants
+      if (url.includes('resy.com') || url.includes('opentable.com')) {
+        return 'reservation'
+      }
+
+      // Camping
+      if (url.includes('recreation.gov')) {
+        return 'travel'
+      }
+
+      // Tickets
+      if (url.includes('ticketmaster.com') || url.includes('stubhub.com') || url.includes('seatgeek.com')) {
+        return 'ticket'
+      }
+
+      // Fall back to action_type
       switch (watch.action_type) {
         case 'price':
         case 'cart':
           return 'product'
-        case 'book': {
-          const url = (watch.url || '').toLowerCase()
-          if (url.includes('resy.com') || url.includes('opentable.com')) {
-            return 'reservation'
-          }
-          return 'general'
-        }
+        case 'book':
+          return 'reservation'
         default:
           return 'general'
       }
