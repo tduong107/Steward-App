@@ -10,6 +10,8 @@ struct ContentView: View {
     @Environment(SupabaseService.self) private var supabaseService
     @Environment(SubscriptionManager.self) private var subscriptionManager
     @AppStorage("isDarkMode") private var isDarkMode = false
+    @AppStorage("appLanguage") private var appLanguage = "en"
+    @AppStorage("currencyCode") private var currencyCode = "USD"
 
     // Shared watch deep link
     @State private var sharedWatchData: SharedWatchData?
@@ -18,6 +20,8 @@ struct ContentView: View {
 
     var body: some View {
         @Bindable var subscription = subscriptionManager
+        // Force full re-render when language or currency changes
+        let localeKey = "\(appLanguage)-\(currencyCode)"
         ZStack {
             // Main app content
             VStack(spacing: 0) {
@@ -79,6 +83,7 @@ struct ContentView: View {
                 viewModel.selectedWatch = nil
             }
         }
+        .id(localeKey) // Force re-render when language/currency changes
         .preferredColorScheme(isDarkMode ? .dark : .light)
         .environment(viewModel)
         .sheet(isPresented: $subscription.showPaywall) {

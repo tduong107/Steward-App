@@ -58,7 +58,7 @@ struct CustomTabBar: View {
                     .font(.system(size: 20))
                     .foregroundStyle(selectedTab == tab ? Theme.accent : Theme.inkLight)
 
-                Text(tab.rawValue)
+                Text(tab.localizedName)
                     .font(Theme.body(10, weight: .semibold))
                     .foregroundStyle(selectedTab == tab ? Theme.accent : Theme.inkLight)
             }

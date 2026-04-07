@@ -88,6 +88,15 @@ final class WatchViewModel {
             case .settings: return "gearshape"
             }
         }
+
+        var localizedName: String {
+            switch self {
+            case .home: return L10n.t("tab.watches")
+            case .savings: return L10n.t("tab.savings")
+            case .activity: return L10n.t("tab.activity")
+            case .settings: return L10n.t("tab.settings")
+            }
+        }
     }
 
     // MARK: - Setup

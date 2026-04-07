@@ -427,7 +427,7 @@ struct HomeScreen: View {
     private var stewardSummaryCard: some View {
         let potentialSavings = viewModel.savingsCalculation.totalSavings
         let checks = viewModel.weeklyCheckCount
-        let triggers = viewModel.triggeredWatches.count
+        let triggers = viewModel.weeklyTriggerCount
         let activeCount = viewModel.watches.filter { $0.status == .watching }.count
         // Each automated check replaces ~1 min of manual work:
         // opening the site (~15s), waiting to load (~10s), finding info (~20s), noting it (~15s)
@@ -444,7 +444,7 @@ struct HomeScreen: View {
                         .font(.system(size: 14))
                         .foregroundStyle(Theme.accent)
 
-                    Text("Steward is working for you")
+                    Text(L10n.t("home.steward_working"))
                         .font(Theme.body(14, weight: .bold))
                         .foregroundStyle(Theme.ink)
 
@@ -457,7 +457,7 @@ struct HomeScreen: View {
                         Text("\(checks)")
                             .font(Theme.body(16, weight: .bold))
                             .foregroundStyle(Theme.accent)
-                        Text("Checks\nlast 7 days")
+                        Text(L10n.t("home.checks") + "\nlast 7 days")
                             .font(Theme.body(9))
                             .foregroundStyle(Theme.inkLight)
                             .multilineTextAlignment(.center)
@@ -485,7 +485,7 @@ struct HomeScreen: View {
                         Text("\(triggers)")
                             .font(Theme.body(16, weight: .bold))
                             .foregroundStyle(Theme.gold)
-                        Text("Triggered\nnow")
+                        Text("Triggers\nlast 7 days")
                             .font(Theme.body(9))
                             .foregroundStyle(Theme.inkLight)
                             .multilineTextAlignment(.center)
@@ -938,11 +938,11 @@ private struct TriggeredAlertCard: View {
 
                     Text({
                         switch watch.actionType {
-                        case .cart:  return "READY TO ADD TO CART"
-                        case .book:  return "READY TO BOOK"
-                        case .price: return "PRICE TARGET HIT"
-                        case .form:  return "READY TO SUBMIT"
-                        case .notify: return "CHANGE DETECTED"
+                        case .cart:  return L10n.t("home.triggered.cart")
+                        case .book:  return L10n.t("home.triggered.book")
+                        case .price: return L10n.t("home.triggered.price")
+                        case .form:  return L10n.t("home.triggered.form")
+                        case .notify: return L10n.t("home.triggered.notify")
                         }
                     }())
                         .font(Theme.body(11, weight: .semibold))
