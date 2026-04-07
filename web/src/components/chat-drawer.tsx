@@ -208,13 +208,9 @@ export function ChatDrawer({ open, onClose }: ChatDrawerProps) {
       }
 
       try {
-        const created = await createWatch(lastMsg.autoCreateWatch!)
-        addMessage({
-          id: crypto.randomUUID(),
-          role: 'steward',
-          text: `✅ Created "${created.name || 'your watch'}"! I'll start monitoring it right away.`,
-          suggestions: ['Create another watch', "That's all for now"],
-        })
+        await createWatch(lastMsg.autoCreateWatch!)
+        // No extra confirmation message — the AI's response already says "You're all set!"
+        // This matches iOS behavior where createWatchFromJSON doesn't add a separate message
       } catch (err) {
         console.error('Auto-create watch failed:', err)
         setShowPaywall(true)
