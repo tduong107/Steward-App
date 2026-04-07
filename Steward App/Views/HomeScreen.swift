@@ -427,13 +427,16 @@ struct HomeScreen: View {
     private var stewardSummaryCard: some View {
         let potentialSavings = viewModel.savingsCalculation.totalSavings
         let checks = viewModel.weeklyCheckCount
-        let triggers = viewModel.weeklyTriggerCount
+        let triggers = viewModel.triggeredWatches.count
         let activeCount = viewModel.watches.filter { $0.status == .watching }.count
         // Each automated check replaces ~1 min of manual work:
         // opening the site (~15s), waiting to load (~10s), finding info (~20s), noting it (~15s)
         let minutesSaved = checks
 
         if activeCount > 0 || checks > 0 {
+            Button {
+                viewModel.selectedTab = .activity
+            } label: {
             VStack(spacing: 12) {
                 // Headline
                 HStack(spacing: 8) {
@@ -482,7 +485,7 @@ struct HomeScreen: View {
                         Text("\(triggers)")
                             .font(Theme.body(16, weight: .bold))
                             .foregroundStyle(Theme.gold)
-                        Text("Triggers\nlast 7 days")
+                        Text("Triggered\nnow")
                             .font(Theme.body(9))
                             .foregroundStyle(Theme.inkLight)
                             .multilineTextAlignment(.center)
@@ -522,6 +525,8 @@ struct HomeScreen: View {
             .shadow(color: .black.opacity(0.04), radius: 8, y: 4)
             .padding(.horizontal, 24)
             .padding(.bottom, 16)
+            }
+            .buttonStyle(.plain)
         }
     }
 
@@ -533,7 +538,7 @@ struct HomeScreen: View {
             VStack(spacing: 10) {
                 ForEach(viewModel.triggeredWatches) { watch in
                     TriggeredAlertCard(watch: watch) {
-                        viewModel.openDetail(for: watch)
+                        viewModel.presentAction(for: watch)
                     }
                 }
             }
