@@ -349,11 +349,11 @@ struct DetailScreen: View {
             DetailRow(icon: "⚡", label: "When found", value: {
                 // Show accurate description based on action type
                 switch watch.actionType {
-                case .book: return "Notify when available"
-                case .price: return "Notify on price drop"
-                case .cart: return "Notify when in stock"
-                case .notify: return "Send notification"
-                case .form: return "Notify when open"
+                case .book: return L10n.t("detail.action.book")
+                case .price: return L10n.t("detail.action.price")
+                case .cart: return L10n.t("detail.action.cart")
+                case .notify: return L10n.t("detail.action.notify")
+                case .form: return L10n.t("detail.action.form")
                 }
             }(), highlight: watch.triggered)
             Button { showFrequencyPicker = true } label: {
@@ -394,7 +394,7 @@ struct DetailScreen: View {
     private var priceChartLoadingState: some View {
         VStack(spacing: 12) {
             HStack {
-                Text("Price History")
+                Text(L10n.t("detail.price_history"))
                     .font(Theme.serif(15, weight: .semibold))
                     .foregroundStyle(Theme.ink)
 
@@ -422,7 +422,7 @@ struct DetailScreen: View {
     private var priceChartEmptyState: some View {
         VStack(spacing: 12) {
             HStack {
-                Text("Price History")
+                Text(L10n.t("detail.price_history"))
                     .font(Theme.serif(15, weight: .semibold))
                     .foregroundStyle(Theme.ink)
 
@@ -460,7 +460,7 @@ struct DetailScreen: View {
 
     private var changeBanner: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("DETECTED CHANGE")
+            Text(L10n.t("detail.change_detected"))
                 .font(Theme.body(11, weight: .bold))
                 .foregroundStyle(Theme.accent)
                 .tracking(0.5)
@@ -496,7 +496,7 @@ struct DetailScreen: View {
                     .font(.system(size: 12))
                     .foregroundStyle(Theme.gold)
 
-                Text("NEEDS ATTENTION")
+                Text(L10n.t("detail.needs_attention"))
                     .font(Theme.body(11, weight: .bold))
                     .foregroundStyle(Theme.gold)
                     .tracking(0.5)
@@ -517,7 +517,7 @@ struct DetailScreen: View {
                     HStack(spacing: 6) {
                         Image(systemName: "sparkles")
                             .font(.system(size: 12))
-                        Text("Ask AI to fix")
+                        Text(L10n.t("detail.ask_ai_fix"))
                             .font(Theme.body(13, weight: .semibold))
                     }
                     .foregroundStyle(.white)
@@ -534,7 +534,7 @@ struct DetailScreen: View {
                     HStack(spacing: 6) {
                         Image(systemName: "safari")
                             .font(.system(size: 12))
-                        Text("Find link")
+                        Text(L10n.t("detail.find_link"))
                             .font(Theme.body(13, weight: .semibold))
                     }
                     .foregroundStyle(Theme.gold)
@@ -751,14 +751,14 @@ struct DetailScreen: View {
                     .background(isPremium ? Theme.accentLight : Theme.bgDeep)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
 
-                Text("When Triggered")
+                Text(L10n.t("detail.when_triggered"))
                     .font(Theme.body(14, weight: .semibold))
                     .foregroundStyle(Theme.ink)
 
                 Spacer()
 
                 if !isPremium {
-                    Text("Premium")
+                    Text(L10n.t("detail.premium"))
                         .font(Theme.body(10, weight: .bold))
                         .foregroundStyle(Theme.gold)
                         .padding(.horizontal, 8)
@@ -992,7 +992,7 @@ struct DetailScreen: View {
                         .clipShape(RoundedRectangle(cornerRadius: 10))
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Visit Website")
+                        Text(L10n.t("detail.visit_website"))
                             .font(Theme.body(13, weight: .semibold))
                             .foregroundStyle(Theme.ink)
 
@@ -1053,7 +1053,7 @@ struct DetailScreen: View {
             HStack(spacing: 8) {
                 Image(systemName: "trash")
                     .font(.system(size: 14))
-                Text("Delete Watch")
+                Text(L10n.t("detail.delete_watch"))
                     .font(Theme.body(14, weight: .medium))
             }
             .foregroundStyle(Theme.red)
@@ -1085,7 +1085,7 @@ struct DetailScreen: View {
                     .clipShape(RoundedRectangle(cornerRadius: 10))
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Share this watch")
+                    Text(L10n.t("detail.share_watch"))
                         .font(Theme.body(13, weight: .semibold))
                         .foregroundStyle(Theme.ink)
 
@@ -1118,7 +1118,7 @@ struct DetailScreen: View {
     private var recentChecks: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Watch History")
+                Text(L10n.t("detail.watch_history"))
                     .font(Theme.serif(15, weight: .semibold))
                     .foregroundStyle(Theme.ink)
 

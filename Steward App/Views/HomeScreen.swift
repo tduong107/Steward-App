@@ -287,12 +287,12 @@ struct HomeScreen: View {
                 HStack(spacing: 8) {
                     StewardLogo(size: 30)
 
-                    Text("Steward")
+                    Text(L10n.t("home.app_title"))
                         .font(Theme.serif(22, weight: .bold))
                         .foregroundStyle(Theme.ink)
                 }
 
-                Text("Your personal AI concierge")
+                Text(L10n.t("home.app_subtitle"))
                     .font(Theme.body(12))
                     .foregroundStyle(Theme.inkLight)
             }
@@ -384,7 +384,7 @@ struct HomeScreen: View {
             HStack(spacing: 10) {
                 StewardLogo(size: 30)
 
-                Text("Ask Steward to watch something…")
+                Text(L10n.t("home.chat_prompt"))
                     .font(Theme.body(13))
                     .foregroundStyle(Theme.inkMid)
 
@@ -575,7 +575,7 @@ struct HomeScreen: View {
                             .clipShape(RoundedRectangle(cornerRadius: 10))
 
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Price Insights")
+                            Text(L10n.t("home.price_insights"))
                                 .font(Theme.body(13, weight: .semibold))
                                 .foregroundStyle(Theme.ink)
 
@@ -618,7 +618,7 @@ struct HomeScreen: View {
 
                         VStack(alignment: .leading, spacing: 2) {
                             HStack(spacing: 6) {
-                                Text("Price Insights")
+                                Text(L10n.t("home.price_insights"))
                                     .font(Theme.body(13, weight: .semibold))
                                     .foregroundStyle(Theme.inkMid)
 
@@ -782,7 +782,7 @@ struct HomeScreen: View {
                 .foregroundStyle(Theme.inkLight)
 
             VStack(spacing: 6) {
-                Text("No watches yet")
+                Text(L10n.t("home.empty.title"))
                     .font(Theme.serif(17, weight: .semibold))
                     .foregroundStyle(Theme.ink)
 
@@ -802,7 +802,7 @@ struct HomeScreen: View {
     private var watchList: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Text("Active Watches")
+                Text(L10n.t("home.active_watches"))
                     .font(Theme.serif(16, weight: .semibold))
                     .foregroundStyle(Theme.ink)
 

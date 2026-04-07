@@ -467,7 +467,7 @@ struct SavingsScreen: View {
                 .foregroundStyle(Theme.inkLight)
 
             VStack(spacing: 6) {
-                Text("No price data yet")
+                Text(L10n.t("savings.empty.title"))
                     .font(Theme.serif(17, weight: .semibold))
                     .foregroundStyle(Theme.ink)
 

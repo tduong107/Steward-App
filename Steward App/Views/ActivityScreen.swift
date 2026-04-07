@@ -31,11 +31,11 @@ struct ActivityScreen: View {
                 // Header
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Activity")
+                        Text(L10n.t("activity.title"))
                             .font(Theme.serif(22, weight: .bold))
                             .foregroundStyle(Theme.ink)
 
-                        Text("Everything Steward has handled for you")
+                        Text(L10n.t("activity.subtitle"))
                             .font(Theme.body(13))
                             .foregroundStyle(Theme.inkLight)
                     }
@@ -224,7 +224,7 @@ struct ActivityScreen: View {
                 .foregroundStyle(Theme.inkLight)
 
             VStack(spacing: 6) {
-                Text("No activity yet")
+                Text(L10n.t("activity.empty.title"))
                     .font(Theme.serif(17, weight: .semibold))
                     .foregroundStyle(Theme.ink)
 

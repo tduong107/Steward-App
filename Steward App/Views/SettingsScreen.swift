@@ -37,7 +37,7 @@ struct SettingsScreen: View {
             VStack(alignment: .leading, spacing: 0) {
                 // Header
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Settings")
+                    Text(L10n.t("settings.title"))
                         .font(Theme.serif(22, weight: .bold))
                         .foregroundStyle(Theme.ink)
 
@@ -55,8 +55,6 @@ struct SettingsScreen: View {
                     toggleRow(icon: "moon.fill", label: "Dark mode", isOn: $isDarkMode)
                     Divider().foregroundStyle(Theme.border).padding(.leading, 52)
                     languageRow
-                    Divider().foregroundStyle(Theme.border).padding(.leading, 52)
-                    currencyRow
                 }
 
                 // Notifications
@@ -299,7 +297,7 @@ struct SettingsScreen: View {
                     .foregroundStyle(Theme.ink)
                     .frame(width: 24)
 
-                Text("Language")
+                Text(L10n.t("settings.language"))
                     .font(Theme.body(13))
                     .foregroundStyle(Theme.ink)
 
@@ -523,7 +521,7 @@ struct SettingsScreen: View {
                     .frame(width: 24)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Plan")
+                    Text(L10n.t("settings.plan"))
                         .font(Theme.body(13))
                         .foregroundStyle(Theme.ink)
 
@@ -573,7 +571,7 @@ struct SettingsScreen: View {
                     .foregroundStyle(Theme.ink)
                     .frame(width: 24)
 
-                Text("Restore purchases")
+                Text(L10n.t("settings.restore"))
                     .font(Theme.body(13))
                     .foregroundStyle(Theme.ink)
 
@@ -633,7 +631,7 @@ struct SettingsScreen: View {
                     .foregroundStyle(Theme.ink)
                     .frame(width: 24)
 
-                Text("Privacy Policy")
+                Text(L10n.t("settings.privacy"))
                     .font(Theme.body(13))
                     .foregroundStyle(Theme.ink)
 
@@ -796,7 +794,7 @@ struct SettingsScreen: View {
                     .foregroundStyle(Theme.red)
                     .frame(width: 24)
 
-                Text("Sign Out")
+                Text(L10n.t("settings.sign_out"))
                     .font(Theme.body(13, weight: .medium))
                     .foregroundStyle(Theme.red)
 
