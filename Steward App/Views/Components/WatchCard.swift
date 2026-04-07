@@ -79,7 +79,7 @@ struct WatchCard: View {
                         HStack(spacing: 4) {
                             Image(systemName: "magnifyingglass")
                                 .font(.system(size: 9))
-                            Text("Tracking across stores")
+                            Text(L10n.t("watch.tracking_stores"))
                                 .lineLimit(1)
                         }
                         .font(Theme.body(11))

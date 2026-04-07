@@ -41,7 +41,7 @@ struct SettingsScreen: View {
                         .font(Theme.serif(22, weight: .bold))
                         .foregroundStyle(Theme.ink)
 
-                    Text("Personalise how Steward serves you")
+                    Text(L10n.t("settings.subtitle"))
                         .font(Theme.body(13))
                         .foregroundStyle(Theme.inkLight)
                 }
@@ -50,7 +50,7 @@ struct SettingsScreen: View {
                 .padding(.bottom, 24)
 
                 // Appearance
-                sectionHeader("Appearance")
+                sectionHeader(L10n.t("settings.appearance"))
                 settingsCard {
                     toggleRow(icon: "moon.fill", label: "Dark mode", isOn: $isDarkMode)
                     Divider().foregroundStyle(Theme.border).padding(.leading, 52)
@@ -58,7 +58,7 @@ struct SettingsScreen: View {
                 }
 
                 // Notifications
-                sectionHeader("Notifications")
+                sectionHeader(L10n.t("settings.notifications"))
                 settingsCard {
                     notificationToggle
                     Divider().foregroundStyle(Theme.border).padding(.leading, 52)
@@ -70,7 +70,7 @@ struct SettingsScreen: View {
                 }
 
                 // Account
-                sectionHeader("Account")
+                sectionHeader(L10n.t("settings.account"))
                 settingsCard {
                     accountRow
                     Divider().foregroundStyle(Theme.border).padding(.leading, 52)
@@ -86,7 +86,7 @@ struct SettingsScreen: View {
                 }
 
                 // Support
-                sectionHeader("Support")
+                sectionHeader(L10n.t("settings.support"))
                 settingsCard {
                     sendFeedbackRow
                     Divider().foregroundStyle(Theme.border).padding(.leading, 52)
@@ -115,7 +115,7 @@ struct SettingsScreen: View {
                 .foregroundStyle(Theme.ink)
                 .frame(width: 24)
 
-            Text("Push notifications")
+            Text(L10n.t("settings.push"))
                 .font(Theme.body(13))
                 .foregroundStyle(Theme.ink)
 
@@ -152,7 +152,7 @@ struct SettingsScreen: View {
                     .frame(width: 24)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Email")
+                    Text(L10n.t("settings.email"))
                         .font(Theme.body(13))
                         .foregroundStyle(Theme.ink)
 
@@ -203,7 +203,7 @@ struct SettingsScreen: View {
                     .frame(width: 24)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("SMS")
+                    Text(L10n.t("settings.sms"))
                         .font(Theme.body(13))
                         .foregroundStyle(Theme.ink)
 
@@ -605,7 +605,7 @@ struct SettingsScreen: View {
                     .foregroundStyle(Theme.ink)
                     .frame(width: 24)
 
-                Text("Replay welcome tour")
+                Text(L10n.t("settings.replay_tour"))
                     .font(Theme.body(13))
                     .foregroundStyle(Theme.ink)
 
@@ -656,7 +656,7 @@ struct SettingsScreen: View {
                     .foregroundStyle(Theme.ink)
                     .frame(width: 24)
 
-                Text("Terms of Use (EULA)")
+                Text(L10n.t("settings.terms"))
                     .font(Theme.body(13))
                     .foregroundStyle(Theme.ink)
 
@@ -682,7 +682,7 @@ struct SettingsScreen: View {
                     .frame(width: 24)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Send Feedback")
+                    Text(L10n.t("settings.feedback"))
                         .font(Theme.body(13))
                         .foregroundStyle(Theme.ink)
                     Text("Tell us what you think or suggest a feature")
@@ -710,7 +710,7 @@ struct SettingsScreen: View {
                     .frame(width: 24)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Get Help")
+                    Text(L10n.t("settings.help"))
                         .font(Theme.body(13))
                         .foregroundStyle(Theme.ink)
                     Text("Contact us for support")
@@ -757,7 +757,7 @@ struct SettingsScreen: View {
                             .font(Theme.body(11))
                             .foregroundStyle(Theme.inkLight)
                     } else {
-                        Text("Apple ID account")
+                        Text(L10n.t("settings.apple_id"))
                             .font(Theme.body(11))
                             .foregroundStyle(Theme.inkLight)
                     }
@@ -827,7 +827,7 @@ struct SettingsScreen: View {
                     .foregroundStyle(Theme.red.opacity(0.6))
                     .frame(width: 24)
 
-                Text("Delete Account")
+                Text(L10n.t("settings.delete_account"))
                     .font(Theme.body(13))
                     .foregroundStyle(Theme.red.opacity(0.6))
 

@@ -243,10 +243,14 @@ final class ChatViewModel {
 
             guard !Task.isCancelled else { return }
 
-            // Inject subscription tier context on first message so AI knows which frequencies to offer
-            // Always send tier — even for Free — so the AI knows NOT to offer frequency options
+            // Inject subscription tier + language context on first message
             if conversationHistory.isEmpty {
                 historyText = "[USER_TIER]\(subscriptionTier.rawValue)[/USER_TIER]\n" + historyText
+                // Tell the AI what language to respond in
+                let lang = L10n.current
+                if lang != .english {
+                    historyText = "[USER_LANGUAGE]\(lang.displayName)[/USER_LANGUAGE]\n" + historyText
+                }
             }
 
             // Add to conversation history (with enriched URL context)

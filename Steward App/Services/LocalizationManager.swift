@@ -305,6 +305,29 @@ final class L10n {
         "common.upgrade": "Upgrade",
         "common.loading": "Loading…",
 
+        // Settings section headers
+        "settings.appearance": "Appearance",
+        "settings.notifications": "Notifications",
+        "settings.account": "Account",
+        "settings.support": "Support",
+        "settings.subtitle": "Personalise how Steward serves you",
+        "settings.email": "Email",
+        "settings.sms": "SMS",
+        "settings.feedback": "Send Feedback",
+        "settings.help": "Get Help",
+        "settings.apple_id": "Apple ID account",
+        "settings.delete_account": "Delete Account",
+
+        // Detail
+        "detail.alt_source": "FOUND ON ANOTHER SITE",
+        "detail.switch": "Switch",
+        "detail.keep_current": "Keep current",
+        "detail.back": "Back",
+        "detail.next_watch": "Next watch",
+
+        // Watch card
+        "watch.tracking_stores": "Tracking across stores",
+
         // Tier gating
         "tier.locked_reason.quickLink": "Notify + Quick Link is a Pro feature",
         "tier.locked_reason.stewardActs": "Steward Acts is a Premium feature",
@@ -541,6 +564,11 @@ final class L10n {
 
         // Tier gating
         "tier.locked_reason.quickLink": "Notificar + Enlace Rápido es una función Pro",
+        "settings.appearance": "Apariencia", "settings.notifications": "Notificaciones", "settings.account": "Cuenta", "settings.support": "Soporte",
+        "settings.subtitle": "Personaliza cómo Steward te sirve", "settings.email": "Correo", "settings.sms": "SMS",
+        "settings.feedback": "Enviar comentarios", "settings.help": "Obtener ayuda", "settings.apple_id": "Cuenta Apple ID", "settings.delete_account": "Eliminar cuenta",
+        "detail.alt_source": "ENCONTRADO EN OTRO SITIO", "detail.switch": "Cambiar", "detail.keep_current": "Mantener actual", "detail.back": "Atrás", "detail.next_watch": "Próxima revisión",
+        "watch.tracking_stores": "Rastreando en tiendas",
         "tier.locked_reason.stewardActs": "Steward Actúa es una función Premium",
     ]
 
@@ -775,6 +803,11 @@ final class L10n {
 
         // Tier gating
         "tier.locked_reason.quickLink": "알림 + 빠른 링크는 Pro 기능입니다",
+        "settings.appearance": "외관", "settings.notifications": "알림", "settings.account": "계정", "settings.support": "지원",
+        "settings.subtitle": "Steward의 서비스 방식을 맞춤 설정하세요", "settings.email": "이메일", "settings.sms": "문자",
+        "settings.feedback": "피드백 보내기", "settings.help": "도움 받기", "settings.apple_id": "Apple ID 계정", "settings.delete_account": "계정 삭제",
+        "detail.alt_source": "다른 사이트에서 발견", "detail.switch": "전환", "detail.keep_current": "현재 유지", "detail.back": "뒤로", "detail.next_watch": "다음 확인",
+        "watch.tracking_stores": "여러 매장에서 추적 중",
         "tier.locked_reason.stewardActs": "Steward 자동 실행은 Premium 기능입니다",
     ]
 
@@ -1009,6 +1042,11 @@ final class L10n {
 
         // Tier gating
         "tier.locked_reason.quickLink": "通知 + 快速链接是 Pro 功能",
+        "settings.appearance": "外观", "settings.notifications": "通知", "settings.account": "账户", "settings.support": "支持",
+        "settings.subtitle": "个性化 Steward 为你服务的方式", "settings.email": "邮箱", "settings.sms": "短信",
+        "settings.feedback": "发送反馈", "settings.help": "获取帮助", "settings.apple_id": "Apple ID 账户", "settings.delete_account": "删除账户",
+        "detail.alt_source": "在其他网站找到", "detail.switch": "切换", "detail.keep_current": "保持当前", "detail.back": "返回", "detail.next_watch": "下次检查",
+        "watch.tracking_stores": "跨店追踪中",
         "tier.locked_reason.stewardActs": "Steward 自动执行是 Premium 功能",
     ]
 
@@ -1243,6 +1281,11 @@ final class L10n {
 
         // Tier gating
         "tier.locked_reason.quickLink": "Thông báo + Liên kết nhanh là tính năng Pro",
+        "settings.appearance": "Giao diện", "settings.notifications": "Thông báo", "settings.account": "Tài khoản", "settings.support": "Hỗ trợ",
+        "settings.subtitle": "Tùy chỉnh cách Steward phục vụ bạn", "settings.email": "Email", "settings.sms": "SMS",
+        "settings.feedback": "Gửi phản hồi", "settings.help": "Trợ giúp", "settings.apple_id": "Tài khoản Apple ID", "settings.delete_account": "Xóa tài khoản",
+        "detail.alt_source": "TÌM THẤY Ở TRANG KHÁC", "detail.switch": "Chuyển", "detail.keep_current": "Giữ hiện tại", "detail.back": "Quay lại", "detail.next_watch": "Lần kiểm tra tiếp",
+        "watch.tracking_stores": "Đang theo dõi nhiều cửa hàng",
         "tier.locked_reason.stewardActs": "Steward Tự động là tính năng Premium",
     ]
 
@@ -1477,6 +1520,11 @@ final class L10n {
 
         // Tier gating
         "tier.locked_reason.quickLink": "Notifier + Lien rapide est une fonctionnalité Pro",
+        "settings.appearance": "Apparence", "settings.notifications": "Notifications", "settings.account": "Compte", "settings.support": "Support",
+        "settings.subtitle": "Personnalisez votre expérience Steward", "settings.email": "E-mail", "settings.sms": "SMS",
+        "settings.feedback": "Envoyer un avis", "settings.help": "Aide", "settings.apple_id": "Compte Apple ID", "settings.delete_account": "Supprimer le compte",
+        "detail.alt_source": "TROUVÉ SUR UN AUTRE SITE", "detail.switch": "Changer", "detail.keep_current": "Garder actuel", "detail.back": "Retour", "detail.next_watch": "Prochain contrôle",
+        "watch.tracking_stores": "Suivi dans les magasins",
         "tier.locked_reason.stewardActs": "Steward Agit est une fonctionnalité Premium",
     ]
 
@@ -1711,6 +1759,11 @@ final class L10n {
 
         // Tier gating
         "tier.locked_reason.quickLink": "اطلاع + لینک سریع یک قابلیت Pro است",
+        "settings.appearance": "ظاهر", "settings.notifications": "اعلان‌ها", "settings.account": "حساب", "settings.support": "پشتیبانی",
+        "settings.subtitle": "نحوه خدمت Steward به شما را شخصی‌سازی کنید", "settings.email": "ایمیل", "settings.sms": "پیامک",
+        "settings.feedback": "ارسال بازخورد", "settings.help": "کمک", "settings.apple_id": "حساب Apple ID", "settings.delete_account": "حذف حساب",
+        "detail.alt_source": "در سایت دیگری یافت شد", "detail.switch": "تغییر", "detail.keep_current": "حفظ فعلی", "detail.back": "بازگشت", "detail.next_watch": "بررسی بعدی",
+        "watch.tracking_stores": "پیگیری در فروشگاه‌ها",
         "tier.locked_reason.stewardActs": "اقدام Steward یک قابلیت Premium است",
     ]
 }

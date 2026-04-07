@@ -264,7 +264,7 @@ struct HomeScreen: View {
                         reason: "Upgrade to keep all your watches."
                     )
                 } label: {
-                    Text("Upgrade")
+                    Text(L10n.t("common.upgrade"))
                         .font(Theme.body(12, weight: .bold))
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
@@ -471,7 +471,7 @@ struct HomeScreen: View {
                             Text("~\(formatTimeSaved(minutesSaved))")
                                 .font(Theme.body(16, weight: .bold))
                                 .foregroundStyle(Theme.accent)
-                            Text("Time\nsaved")
+                            Text(L10n.t("home.time_saved"))
                                 .font(Theme.body(9))
                                 .foregroundStyle(Theme.inkLight)
                                 .multilineTextAlignment(.center)
@@ -485,7 +485,7 @@ struct HomeScreen: View {
                         Text("\(triggers)")
                             .font(Theme.body(16, weight: .bold))
                             .foregroundStyle(Theme.gold)
-                        Text("Triggers\nlast 7 days")
+                        Text(L10n.t("home.triggers") + "\nlast 7 days")
                             .font(Theme.body(9))
                             .foregroundStyle(Theme.inkLight)
                             .multilineTextAlignment(.center)
@@ -499,7 +499,7 @@ struct HomeScreen: View {
                             Text(Theme.formatPrice(potentialSavings))
                                 .font(Theme.body(14, weight: .bold))
                                 .foregroundStyle(Theme.green)
-                            Text("Potential\nsavings")
+                            Text(L10n.t("home.potential_savings"))
                                 .font(Theme.body(9))
                                 .foregroundStyle(Theme.inkLight)
                                 .multilineTextAlignment(.center)
@@ -634,7 +634,7 @@ struct HomeScreen: View {
 
                         Spacer()
 
-                        Text("PRO")
+                        Text(L10n.t("home.price_insights.pro"))
                             .font(Theme.body(10, weight: .bold))
                             .foregroundStyle(.white)
                             .padding(.horizontal, 8)

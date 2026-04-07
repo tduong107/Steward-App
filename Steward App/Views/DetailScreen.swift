@@ -48,7 +48,7 @@ struct DetailScreen: View {
                     HStack(spacing: 4) {
                         Image(systemName: "chevron.left")
                             .font(.system(size: 14, weight: .medium))
-                        Text("Back")
+                        Text(L10n.t("detail.back"))
                             .font(Theme.body(13))
                     }
                     .foregroundStyle(Theme.inkMid)
@@ -571,7 +571,7 @@ struct DetailScreen: View {
                     .font(.system(size: 12))
                     .foregroundStyle(Theme.accent)
 
-                Text("FOUND ON ANOTHER SITE")
+                Text(L10n.t("detail.alt_source"))
                     .font(Theme.body(11, weight: .bold))
                     .foregroundStyle(Theme.accent)
                     .tracking(0.5)
@@ -594,7 +594,7 @@ struct DetailScreen: View {
                     HStack(spacing: 6) {
                         Image(systemName: "arrow.right.arrow.left")
                             .font(.system(size: 12))
-                        Text("Switch")
+                        Text(L10n.t("detail.switch"))
                             .font(Theme.body(13, weight: .semibold))
                     }
                     .foregroundStyle(.white)
@@ -611,7 +611,7 @@ struct DetailScreen: View {
                     HStack(spacing: 6) {
                         Image(systemName: "xmark")
                             .font(.system(size: 12))
-                        Text("Keep current")
+                        Text(L10n.t("detail.keep_current"))
                             .font(Theme.body(13, weight: .semibold))
                     }
                     .foregroundStyle(Theme.accent)
@@ -716,7 +716,7 @@ struct DetailScreen: View {
                 .frame(width: 28, alignment: .center)
 
             VStack(alignment: .leading, spacing: 1) {
-                Text("Next watch")
+                Text(L10n.t("detail.next_watch"))
                     .font(Theme.body(12))
                     .foregroundStyle(Theme.inkLight)
                 Text(watch.nextCheckCountdown)
