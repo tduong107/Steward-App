@@ -3,40 +3,38 @@
 import { Suspense, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Sidebar } from '@/components/sidebar'
-import { Header } from '@/components/header'
+import { Topbar } from '@/components/topbar'
 import { ChatDrawer } from '@/components/chat-drawer'
 import { LaunchAnimation } from '@/components/launch-animation'
 import { PaywallDialog } from '@/components/paywall-dialog'
 import { ChatProvider, useChatDrawer } from '@/providers/chat-provider'
+import { useWatches } from '@/hooks/use-watches'
 
 function DashboardLayoutInner({ children }: { children: ReactNode }) {
   const { isChatOpen, openChat, closeChat } = useChatDrawer()
+  const { watches } = useWatches()
   const searchParams = useSearchParams()
   const router = useRouter()
   const [showAnimation, setShowAnimation] = useState(false)
   const [showPaywall, setShowPaywall] = useState(false)
   const checkedRef = useRef(false)
 
+  const triggeredCount = watches.filter(w => w.triggered && w.status !== 'deleted').length
+
   useEffect(() => {
-    // Only check once on initial mount — not on every navigation
     if (checkedRef.current) return
     checkedRef.current = true
 
-    // If we already showed the animation this session, skip entirely
     if (sessionStorage.getItem('steward_animation_shown')) return
 
-    // Check sessionStorage flag (email/password login & signup)
     const fromLogin = sessionStorage.getItem('steward_just_signed_in')
-    // Check URL param (OAuth callback)
     const fromOAuth = searchParams.get('welcome') === '1'
 
     if (fromLogin || fromOAuth) {
       setShowAnimation(true)
       sessionStorage.removeItem('steward_just_signed_in')
-      // Mark that we've already shown the animation this session
       sessionStorage.setItem('steward_animation_shown', '1')
 
-      // Clean up the ?welcome param from the URL
       if (fromOAuth) {
         const url = new URL(window.location.href)
         url.searchParams.delete('welcome')
@@ -51,25 +49,30 @@ function DashboardLayoutInner({ children }: { children: ReactNode }) {
         <LaunchAnimation onComplete={() => setShowAnimation(false)} />
       )}
 
-      <div className="flex h-dvh overflow-hidden bg-[var(--color-bg)]">
-        {/* Desktop sidebar */}
+      <div className="flex h-dvh overflow-hidden bg-[var(--color-bg)]" style={{ fontFamily: 'var(--font-body)' }}>
+        {/* Sidebar */}
         <Sidebar onChatOpen={openChat} />
 
-        {/* Main column */}
-        <div className="flex-1 min-w-0 flex flex-col pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0">
-          {/* Mobile header */}
-          <Header onChatOpen={openChat} onTierBadgeClick={() => setShowPaywall(true)} />
+        {/* Main content area */}
+        <div className="flex-1 min-w-0 flex flex-col">
+          {/* Top bar */}
+          <Topbar
+            onNewWatch={openChat}
+            triggeredCount={triggeredCount}
+          />
 
-          <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-8">
-            <div className="mx-auto max-w-3xl w-full">{children}</div>
-          </main>
+          {/* Content scroll area */}
+          <div className="flex-1 overflow-hidden flex">
+            <main className="flex-1 overflow-y-auto dashboard-scroll px-4 py-6 md:px-8 md:py-7">
+              {children}
+            </main>
+          </div>
         </div>
 
         {/* Chat drawer overlay */}
         <ChatDrawer open={isChatOpen} onClose={closeChat} />
       </div>
 
-      {/* Paywall dialog (opened from mobile header tier badge) */}
       <PaywallDialog open={showPaywall} onClose={() => setShowPaywall(false)} />
     </>
   )

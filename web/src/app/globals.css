@@ -1,61 +1,102 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
 @theme {
-  /* Brand colors — Light mode defaults */
-  --color-bg: #F7F6F3;
+  /* Brand colors — Redesigned dashboard palette */
+  --color-bg: #FAFBFC;
   --color-bg-card: #FFFFFF;
-  --color-bg-deep: #EFEDE8;
-  --color-border: #E8E5DF;
-  --color-border-mid: #D8D4CC;
-  --color-ink: #1A1814;
-  --color-ink-mid: #6B6760;
-  --color-ink-light: #A09D98;
-  --color-accent: #2A5C45;
-  --color-accent-light: #EAF2ED;
-  --color-accent-mid: #C4DDD0;
+  --color-bg-deep: #F3F4F6;
+  --color-border: #E8EAED;
+  --color-border-mid: #D1D5DB;
+  --color-border-subtle: #F1F3F5;
+  --color-ink: #111827;
+  --color-ink-mid: #6B7280;
+  --color-ink-light: #9CA3AF;
+  --color-accent: #16A34A;
+  --color-accent-light: #F0FDF4;
+  --color-accent-mid: #BBF7D0;
   --color-gold: #F59E0B;
   --color-gold-light: #FEF3C7;
-  --color-green: #27AE60;
-  --color-green-light: #EAFAEF;
-  --color-red: #C0392B;
-  --color-red-light: #FDECEA;
-  --color-blue: #1E4A8A;
-  --color-blue-light: #EAF0FA;
+  --color-green: #22C55E;
+  --color-green-light: #F0FDF4;
+  --color-red: #EF4444;
+  --color-red-light: #FEF2F2;
+  --color-blue: #3B82F6;
+  --color-blue-light: #EFF6FF;
+  --color-pink: #EC4899;
+  --color-pink-light: #FDF2F8;
+  --color-amber: #F59E0B;
+  --color-amber-light: #FFFBEB;
   --color-mint: #6EE7B7;
   --color-deep-forest: #0F2018;
 
   /* Typography */
   --font-serif: "Georgia", "Times New Roman", serif;
-  --font-body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
 
   /* Radii */
-  --radius-sm: 8px;
-  --radius-md: 13px;
-  --radius-lg: 18px;
-  --radius-xl: 28px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+
+  /* Shadows */
+  --shadow-xs: 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04);
+  --shadow-lg: 0 12px 40px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04);
+  --shadow-xl: 0 24px 64px rgba(0,0,0,0.12), 0 8px 20px rgba(0,0,0,0.06);
 }
 
 /* Dark mode overrides */
 .dark {
-  --color-bg: #141412;
-  --color-bg-card: #1E1E1C;
-  --color-bg-deep: #0F0F0E;
-  --color-border: #2C2C28;
-  --color-border-mid: #3C3C38;
-  --color-ink: #EDEDEA;
-  --color-ink-mid: #9C9A95;
-  --color-ink-light: #68665F;
-  --color-accent: #3A7C5A;
-  --color-accent-light: #1A2E22;
-  --color-accent-mid: #2A4A38;
+  --color-bg: #0F1117;
+  --color-bg-card: #1A1D26;
+  --color-bg-deep: #141720;
+  --color-border: #2A2D36;
+  --color-border-mid: #3A3D46;
+  --color-border-subtle: #22252E;
+  --color-ink: #F3F4F6;
+  --color-ink-mid: #9CA3AF;
+  --color-ink-light: #6B7280;
+  --color-accent: #4ADE80;
+  --color-accent-light: #14291E;
+  --color-accent-mid: #1A3A28;
   --color-gold: #F5AE2B;
   --color-gold-light: #2A2418;
-  --color-green: #3AAA6A;
-  --color-green-light: #142A1A;
-  --color-red: #D04939;
-  --color-red-light: #2A1814;
-  --color-blue: #3A6AAA;
+  --color-green: #4ADE80;
+  --color-green-light: #14291E;
+  --color-red: #F87171;
+  --color-red-light: #2A1418;
+  --color-blue: #60A5FA;
   --color-blue-light: #141E2A;
+  --color-pink: #F472B6;
+  --color-pink-light: #2A1420;
+  --color-amber: #FBBF24;
+  --color-amber-light: #2A2418;
+}
+
+/* ── Dashboard scrollbar ── */
+.dashboard-scroll::-webkit-scrollbar { width: 6px; }
+.dashboard-scroll::-webkit-scrollbar-track { background: transparent; }
+.dashboard-scroll::-webkit-scrollbar-thumb { background: var(--color-border-mid); border-radius: 3px; }
+.dashboard-scroll::-webkit-scrollbar-thumb:hover { background: var(--color-ink-light); }
+
+/* ── Animations ── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up { animation: fadeUp 0.35s cubic-bezier(0.16, 1, 0.3, 1); }
+
+@keyframes cmdUp {
+  from { opacity: 0; transform: translateY(-12px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 
 /* Landing page colors — dark by default */

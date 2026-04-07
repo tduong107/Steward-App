@@ -82,7 +82,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body>
+      <body style={{ fontFamily: 'var(--font-body)' }}>
         <ThemeProvider>
           <AuthProvider>
             <SubscriptionProvider>

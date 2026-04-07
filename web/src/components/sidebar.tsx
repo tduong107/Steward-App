@@ -11,14 +11,15 @@ import {
   BarChart3,
   Settings,
   LogOut,
-  Sparkles,
-  ArrowUpRight,
-  Crown,
+  Search,
   Lock,
+  Crown,
+  Menu,
+  X,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { useSub } from '@/hooks/use-subscription'
-import { ThemeToggle } from '@/components/theme-toggle'
+import { useActivities } from '@/hooks/use-activities'
 import { PaywallDialog } from '@/components/paywall-dialog'
 
 interface SidebarProps {
@@ -36,241 +37,182 @@ export function Sidebar({ onChatOpen }: SidebarProps) {
   const pathname = usePathname()
   const { profile, signOut } = useAuth()
   const { tier } = useSub()
+  const { activities } = useActivities()
   const [showPaywall, setShowPaywall] = useState(false)
+  const [mobileOpen, setMobileOpen] = useState(false)
   const showUpgrade = tier === 'free'
 
   const isActive = (href: string) =>
-    href === '/home'
-      ? pathname === '/home'
-      : pathname.startsWith(href)
+    href === '/home' ? pathname === '/home' : pathname.startsWith(href)
 
   const settingsActive = pathname.startsWith('/home/settings')
 
-  return (
+  // Count unread alerts (activities from last 24h)
+  const recentAlertCount = activities.filter(a => {
+    const created = new Date(a.created_at)
+    const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
+    return created > dayAgo
+  }).length
+
+  const initials = (profile?.display_name ?? 'U')
+    .split(' ')
+    .map(w => w[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2)
+
+  const tierLabel = tier === 'premium' ? 'Premium' : tier === 'pro' ? 'Pro' : 'Free'
+
+  const sidebarContent = (
     <>
-      {/* ── Desktop sidebar ── */}
-      <aside className="hidden md:flex w-60 shrink-0 flex-col bg-[var(--color-bg-card)] border-r border-[var(--color-border)] sticky top-0 h-dvh overflow-y-auto">
-        {/* Logo */}
-        <Link href="/" className="flex items-center gap-2.5 px-5 pt-6 pb-4 transition-opacity hover:opacity-80">
-          <Image
-            src="/steward-logo.png"
-            alt="Steward"
-            width={32}
-            height={32}
-            className="rounded-lg"
-          />
-          <span className="text-xl font-semibold font-[var(--font-serif)] text-[var(--color-accent)]">
+      {/* Logo + Brand */}
+      <div className="flex items-center gap-[11px] px-[18px] pt-[22px] pb-3">
+        <Link href="/" className="flex items-center gap-[11px] transition-opacity hover:opacity-80">
+          <div
+            className="w-[30px] h-[30px] rounded-[var(--radius-sm)] flex items-center justify-center text-white font-extrabold text-[15px]"
+            style={{
+              background: 'linear-gradient(135deg, #059669 0%, #34D399 50%, #6EE7B7 100%)',
+              boxShadow: '0 2px 8px rgba(5,150,105,0.3)',
+            }}
+          >
+            S
+          </div>
+          <span className="text-[17px] font-extrabold text-[var(--color-ink)] tracking-tight">
             Steward
           </span>
         </Link>
+      </div>
 
-        {/* Ask Steward button — matches iOS chat prompt bar */}
-        <div className="px-3 mt-1">
-          <button
-            onClick={onChatOpen}
-            className="flex w-full items-center gap-2.5 rounded-2xl border-[1.5px] border-[var(--color-accent-mid)] bg-[var(--color-bg-card)] px-4 py-3 text-left transition-colors hover:bg-[var(--color-accent-light)] shadow-sm"
-          >
-            <Image
-              src="/steward-logo.png"
-              alt=""
-              width={28}
-              height={28}
-              className="rounded-md shrink-0"
-            />
-            <span className="flex-1 text-sm text-[var(--color-ink-mid)]">
-              Ask Steward...
-            </span>
-            <ArrowUpRight size={14} className="shrink-0 text-[var(--color-accent-mid)]" />
-          </button>
-        </div>
+      {/* Command trigger — opens chat */}
+      <div className="px-3 mb-3.5">
+        <button
+          onClick={onChatOpen}
+          className="flex w-full items-center gap-2 px-[11px] py-2 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-bg-deep)] text-[13px] text-[var(--color-ink-light)] cursor-pointer transition-all hover:border-[var(--color-border-mid)] hover:bg-[var(--color-bg)]"
+          style={{ fontFamily: 'inherit' }}
+        >
+          <Search size={14} className="shrink-0" />
+          <span className="flex-1 text-left">Ask Steward...</span>
+          <kbd className="ml-auto text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[var(--color-border)] text-[var(--color-ink-light)]">
+            ⌘K
+          </kbd>
+        </button>
+      </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 flex flex-col gap-1 px-3 mt-3">
-          {navItems.map(({ label, icon: Icon, href, ...rest }) => {
-            const active = isActive(href)
-            const isProLocked = 'proOnly' in rest && rest.proOnly && showUpgrade
-            return (
-              <Link
-                key={href}
-                href={isProLocked ? '#' : href}
-                onClick={isProLocked ? (e: React.MouseEvent) => { e.preventDefault(); setShowPaywall(true) } : undefined}
-                className={`flex items-center gap-3 rounded-[var(--radius-lg)] px-3 py-2.5 text-sm font-medium transition-colors ${
-                  active
-                    ? 'bg-[var(--color-accent-light)] text-[var(--color-accent)]'
-                    : 'text-[var(--color-ink-mid)] hover:bg-[var(--color-bg-deep)]'
-                }`}
-              >
-                <Icon size={20} />
-                {label}
-                {isProLocked && <Lock size={12} className="ml-auto text-[var(--color-ink-light)]" />}
-              </Link>
-            )
-          })}
-        </nav>
-
-        {/* Upgrade CTA — only shown for free tier */}
-        {showUpgrade && (
-          <div className="px-3 mb-2">
-            <button
-              onClick={() => setShowPaywall(true)}
-              className="flex w-full flex-col rounded-[var(--radius-lg)] bg-gradient-to-br from-[var(--color-accent)] to-emerald-600 p-3.5 text-left transition-all hover:opacity-90 shadow-sm"
-            >
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20">
-                  <Crown size={16} className="text-white" />
-                </div>
-                <p className="text-sm font-semibold text-white">Upgrade to Pro</p>
-              </div>
-              <div className="mt-2.5 space-y-1.5 pl-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] text-white/90">✓ 7 watches (vs 3)</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] text-white/90">✓ Check every 12 hours</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] text-white/90">✓ Price history & insights</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] text-white/90">✓ Quick action links</span>
-                </div>
-              </div>
-              <div className="mt-3 flex items-center justify-center rounded-full bg-white/20 py-1.5 text-xs font-semibold text-white">
-                From $3.33/mo (billed yearly)
-              </div>
-            </button>
-          </div>
-        )}
-
-        {/* Tier badge for paid users — click to see plan benefits */}
-        {!showUpgrade && (
-          <div className="px-3 mb-2">
-            <button
-              type="button"
-              onClick={() => setShowPaywall(true)}
-              className={`flex w-full items-center gap-2 rounded-[var(--radius-lg)] px-3 py-2 transition-all hover:opacity-80 cursor-pointer ${
-                tier === 'premium'
-                  ? 'bg-amber-500/10 border border-amber-500/30'
-                  : 'bg-[var(--color-accent-light)] border border-[var(--color-accent)]/20'
+      {/* Navigation */}
+      <nav className="flex-1 px-2 overflow-y-auto">
+        {navItems.map(({ label, icon: Icon, href, ...rest }) => {
+          const active = isActive(href)
+          const isProLocked = 'proOnly' in rest && rest.proOnly && showUpgrade
+          return (
+            <Link
+              key={href}
+              href={isProLocked ? '#' : href}
+              onClick={(e) => {
+                if (isProLocked) { e.preventDefault(); setShowPaywall(true) }
+                setMobileOpen(false)
+              }}
+              className={`relative flex items-center gap-2.5 px-3 py-[9px] rounded-[var(--radius-md)] mb-px text-[13.5px] font-medium cursor-pointer transition-all ${
+                active
+                  ? 'bg-[var(--color-green-light)] text-[var(--color-accent)] font-semibold'
+                  : 'text-[var(--color-ink-mid)] hover:bg-[var(--color-bg-deep)] hover:text-[var(--color-ink)]'
               }`}
             >
-              <Crown size={14} className={tier === 'premium' ? 'text-amber-500' : 'text-[var(--color-accent)]'} />
-              <span className={`text-xs font-semibold uppercase tracking-wide ${
-                tier === 'premium' ? 'text-amber-500' : 'text-[var(--color-accent)]'
-              }`}>
-                {tier} Plan
-              </span>
-            </button>
-          </div>
-        )}
+              {/* Active indicator bar */}
+              {active && (
+                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-[3px] bg-[var(--color-accent)]" />
+              )}
+              <Icon size={18} />
+              {label}
+              {isProLocked && <Lock size={12} className="ml-auto text-[var(--color-ink-light)]" />}
+              {label === 'Activity' && recentAlertCount > 0 && (
+                <span className="ml-auto text-[10.5px] font-bold px-[7px] py-px rounded-[10px] bg-[var(--color-gold-light)] text-[var(--color-gold)]">
+                  {recentAlertCount > 9 ? '9+' : recentAlertCount}
+                </span>
+              )}
+            </Link>
+          )
+        })}
+      </nav>
 
-        {/* Bottom area: Settings + User + Sign Out */}
-        <div className="border-t border-[var(--color-border)] px-3 pt-2 pb-4">
-          {/* Settings */}
-          <Link
-            href="/home/settings"
-            className={`flex items-center gap-3 rounded-[var(--radius-lg)] px-3 py-2.5 text-sm font-medium transition-colors ${
-              settingsActive
-                ? 'bg-[var(--color-accent-light)] text-[var(--color-accent)]'
-                : 'text-[var(--color-ink-mid)] hover:bg-[var(--color-bg-deep)]'
-            }`}
+      {/* Footer */}
+      <div className="border-t border-[var(--color-border)] px-3 pt-2.5 pb-3.5">
+        {/* Settings */}
+        <Link
+          href="/home/settings"
+          onClick={() => setMobileOpen(false)}
+          className={`flex items-center gap-2.5 px-3 py-[9px] rounded-[var(--radius-md)] text-[13.5px] font-medium cursor-pointer transition-all ${
+            settingsActive
+              ? 'bg-[var(--color-green-light)] text-[var(--color-accent)] font-semibold'
+              : 'text-[var(--color-ink-mid)] hover:bg-[var(--color-bg-deep)] hover:text-[var(--color-ink)]'
+          }`}
+        >
+          <Settings size={18} />
+          Settings
+        </Link>
+
+        {/* User card */}
+        <div className="flex items-center gap-2.5 px-3 py-2.5 mt-1.5">
+          <div
+            className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[11px] font-extrabold shrink-0"
+            style={{
+              background: 'linear-gradient(135deg, #6EE7B7, #059669)',
+              boxShadow: '0 2px 6px rgba(5,150,105,0.25)',
+            }}
           >
-            <Settings size={20} />
-            Settings
-          </Link>
-
-          {/* Theme toggle */}
-          <ThemeToggle />
-
-          {/* User + Sign Out */}
-          <div className="flex items-center gap-3 px-3 py-2.5 mt-1">
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-[var(--color-ink)] truncate">
-                {profile?.display_name ?? 'User'}
-              </p>
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-ink-light)]">
-                {tier === 'free' ? 'Free' : tier === 'premium' ? 'Premium' : 'Pro'} account
-              </p>
-            </div>
-            <button
-              onClick={signOut}
-              className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-[var(--radius-lg)] text-sm text-[var(--color-ink-mid)] hover:bg-[var(--color-bg-deep)] transition-colors"
-              aria-label="Sign out"
-            >
-              <LogOut size={16} />
-            </button>
+            {initials}
           </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[13px] font-semibold text-[var(--color-ink)] truncate">
+              {profile?.display_name ?? 'User'}
+            </p>
+            <p className="text-[11px] font-semibold text-[var(--color-accent)]">
+              {tierLabel}
+            </p>
+          </div>
+          <button
+            onClick={signOut}
+            className="shrink-0 p-1.5 rounded-[var(--radius-sm)] text-[var(--color-ink-light)] hover:bg-[var(--color-bg-deep)] hover:text-[var(--color-ink-mid)] transition-colors"
+            aria-label="Sign out"
+          >
+            <LogOut size={14} />
+          </button>
         </div>
+      </div>
+    </>
+  )
+
+  return (
+    <>
+      {/* Desktop sidebar */}
+      <aside className="hidden md:flex w-[240px] shrink-0 flex-col bg-[var(--color-bg-card)] border-r border-[var(--color-border)] h-dvh sticky top-0 z-20">
+        {sidebarContent}
       </aside>
 
-      {/* Paywall dialog */}
+      {/* Mobile hamburger button */}
+      <button
+        onClick={() => setMobileOpen(true)}
+        className="md:hidden fixed top-3 left-3 z-30 w-10 h-10 rounded-[var(--radius-md)] bg-[var(--color-bg-card)] border border-[var(--color-border)] flex items-center justify-center shadow-sm"
+      >
+        <Menu size={18} className="text-[var(--color-ink-mid)]" />
+      </button>
+
+      {/* Mobile sidebar overlay */}
+      {mobileOpen && (
+        <div className="md:hidden fixed inset-0 z-40">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setMobileOpen(false)} />
+          <aside className="absolute left-0 top-0 bottom-0 w-[280px] bg-[var(--color-bg-card)] flex flex-col shadow-xl animate-fade-up">
+            <button
+              onClick={() => setMobileOpen(false)}
+              className="absolute top-4 right-4 w-8 h-8 rounded-[var(--radius-sm)] flex items-center justify-center text-[var(--color-ink-light)] hover:bg-[var(--color-bg-deep)]"
+            >
+              <X size={16} />
+            </button>
+            {sidebarContent}
+          </aside>
+        </div>
+      )}
+
       <PaywallDialog open={showPaywall} onClose={() => setShowPaywall(false)} />
-
-      {/* ── Mobile bottom tab bar ── */}
-      <div className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-[var(--color-bg-card)] border-t border-[var(--color-border)] pb-[env(safe-area-inset-bottom)]">
-        <nav className="relative flex items-center justify-around h-16 px-2">
-          {/* Home */}
-          <Link
-            href="/home"
-            className={`flex flex-col items-center gap-0.5 py-1 px-2 transition-colors ${
-              pathname === '/home'
-                ? 'text-[var(--color-accent)]'
-                : 'text-[var(--color-ink-light)]'
-            }`}
-          >
-            <Home size={22} />
-            <span className="text-[10px] font-medium">Home</span>
-          </Link>
-
-          {/* Savings */}
-          <Link
-            href="/home/savings"
-            className={`flex flex-col items-center gap-0.5 py-1 px-2 transition-colors ${
-              pathname.startsWith('/home/savings')
-                ? 'text-[var(--color-accent)]'
-                : 'text-[var(--color-ink-light)]'
-            }`}
-          >
-            <PiggyBank size={22} />
-            <span className="text-[10px] font-medium">Savings</span>
-          </Link>
-
-          {/* Center AI Chat button — sparkle icon like iOS */}
-          <button
-            onClick={onChatOpen}
-            className="flex items-center justify-center w-12 h-12 -mt-5 rounded-full bg-[var(--color-accent)] text-white shadow-lg active:scale-95 transition-transform"
-            aria-label="Open Steward AI chat"
-          >
-            <Sparkles size={22} />
-          </button>
-
-          {/* Activity */}
-          <Link
-            href="/home/activity"
-            className={`flex flex-col items-center gap-0.5 py-1 px-2 transition-colors ${
-              pathname.startsWith('/home/activity')
-                ? 'text-[var(--color-accent)]'
-                : 'text-[var(--color-ink-light)]'
-            }`}
-          >
-            <Activity size={22} />
-            <span className="text-[10px] font-medium">Activity</span>
-          </Link>
-
-          {/* Settings */}
-          <Link
-            href="/home/settings"
-            className={`flex flex-col items-center gap-0.5 py-1 px-2 transition-colors ${
-              pathname.startsWith('/home/settings')
-                ? 'text-[var(--color-accent)]'
-                : 'text-[var(--color-ink-light)]'
-            }`}
-          >
-            <Settings size={22} />
-            <span className="text-[10px] font-medium">Settings</span>
-          </Link>
-        </nav>
-      </div>
     </>
   )
 }
