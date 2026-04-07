@@ -1389,7 +1389,11 @@ serve(async (req) => {
 
       // If page content is identical to last check, skip evaluation entirely
       // (Still record the check for price tracking, but avoid expensive AI calls)
-      if (contentHash && lastContentHash && contentHash === lastContentHash) {
+      // IMPORTANT: Don't skip for empty content (hash of "") — that means the page couldn't be fetched,
+      // not that content is unchanged. API-based handlers (Resy, OpenTable, flights) run AFTER this
+      // point and need the chance to run even when scraping fails.
+      const EMPTY_HASH = "e3b0c44298fc1c14"; // SHA-256 prefix of empty string
+      if (contentHash && lastContentHash && contentHash === lastContentHash && contentHash !== EMPTY_HASH) {
         const now = new Date().toISOString();
         console.log(`[check-watch] Content unchanged for ${watch.id}, skipping evaluation`);
 
@@ -4028,42 +4032,72 @@ async function checkResyWatch(
       return null;
     }
 
-    // Step 2: Get venue_id by searching
+    // Step 2: Get venue_id — try /4/find with slug first (most reliable), then search API
     let venueId: number | null = null;
     let venueName = watch.name || venueSlug.replace(/-/g, " ");
+    const city = pathParts[1] || "ny";
 
+    // Method A: Use /4/find with a trial call — pass venue slug as a search hint
+    // The /4/find endpoint works reliably and returns venue data when given a venue_id
+    // We need to resolve the slug to an ID first — try the /3/venue/resolve endpoint
     try {
-      const searchQuery = venueSlug.replace(/-/g, " ");
-      const searchRes = await fetch("https://api.resy.com/3/venuesearch/search", {
-        method: "POST",
-        headers: {
-          ...resyHeaders,
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: `query=${encodeURIComponent(searchQuery)}&geo=${encodeURIComponent('{"latitude":0,"longitude":0}')}&types=${encodeURIComponent('["venue"]')}`,
+      const resolveRes = await fetch(`https://api.resy.com/3/venue?url_slug=${venueSlug}&location=${city}`, {
+        headers: resyHeaders,
         signal: AbortSignal.timeout(5000),
       });
-
-      if (searchRes.ok) {
-        const searchData = await searchRes.json();
-        const hits = searchData.search?.hits ?? [];
-        const match = hits.find((h: any) =>
-          h.url_slug === venueSlug ||
-          h.name?.toLowerCase().includes(searchQuery.toLowerCase())
-        ) ?? hits[0];
-
-        if (match) {
-          venueId = match.id?.resy ?? match.objectID ?? null;
-          if (typeof venueId === "string") venueId = parseInt(venueId);
-          venueName = match.name || venueName;
-        }
+      if (resolveRes.ok) {
+        const resolveData = await resolveRes.json();
+        venueId = resolveData.id?.resy ?? null;
+        if (typeof venueId === "string") venueId = parseInt(venueId as string);
+        venueName = resolveData.name || venueName;
+        console.log(`[check-watch] Resy /3/venue resolved "${venueSlug}" → ${venueId} (${venueName})`);
+      } else {
+        const errBody = await resolveRes.text().catch(() => "");
+        console.log(`[check-watch] Resy /3/venue HTTP ${resolveRes.status}: ${errBody.substring(0, 100)}`);
       }
-    } catch (searchErr: any) {
-      console.log(`[check-watch] Resy search failed: ${searchErr.message}`);
+    } catch (e: any) {
+      console.log(`[check-watch] Resy /3/venue error: ${e.message}`);
+    }
+
+    // Method B: Fallback — use Serper to find the Resy venue ID from Google
+    if (!venueId) {
+      const SERPER_KEY = Deno.env.get("SERPER_API_KEY") ?? "";
+      if (SERPER_KEY) {
+        try {
+          const searchRes = await fetch("https://google.serper.dev/search", {
+            method: "POST",
+            headers: { "X-API-KEY": SERPER_KEY, "Content-Type": "application/json" },
+            body: JSON.stringify({ q: `site:resy.com ${venueSlug.replace(/-/g, " ")} ${city}`, num: 3 }),
+            signal: AbortSignal.timeout(5000),
+          });
+          if (searchRes.ok) {
+            const data = await searchRes.json();
+            // Try to extract venue slug from search results to confirm it matches
+            for (const r of (data.organic ?? [])) {
+              if (r.link?.includes(`resy.com/cities/${city}/${venueSlug}`)) {
+                // Found matching URL — now try /3/venue again with confirmed slug
+                try {
+                  const retryRes = await fetch(`https://api.resy.com/3/venue?url_slug=${venueSlug}&location=${city}`, {
+                    headers: resyHeaders,
+                    signal: AbortSignal.timeout(5000),
+                  });
+                  if (retryRes.ok) {
+                    const retryData = await retryRes.json();
+                    venueId = retryData.id?.resy ?? null;
+                    venueName = retryData.name || venueName;
+                    console.log(`[check-watch] Resy resolved via Serper+retry: ${venueId} (${venueName})`);
+                  }
+                } catch { /* non-critical */ }
+                break;
+              }
+            }
+          }
+        } catch { /* non-critical */ }
+      }
     }
 
     if (!venueId) {
-      console.log(`[check-watch] Resy: could not resolve venue_id for "${venueSlug}"`);
+      console.error(`[check-watch] Resy: could not resolve venue_id for "${venueSlug}" in ${city} (watch ${watch.id})`);
       return null;
     }
 
@@ -4092,7 +4126,8 @@ async function checkResyWatch(
     });
 
     if (!findRes.ok) {
-      console.log(`[check-watch] Resy /4/find returned ${findRes.status}`);
+      const findErr = await findRes.text().catch(() => "");
+      console.error(`[check-watch] Resy /4/find HTTP ${findRes.status}: ${findErr.substring(0, 200)}`);
       return null;
     }
 
