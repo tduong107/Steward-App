@@ -58,10 +58,50 @@ function generateActionURL(watch: any, pageHtml?: string): string | null {
     }
   }
 
+  // ── Nike: add-to-cart via product SKU ──
+  if (urlLower.includes("nike.com")) {
+    // Nike URLs: nike.com/t/product-name/SKUID or nike.com/w/product-name/SKUID
+    const nikeMatch = url.match(/\/(?:t|w)\/[^/]+\/([A-Z0-9-]+)/);
+    if (nikeMatch) {
+      return `https://www.nike.com/cart?skuId=${nikeMatch[1]}`;
+    }
+  }
+
+  // ── Adidas: add-to-cart via product ID ──
+  if (urlLower.includes("adidas.com")) {
+    // Adidas URLs: adidas.com/us/product-name/PRODUCTID.html
+    const adidasMatch = url.match(/\/([A-Z0-9]{6,10})\.html/i);
+    if (adidasMatch) {
+      return `https://www.adidas.com/us/cart?pid=${adidasMatch[1]}`;
+    }
+  }
+
+  // ── Costco: product page (no direct cart API, but fast link) ──
+  if (urlLower.includes("costco.com")) {
+    const costcoMatch = url.match(/\.product\.(\d{6,10})/);
+    if (costcoMatch) {
+      return `https://www.costco.com/AjaxAddToCartCmd?productId=${costcoMatch[1]}&qty=1`;
+    }
+  }
+
   // ── Shopify stores: direct checkout via variant ID (from page HTML) ──
   if (pageHtml) {
     const shopifyCheckout = detectShopifyCheckoutURL(pageHtml, url);
     if (shopifyCheckout) return shopifyCheckout;
+  }
+
+  // ── Resy: pre-filled booking link ──
+  if (urlLower.includes("resy.com")) {
+    // Already has date/seats params, just return as-is
+    return url;
+  }
+
+  // ── OpenTable: pre-filled booking link ──
+  if (urlLower.includes("opentable.com")) {
+    const profileMatch = url.match(/profile\/(\d+)/);
+    if (profileMatch) {
+      return `https://www.opentable.com/restref/client/?restref=${profileMatch[1]}`;
+    }
   }
 
   // ── StubHub: append price filter from condition ──
@@ -4045,7 +4085,37 @@ async function checkResyWatch(
     const available = slots.length > 0;
     let resultText: string;
 
+    // Build smart action URL with the best matching slot pre-selected
+    let bestSlotTime = "";
+    let bestSlotUrl = watch.url; // Fallback to generic URL
+
     if (available) {
+      // Parse user's preferred time from condition
+      let preferredHour = 19; // default 7pm
+      const timeMatch = condLower.match(/(\d{1,2}):?(\d{2})?\s*(am|pm)/i) ||
+        condLower.match(/around\s+(\d{1,2})\s*(am|pm)?/i);
+      if (timeMatch) {
+        let h = parseInt(timeMatch[1]);
+        const ampm = (timeMatch[timeMatch.length - 1] || "pm").toLowerCase();
+        if (ampm === "pm" && h < 12) h += 12;
+        if (ampm === "am" && h === 12) h = 0;
+        preferredHour = h;
+      }
+
+      // Find the slot closest to preferred time
+      let bestSlot = slots[0];
+      let bestDiff = Infinity;
+      for (const s of slots) {
+        const start = s.date?.start || "";
+        const timePart = start.split(" ")[1]?.substring(0, 5) || "";
+        if (timePart) {
+          const slotHour = parseInt(timePart.split(":")[0]);
+          const slotMin = parseInt(timePart.split(":")[1] || "0");
+          const diff = Math.abs((slotHour * 60 + slotMin) - (preferredHour * 60));
+          if (diff < bestDiff) { bestDiff = diff; bestSlot = s; }
+        }
+      }
+
       const times = slots.slice(0, 5).map((s: any) => {
         const start = s.date?.start || "";
         const timePart = start.split(" ")[1]?.substring(0, 5) || "";
@@ -4056,6 +4126,14 @@ async function checkResyWatch(
         const h12 = h > 12 ? h - 12 : h === 0 ? 12 : h;
         return `${h12}:${String(m).padStart(2, "0")} ${ampm}${type ? ` (${type})` : ""}`;
       });
+
+      // Build smart Resy deep link with date, seats, and closest time slot
+      const bestTime = bestSlot?.date?.start?.split(" ")[1]?.substring(0, 5) || "";
+      if (bestTime) {
+        bestSlotTime = bestTime;
+        const city = pathParts[1] || "ny";
+        bestSlotUrl = `https://resy.com/cities/${city}/${venueSlug}?date=${day}&seats=${partySize}`;
+      }
 
       resultText = `${slots.length} table${slots.length > 1 ? "s" : ""} available at ${venueName}: ${times.join(", ")}${slots.length > 5 ? ` +${slots.length - 5} more` : ""}`;
     } else {
@@ -4089,7 +4167,7 @@ async function checkResyWatch(
       updateData.triggered = true;
       updateData.status = "triggered";
       updateData.change_note = resultText;
-      updateData.action_url = watch.url;
+      updateData.action_url = bestSlotUrl; // Smart deep link with date/seats pre-filled
     } else if (watch.triggered) {
       updateData.triggered = false;
       updateData.status = "watching";

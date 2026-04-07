@@ -842,10 +842,11 @@ struct DetailScreen: View {
                     autoActOption(
                         icon: "calendar.badge.plus",
                         title: "Auto Book",
-                        subtitle: "Coming soon",
+                        subtitle: "Coming soon for Premium",
                         isSelected: false,
-                        isAvailable: false
-                    ) { }
+                        isAvailable: false,
+                        tierBadge: "Premium"
+                    ) { subscriptionManager.presentPaywall(highlighting: .premium, reason: "Auto Book is coming soon for Premium users") }
                 case .form:
                     autoActOption(
                         icon: "doc.badge.plus",
@@ -914,10 +915,13 @@ struct DetailScreen: View {
     }
 
     /// Whether the watch's URL is on a retailer that supports server-side cart-add.
-    /// Currently: Amazon, Target, Walmart, Best Buy, and Shopify stores.
     private func autoActSupportedForURL(_ url: String) -> Bool {
         let lower = url.lowercased()
-        let supportedDomains = ["amazon.com", "target.com", "walmart.com", "bestbuy.com", "myshopify.com", "shopify.com"]
+        let supportedDomains = [
+            "amazon.com", "target.com", "walmart.com", "bestbuy.com",
+            "nike.com", "adidas.com", "costco.com",
+            "myshopify.com", "shopify.com",
+        ]
         return supportedDomains.contains { lower.contains($0) }
     }
 
