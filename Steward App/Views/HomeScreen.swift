@@ -847,6 +847,9 @@ struct HomeScreen: View {
                         WatchCard(watch: watch) {
                             if isEditMode {
                                 toggleSelection(watch.id)
+                            } else if watch.triggered {
+                                // Triggered watches go straight to action modal
+                                viewModel.presentAction(for: watch)
                             } else {
                                 viewModel.openDetail(for: watch)
                             }

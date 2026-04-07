@@ -365,7 +365,13 @@ export default function DashboardPage() {
               >
                 <WatchCard
                   watch={watch}
-                  onClick={() => router.push(`/home/watch/${watch.id}`)}
+                  onClick={() => {
+                    if (watch.action_url) {
+                      window.open(watch.action_url, '_blank', 'noopener,noreferrer')
+                    } else {
+                      router.push(`/home/watch/${watch.id}`)
+                    }
+                  }}
                 />
               </div>
             ))}
