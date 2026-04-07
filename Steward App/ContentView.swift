@@ -10,8 +10,6 @@ struct ContentView: View {
     @Environment(SupabaseService.self) private var supabaseService
     @Environment(SubscriptionManager.self) private var subscriptionManager
     @AppStorage("isDarkMode") private var isDarkMode = false
-    @AppStorage("appLanguage") private var appLanguage = "en"
-    @AppStorage("currencyCode") private var currencyCode = "USD"
 
     // Shared watch deep link
     @State private var sharedWatchData: SharedWatchData?
@@ -20,11 +18,6 @@ struct ContentView: View {
 
     var body: some View {
         @Bindable var subscription = subscriptionManager
-        // appLanguage and currencyCode are @AppStorage — reading them here
-        // ensures SwiftUI re-evaluates the body when they change, which
-        // propagates to all child views using L10n.t() and Theme.formatPrice()
-        let _ = appLanguage
-        let _ = currencyCode
         ZStack {
             // Main app content
             VStack(spacing: 0) {
