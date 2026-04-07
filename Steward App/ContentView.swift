@@ -20,8 +20,11 @@ struct ContentView: View {
 
     var body: some View {
         @Bindable var subscription = subscriptionManager
-        // Force full re-render when language or currency changes
-        let localeKey = "\(appLanguage)-\(currencyCode)"
+        // appLanguage and currencyCode are @AppStorage — reading them here
+        // ensures SwiftUI re-evaluates the body when they change, which
+        // propagates to all child views using L10n.t() and Theme.formatPrice()
+        let _ = appLanguage
+        let _ = currencyCode
         ZStack {
             // Main app content
             VStack(spacing: 0) {
@@ -83,7 +86,6 @@ struct ContentView: View {
                 viewModel.selectedWatch = nil
             }
         }
-        .id(localeKey) // Force re-render when language/currency changes
         .preferredColorScheme(isDarkMode ? .dark : .light)
         .environment(viewModel)
         .sheet(isPresented: $subscription.showPaywall) {
