@@ -168,6 +168,43 @@ export default function DashboardPage() {
     [activeWatches],
   )
 
+  // ─── Weekly stats: checks + triggers in last 7 days (matches iOS) ───
+  const [weeklyChecks, setWeeklyChecks] = useState(0)
+  const [weeklyTriggers, setWeeklyTriggers] = useState(0)
+  useEffect(() => {
+    if (!user) return
+    const fetchStats = async () => {
+      const supabase = supabaseRef.current
+      const cutoff = new Date()
+      cutoff.setDate(cutoff.getDate() - 7)
+      const cutoffStr = cutoff.toISOString()
+
+      const [totalRes, triggeredRes] = await Promise.all([
+        supabase
+          .from('check_results')
+          .select('*', { count: 'exact', head: true })
+          .gte('checked_at', cutoffStr),
+        supabase
+          .from('check_results')
+          .select('*', { count: 'exact', head: true })
+          .gte('checked_at', cutoffStr)
+          .eq('changed', true),
+      ])
+      setWeeklyChecks(totalRes.count ?? 0)
+      setWeeklyTriggers(triggeredRes.count ?? 0)
+    }
+    fetchStats()
+  }, [user])
+
+  // Time saved: each check ≈ 1 minute of manual browsing
+  const timeSavedLabel = useMemo(() => {
+    const mins = weeklyChecks
+    if (mins < 60) return `${mins}m`
+    const h = Math.floor(mins / 60)
+    const m = mins % 60
+    return m > 0 ? `~${h}h ${m}m` : `~${h}h`
+  }, [weeklyChecks])
+
   const firstName = profile?.display_name?.split(' ')[0] || 'there'
 
   return (
@@ -243,6 +280,70 @@ export default function DashboardPage() {
           className="shrink-0 text-[var(--color-accent-mid)] transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
         />
       </button>
+
+      {/* ── Steward is working for you — stats card (matches iOS) ── */}
+      {!loading && (activeWatches.length > 0 || weeklyChecks > 0) && (
+        <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-4 animate-fade-in-up [animation-delay:120ms]">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-sm">✨</span>
+            <span className="text-sm font-bold text-[var(--color-ink)]">
+              Steward is working for you
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {/* Checks */}
+            <div className="text-center">
+              <p className="text-lg font-bold text-[var(--color-accent)]">
+                {weeklyChecks.toLocaleString()}
+              </p>
+              <p className="text-[10px] text-[var(--color-ink-light)] leading-tight">
+                Checks<br />last 7 days
+              </p>
+            </div>
+
+            {/* Time saved */}
+            {weeklyChecks > 0 && (
+              <div className="text-center">
+                <p className="text-lg font-bold text-[var(--color-accent)]">
+                  {timeSavedLabel}
+                </p>
+                <p className="text-[10px] text-[var(--color-ink-light)] leading-tight">
+                  Time<br />saved
+                </p>
+              </div>
+            )}
+
+            {/* Triggers */}
+            <div className="text-center">
+              <p className="text-lg font-bold text-[var(--color-gold)]">
+                {weeklyTriggers}
+              </p>
+              <p className="text-[10px] text-[var(--color-ink-light)] leading-tight">
+                Triggers<br />last 7 days
+              </p>
+            </div>
+
+            {/* Potential savings */}
+            {savingsData.total > 0 && (
+              <div className="text-center">
+                <p className="text-lg font-bold text-[var(--color-green)]">
+                  ${savingsData.total.toFixed(2)}
+                </p>
+                <p className="text-[10px] text-[var(--color-ink-light)] leading-tight">
+                  Potential<br />savings
+                </p>
+              </div>
+            )}
+          </div>
+
+          {weeklyChecks > 0 && (
+            <p className="mt-3 text-[11px] text-[var(--color-ink-light)]">
+              {weeklyChecks.toLocaleString()} automated checks in the last 7 days — that&apos;s {timeSavedLabel} you didn&apos;t spend manually browsing
+            </p>
+          )}
+        </div>
+      )}
 
       {/* ── Triggered Alerts ── */}
       {!loading && triggeredWatches.length > 0 && (
