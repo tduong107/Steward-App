@@ -2759,8 +2759,11 @@ async function claudePriceFallback(
         const price = r.price || "";
         searchContext += `${r.title} — ${price} (${r.source || "store"})\n`;
       }
+    } else {
+      const errBody = await shoppingRes.text().catch(() => "");
+      console.error(`[claudeFallback] Serper Shopping ${shoppingRes.status}: ${errBody.substring(0, 200)}`);
     }
-  } catch { /* non-critical */ }
+  } catch (e: any) { console.log(`[claudeFallback] Serper Shopping error: ${e.message}`); }
 
   // 1b: Serper web search (organic snippets + answer boxes)
   try {
@@ -2789,13 +2792,63 @@ async function claudePriceFallback(
         snippets.push(`${r.title} — ${price} (${r.source || "store"})`);
       }
 
-      searchContext = snippets.join("\n");
+      searchContext += "\n" + snippets.join("\n");
+    } else {
+      const errBody = await searchRes.text().catch(() => "");
+      console.error(`[claudeFallback] Serper Search ${searchRes.status}: ${errBody.substring(0, 200)}`);
     }
-  } catch {
-    return null;
+  } catch (e: any) {
+    console.log(`[claudeFallback] Serper Search error: ${e.message}`);
   }
 
-  if (!searchContext) return null;
+  // ─── Claude-direct fallback: when Serper is completely down ────────────
+  // Use Claude's knowledge to provide an approximate price based on product name
+  if (!searchContext.trim() && ANTHROPIC_API_KEY && watch.name) {
+    try {
+      console.log(`[claudeFallback] Serper unavailable, trying Claude-direct for ${watch.id}`);
+      const directRes = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "x-api-key": ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "claude-haiku-4-5-20251001",
+          max_tokens: 150,
+          system: "You help estimate current retail product prices. Given a product name and retailer URL, provide the most likely current price based on your knowledge. Respond ONLY with JSON: {\"price\": NUMBER, \"confidence\": \"high\"|\"medium\"|\"low\", \"note\": \"brief explanation\"}. Use 'high' for well-known products with stable prices, 'medium' for products you recognize but prices may vary, 'low' for uncertain. If you truly cannot estimate, respond {\"price\": null}.",
+          messages: [{
+            role: "user",
+            content: `Product: ${watch.name}\nRetailer URL: ${watch.url}\n${lastKnownPrice ? `Last known price: $${lastKnownPrice.toFixed(2)}` : ""}\n\nWhat is the approximate current retail price?`,
+          }],
+        }),
+        signal: AbortSignal.timeout(8000),
+      });
+
+      if (directRes.ok) {
+        const directData = await directRes.json();
+        const directText = directData.content?.[0]?.text ?? "";
+        const directMatch = directText.match(/\{\s*"price"\s*:\s*([\d.]+)/);
+        const confMatch = directText.match(/"confidence"\s*:\s*"(\w+)"/);
+        if (directMatch) {
+          const directPrice = parseFloat(directMatch[1]);
+          const confidence = confMatch?.[1] || "low";
+          if (!isNaN(directPrice) && directPrice > 0.50 && directPrice < 100_000 && confidence !== "low") {
+            console.log(`[claudeFallback] Claude-direct found $${directPrice} (${confidence}) for ${watch.id}`);
+            return {
+              price: directPrice,
+              resultText: `~$${directPrice.toFixed(2)} (estimated, ${confidence} confidence)`,
+            };
+          }
+        }
+      }
+    } catch (e: any) {
+      console.log(`[claudeFallback] Claude-direct error: ${e.message}`);
+    }
+    return null; // Both Serper and Claude-direct failed
+  }
+
+  if (!searchContext.trim()) return null;
 
   // Step 2: Ask Claude to extract the current price from search results
   try {
@@ -4092,14 +4145,73 @@ async function checkOpenTableWatch(
     const partySize = partySizeMatch ? parseInt(partySizeMatch[1]) : 2;
 
     // Extract restaurant name from watch name or URL
-    // URL patterns: /r/restaurant-name-city or /restaurant/profile/123
     const urlStr = watch.url || "";
     let restaurantName = watch.name || "";
-    if (restaurantName === "www.opentable.com" || !restaurantName) {
+    if (restaurantName === "www.opentable.com" || restaurantName.startsWith("www.") || !restaurantName) {
+      // Try URL slug: /r/restaurant-name-city
       const slugMatch = urlStr.match(/\/r\/([a-z0-9-]+)/i);
       if (slugMatch) {
-        restaurantName = slugMatch[1].replace(/-/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase());
+        // Remove trailing city name (last segment after the restaurant name)
+        const slug = slugMatch[1];
+        restaurantName = slug.replace(/-/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase());
       }
+
+      // If still generic, try Serper to resolve the restaurant name from the URL
+      if ((restaurantName === "www.opentable.com" || restaurantName.startsWith("www.") || !restaurantName) && SERPER_KEY) {
+        try {
+          const nameRes = await fetch("https://google.serper.dev/search", {
+            method: "POST",
+            headers: { "X-API-KEY": SERPER_KEY, "Content-Type": "application/json" },
+            body: JSON.stringify({ q: `site:opentable.com ${urlStr.match(/profile\/(\d+)/)?.[1] || ""}`, num: 1 }),
+            signal: AbortSignal.timeout(3000),
+          });
+          if (nameRes.ok) {
+            const nameData = await nameRes.json();
+            const firstResult = nameData.organic?.[0];
+            if (firstResult?.title) {
+              // OpenTable titles are like "Restaurant Name - City | OpenTable"
+              restaurantName = firstResult.title.split(/\s*[-|]\s*/)[0].trim();
+              // Update the watch name in DB so future checks have it
+              await supabase.from("watches").update({ name: restaurantName }).eq("id", watch.id);
+              console.log(`[check-watch] OpenTable: resolved name "${restaurantName}" for ${watch.id}`);
+            }
+          }
+        } catch { /* non-critical */ }
+      }
+
+      // Last resort: use Claude to identify from profile ID
+      if ((restaurantName === "www.opentable.com" || restaurantName.startsWith("www.") || !restaurantName) && ANTHROPIC_API_KEY) {
+        try {
+          const profileId = urlStr.match(/profile\/(\d+)/)?.[1] || "";
+          if (profileId) {
+            const idRes = await fetch("https://api.anthropic.com/v1/messages", {
+              method: "POST",
+              headers: { "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+              body: JSON.stringify({
+                model: "claude-haiku-4-5-20251001",
+                max_tokens: 50,
+                system: "Given an OpenTable restaurant profile ID, identify the restaurant name if you can. Respond with ONLY the restaurant name, nothing else. If unknown, respond 'Unknown'.",
+                messages: [{ role: "user", content: `OpenTable profile ID: ${profileId}\nURL: ${urlStr}` }],
+              }),
+              signal: AbortSignal.timeout(5000),
+            });
+            if (idRes.ok) {
+              const idData = await idRes.json();
+              const name = idData.content?.[0]?.text?.trim() || "";
+              if (name && name !== "Unknown" && name.length < 100) {
+                restaurantName = name;
+                await supabase.from("watches").update({ name: restaurantName }).eq("id", watch.id);
+                console.log(`[check-watch] OpenTable: Claude identified "${restaurantName}" for ${watch.id}`);
+              }
+            }
+          }
+        } catch { /* non-critical */ }
+      }
+    }
+
+    if (!restaurantName || restaurantName === "www.opentable.com" || restaurantName.startsWith("www.")) {
+      console.log(`[check-watch] OpenTable: could not determine restaurant name for ${watch.id}`);
+      return null;
     }
 
     // Parse date
