@@ -5,11 +5,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Eye,
-  ArrowUpRight,
-  ChevronRight,
-  TrendingDown,
-  BarChart3,
-  Lock,
   Plus,
   AlertTriangle,
   Crown,
@@ -314,38 +309,22 @@ export default function DashboardPage() {
         </button>
       )}
 
-      {/* ── Row 2: AI Command Bar ── */}
-      <div
+      {/* ── AI Command Bar (compact) ── */}
+      <button
         onClick={openChat}
-        className="bg-[var(--color-bg-card)] rounded-[var(--radius-lg)] border border-[var(--color-border)] mb-5 cursor-pointer transition-all hover:border-[var(--color-green)] hover:shadow-[0_0_0_3px_rgba(34,197,94,0.08)]"
+        className="w-full flex items-center gap-3 bg-[var(--color-bg-card)] rounded-[var(--radius-lg)] border border-[var(--color-border)] px-4 py-3 mb-5 cursor-pointer transition-all hover:border-[var(--color-green)] hover:shadow-[0_0_0_3px_rgba(34,197,94,0.08)] text-left"
       >
-        <div className="flex items-center gap-3.5 px-5 py-4">
-          <div
-            className="w-10 h-10 rounded-[var(--radius-md)] flex items-center justify-center shrink-0"
-            style={{
-              background: 'linear-gradient(135deg, #059669, #6EE7B7)',
-              boxShadow: '0 2px 8px rgba(5,150,105,0.25)',
-            }}
-          >
-            <Zap size={20} className="text-white" />
-          </div>
-          <div className="flex-1">
-            <span className="text-[15px] text-[var(--color-ink-light)] font-medium">Ask Steward to watch something...</span>
-            <p className="text-xs text-[var(--color-ink-light)] mt-0.5">Paste any URL or describe what you want to track</p>
-          </div>
-          <div className="hidden sm:flex items-center gap-1.5">
-            <kbd className="text-[11px] font-semibold px-2 py-0.5 rounded-[var(--radius-sm)] bg-[var(--color-bg-deep)] text-[var(--color-ink-light)] border border-[var(--color-border)]">⌘</kbd>
-            <kbd className="text-[11px] font-semibold px-2 py-0.5 rounded-[var(--radius-sm)] bg-[var(--color-bg-deep)] text-[var(--color-ink-light)] border border-[var(--color-border)]">K</kbd>
-          </div>
+        <div
+          className="w-9 h-9 rounded-[var(--radius-md)] flex items-center justify-center shrink-0"
+          style={{ background: 'linear-gradient(135deg, #059669, #6EE7B7)', boxShadow: '0 2px 8px rgba(5,150,105,0.25)' }}
+        >
+          <Zap size={16} className="text-white" />
         </div>
-        <div className="flex gap-2 px-5 pb-3.5 flex-wrap">
-          {['Track a price drop', 'Watch a restaurant', 'Monitor a flight', 'Find a campsite', 'Concert tickets'].map(pill => (
-            <span key={pill} className="text-xs font-medium text-[var(--color-ink-mid)] px-3 py-1.5 rounded-full bg-[var(--color-bg-deep)] border border-[var(--color-border)] cursor-pointer transition-all hover:bg-[var(--color-green-light)] hover:border-[var(--color-accent-mid)] hover:text-[var(--color-accent)]">
-              {pill}
-            </span>
-          ))}
+        <span className="flex-1 text-sm text-[var(--color-ink-light)] font-medium">Ask Steward to watch something...</span>
+        <div className="hidden sm:flex items-center gap-1">
+          <kbd className="text-[10px] font-semibold px-1.5 py-px rounded bg-[var(--color-bg-deep)] text-[var(--color-ink-light)] border border-[var(--color-border)]">⌘K</kbd>
         </div>
-      </div>
+      </button>
 
       {/* ── Row 3: Alert Banner (triggered watches) ── */}
       {!loading && triggeredWatches.length > 0 && (
@@ -496,60 +475,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* ── Row 6: Bottom Row — Activity + Savings ── */}
-      {!loading && activeWatches.length > 0 && (
-        <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr] gap-4 mt-5">
-          {/* Recent Activity card */}
-          <div className="bg-[var(--color-bg-card)] rounded-[var(--radius-lg)] border border-[var(--color-border)] overflow-hidden transition-all hover:border-[var(--color-border-mid)] hover:shadow-[var(--shadow-xs)]">
-            <div className="flex items-center justify-between px-4 py-3">
-              <span className="text-[13px] font-bold text-[var(--color-ink)]">Recent Activity</span>
-              <button onClick={() => router.push('/home/activity')} className="text-[11.5px] font-semibold text-[var(--color-accent)] flex items-center gap-1 cursor-pointer hover:text-[var(--color-ink)]">
-                View all <ChevronRight size={11} />
-              </button>
-            </div>
-            <div className="px-4 pb-3">
-              {triggeredWatches.slice(0, 3).map(w => (
-                <div key={w.id} className="flex items-center gap-2.5 py-2 border-b border-[var(--color-border)] last:border-b-0">
-                  <div className="w-1.5 h-1.5 rounded-full bg-[var(--color-gold)] shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[12.5px] font-semibold text-[var(--color-ink)]">{w.change_note || 'Condition met'}</div>
-                    <div className="text-[11.5px] text-[var(--color-ink-light)] truncate">{w.name}</div>
-                  </div>
-                  <span className="text-[11px] text-[var(--color-ink-light)] shrink-0">
-                    {w.last_checked ? timeAgo(w.last_checked) : ''}
-                  </span>
-                </div>
-              ))}
-              {triggeredWatches.length === 0 && (
-                <p className="text-xs text-[var(--color-ink-light)] py-4 text-center">No recent activity</p>
-              )}
-            </div>
-          </div>
-
-          {/* Savings card */}
-          <div className="bg-[var(--color-bg-card)] rounded-[var(--radius-lg)] border border-[var(--color-border)] overflow-hidden transition-all hover:border-[var(--color-border-mid)] hover:shadow-[var(--shadow-xs)]">
-            <div className="flex items-center justify-between px-4 py-3">
-              <span className="text-[13px] font-bold text-[var(--color-ink)]">Savings</span>
-              <button onClick={() => router.push('/home/savings')} className="flex items-center gap-1.5 cursor-pointer hover:opacity-80">
-                <span className="text-sm font-extrabold text-[var(--color-accent)]">${savingsData.total.toFixed(2)}</span>
-                <span className="text-[11.5px] font-semibold text-[var(--color-accent)]">View</span>
-                <ChevronRight size={11} className="text-[var(--color-accent)]" />
-              </button>
-            </div>
-            <div className="px-4 pb-3">
-              {savingsData.drops.map((drop, i) => (
-                <div key={i} className="flex items-center justify-between py-2 border-b border-[var(--color-border)] last:border-b-0">
-                  <span className="text-[12.5px] text-[var(--color-ink)]">{drop.name}</span>
-                  <span className="text-[12.5px] font-bold text-[var(--color-accent)]">-${drop.amount.toFixed(2)}</span>
-                </div>
-              ))}
-              {savingsData.drops.length === 0 && (
-                <p className="text-xs text-[var(--color-ink-light)] py-4 text-center">No savings tracked yet</p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Bottom row removed — Activity and Savings have dedicated sidebar pages */}
 
       {/* Watch count footer */}
       {!loading && activeWatches.length > 0 && (
