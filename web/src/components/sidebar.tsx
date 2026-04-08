@@ -18,6 +18,7 @@ import {
   X,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
+import { useWatches } from '@/hooks/use-watches'
 import { useSub } from '@/hooks/use-subscription'
 import { useActivities } from '@/hooks/use-activities'
 import { PaywallDialog } from '@/components/paywall-dialog'
@@ -38,6 +39,8 @@ export function Sidebar({ onChatOpen }: SidebarProps) {
   const { profile, signOut } = useAuth()
   const { tier } = useSub()
   const { activities } = useActivities()
+  const { watches } = useWatches()
+  const triggeredCount = watches.filter(w => w.triggered && w.status !== 'deleted').length
   const [showPaywall, setShowPaywall] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const showUpgrade = tier === 'free'
@@ -122,9 +125,9 @@ export function Sidebar({ onChatOpen }: SidebarProps) {
               <Icon size={18} />
               {label}
               {isProLocked && <Lock size={12} className="ml-auto text-[var(--color-ink-light)]" />}
-              {label === 'Activity' && recentAlertCount > 0 && (
-                <span className="ml-auto text-[10px] font-bold px-[6px] py-px rounded-full bg-[var(--color-accent)] text-white" title="New activity in last 24h">
-                  {recentAlertCount > 9 ? '9+' : recentAlertCount}
+              {label === 'Home' && triggeredCount > 0 && (
+                <span className="ml-auto text-[10px] font-bold px-[6px] py-px rounded-full bg-[var(--color-accent)] text-[var(--color-ink)]">
+                  {triggeredCount}
                 </span>
               )}
             </Link>

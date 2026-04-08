@@ -320,6 +320,44 @@ export default function DashboardPage() {
         </div>
       </button>
 
+      {/* ── Steward is working for you (matches iOS) ── */}
+      {!loading && weeklyChecks > 0 && (
+        <div className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-5 py-4 mb-5">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-sm">✨</span>
+            <span className="text-[14px] font-bold text-[var(--color-ink)]">Steward is working for you</span>
+          </div>
+          <div className="flex items-center gap-6 mb-3">
+            <div className="text-center">
+              <div className="text-lg font-extrabold text-[var(--color-accent)]">{weeklyChecks.toLocaleString()}</div>
+              <div className="text-[11px] text-[var(--color-ink-light)]">Checks</div>
+            </div>
+            <div className="w-px h-6 bg-[var(--color-border)]" />
+            <div className="text-center">
+              <div className="text-lg font-extrabold text-[var(--color-accent)]">{timeSavedLabel}</div>
+              <div className="text-[11px] text-[var(--color-ink-light)]">Time saved</div>
+            </div>
+            <div className="w-px h-6 bg-[var(--color-border)]" />
+            <div className="text-center">
+              <div className="text-lg font-extrabold text-[var(--color-gold)]">{weeklyTriggers}</div>
+              <div className="text-[11px] text-[var(--color-ink-light)]">Triggers</div>
+            </div>
+            {savingsData.total > 0 && (
+              <>
+                <div className="w-px h-6 bg-[var(--color-border)]" />
+                <div className="text-center">
+                  <div className="text-lg font-extrabold text-[var(--color-green)]">${savingsData.total.toFixed(2)}</div>
+                  <div className="text-[11px] text-[var(--color-ink-light)]">Savings</div>
+                </div>
+              </>
+            )}
+          </div>
+          <p className="text-[12px] text-[var(--color-ink-light)]">
+            {weeklyChecks.toLocaleString()} automated checks in the last 7 days &mdash; that&apos;s {timeSavedLabel} you didn&apos;t spend manually browsing
+          </p>
+        </div>
+      )}
+
       {/* ── Triggered Watches (prominent cards like iOS) ── */}
       {!loading && triggeredWatches.length > 0 && (
         <div className="space-y-3 mb-5">
@@ -333,8 +371,8 @@ export default function DashboardPage() {
               }}
             >
               {/* Badge */}
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[var(--color-accent)] text-white text-[11px] font-bold tracking-wide mb-3">
-                <div className="w-1.5 h-1.5 rounded-full bg-white" style={{ animation: 'pulseGlow 2s ease-in-out infinite' }} />
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[var(--color-accent)] text-[var(--color-bg)] text-[11px] font-bold tracking-wide mb-3">
+                <div className="w-1.5 h-1.5 rounded-full bg-[var(--color-bg)]" style={{ animation: 'pulseGlow 2s ease-in-out infinite' }} />
                 {watch.action_type === 'book' ? 'READY TO BOOK' : watch.action_type === 'price' ? 'PRICE TARGET HIT' : watch.action_type === 'cart' ? 'READY TO ADD TO CART' : 'CHANGE DETECTED'}
               </div>
               {/* Content */}
@@ -347,7 +385,7 @@ export default function DashboardPage() {
                     {watch.change_note || 'Condition met'}
                   </div>
                 </div>
-                <div className="shrink-0 px-4 py-2.5 rounded-[var(--radius-md)] bg-[var(--color-accent)] text-white text-[13px] font-bold cursor-pointer hover:opacity-90 transition-opacity">
+                <div className="shrink-0 px-4 py-2.5 rounded-[var(--radius-md)] bg-[var(--color-accent)] text-[var(--color-bg)] text-[13px] font-bold cursor-pointer hover:opacity-90 transition-opacity">
                   {watch.action_type === 'book' ? 'Open & Reserve →' : watch.action_type === 'price' ? 'Open & Buy →' : 'View →'}
                 </div>
               </div>
@@ -374,7 +412,7 @@ export default function DashboardPage() {
                 onClick={() => setCategory(cat)}
                 className={`text-[13px] font-medium px-3.5 py-1.5 rounded-full border cursor-pointer transition-all whitespace-nowrap ${
                   category === cat
-                    ? 'bg-[var(--color-accent)] text-white border-transparent'
+                    ? 'bg-[var(--color-accent)] text-[var(--color-bg)] border-transparent'
                     : 'bg-[var(--color-bg-deep)] text-[var(--color-ink-mid)] border-[var(--color-border)] hover:border-[var(--color-border-mid)] hover:text-[var(--color-ink)]'
                 }`}
                 style={{ fontFamily: 'inherit' }}
