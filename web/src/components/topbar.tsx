@@ -28,14 +28,14 @@ export function Topbar({ onNewWatch, triggeredCount = 0 }: TopbarProps) {
 
   return (
     <header
-      className="h-[52px] shrink-0 flex items-center justify-between px-7 sticky top-0 z-15 border-b border-[var(--color-border)]"
+      className="h-[52px] shrink-0 flex items-center justify-between px-4 md:px-7 sticky top-0 z-15 border-b border-[var(--color-border)]"
       style={{
         background: 'color-mix(in srgb, var(--color-bg-card) 92%, transparent)',
         backdropFilter: 'blur(12px)',
         WebkitBackdropFilter: 'blur(12px)',
       }}
     >
-      <span className="text-sm font-semibold text-[var(--color-ink)] tracking-tight">
+      <span className="text-sm font-semibold text-[var(--color-ink)] tracking-tight ml-10 md:ml-0">
         {title}
       </span>
 
@@ -51,7 +51,7 @@ export function Topbar({ onNewWatch, triggeredCount = 0 }: TopbarProps) {
           }}
         >
           <Plus size={15} strokeWidth={2.5} />
-          New Watch
+          <span className="hidden sm:inline">New Watch</span>
         </button>
 
         {/* Notification bell — navigates to activity */}

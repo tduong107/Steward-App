@@ -229,7 +229,7 @@ export default function DashboardPage() {
   }, [filteredWatches, searchQuery])
 
   return (
-    <div className="animate-fade-up">
+    <div className="animate-fade-up overflow-x-hidden">
       {/* ── Row 1: Greeting + Inline Stats ── */}
       <div className="flex items-end justify-between mb-5">
         <div>
@@ -395,9 +395,9 @@ export default function DashboardPage() {
       )}
 
       {/* ── Row 4: Filter Bar ── */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-1.5">
-          <h2 className="text-base font-bold text-[var(--color-ink)] mr-3">Your Watches</h2>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3 overflow-hidden">
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
+          <h2 className="text-base font-bold text-[var(--color-ink)] mr-2 shrink-0">Your Watches</h2>
           {['', 'reservation', 'travel', 'product'].map(cat => {
             const labels: Record<string, string> = { '': 'All', reservation: 'Reservations', travel: 'Travel', product: 'Products' }
             const counts: Record<string, number> = {
