@@ -45,7 +45,7 @@ export function Topbar({ onNewWatch, triggeredCount = 0 }: TopbarProps) {
           onClick={onNewWatch}
           className="inline-flex items-center gap-1.5 px-3.5 py-[7px] rounded-[var(--radius-md)] border-none text-white text-[13px] font-semibold cursor-pointer transition-all hover:-translate-y-px"
           style={{
-            background: 'linear-gradient(180deg, #2A5C45 0%, #1C3D2E 100%)',
+            background: 'linear-gradient(180deg, #22C55E 0%, #16A34A 100%)',
             boxShadow: '0 1px 2px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.15)',
             fontFamily: 'inherit',
           }}
