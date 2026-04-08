@@ -10,7 +10,6 @@ import {
   Crown,
   Search,
   Zap,
-  Clock,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
@@ -229,21 +228,12 @@ export default function DashboardPage() {
     )
   }, [filteredWatches, searchQuery])
 
-  // Watch category helper for type badges
-  const getWatchType = (w: typeof watches[number]) => {
-    const cat = watchCategory(w)
-    if (cat === 'reservation') return { label: 'Reservation', cls: 'bg-[var(--color-pink-light)] text-[var(--color-pink)]' }
-    if (cat === 'travel') return { label: 'Travel', cls: 'bg-[var(--color-blue-light)] text-[var(--color-blue)]' }
-    if (cat === 'camping') return { label: 'Camping', cls: 'bg-[var(--color-green-light)] text-[var(--color-green)]' }
-    return { label: 'Product', cls: 'bg-[var(--color-amber-light)] text-[var(--color-amber)]' }
-  }
-
   return (
     <div className="animate-fade-up">
       {/* ── Row 1: Greeting + Inline Stats ── */}
       <div className="flex items-end justify-between mb-5">
         <div>
-          <h1 className="text-[26px] font-extrabold tracking-tight text-[var(--color-ink)]">
+          <h1 className="text-[28px] font-extrabold tracking-tight text-[var(--color-ink)]">
             {greeting}, {firstName}
           </h1>
           <p className="text-[13px] text-[var(--color-ink-mid)] mt-0.5">
@@ -360,7 +350,7 @@ export default function DashboardPage() {
       {/* ── Row 4: Filter Bar ── */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-1.5">
-          <h2 className="text-sm font-bold text-[var(--color-ink)] mr-2.5">Your Watches</h2>
+          <h2 className="text-base font-bold text-[var(--color-ink)] mr-3">Your Watches</h2>
           {['', 'reservation', 'travel', 'product'].map(cat => {
             const labels: Record<string, string> = { '': 'All', reservation: 'Reservations', travel: 'Travel', product: 'Products' }
             const counts: Record<string, number> = {
@@ -373,7 +363,7 @@ export default function DashboardPage() {
               <button
                 key={cat}
                 onClick={() => setCategory(cat)}
-                className={`text-xs font-semibold px-3 py-1.5 rounded-full border cursor-pointer transition-all whitespace-nowrap ${
+                className={`text-[13px] font-medium px-3.5 py-1.5 rounded-full border cursor-pointer transition-all whitespace-nowrap ${
                   category === cat
                     ? 'bg-[var(--color-ink)] text-white border-transparent'
                     : 'bg-[var(--color-bg-card)] text-[var(--color-ink-mid)] border-[var(--color-border)] hover:border-[var(--color-border-mid)] hover:text-[var(--color-ink)]'
@@ -392,7 +382,7 @@ export default function DashboardPage() {
             placeholder="Search watches..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            className="border-none outline-none text-[12.5px] text-[var(--color-ink)] bg-transparent w-[140px] placeholder:text-[var(--color-ink-light)]"
+            className="border-none outline-none text-[13px] text-[var(--color-ink)] bg-transparent w-[160px] placeholder:text-[var(--color-ink-light)]"
             style={{ fontFamily: 'inherit' }}
           />
         </div>
@@ -430,61 +420,44 @@ export default function DashboardPage() {
 
       {!loading && searchedWatches.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-          {searchedWatches.map((watch) => {
-            const type = getWatchType(watch)
-            const lastPrice: number | undefined = undefined // price shown from check_results, not on watch type
-            return (
-              <div
-                key={watch.id}
-                onClick={() => router.push(`/home/watch/${watch.id}`)}
-                className={`bg-[var(--color-bg-card)] rounded-[var(--radius-lg)] border border-[var(--color-border)] px-4 py-3.5 cursor-pointer transition-all hover:border-[var(--color-border-mid)] hover:shadow-[var(--shadow-sm)] hover:-translate-y-px relative overflow-hidden ${
-                  watch.triggered ? 'border-l-[3px] border-l-[var(--color-green)]' : ''
-                } ${watch.needs_attention ? 'border-l-[3px] border-l-[var(--color-gold)]' : ''}`}
-              >
-                {/* Top: icon + name + badge */}
-                <div className="flex items-start gap-3 mb-2.5">
-                  {watch.image_url ? (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img
-                      src={watch.image_url}
-                      alt=""
-                      className="w-10 h-10 rounded-[var(--radius-md)] object-cover shrink-0 bg-[var(--color-bg-deep)]"
-                    />
-                  ) : (
-                    <div className="w-10 h-10 rounded-[var(--radius-md)] bg-[var(--color-bg-deep)] flex items-center justify-center text-xl shrink-0">
-                      {watch.emoji || '👀'}
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-bold text-[var(--color-ink)] truncate tracking-tight">{watch.name}</div>
-                    <div className="text-xs text-[var(--color-ink-mid)] mt-px truncate">{watch.condition || 'Watching'}</div>
+          {searchedWatches.map((watch) => (
+            <div
+              key={watch.id}
+              onClick={() => router.push(`/home/watch/${watch.id}`)}
+              className={`rounded-[var(--radius-lg)] border px-5 py-4 cursor-pointer transition-all hover:shadow-[var(--shadow-sm)] hover:-translate-y-px ${
+                watch.triggered
+                  ? 'border-[var(--color-accent)] bg-[var(--color-accent-light)]'
+                  : watch.needs_attention
+                  ? 'border-[var(--color-gold)] bg-[var(--color-gold-light)]'
+                  : 'border-[var(--color-border)] bg-[var(--color-bg-card)] hover:border-[var(--color-border-mid)]'
+              }`}
+            >
+              {/* Row: icon + name */}
+              <div className="flex items-center gap-3 mb-3">
+                {watch.image_url ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img src={watch.image_url} alt="" className="w-11 h-11 rounded-[var(--radius-md)] object-cover shrink-0 bg-[var(--color-bg-deep)]" />
+                ) : (
+                  <div className="w-11 h-11 rounded-[var(--radius-md)] bg-[var(--color-bg-deep)] flex items-center justify-center text-[22px] shrink-0">
+                    {watch.emoji || '👀'}
                   </div>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 mt-0.5 ${type.cls}`}>
-                    {type.label}
-                  </span>
-                </div>
-                {/* Bottom: meta + price/status */}
-                <div className="flex items-center justify-between pt-2.5 border-t border-[var(--color-border)]">
-                  <div className="text-[11px] text-[var(--color-ink-light)] flex items-center gap-1">
-                    <Clock size={12} className="opacity-60" />
-                    {watch.last_checked ? `Checked ${timeAgo(watch.last_checked)}` : 'Not checked yet'}
-                    {' · '}
-                    {getDomain(watch.url)}
-                  </div>
-                  {lastPrice != null && lastPrice > 0 ? (
-                    <div className="text-right">
-                      <div className="text-base font-extrabold text-[var(--color-ink)] tracking-tight">${Number(lastPrice).toFixed(2)}</div>
-                    </div>
-                  ) : (
-                    <div className="text-[11px] font-semibold text-[var(--color-accent)] flex items-center gap-1">
-                      <div className="w-[5px] h-[5px] rounded-full bg-[var(--color-green)]" />
-                      {watch.triggered ? 'Triggered' : watch.needs_attention ? 'Needs attention' : 'Watching'}
-                    </div>
-                  )}
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="text-[15px] font-semibold text-[var(--color-ink)] truncate">{watch.name}</div>
+                  <div className="text-[13px] text-[var(--color-ink-mid)] mt-0.5 truncate">{watch.condition || 'Watching'}</div>
                 </div>
               </div>
-            )
-          })}
+              {/* Meta row */}
+              <div className="flex items-center justify-between text-[13px] text-[var(--color-ink-light)]">
+                <span>{watch.last_checked ? timeAgo(watch.last_checked) : 'Not checked yet'} · {getDomain(watch.url)}</span>
+                <span className={`font-semibold ${
+                  watch.triggered ? 'text-[var(--color-accent)]' : watch.needs_attention ? 'text-[var(--color-gold)]' : 'text-[var(--color-ink-light)]'
+                }`}>
+                  {watch.triggered ? '● Triggered' : watch.needs_attention ? '● Attention' : '● Watching'}
+                </span>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
