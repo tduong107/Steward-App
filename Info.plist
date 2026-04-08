@@ -33,5 +33,7 @@
 	<string>Steward uses speech recognition so you can describe what to watch using your voice.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Steward needs microphone access for voice input in the AI chat.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Steward needs photo access so you can share screenshots of products you want to track.</string>
 </dict>
 </plist>
