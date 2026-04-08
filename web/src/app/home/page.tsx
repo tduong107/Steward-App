@@ -316,11 +316,11 @@ export default function DashboardPage() {
       {/* ── AI Command Bar (compact) ── */}
       <button
         onClick={openChat}
-        className="w-full flex items-center gap-3 bg-[var(--color-bg-card)] rounded-[var(--radius-lg)] border border-[var(--color-border)] px-4 py-3 mb-5 cursor-pointer transition-all hover:border-[var(--color-green)] hover:shadow-[0_0_0_3px_rgba(34,197,94,0.08)] text-left"
+        className="w-full flex items-center gap-3 bg-[var(--color-bg-card)] rounded-[var(--radius-lg)] border border-[var(--color-border)] px-4 py-3 mb-5 cursor-pointer transition-all hover:border-[var(--color-green)] hover:shadow-[0_0_0_3px_rgba(42,92,69,0.08)] text-left"
       >
         <div
           className="w-9 h-9 rounded-[var(--radius-md)] flex items-center justify-center shrink-0"
-          style={{ background: 'linear-gradient(135deg, #059669, #6EE7B7)', boxShadow: '0 2px 8px rgba(5,150,105,0.25)' }}
+          style={{ background: 'linear-gradient(135deg, #2A5C45, #6EE7B7)', boxShadow: '0 2px 8px rgba(42,92,69,0.25)' }}
         >
           <Zap size={16} className="text-white" />
         </div>
@@ -385,7 +385,7 @@ export default function DashboardPage() {
             )
           })}
         </div>
-        <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-bg-card)] focus-within:border-[var(--color-green)] focus-within:shadow-[0_0_0_3px_rgba(34,197,94,0.08)] transition-all">
+        <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-bg-card)] focus-within:border-[var(--color-green)] focus-within:shadow-[0_0_0_3px_rgba(42,92,69,0.08)] transition-all">
           <Search size={13} className="text-[var(--color-ink-light)]" />
           <input
             type="text"
@@ -417,7 +417,7 @@ export default function DashboardPage() {
           <button
             onClick={openChat}
             className="mt-5 flex items-center gap-2 rounded-full text-sm font-semibold text-white px-5 py-2.5 cursor-pointer transition-all hover:-translate-y-px"
-            style={{ background: 'linear-gradient(180deg, #22C55E 0%, #16A34A 100%)', fontFamily: 'inherit' }}
+            style={{ background: 'linear-gradient(180deg, #2A5C45 0%, #1C3D2E 100%)', fontFamily: 'inherit' }}
           >
             <Plus size={16} /> Create your first watch
           </button>

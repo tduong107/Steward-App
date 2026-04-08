@@ -153,8 +153,8 @@ export function Sidebar({ onChatOpen }: SidebarProps) {
           <div
             className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[11px] font-extrabold shrink-0"
             style={{
-              background: 'linear-gradient(135deg, #6EE7B7, #059669)',
-              boxShadow: '0 2px 6px rgba(5,150,105,0.25)',
+              background: 'linear-gradient(135deg, #6EE7B7, #2A5C45)',
+              boxShadow: '0 2px 6px rgba(42,92,69,0.25)',
             }}
           >
             {initials}
