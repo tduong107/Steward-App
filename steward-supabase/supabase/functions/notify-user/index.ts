@@ -431,16 +431,21 @@ serve(async (req) => {
 
     // ─── Email Notification (Resend) ────────────────────────────
     if (notifyChannels.includes("email")) {
-      // Get user's email from Supabase Auth
-      const { data: { user: authUser }, error: authError } = await supabase.auth.admin.getUserById(user_id);
+      // Prefer profile.notification_email, fall back to auth email
+      let userEmail = profile?.notification_email ?? null;
+      if (!userEmail) {
+        const { data: { user: authUser }, error: authError } = await supabase.auth.admin.getUserById(user_id);
+        userEmail = authUser?.email ?? null;
+        if (authError) console.log(`[notify-user] Auth email lookup error: ${authError.message}`);
+      }
 
-      if (authError || !authUser?.email) {
-        console.log(`[notify-user] Could not get email for user ${user_id}: ${authError?.message ?? "no email"}`);
+      if (!userEmail) {
+        console.log(`[notify-user] No email found for user ${user_id}`);
         results.email = { sent: false, reason: "No email address found" };
       } else if (isNeedsAttention) {
         // Send a "needs attention" email instead of the triggered email
         results.email = await sendNeedsAttentionEmail(
-          authUser.email,
+          userEmail,
           watchEmoji,
           watchName,
           changeNote,
@@ -448,7 +453,7 @@ serve(async (req) => {
         );
       } else {
         results.email = await sendEmailNotification(
-          authUser.email,
+          userEmail,
           watchEmoji,
           watchName,
           changeNote,
@@ -460,17 +465,21 @@ serve(async (req) => {
     }
 
     // ─── SMS Notification (Twilio) — skip for needs_attention ──
-    if (notifyChannels.includes("sms") && !isNeedsAttention) {
+    if (notifyChannels.includes("sms")) {
       if (!profile?.phone_number) {
         console.log(`[notify-user] No phone number for user ${user_id}`);
         results.sms = { sent: false, reason: "No phone number" };
       } else {
+        // For needs_attention, customize the SMS content
+        const smsBody = isNeedsAttention
+          ? `${watchEmoji} ${watchName} needs attention. ${changeNote} Open Steward to fix it.`
+          : undefined; // Default content
         results.sms = await sendSMSNotification(
           profile.phone_number,
           watchEmoji,
           watchName,
-          changeNote,
-          finalActionUrl
+          isNeedsAttention ? (changeNote || "Watch check is failing") : changeNote,
+          isNeedsAttention ? null : finalActionUrl
         );
       }
     }

@@ -485,6 +485,12 @@ final class WatchViewModel {
             }
         }
 
+        // Set notify_channels based on user's enabled notification preferences
+        var channels: [String] = ["push"] // push is always included
+        if UserDefaults.standard.bool(forKey: "notifyEmail") { channels.append("email") }
+        if UserDefaults.standard.bool(forKey: "notifySMS") { channels.append("sms") }
+        watch.notifyChannels = channels.joined(separator: ",")
+
         // Insert locally first for instant UI
         context.insert(watch)
         try? context.save()
