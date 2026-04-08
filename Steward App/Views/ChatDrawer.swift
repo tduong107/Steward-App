@@ -159,9 +159,6 @@ struct ChatDrawer: View {
         // "Browse & find it" / "Find the link myself" opens in-app browser
         let isBrowse: Bool = lower.contains("browse & find it") || lower.contains("find the link myself") || lower.contains("find it myself")
         if isBrowse {
-            // Gather ALL conversation text (user + steward) for full context
-            let allText: String = chatVM.messages.map { $0.text.lowercased() }.joined(separator: " ")
-
             let browseURL: URL? = {
                 // Use RECENT messages (last 4) for context, not full history
                 // This prevents early category chips (e.g. "Camping") from overriding
