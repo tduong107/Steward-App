@@ -45,8 +45,8 @@ export default function ActivityPage() {
             onClick={() => setFilter(tab.key)}
             className={`px-4 py-[7px] rounded-[var(--radius-md)] text-[13px] font-medium cursor-pointer transition-all border ${
               filter === tab.key
-                ? 'bg-[var(--color-ink)] text-white border-transparent shadow-[var(--shadow-xs)]'
-                : 'bg-[var(--color-bg-card)] text-[var(--color-ink-mid)] border-[var(--color-border)] hover:bg-[var(--color-bg-deep)] hover:text-[var(--color-ink)]'
+                ? 'bg-[var(--color-accent)] text-white border-transparent shadow-[var(--shadow-xs)]'
+                : 'bg-[var(--color-bg-deep)] text-[var(--color-ink-mid)] border-[var(--color-border)] hover:border-[var(--color-border-mid)] hover:text-[var(--color-ink)]'
             }`}
             style={{ fontFamily: 'inherit' }}
           >

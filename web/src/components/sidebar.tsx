@@ -123,7 +123,7 @@ export function Sidebar({ onChatOpen }: SidebarProps) {
               {label}
               {isProLocked && <Lock size={12} className="ml-auto text-[var(--color-ink-light)]" />}
               {label === 'Activity' && recentAlertCount > 0 && (
-                <span className="ml-auto text-[10.5px] font-bold px-[7px] py-px rounded-[10px] bg-[var(--color-gold-light)] text-[var(--color-gold)]">
+                <span className="ml-auto text-[10px] font-bold px-[6px] py-px rounded-full bg-[var(--color-accent)] text-white" title="New activity in last 24h">
                   {recentAlertCount > 9 ? '9+' : recentAlertCount}
                 </span>
               )}

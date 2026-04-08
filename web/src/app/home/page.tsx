@@ -320,30 +320,39 @@ export default function DashboardPage() {
         </div>
       </button>
 
-      {/* ── Row 3: Alert Banner (triggered watches) ── */}
+      {/* ── Triggered Watches (prominent cards like iOS) ── */}
       {!loading && triggeredWatches.length > 0 && (
-        <div
-          className="flex items-center gap-3 px-4 py-3 rounded-[var(--radius-md)] mb-4"
-          style={{
-            background: 'linear-gradient(135deg, rgba(245,158,11,0.08), rgba(245,158,11,0.03))',
-            border: '1px solid rgba(245,158,11,0.2)',
-          }}
-        >
-          <div className="w-2 h-2 rounded-full bg-[var(--color-gold)] shrink-0" style={{ animation: 'pulseGlow 2s ease-in-out infinite' }} />
-          <div className="text-[13px] text-[var(--color-ink)] flex-1">
-            <strong className="font-bold">{triggeredWatches.length} new update{triggeredWatches.length > 1 ? 's' : ''}:</strong>{' '}
-            {triggeredWatches.slice(0, 2).map(w => w.change_note || w.name).join(' · ')}
-          </div>
-          <button
-            onClick={() => {
-              const first = triggeredWatches[0]
-              if (first?.action_url) window.open(first.action_url, '_blank', 'noopener,noreferrer')
-              else router.push(`/home/watch/${first?.id}`)
-            }}
-            className="text-xs font-semibold text-[var(--color-gold)] whitespace-nowrap px-2.5 py-1 rounded-[var(--radius-sm)] hover:bg-[rgba(245,158,11,0.1)] transition-colors cursor-pointer"
-          >
-            View details →
-          </button>
+        <div className="space-y-3 mb-5">
+          {triggeredWatches.map((watch) => (
+            <div
+              key={watch.id}
+              className="rounded-[var(--radius-lg)] border border-[var(--color-accent)] bg-[var(--color-accent-light)] px-5 py-4 cursor-pointer transition-all hover:shadow-[var(--shadow-sm)]"
+              onClick={() => {
+                if (watch.action_url) window.open(watch.action_url, '_blank', 'noopener,noreferrer')
+                else router.push(`/home/watch/${watch.id}`)
+              }}
+            >
+              {/* Badge */}
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[var(--color-accent)] text-white text-[11px] font-bold tracking-wide mb-3">
+                <div className="w-1.5 h-1.5 rounded-full bg-white" style={{ animation: 'pulseGlow 2s ease-in-out infinite' }} />
+                {watch.action_type === 'book' ? 'READY TO BOOK' : watch.action_type === 'price' ? 'PRICE TARGET HIT' : watch.action_type === 'cart' ? 'READY TO ADD TO CART' : 'CHANGE DETECTED'}
+              </div>
+              {/* Content */}
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="text-[16px] font-bold text-[var(--color-ink)]">
+                    {watch.emoji} {watch.name}
+                  </div>
+                  <div className="text-[14px] text-[var(--color-accent)] mt-1">
+                    {watch.change_note || 'Condition met'}
+                  </div>
+                </div>
+                <div className="shrink-0 px-4 py-2.5 rounded-[var(--radius-md)] bg-[var(--color-accent)] text-white text-[13px] font-bold cursor-pointer hover:opacity-90 transition-opacity">
+                  {watch.action_type === 'book' ? 'Open & Reserve →' : watch.action_type === 'price' ? 'Open & Buy →' : 'View →'}
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
