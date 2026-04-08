@@ -30,7 +30,7 @@ export function Topbar({ onNewWatch, triggeredCount = 0 }: TopbarProps) {
     <header
       className="h-[52px] shrink-0 flex items-center justify-between px-7 sticky top-0 z-15 border-b border-[var(--color-border)]"
       style={{
-        background: 'rgba(255,255,255,0.85)',
+        background: 'color-mix(in srgb, var(--color-bg-card) 92%, transparent)',
         backdropFilter: 'blur(12px)',
         WebkitBackdropFilter: 'blur(12px)',
       }}
@@ -61,7 +61,7 @@ export function Topbar({ onNewWatch, triggeredCount = 0 }: TopbarProps) {
         >
           <Bell size={17} className="text-[var(--color-ink-mid)]" />
           {triggeredCount > 0 && (
-            <div className="absolute top-[5px] right-[5px] w-[7px] h-[7px] rounded-full bg-[var(--color-red)] border-2 border-white" />
+            <div className="absolute top-[5px] right-[5px] w-[7px] h-[7px] rounded-full bg-[var(--color-red)] border-2 border-[var(--color-bg-card)]" />
           )}
         </button>
       </div>

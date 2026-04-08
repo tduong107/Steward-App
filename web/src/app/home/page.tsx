@@ -365,8 +365,8 @@ export default function DashboardPage() {
                 onClick={() => setCategory(cat)}
                 className={`text-[13px] font-medium px-3.5 py-1.5 rounded-full border cursor-pointer transition-all whitespace-nowrap ${
                   category === cat
-                    ? 'bg-[var(--color-ink)] text-white border-transparent'
-                    : 'bg-[var(--color-bg-card)] text-[var(--color-ink-mid)] border-[var(--color-border)] hover:border-[var(--color-border-mid)] hover:text-[var(--color-ink)]'
+                    ? 'bg-[var(--color-accent)] text-white border-transparent'
+                    : 'bg-[var(--color-bg-deep)] text-[var(--color-ink-mid)] border-[var(--color-border)] hover:border-[var(--color-border-mid)] hover:text-[var(--color-ink)]'
                 }`}
                 style={{ fontFamily: 'inherit' }}
               >
