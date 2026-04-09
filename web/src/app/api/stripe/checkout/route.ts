@@ -46,9 +46,9 @@ export async function POST(request: NextRequest) {
       || user.user_metadata?.email
       || undefined
 
-    const session = await getStripe().checkout.sessions.create({
+    // If we have the email, pre-fill it. If not, Stripe will ask for it.
+    const sessionParams: Record<string, unknown> = {
       mode: 'subscription',
-      customer_email: customerEmail,
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${origin}/home?upgraded=${tier}`,
       cancel_url: `${origin}/home/settings`,
@@ -56,7 +56,19 @@ export async function POST(request: NextRequest) {
         user_id: user.id,
         tier,
       },
-    })
+      subscription_data: {
+        metadata: {
+          user_id: user.id,
+          tier,
+        },
+      },
+    }
+
+    if (customerEmail) {
+      sessionParams.customer_email = customerEmail
+    }
+
+    const session = await getStripe().checkout.sessions.create(sessionParams as any)
 
     return NextResponse.json({ url: session.url })
   } catch (err) {

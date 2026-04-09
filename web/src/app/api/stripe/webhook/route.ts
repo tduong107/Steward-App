@@ -77,6 +77,25 @@ export async function POST(request: NextRequest) {
         break
       }
 
+      case 'invoice.payment_failed': {
+        const invoice = event.data.object as Stripe.Invoice
+        const subscriptionId = invoice.subscription as string
+        if (subscriptionId) {
+          // Retrieve the subscription to get user_id from metadata
+          try {
+            const sub = await getStripe().subscriptions.retrieve(subscriptionId)
+            const userId = sub.metadata?.user_id
+            if (userId) {
+              console.log(`Payment failed for user=${userId}, subscription=${subscriptionId}`)
+              // Don't immediately downgrade — Stripe will retry. Just log it.
+              // After all retries fail, Stripe will cancel the subscription and
+              // trigger customer.subscription.deleted which handles the downgrade.
+            }
+          } catch { /* subscription may not exist */ }
+        }
+        break
+      }
+
       case 'customer.subscription.deleted': {
         const subscription = event.data.object as Stripe.Subscription
         const userId = subscription.metadata?.user_id
