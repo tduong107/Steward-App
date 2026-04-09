@@ -21,6 +21,7 @@ import {
   Smartphone,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { useSub } from '@/hooks/use-subscription'
 import type { Watch, CheckResult, CheckFrequency } from '@/lib/types'
 import { timeAgo, nextCheckLabel, getDomain, cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -32,7 +33,7 @@ import { Dropdown } from '@/components/ui/dropdown'
 import { Skeleton } from '@/components/ui/skeleton'
 import { PriceHistoryChart } from '@/components/price-history-chart'
 
-const frequencyOptions = [
+const allFrequencyOptions = [
   { label: 'Daily', value: 'Daily' },
   { label: 'Every 12 hours', value: 'Every 12 hours' },
   { label: 'Every 6 hours', value: 'Every 6 hours' },
@@ -40,11 +41,19 @@ const frequencyOptions = [
   { label: 'Every 2 hours', value: 'Every 2 hours' },
 ]
 
+const tierFrequencies: Record<string, string[]> = {
+  free: ['Daily'],
+  pro: ['Daily', 'Every 12 hours'],
+  premium: ['Daily', 'Every 12 hours', 'Every 6 hours', 'Every 4 hours', 'Every 2 hours'],
+}
+
 export default function WatchDetailPage() {
   const params = useParams()
   const router = useRouter()
   const watchId = params.id as string
   const supabaseRef = useRef(createClient())
+  const { tier } = useSub()
+  const frequencyOptions = allFrequencyOptions.filter(f => (tierFrequencies[tier] ?? ['Daily']).includes(f.value))
 
   const [watch, setWatch] = useState<Watch | null>(null)
   const [checkResults, setCheckResults] = useState<CheckResult[]>([])

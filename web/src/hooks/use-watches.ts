@@ -145,7 +145,13 @@ export function useWatches() {
         .single()
 
       if (createError) throw new Error(createError.message)
-      return created as Watch
+      // Optimistic update — add to state immediately (realtime may have a delay)
+      const newWatch = created as Watch
+      setWatches((prev) => {
+        if (prev.some(w => w.id === newWatch.id)) return prev
+        return [newWatch, ...prev]
+      })
+      return newWatch
     },
     [user]
   )
