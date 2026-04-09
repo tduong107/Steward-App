@@ -767,31 +767,19 @@ function PlatformShowcase() {
               transition: 'background 0.4s 0.2s',
             }} />
 
-            {/* Traveling pulses — full width, pass through the orb */}
-            {step >= 2 && <>
-              {/* Phone → Laptop pulse */}
+            {/* Single traveling pulse — goes phone→laptop then laptop→phone */}
+            {step >= 2 && (
               <div className="lnd-pulse-track" style={{
                 position: 'absolute', left: 0, right: 0, top: '28px', height: 2, overflow: 'visible', pointerEvents: 'none',
               }}>
-                <div className="lnd-pulse-dot-fwd" style={{
+                <div className="lnd-pulse-dot-pingpong" style={{
                   position: 'absolute', top: '50%', width: 10, height: 10, borderRadius: '50%',
                   background: S.mint, transform: 'translateY(-50%)',
                   boxShadow: `0 0 8px ${S.mint}, 0 0 16px ${S.mint}80`,
-                  animation: 'beamPulseFullRight 2.5s linear infinite',
+                  animation: 'beamPingPong 3s ease-in-out infinite',
                 }} />
               </div>
-              {/* Laptop → Phone pulse (offset) */}
-              <div className="lnd-pulse-track" style={{
-                position: 'absolute', left: 0, right: 0, top: '28px', height: 2, overflow: 'visible', pointerEvents: 'none',
-              }}>
-                <div className="lnd-pulse-dot-rev" style={{
-                  position: 'absolute', top: '50%', width: 10, height: 10, borderRadius: '50%',
-                  background: S.mint, transform: 'translateY(-50%)',
-                  boxShadow: `0 0 8px ${S.mint}, 0 0 16px ${S.mint}80`,
-                  animation: 'beamPulseFullLeft 2.5s linear infinite 1.25s',
-                }} />
-              </div>
-            </>}
+            )}
 
             {/* Sync orb — centered on top of beam */}
             <div className="lnd-sync-orb" style={{
@@ -1169,30 +1157,25 @@ export function LandingClientPage() {
           0%, 100% { transform: translateY(0); }
           50% { transform: translateY(-8px); }
         }
-        @keyframes beamPulseFullRight {
-          0%   { left: -10px; opacity: 0; }
-          5%   { opacity: 1; }
-          95%  { opacity: 1; }
-          100% { left: calc(100% - 0px); opacity: 0; }
+        /* Single pulse: phone→laptop→phone ping-pong (horizontal) */
+        @keyframes beamPingPong {
+          0%   { left: 0; opacity: 0; }
+          3%   { opacity: 1; }
+          48%  { left: calc(100% - 10px); opacity: 1; }
+          50%  { left: calc(100% - 10px); opacity: 1; }
+          52%  { opacity: 1; }
+          97%  { left: 0; opacity: 1; }
+          100% { left: 0; opacity: 0; }
         }
-        @keyframes beamPulseFullLeft {
-          0%   { right: -10px; left: auto; opacity: 0; }
-          5%   { opacity: 1; }
-          95%  { opacity: 1; }
-          100% { right: calc(100% - 0px); left: auto; opacity: 0; }
-        }
-        /* Vertical pulse for mobile */
-        @keyframes beamPulseDown {
-          0%   { top: -10px; opacity: 0; }
-          5%   { opacity: 1; }
-          95%  { opacity: 1; }
-          100% { top: calc(100% - 0px); opacity: 0; }
-        }
-        @keyframes beamPulseUp {
-          0%   { bottom: -10px; top: auto; opacity: 0; }
-          5%   { opacity: 1; }
-          95%  { opacity: 1; }
-          100% { bottom: calc(100% - 0px); top: auto; opacity: 0; }
+        /* Single pulse: phone→laptop→phone ping-pong (vertical for mobile) */
+        @keyframes beamPingPongV {
+          0%   { top: 0; opacity: 0; }
+          3%   { opacity: 1; }
+          48%  { top: calc(100% - 10px); opacity: 1; }
+          50%  { top: calc(100% - 10px); opacity: 1; }
+          52%  { opacity: 1; }
+          97%  { top: 0; opacity: 1; }
+          100% { top: 0; opacity: 0; }
         }
         .lnd-sync-orb { animation: syncPulse 3s ease-in-out infinite; }
         @keyframes syncPulse {
@@ -1230,8 +1213,7 @@ export function LandingClientPage() {
           .lnd-sync-connector     { flex-direction: column !important; min-width: unset !important; max-width: unset !important; width: auto !important; min-height: 100px; padding: 8px 0 !important; }
           .lnd-beam-track         { left: 50% !important; right: auto !important; top: 0 !important; bottom: 0 !important; width: 2px !important; height: auto !important; transform: translateX(-50%); background: repeating-linear-gradient(180deg, rgba(110,231,183,0.33) 0, rgba(110,231,183,0.33) 3px, transparent 3px, transparent 8px) !important; }
           .lnd-pulse-track        { left: 50% !important; right: auto !important; top: 0 !important; bottom: 0 !important; width: 2px !important; height: auto !important; transform: translateX(-50%) !important; }
-          .lnd-pulse-dot-fwd      { width: 10px !important; height: 10px !important; top: auto !important; left: 50% !important; transform: translateX(-50%) !important; animation: beamPulseDown 2.5s linear infinite !important; }
-          .lnd-pulse-dot-rev      { width: 10px !important; height: 10px !important; top: auto !important; left: 50% !important; transform: translateX(-50%) !important; animation: beamPulseUp 2.5s linear infinite 1.25s !important; }
+          .lnd-pulse-dot-pingpong { top: 0 !important; left: 50% !important; transform: translateX(-50%) !important; animation: beamPingPongV 3s ease-in-out infinite !important; }
           .lnd-nav-links      { display: none !important; }
           .lnd-hamburger      { display: flex !important; }
         }
