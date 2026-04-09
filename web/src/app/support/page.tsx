@@ -71,6 +71,9 @@ export default function SupportPage() {
           <p className="text-[var(--landing-text-mid)] max-w-lg mx-auto">
             Have a question, found a bug, or want to request a feature? We&apos;d love to hear from you
           </p>
+          <p className="text-[var(--landing-text-dim)] text-sm max-w-lg mx-auto mt-4">
+            Steward is an AI-powered concierge that monitors the web for you. It sends automated push, email, and SMS alerts when your conditions are met — price drops, restocks, restaurant reservations, campsite availability, flight deals, and more. Operated by StewardConcierge · hello@joinsteward.app
+          </p>
         </div>
 
         {status === 'success' ? (
