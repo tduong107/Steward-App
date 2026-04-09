@@ -135,6 +135,40 @@ export function Sidebar({ onChatOpen }: SidebarProps) {
         })}
       </nav>
 
+      {/* Subscription tier */}
+      <div className="px-3 mb-2">
+        <button
+          onClick={() => { setShowPaywall(true); setMobileOpen(false) }}
+          className={`flex w-full items-center gap-2.5 px-3 py-2.5 rounded-[var(--radius-md)] transition-all cursor-pointer ${
+            tier === 'premium'
+              ? 'bg-[var(--color-gold)]/10 border border-[var(--color-gold)]/20 hover:bg-[var(--color-gold)]/15'
+              : tier === 'pro'
+              ? 'bg-[var(--color-accent-light)] border border-[var(--color-accent)]/20 hover:bg-[var(--color-accent-mid)]/30'
+              : 'bg-[var(--color-bg-deep)] border border-[var(--color-border)] hover:bg-[var(--color-bg)]'
+          }`}
+        >
+          <Crown size={15} className={
+            tier === 'premium' ? 'text-[var(--color-gold)]'
+            : tier === 'pro' ? 'text-[var(--color-accent)]'
+            : 'text-[var(--color-ink-light)]'
+          } />
+          <div className="flex-1 text-left">
+            <span className={`text-[12px] font-bold uppercase tracking-wide ${
+              tier === 'premium' ? 'text-[var(--color-gold)]'
+              : tier === 'pro' ? 'text-[var(--color-accent)]'
+              : 'text-[var(--color-ink-mid)]'
+            }`}>
+              {tierLabel} Plan
+            </span>
+          </div>
+          {tier === 'free' && (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[var(--color-accent)] text-white">
+              Upgrade
+            </span>
+          )}
+        </button>
+      </div>
+
       {/* Footer */}
       <div className="border-t border-[var(--color-border)] px-3 pt-2.5 pb-3.5">
         {/* Settings */}

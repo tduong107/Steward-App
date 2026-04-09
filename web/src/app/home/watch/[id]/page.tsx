@@ -11,6 +11,7 @@ import {
   Trash2,
   Pencil,
   CheckCircle,
+  Lock,
   AlertTriangle,
   Eye,
   Copy,
@@ -637,12 +638,61 @@ export default function WatchDetailPage() {
             value={editName}
             onChange={(e) => setEditName(e.target.value)}
           />
-          <Dropdown
-            label="Check Frequency"
-            options={frequencyOptions}
-            value={editFrequency}
-            onChange={setEditFrequency}
-          />
+          {/* Frequency picker with tier sections (matches iOS) */}
+          <div>
+            <label className="block text-xs font-medium text-[var(--color-ink-mid)] mb-2">Check Frequency</label>
+            {[
+              { tier: 'FREE', price: '', frequencies: ['Daily'] },
+              { tier: 'PRO', price: '$4.99/mo', frequencies: ['Every 12 hours'] },
+              { tier: 'PREMIUM', price: '$9.99/mo', frequencies: ['Every 6 hours', 'Every 4 hours', 'Every 2 hours'] },
+            ].map(section => {
+              const isCurrentOrLower = section.tier === 'FREE' ? true
+                : section.tier === 'PRO' ? (tier === 'pro' || tier === 'premium')
+                : tier === 'premium'
+              return (
+                <div key={section.tier} className="mb-3">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className={`text-[11px] font-bold tracking-wide ${
+                      section.tier === 'PREMIUM' ? 'text-[var(--color-gold)]'
+                      : section.tier === 'PRO' ? 'text-[var(--color-accent)]'
+                      : 'text-[var(--color-ink-light)]'
+                    }`}>
+                      {section.tier}
+                    </span>
+                    {section.price && (
+                      <span className="text-[11px] text-[var(--color-ink-light)]">· {section.price}</span>
+                    )}
+                  </div>
+                  <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] overflow-hidden">
+                    {section.frequencies.map((freq, i) => (
+                      <button
+                        key={freq}
+                        type="button"
+                        onClick={() => isCurrentOrLower && setEditFrequency(freq)}
+                        className={`w-full flex items-center justify-between px-4 py-3 text-sm transition-colors ${
+                          i > 0 ? 'border-t border-[var(--color-border)]' : ''
+                        } ${editFrequency === freq
+                          ? 'bg-[var(--color-accent-light)] text-[var(--color-accent)] font-semibold'
+                          : isCurrentOrLower
+                            ? 'bg-[var(--color-bg-card)] text-[var(--color-ink)] hover:bg-[var(--color-bg-deep)] cursor-pointer'
+                            : 'bg-[var(--color-bg-deep)] text-[var(--color-ink-light)] cursor-not-allowed opacity-60'
+                        }`}
+                        disabled={!isCurrentOrLower}
+                      >
+                        <span>{freq}</span>
+                        {editFrequency === freq && (
+                          <CheckCircle size={18} className="text-[var(--color-accent)]" />
+                        )}
+                        {!isCurrentOrLower && (
+                          <Lock size={14} className="text-[var(--color-ink-light)]" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
           <Input
             label="Preferred Check Time"
             type="time"
