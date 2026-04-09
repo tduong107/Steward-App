@@ -751,13 +751,18 @@ function Footer() {
           <div style={{ fontSize: 12, color: 'rgba(247,246,243,0.3)' }}>© 2026 Steward. All rights reserved.</div>
         </div>
       </div>
-      <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' as const }}>
-        {[['Privacy', '/privacy'], ['Terms', '/terms'], ['Support', '/support'], ['Sign In', '/login']].map(([label, href]) => (
-          <Link key={href} href={href} className="lnd-footer-link"
-            style={{ fontSize: 12, color: 'rgba(247,246,243,0.35)', textDecoration: 'none', transition: 'color .25s' }}>
-            {label}
-          </Link>
-        ))}
+      <div style={{ display: 'flex', flexDirection: 'column' as const, alignItems: 'flex-end', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' as const }}>
+          {[['Privacy', '/privacy'], ['Terms', '/terms'], ['Support', '/support'], ['Sign In', '/login']].map(([label, href]) => (
+            <Link key={href} href={href} className="lnd-footer-link"
+              style={{ fontSize: 12, color: 'rgba(247,246,243,0.35)', textDecoration: 'none', transition: 'color .25s' }}>
+              {label}
+            </Link>
+          ))}
+        </div>
+        <div style={{ fontSize: 11, color: 'rgba(247,246,243,0.25)' }}>
+          Contact: <a href="mailto:hello@joinsteward.app" style={{ color: 'rgba(110,231,183,0.5)', textDecoration: 'none' }}>hello@joinsteward.app</a>
+        </div>
       </div>
     </footer>
   )
