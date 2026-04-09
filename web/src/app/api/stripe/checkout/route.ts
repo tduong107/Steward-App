@@ -17,27 +17,21 @@ export async function POST(request: NextRequest) {
     }
 
     if (!tier || !billing) {
-      return NextResponse.json(
-        { error: 'Missing tier or billing parameter' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Missing tier or billing parameter' }, { status: 400 })
     }
 
     const priceId = getStripePriceId(tier, billing)
-
     if (!priceId) {
-      return NextResponse.json(
-        { error: 'Invalid tier or billing combination' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Invalid tier or billing combination' }, { status: 400 })
     }
 
+    const stripe = getStripe()
     const origin = request.headers.get('origin') || process.env.NEXT_PUBLIC_SITE_URL || ''
 
-    // Get the best email: profile notification_email → auth email → OAuth email
+    // Get user's email and profile
     const { data: profile } = await supabase
       .from('profiles')
-      .select('notification_email')
+      .select('notification_email, subscription_source')
       .eq('id', user.id)
       .single()
 
@@ -46,21 +40,52 @@ export async function POST(request: NextRequest) {
       || user.user_metadata?.email
       || undefined
 
-    // If we have the email, pre-fill it. If not, Stripe will ask for it.
+    // Check if user already has a Stripe subscription (Pro → Premium upgrade)
+    if (customerEmail) {
+      const customers = await stripe.customers.list({ email: customerEmail, limit: 1 })
+      if (customers.data.length > 0) {
+        const customer = customers.data[0]
+        // Find their active subscription
+        const subscriptions = await stripe.subscriptions.list({
+          customer: customer.id,
+          status: 'active',
+          limit: 1,
+        })
+
+        if (subscriptions.data.length > 0) {
+          // UPGRADE existing subscription (prorated)
+          const existingSub = subscriptions.data[0]
+          const updatedSub = await stripe.subscriptions.update(existingSub.id, {
+            items: [{
+              id: existingSub.items.data[0].id,
+              price: priceId,
+            }],
+            proration_behavior: 'create_prorations',
+            metadata: { user_id: user.id, tier },
+          })
+
+          // Update tier in Supabase immediately
+          await supabase
+            .from('profiles')
+            .update({ subscription_tier: tier, subscription_source: 'stripe' })
+            .eq('id', user.id)
+
+          console.log(`Subscription upgraded: user=${user.id} to=${tier} sub=${updatedSub.id}`)
+          // Return a redirect URL instead of a Stripe checkout URL
+          return NextResponse.json({ url: `${origin}/home?upgraded=${tier}` })
+        }
+      }
+    }
+
+    // NEW subscription — create checkout session
     const sessionParams: Record<string, unknown> = {
       mode: 'subscription',
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${origin}/home?upgraded=${tier}`,
       cancel_url: `${origin}/home/settings`,
-      metadata: {
-        user_id: user.id,
-        tier,
-      },
+      metadata: { user_id: user.id, tier },
       subscription_data: {
-        metadata: {
-          user_id: user.id,
-          tier,
-        },
+        metadata: { user_id: user.id, tier },
       },
     }
 
@@ -68,14 +93,10 @@ export async function POST(request: NextRequest) {
       sessionParams.customer_email = customerEmail
     }
 
-    const session = await getStripe().checkout.sessions.create(sessionParams as any)
-
+    const session = await stripe.checkout.sessions.create(sessionParams as any)
     return NextResponse.json({ url: session.url })
   } catch (err) {
     console.error('Stripe checkout error:', err)
-    return NextResponse.json(
-      { error: 'Failed to create checkout session' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Failed to create checkout session' }, { status: 500 })
   }
 }
