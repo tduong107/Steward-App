@@ -14,10 +14,10 @@ export const viewport = {
 
 export const metadata: Metadata = {
   title: {
-    default: 'Steward AI Concierge',
+    default: 'Steward — AI Price Tracker for Deals, Restocks, Reservations & Flights',
     template: '%s | Steward',
   },
-  description: 'Steward is an AI-powered price tracker that monitors price drops, restocks, restaurant reservations, campsite openings, flight deals, and event tickets. Set up in 30 seconds. Free to start.',
+  description: 'Steward is an AI-powered price tracker that monitors price drops, restocks, restaurant reservations, campsite openings, flight deals, and event tickets across Amazon, Nike, Resy, Recreation.gov & more. Free to start.',
   keywords: [
     'price tracker',
     'price drop alert',
@@ -42,17 +42,24 @@ export const metadata: Metadata = {
   ],
   metadataBase: new URL('https://www.joinsteward.app'),
   openGraph: {
-    title: 'Steward — AI Price Tracker & Web Monitor',
+    title: 'Steward — AI Price Tracker for Deals, Restocks, Reservations & Flights',
     description: 'Track price drops, restocks, restaurant reservations, campsites, flights, and event tickets. AI-powered setup in seconds. Free to start.',
     url: 'https://www.joinsteward.app',
     siteName: 'Steward',
     type: 'website',
     locale: 'en_US',
+    images: [{
+      url: '/og-image.png',
+      width: 1200,
+      height: 630,
+      alt: 'Steward — AI Price Tracker for Deals, Restocks, Reservations & Flights',
+    }],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Steward — AI Price Tracker & Web Monitor',
+    title: 'Steward — AI Price Tracker for Deals, Restocks, Reservations & Flights',
     description: 'Track price drops, restocks, restaurant reservations, campsites, flights, and event tickets. Free to start.',
+    images: ['/og-image.png'],
   },
   robots: {
     index: true,
@@ -79,9 +86,53 @@ export const metadata: Metadata = {
   category: 'technology',
 }
 
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'WebSite',
+      'name': 'Steward',
+      'url': 'https://www.joinsteward.app',
+      'description': 'AI-powered price tracker that monitors price drops, restocks, restaurant reservations, campsite openings, flight deals, and event tickets.',
+    },
+    {
+      '@type': 'SoftwareApplication',
+      'name': 'Steward',
+      'alternateName': 'Steward AI Concierge',
+      'applicationCategory': 'UtilitiesApplication',
+      'operatingSystem': 'iOS, Web',
+      'url': 'https://www.joinsteward.app',
+      'downloadUrl': 'https://apps.apple.com/us/app/steward-concierge/id6760180137',
+      'description': 'AI-powered price tracker that monitors price drops, restocks, restaurant reservations, campsite openings, flight deals, and event tickets across Amazon, Nike, Resy, Recreation.gov and more.',
+      'offers': [
+        { '@type': 'Offer', 'price': '0', 'priceCurrency': 'USD', 'name': 'Free', 'description': '3 trackers, daily checks, push notifications' },
+        { '@type': 'Offer', 'price': '4.99', 'priceCurrency': 'USD', 'name': 'Pro', 'description': '7 trackers, 12-hour checks, email & SMS alerts' },
+        { '@type': 'Offer', 'price': '9.99', 'priceCurrency': 'USD', 'name': 'Premium', 'description': '15 trackers, 2-hour checks, automated actions, fake deal detection' },
+      ],
+    },
+    {
+      '@type': 'Organization',
+      'name': 'Steward',
+      'url': 'https://www.joinsteward.app',
+      'logo': 'https://www.joinsteward.app/steward-logo.png',
+      'contactPoint': {
+        '@type': 'ContactPoint',
+        'email': 'hello@joinsteward.app',
+        'contactType': 'customer support',
+      },
+    },
+  ],
+}
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      </head>
       <body style={{ fontFamily: 'var(--font-body)' }}>
         <ThemeProvider>
           <AuthProvider>

@@ -3,8 +3,9 @@ import Link from 'next/link'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Privacy Policy - Steward',
-  description: 'Privacy Policy for Steward, your AI concierge that watches the web.',
+  title: 'Privacy Policy',
+  description: 'Privacy Policy for Steward — how we handle your data, protect your privacy, and keep your price tracking information secure.',
+  alternates: { canonical: 'https://www.joinsteward.app/privacy' },
 }
 
 export default function PrivacyPolicyPage() {

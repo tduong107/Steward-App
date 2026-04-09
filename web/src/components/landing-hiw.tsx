@@ -336,9 +336,9 @@ export function LandingHIW() {
       {/* Header */}
       <div className="hiw-header landing-reveal">
         <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#6EE7B7', opacity: 0.7, marginBottom: 16 }}>How it works</div>
-        <div style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(32px,5vw,48px)', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-0.03em', color: '#F7F6F3', marginBottom: 16 }}>
+        <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(32px,5vw,48px)', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-0.03em', color: '#F7F6F3', margin: 0, marginBottom: 16 }}>
           Effortless savings<br />in <em style={{ fontStyle: 'italic', color: '#6EE7B7' }}>three steps</em>
-        </div>
+        </h2>
         <div style={{ fontSize: 16, lineHeight: 1.6, color: 'rgba(247,246,243,0.5)', fontWeight: 300 }}>Set up in 30 seconds. Here&apos;s how.</div>
       </div>
 

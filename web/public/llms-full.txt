@@ -1,0 +1,112 @@
+# Steward — AI-Powered Price Tracker & Personal Concierge
+
+> Steward is an AI-powered personal concierge app that monitors websites for price drops, restocks, restaurant reservation openings, campsite availability, flight fare changes, and event ticket restocks. Available as a native iOS app and a full web dashboard at joinsteward.app.
+
+## Product Overview
+
+Steward levels the playing field for everyday consumers. While scalpers use bots to snag deals, reservations, and tickets in milliseconds, Steward gives regular people an AI concierge that watches the web 24/7 on their behalf. Users describe what they want in natural language, and Steward sets up automated monitoring with intelligent alerts.
+
+### Core Capabilities
+
+1. **Price Drop Tracking**: Monitors prices across Amazon, Nike, Best Buy, Target, Walmart, Costco, Nordstrom, REI, Bloomingdale's, and thousands of other retailers. Users set a target price and get notified instantly when it's hit. Includes fake deal detection to identify artificially inflated prices.
+
+2. **Restaurant Reservation Monitoring**: Watches Resy and OpenTable for cancellations and new openings at hard-to-book restaurants like Carbone (NYC), Don Angie, Nobu, and other high-demand venues. Alerts include restaurant name, date, time, and party size.
+
+3. **Campsite Availability Tracking**: Monitors Recreation.gov for campsite cancellations at national parks including Yosemite (Upper Pines, Lower Pines, North Pines), Yellowstone (Madison, Bridge Bay), Big Sur (Kirk Creek, Plaskett Creek), Glacier, Zion, Grand Canyon, and others.
+
+4. **Flight Fare Monitoring**: Tracks round-trip and one-way fares across airlines and routes via Google Flights and Kayak. Supports specific date monitoring with alerts on price drops below a target.
+
+5. **Event Ticket Restock Alerts**: Watches Ticketmaster and other platforms for face-value ticket drops and restocks for sold-out concerts, sports events, and shows.
+
+6. **Product Restock Monitoring**: Monitors sold-out products, limited releases (sneaker drops, PS5, etc.), and viral items across e-commerce sites.
+
+## How Steward Works
+
+### Setup (30 seconds)
+1. **Share a URL**: From Safari, Chrome, or any app, share a link directly to Steward via the iOS Share Extension, or paste it into the web dashboard.
+2. **AI Analysis**: Steward's AI reads the page, identifies the product/listing/reservation, detects the current price or availability, and asks what you want to track.
+3. **Natural Language Chat**: Alternatively, just describe what you want: "Track Nike Dunk Low Panda under $90" or "Find me a table at Carbone NY for Friday 8pm, 2 guests."
+
+### Monitoring
+- Steward checks your watches on a schedule based on your plan (daily, every 12 hours, or every 2 hours)
+- Uses a 4-tier fallback system: direct website fetch → smart scraping → shopping APIs → AI analysis
+- Automatically detects method that works best for each site and remembers it
+- Auto-pauses watches after ~2 days of consecutive failures to conserve resources
+
+### Alerts
+- **Push notifications** (iOS): Instant lock screen alerts with direct action links
+- **Email alerts** (Pro+): Detailed notifications with price history
+- **SMS alerts** (Pro+): Text message notifications
+- All alerts include a direct link to the product/listing for immediate action
+
+## Technical Architecture
+
+- **Frontend**: Next.js App Router on Vercel (web), SwiftUI with SwiftData (iOS)
+- **Backend**: Supabase (auth, database, realtime subscriptions, edge functions)
+- **AI**: Claude API for natural language understanding and page analysis
+- **Payments**: Stripe (subscriptions with Pro and Premium tiers)
+- **Notifications**: Twilio (SMS), Supabase (push), email via edge functions
+- **Price Fetching**: 4-tier fallback chain — direct fetch, Scrape.do, Serper Shopping API, Claude AI analysis
+
+## Pricing Tiers
+
+| Feature | Free | Pro ($4.99/mo) | Premium ($9.99/mo) |
+|---|---|---|---|
+| Active watches | 3 | 7 | 15 |
+| Check frequency | Daily | Every 12 hours | Every 2 hours |
+| Push notifications | Yes | Yes | Yes |
+| Email & SMS alerts | No | Yes | Yes |
+| Price insights | No | Yes | Yes |
+| Fake deal detection | No | No | Yes |
+| Steward Acts (auto-execute) | No | No | Yes |
+| Priority support | No | No | Yes |
+
+Annual plans: Pro $39.99/year (save 33%), Premium $79.99/year (save 33%).
+
+## Competitive Positioning
+
+### vs Honey
+Honey is a browser extension focused on coupon codes at checkout. Steward is a standalone app that proactively monitors prices over time, works on any URL (not just supported retailers), and covers non-shopping use cases like reservations, campsites, and flights.
+
+### vs CamelCamelCamel / Keepa
+CamelCamelCamel and Keepa are Amazon-only price trackers. Steward works across all retailers and websites, uses AI to understand any product page, and covers categories beyond shopping.
+
+### vs Karma
+Karma is a shopping-focused price tracker with a browser extension. Steward differentiates by offering AI-powered setup (no browser extension needed), support for non-shopping categories (restaurants, campsites, flights, tickets), and a native iOS app with push notifications.
+
+### vs HARPA AI
+HARPA AI is a browser automation tool. Steward is a purpose-built tracking app that runs in the cloud (no browser needed), with a mobile-first design and consumer-friendly UX.
+
+## Use Cases by Category
+
+### Shopping
+- Track Black Friday and Cyber Monday deals months in advance
+- Monitor limited-edition sneaker drops on Nike, Adidas, New Balance
+- Watch for PS5, Xbox, GPU restocks at retail price
+- Set price alerts on furniture, appliances, electronics across multiple retailers
+- Detect fake sales where prices are artificially inflated before "discounts"
+
+### Dining
+- Get notified when Carbone, Don Angie, or other impossible-to-book restaurants have cancellations
+- Monitor specific dates, times, and party sizes on Resy
+- Track OpenTable availability for special occasions
+
+### Travel & Outdoors
+- Monitor flight fares for upcoming trips on Google Flights and Kayak
+- Track campsite cancellations at national parks on Recreation.gov
+- Watch for hotel rate drops on booking platforms
+
+### Entertainment
+- Get alerted when sold-out concert tickets reappear at face value on Ticketmaster
+- Monitor sports event ticket availability
+- Track festival and show ticket restocks
+
+## Links
+
+- **Website**: https://www.joinsteward.app
+- **iOS App**: https://apps.apple.com/us/app/steward-concierge/id6760180137
+- **Sign Up (Web)**: https://www.joinsteward.app/signup
+- **Support**: https://www.joinsteward.app/support
+- **Privacy Policy**: https://www.joinsteward.app/privacy
+- **Terms of Service**: https://www.joinsteward.app/terms
+- **Contact**: hello@joinsteward.app

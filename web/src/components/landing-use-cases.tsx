@@ -114,9 +114,9 @@ export function LandingUseCases() {
       {/* Header */}
       <div className="landing-reveal" style={{ textAlign: 'center', maxWidth: 600, margin: '0 auto clamp(40px,7vh,72px)' }}>
         <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#6EE7B7', opacity: 0.7, marginBottom: 16 }}>Why Steward</div>
-        <div style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(36px,5vw,48px)', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-0.03em', color: '#F7F6F3', marginBottom: 16 }}>
+        <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(36px,5vw,48px)', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-0.03em', color: '#F7F6F3', margin: 0, marginBottom: 16 }}>
           One app, endless<br />ways to <em style={{ fontStyle: 'italic', color: '#6EE7B7' }}>save</em>
-        </div>
+        </h2>
       </div>
 
       {/* Tab filters */}

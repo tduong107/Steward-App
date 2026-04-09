@@ -8,3 +8,4 @@ Sitemap: https://www.joinsteward.app/sitemap.xml
 
 # AI search optimization
 # See https://www.joinsteward.app/llms.txt for AI-friendly site description
+# See https://www.joinsteward.app/llms-full.txt for detailed product context

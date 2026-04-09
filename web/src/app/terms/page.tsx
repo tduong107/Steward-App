@@ -3,8 +3,9 @@ import Link from 'next/link'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Terms of Service - Steward',
-  description: 'Terms of Service for Steward, your AI concierge that watches the web.',
+  title: 'Terms of Service',
+  description: 'Terms of Service for Steward — the AI-powered price tracker and web monitoring concierge.',
+  alternates: { canonical: 'https://www.joinsteward.app/terms' },
 }
 
 export default function TermsOfServicePage() {
