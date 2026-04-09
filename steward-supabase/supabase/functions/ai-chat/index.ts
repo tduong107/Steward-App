@@ -764,8 +764,9 @@ async function enrichPriceCheck(responseText: string): Promise<string> {
   const hostname = new URL(url).hostname.replace("www.", "");
   const SCRAPE_DO_KEY = Deno.env.get("SCRAPE_DO_API_KEY") ?? "";
   const startTime = Date.now();
-  const TIMEOUT_MS = 4000;
+  const TIMEOUT_MS = 8000;
   const timeLeft = () => TIMEOUT_MS - (Date.now() - startTime);
+  const elapsed = () => Date.now() - startTime;
 
   const replace = (text: string) =>
     responseText.replace(/\[FETCH_PRICE\][\s\S]*?\[\/FETCH_PRICE\]/, text);
@@ -818,7 +819,7 @@ async function enrichPriceCheck(responseText: string): Promise<string> {
     } catch { /* continue to next tier */ }
   }
 
-  if (timeLeft() < 500) return replace("I'll verify the current price on my first automated check — this may take a moment.");
+  if (timeLeft() < 500) return replace(elapsed() > 4000 ? "Tried multiple methods but couldn't verify the price right now. I'll check on my first automated run and notify you." : "Still checking price — trying other methods...");
 
   // ── Tier 2: Scrape.do (rendered JS) ──
   if (SCRAPE_DO_KEY && timeLeft() > 1500) {
@@ -836,7 +837,7 @@ async function enrichPriceCheck(responseText: string): Promise<string> {
     } catch { /* continue */ }
   }
 
-  if (timeLeft() < 500) return replace("I'll verify the current price on my first automated check — this may take a moment.");
+  if (timeLeft() < 500) return replace(elapsed() > 4000 ? "Tried multiple methods but couldn't verify the price right now. I'll check on my first automated run and notify you." : "Still checking price — trying other methods...");
 
   // ── Tier 3: Serper Shopping API ──
   if (SERPER_API_KEY && timeLeft() > 1000) {
@@ -862,7 +863,7 @@ async function enrichPriceCheck(responseText: string): Promise<string> {
     } catch { /* continue */ }
   }
 
-  if (timeLeft() < 500) return replace("I'll verify the current price on my first automated check — this may take a moment.");
+  if (timeLeft() < 500) return replace(elapsed() > 4000 ? "Tried multiple methods but couldn't verify the price right now. I'll check on my first automated run and notify you." : "Still checking price — trying other methods...");
 
   // ── Tier 4: Claude AI (Serper search → Claude extracts) ──
   if (ANTHROPIC_API_KEY && SERPER_API_KEY && timeLeft() > 1500) {
@@ -915,9 +916,9 @@ async function enrichPriceCheck(responseText: string): Promise<string> {
   }
 
   // All tiers exhausted or timed out
-  const elapsed = Date.now() - startTime;
-  console.log(`[ai-chat] Price fetch: all 4 tiers failed for ${hostname} (${elapsed}ms)`);
-  return replace("I'll verify the current price on my first automated check — this may take a moment.");
+  const totalElapsed = elapsed();
+  console.log(`[ai-chat] Price fetch: all 4 tiers failed for ${hostname} (${totalElapsed}ms)`);
+  return replace("I tried multiple methods to verify the current price but this site is tricky. I'll check on my first automated run and let you know!");
 }
 
 // Streamlined price extraction for chat context (mirrors check-watch logic)
