@@ -277,10 +277,14 @@ Examples:
 - Include "Browse & find it" in ANY response where you don't yet have a URL from the user.
 
 PRICE CONFIRMATION (for price watches):
-Do NOT use [FETCH_PRICE] — many sites block automated price fetching which shows error messages.
-Instead, simply proceed with creating the watch. Steward will verify the price on the first automated check.
-If the user already told you the price target (e.g. "under $100"), use that as the condition and move to frequency selection.
-Do NOT show "(Couldn't reach the page)" or any error messages about price verification.
+When setting up a price watch, try to verify the current price. Include this marker with the URL:
+[FETCH_PRICE]https://example.com/product[/FETCH_PRICE]
+The server will fetch the page and replace this with the actual current price (e.g. "Currently $59.99 on Amazon").
+Write your message so it flows naturally around this marker, for example:
+"Great, I'll watch that for you! [FETCH_PRICE]https://a.co/d/abc123[/FETCH_PRICE] I'll alert you when it drops below $50. Does the current price look right?"
+IMPORTANT: If the price fetch fails or returns an error, do NOT show the error to the user. Instead say something like "I'll verify the current price on my first check." and proceed normally with watch creation.
+Never show "(Couldn't reach the page)" or technical error messages. Just move on gracefully.
+Only use [FETCH_PRICE] for price-related watches. Do not use it for stock checks, booking watches, etc.
 
 PROPOSING A WATCH:
 When you have enough info (URL + condition + action), confirm the details and ask about check frequency in the SAME message. Use frequency [SUGGESTIONS] chips — these serve as both the frequency selector AND the confirmation.
@@ -778,9 +782,10 @@ async function enrichPriceCheck(responseText: string): Promise<string> {
     });
 
     if (!response.ok) {
+      // Graceful fallback — don't show error to user
       return responseText.replace(
         /\[FETCH_PRICE\][\s\S]*?\[\/FETCH_PRICE\]/,
-        "*(Couldn't reach the page to verify the price)*"
+        "I'll verify the current price on my first automated check."
       );
     }
 
@@ -795,16 +800,17 @@ async function enrichPriceCheck(responseText: string): Promise<string> {
         replacement
       );
     } else {
+      // Price not found in HTML — don't alarm the user
       return responseText.replace(
         /\[FETCH_PRICE\][\s\S]*?\[\/FETCH_PRICE\]/,
-        "*(Couldn't extract the current price from the page — can you tell me what you're seeing?)*"
+        "I'll verify the current price on my first automated check."
       );
     }
   } catch (err) {
     console.error(`[ai-chat] Price fetch error: ${err.message}`);
     return responseText.replace(
       /\[FETCH_PRICE\][\s\S]*?\[\/FETCH_PRICE\]/,
-      "*(Couldn't load the page to check the price)*"
+      "I'll verify the current price on my first automated check."
     );
   }
 }
