@@ -730,7 +730,8 @@ function generateFallbackLinks(query: string): string[] {
 }
 
 // ────────────────────────────────────────────────────────────────
-// Live Price Check: Replaces [FETCH_PRICE] blocks with real price
+// Live Price Check: 4-tier fallback chain with 4s total timeout
+// Matches check-watch's approach: direct → Scrape.do → Serper Shopping → Claude
 // ────────────────────────────────────────────────────────────────
 
 async function enrichPriceCheck(responseText: string): Promise<string> {
@@ -740,79 +741,154 @@ async function enrichPriceCheck(responseText: string): Promise<string> {
   if (!match) return responseText;
 
   let url = match[1].trim();
-  if (!url.match(/^https?:\/\//i)) {
-    url = `https://${url}`;
-  }
+  if (!url.match(/^https?:\/\//i)) url = `https://${url}`;
 
-  // SSRF protection: block private/internal URLs
+  // SSRF protection
   try {
-    const parsed = new URL(url);
-    const hostname = parsed.hostname.toLowerCase();
-    if (
-      hostname === "localhost" ||
-      hostname.startsWith("127.") ||
-      hostname.startsWith("10.") ||
-      hostname.startsWith("192.168.") ||
-      hostname.startsWith("172.") ||
-      hostname === "0.0.0.0" ||
-      hostname.endsWith(".local") ||
-      hostname.startsWith("169.254.") ||
-      hostname.includes("metadata.google") ||
-      hostname.includes("169.254.169.254")
-    ) {
-      return responseText.replace(
-        /\[FETCH_PRICE\][\s\S]*?\[\/FETCH_PRICE\]/,
-        "*(Cannot fetch prices from internal addresses)*"
-      );
+    const h = new URL(url).hostname.toLowerCase();
+    if (["localhost","0.0.0.0"].includes(h) || h.endsWith(".local") ||
+        /^(127\.|10\.|192\.168\.|172\.|169\.254\.)/.test(h) ||
+        h.includes("metadata.google")) {
+      return responseText.replace(/\[FETCH_PRICE\][\s\S]*?\[\/FETCH_PRICE\]/, "*(Cannot fetch internal URLs)*");
     }
   } catch {
-    return responseText.replace(
-      /\[FETCH_PRICE\][\s\S]*?\[\/FETCH_PRICE\]/,
-      "*(Invalid URL)*"
-    );
+    return responseText.replace(/\[FETCH_PRICE\][\s\S]*?\[\/FETCH_PRICE\]/, "*(Invalid URL)*");
   }
 
+  const hostname = new URL(url).hostname.replace("www.", "");
+  const SCRAPE_DO_KEY = Deno.env.get("SCRAPE_DO_API_KEY") ?? "";
+  const startTime = Date.now();
+  const TIMEOUT_MS = 4000;
+  const timeLeft = () => TIMEOUT_MS - (Date.now() - startTime);
+
+  const replace = (text: string) =>
+    responseText.replace(/\[FETCH_PRICE\][\s\S]*?\[\/FETCH_PRICE\]/, text);
+
+  // Extract product name from URL for Serper/Claude fallback
+  const pathSegments = new URL(url).pathname.split('/').filter(Boolean);
+  const productName = pathSegments
+    .filter(s => !s.match(/^[A-Z0-9]{5,}\.html$/) && s.length > 2)
+    .pop()
+    ?.replace(/[-_]/g, ' ')
+    ?.replace(/\.html$/i, '') || hostname;
+
+  // ── Tier 1: Direct fetch ──
   try {
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-      },
+    const res = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" },
       redirect: "follow",
+      signal: AbortSignal.timeout(Math.min(2000, timeLeft())),
     });
-
-    if (!response.ok) {
-      // Graceful fallback — don't show error to user
-      return responseText.replace(
-        /\[FETCH_PRICE\][\s\S]*?\[\/FETCH_PRICE\]/,
-        "I'll verify the current price on my first automated check."
-      );
+    if (res.ok) {
+      const html = await res.text();
+      const price = extractPriceFromHtml(html);
+      if (price !== null) {
+        console.log(`[ai-chat] Price fetch tier 1 (direct): $${price} from ${hostname}`);
+        return replace(`Currently **$${price.toFixed(2)}** on ${hostname}.`);
+      }
     }
+  } catch { /* continue to next tier */ }
 
-    const html = await response.text();
-    const price = extractPriceFromHtml(html);
-    const hostname = new URL(url).hostname.replace("www.", "");
+  if (timeLeft() < 500) return replace("I'll verify the current price on my first automated check — this may take a moment.");
 
-    if (price !== null) {
-      const replacement = `Currently **$${price.toFixed(2)}** on ${hostname}.`;
-      return responseText.replace(
-        /\[FETCH_PRICE\][\s\S]*?\[\/FETCH_PRICE\]/,
-        replacement
-      );
-    } else {
-      // Price not found in HTML — don't alarm the user
-      return responseText.replace(
-        /\[FETCH_PRICE\][\s\S]*?\[\/FETCH_PRICE\]/,
-        "I'll verify the current price on my first automated check."
-      );
-    }
-  } catch (err) {
-    console.error(`[ai-chat] Price fetch error: ${err.message}`);
-    return responseText.replace(
-      /\[FETCH_PRICE\][\s\S]*?\[\/FETCH_PRICE\]/,
-      "I'll verify the current price on my first automated check."
-    );
+  // ── Tier 2: Scrape.do (rendered JS) ──
+  if (SCRAPE_DO_KEY && timeLeft() > 1500) {
+    try {
+      const sdUrl = `https://api.scrape.do/?token=${SCRAPE_DO_KEY}&url=${encodeURIComponent(url)}&render=true`;
+      const sdRes = await fetch(sdUrl, { signal: AbortSignal.timeout(Math.min(2500, timeLeft())) });
+      if (sdRes.ok) {
+        const html = await sdRes.text();
+        const price = extractPriceFromHtml(html);
+        if (price !== null) {
+          console.log(`[ai-chat] Price fetch tier 2 (scrape.do): $${price} from ${hostname}`);
+          return replace(`Currently **$${price.toFixed(2)}** on ${hostname}.`);
+        }
+      }
+    } catch { /* continue */ }
   }
+
+  if (timeLeft() < 500) return replace("I'll verify the current price on my first automated check — this may take a moment.");
+
+  // ── Tier 3: Serper Shopping API ──
+  if (SERPER_API_KEY && timeLeft() > 1000) {
+    try {
+      const serperRes = await fetch("https://google.serper.dev/shopping", {
+        method: "POST",
+        headers: { "X-API-KEY": SERPER_API_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify({ q: productName, num: 3 }),
+        signal: AbortSignal.timeout(Math.min(2000, timeLeft())),
+      });
+      if (serperRes.ok) {
+        const data = await serperRes.json();
+        for (const item of (data.shopping ?? [])) {
+          const priceStr = (item.price || "").replace(/[^0-9.]/g, "");
+          const price = parseFloat(priceStr);
+          if (!isNaN(price) && price > 0.5) {
+            const source = item.source || hostname;
+            console.log(`[ai-chat] Price fetch tier 3 (serper): $${price} from ${source}`);
+            return replace(`Currently **$${price.toFixed(2)}** (via ${source}).`);
+          }
+        }
+      }
+    } catch { /* continue */ }
+  }
+
+  if (timeLeft() < 500) return replace("I'll verify the current price on my first automated check — this may take a moment.");
+
+  // ── Tier 4: Claude AI (Serper search → Claude extracts) ──
+  if (ANTHROPIC_API_KEY && SERPER_API_KEY && timeLeft() > 1500) {
+    try {
+      // Quick web search for price context
+      const searchRes = await fetch("https://google.serper.dev/search", {
+        method: "POST",
+        headers: { "X-API-KEY": SERPER_API_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify({ q: `${productName} price`, num: 3 }),
+        signal: AbortSignal.timeout(Math.min(1500, timeLeft())),
+      });
+      if (searchRes.ok) {
+        const searchData = await searchRes.json();
+        const snippets: string[] = [];
+        if (searchData.answerBox?.snippet) snippets.push(searchData.answerBox.snippet);
+        for (const r of (searchData.organic ?? []).slice(0, 3)) {
+          if (r.snippet) snippets.push(`${r.title}: ${r.snippet}`);
+        }
+        for (const r of (searchData.shopping ?? []).slice(0, 3)) {
+          snippets.push(`${r.title} — ${r.price || ""} (${r.source || ""})`);
+        }
+        const context = snippets.join("\n").substring(0, 2000);
+
+        if (context && timeLeft() > 800) {
+          const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
+            method: "POST",
+            headers: { "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+            body: JSON.stringify({
+              model: "claude-haiku-4-5-20251001", max_tokens: 80,
+              system: 'Extract the current retail price from search results. Respond ONLY with JSON: {"price": NUMBER}. If unsure, respond {"price": null}.',
+              messages: [{ role: "user", content: `Product: ${productName}\nURL: ${url}\n\nSearch results:\n${context}\n\nWhat is the current price?` }],
+            }),
+            signal: AbortSignal.timeout(Math.min(2000, timeLeft())),
+          });
+          if (claudeRes.ok) {
+            const claudeData = await claudeRes.json();
+            const text = claudeData.content?.[0]?.text ?? "";
+            const priceMatch = text.match(/\{\s*"price"\s*:\s*([\d.]+)\s*\}/);
+            if (priceMatch) {
+              const price = parseFloat(priceMatch[1]);
+              if (!isNaN(price) && price > 0.5 && price < 100000) {
+                console.log(`[ai-chat] Price fetch tier 4 (claude): $${price}`);
+                return replace(`Currently approximately **$${price.toFixed(2)}** based on recent listings.`);
+              }
+            }
+          }
+        }
+      }
+    } catch { /* timeout or error */ }
+  }
+
+  // All tiers exhausted or timed out
+  const elapsed = Date.now() - startTime;
+  console.log(`[ai-chat] Price fetch: all 4 tiers failed for ${hostname} (${elapsed}ms)`);
+  return replace("I'll verify the current price on my first automated check — this may take a moment.");
 }
 
 // Streamlined price extraction for chat context (mirrors check-watch logic)
