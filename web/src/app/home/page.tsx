@@ -71,18 +71,16 @@ export default function DashboardPage() {
       (w) => w.check_frequency && !isFrequencyAllowed(w.check_frequency, tier),
     )
     if (needsDowngrade.length > 0) {
-      const supabase = createClient()
-      Promise.all(
-        needsDowngrade.map((w) =>
-          supabase
-            .from('watches')
-            .update({ check_frequency: maxFreq })
-            .eq('id', w.id),
-        ),
-      ).then(() => {
-        console.log(`[tier-enforcement] Downgraded ${needsDowngrade.length} watches to ${maxFreq}`)
-        setHasEnforced(true)
-      })
+      // Single batch update instead of N individual updates
+      const watchIds = needsDowngrade.map(w => w.id)
+      supabaseRef.current
+        .from('watches')
+        .update({ check_frequency: maxFreq })
+        .in('id', watchIds)
+        .then(() => {
+          console.log(`[tier-enforcement] Downgraded ${needsDowngrade.length} watches to ${maxFreq}`)
+          setHasEnforced(true)
+        })
     } else {
       setHasEnforced(true)
     }
@@ -106,13 +104,13 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!user || priceWatches.length === 0) return
+    let cancelled = false
 
     const fetchResults = async () => {
       const cutoff = new Date()
       cutoff.setDate(cutoff.getDate() - 90)
       const cutoffStr = cutoff.toISOString()
 
-      // Fetch per watch concurrently (matches iOS — no global limit)
       const promises = priceWatches.map(async (w) => {
         const { data } = await supabaseRef.current
           .from('check_results')
@@ -126,10 +124,11 @@ export default function DashboardPage() {
       })
 
       const results = await Promise.all(promises)
-      setCheckResults(results.flat())
+      if (!cancelled) setCheckResults(results.flat())
     }
 
     fetchResults()
+    return () => { cancelled = true }
   }, [user, priceWatches])
 
   // Match iOS logic: savings = highestPrice - currentPrice per watch
@@ -171,17 +170,8 @@ export default function DashboardPage() {
     return { total, drops: drops.slice(0, 2) }
   }, [checkResults, priceWatches])
 
-  // Price watches for insights card
-  const priceWatchCount = useMemo(
-    () =>
-      activeWatches.filter(
-        (w) =>
-          w.action_type === 'price' ||
-          w.condition?.toLowerCase().includes('price') ||
-          w.action_label?.toLowerCase().includes('price'),
-      ).length,
-    [activeWatches],
-  )
+  // Price watches for insights card — reuse priceWatches instead of re-filtering
+  const priceWatchCount = priceWatches.length
 
   // ─── Weekly stats: checks + triggers in last 7 days (matches iOS) ───
   const [weeklyChecks, setWeeklyChecks] = useState(0)

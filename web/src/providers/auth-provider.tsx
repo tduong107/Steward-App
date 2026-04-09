@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useCallback, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import type { User } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
@@ -21,16 +21,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
-
-  const supabase = createClient()
+  const supabaseRef = useRef(createClient())
+  const mountedRef = useRef(true)
 
   const fetchProfile = useCallback(
     async (userId: string) => {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseRef.current
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .single()
+
+      // Only update state if still mounted
+      if (!mountedRef.current) return
 
       if (error) {
         console.error('Failed to fetch profile:', error.message)
@@ -39,7 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setProfile(data as Profile)
       }
     },
-    [supabase]
+    []
   )
 
   const refreshProfile = useCallback(async () => {
@@ -49,32 +52,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user, fetchProfile])
 
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut()
+    await supabaseRef.current.auth.signOut()
     setUser(null)
     setProfile(null)
-    // Clear animation flag so it plays again on next login
     sessionStorage.removeItem('steward_animation_shown')
     router.push('/')
-  }, [supabase, router])
+  }, [router])
 
   useEffect(() => {
+    mountedRef.current = true
+    const supabase = supabaseRef.current
+
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!mountedRef.current) return
       const currentUser = session?.user ?? null
       setUser(currentUser)
-      if (currentUser) {
-        fetchProfile(currentUser.id)
-      }
+      if (currentUser) fetchProfile(currentUser.id)
       setLoading(false)
     })
 
-    // Listen for auth state changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    // Listen for auth state changes (login, logout, token refresh)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!mountedRef.current) return
       const currentUser = session?.user ?? null
       setUser(currentUser)
-
       if (currentUser) {
         fetchProfile(currentUser.id)
       } else {
@@ -83,9 +85,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
 
     return () => {
+      mountedRef.current = false
       subscription.unsubscribe()
     }
-  }, [supabase, fetchProfile])
+  }, [fetchProfile])
 
   return (
     <AuthContext.Provider value={{ user, profile, loading, signOut, refreshProfile }}>
