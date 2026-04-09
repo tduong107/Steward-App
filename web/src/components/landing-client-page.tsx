@@ -49,6 +49,7 @@ const S = {
 }
 
 // ── Nav ───────────────────────────────────────────────────────────────────────
+const APP_STORE_URL = 'https://apps.apple.com/us/app/steward-concierge/id6760180137'
 const NAV_LINKS = [['#how-it-works', 'How it Works'], ['#why-steward', 'Why Steward'], ['#pricing', 'Pricing']] as const
 
 function Nav() {
@@ -123,6 +124,11 @@ function Nav() {
             style={{ background: S.mint, color: S.forest, fontWeight: 700, padding: '13px', borderRadius: 10, fontSize: 15, textDecoration: 'none', textAlign: 'center' as const, marginTop: 8, display: 'block' }}>
             Get Started Free
           </Link>
+          <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" onClick={() => setMenuOpen(false)}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: S.cream, fontWeight: 600, padding: '13px', borderRadius: 10, fontSize: 14, textDecoration: 'none', marginTop: 6 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+            Download iOS App
+          </a>
         </div>
       )}
     </nav>
@@ -298,7 +304,7 @@ function Hero() {
           {/* Eyebrow */}
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(110,231,183,0.08)', border: '1px solid rgba(110,231,183,0.18)', borderRadius: 30, padding: '6px 16px', marginBottom: 28, opacity: 0, transform: 'translateY(20px)', animation: 'hiw-fadeUp .7s .3s ease forwards' }}>
             <span style={{ fontSize: 14, color: S.mint }}>✦</span>
-            <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.18em', textTransform: 'uppercase' as const, color: S.mint }}>Your personal AI concierge</span>
+            <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.18em', textTransform: 'uppercase' as const, color: S.mint }}>Now on the App Store &amp; Web</span>
           </div>
 
           {/* Title — word by word */}
@@ -322,15 +328,16 @@ function Hero() {
               style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: S.mint, color: S.forest, fontSize: 16, fontWeight: 700, padding: '18px 36px', borderRadius: 14, textDecoration: 'none', transition: 'all .35s cubic-bezier(.34,1.56,.64,1)' }}>
               Start for free <span>→</span>
             </Link>
-            <a href="#how-it-works" className="lnd-ghost-link"
-              style={{ fontSize: 14.5, fontWeight: 500, color: 'rgba(247,246,243,0.55)', textDecoration: 'none', transition: 'color .25s', display: 'flex', alignItems: 'center', gap: 6 }}>
-              See how it works ↓
+            <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className="lnd-appstore-btn"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: S.cream, fontSize: 14, fontWeight: 600, padding: '14px 24px', borderRadius: 14, textDecoration: 'none', transition: 'all .35s cubic-bezier(.34,1.56,.64,1)' }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+              Download iOS App
             </a>
           </div>
 
           {/* Social proof */}
-          <div style={{ marginTop: 28, display: 'flex', alignItems: 'center', gap: 8, opacity: 0, animation: 'hiw-fadeUp .7s 1.8s ease forwards' }}>
-            {['Free forever', 'No credit card', 'Setup in seconds'].map((t, i) => (
+          <div style={{ marginTop: 28, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' as const, opacity: 0, animation: 'hiw-fadeUp .7s 1.8s ease forwards' }}>
+            {['Free forever', 'No credit card', 'iOS & Web'].map((t, i) => (
               <span key={t} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 {i > 0 && <span style={{ width: 3, height: 3, borderRadius: '50%', background: 'rgba(247,246,243,0.2)', display: 'inline-block' }} />}
                 <span style={{ fontSize: 12.5, color: 'rgba(247,246,243,0.35)', fontWeight: 300 }}>{t}</span>
@@ -619,6 +626,88 @@ function FeatLink({ href, children }: { href: string; children: React.ReactNode 
   )
 }
 
+// ── Platform Showcase ────────────────────────────────────────────────────────
+function PlatformShowcase() {
+  return (
+    <section id="platforms" style={{ padding: 'clamp(60px,10vh,120px) clamp(24px,8vw,60px)', background: S.bg, position: 'relative', overflow: 'hidden' }}>
+      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 800px 600px at 50% 40%,rgba(42,92,69,0.25) 0%,transparent 60%)' }} />
+      <div style={{ position: 'relative', zIndex: 1, maxWidth: 1100, margin: '0 auto' }}>
+        <div className="landing-reveal" style={{ textAlign: 'center', maxWidth: 600, margin: '0 auto 60px' }}>
+          <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '0.2em', textTransform: 'uppercase' as const, color: S.mint, opacity: 0.7, marginBottom: 16 }}>Available everywhere</div>
+          <div style={{ fontFamily: S.serif, fontSize: 'clamp(36px,5vw,48px)', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-0.03em', color: S.cream, marginBottom: 16 }}>
+            Your concierge,<br /><em style={{ color: S.mint }}>any device</em>
+          </div>
+          <p style={{ fontSize: 16, lineHeight: 1.6, color: 'rgba(247,246,243,0.5)', fontWeight: 300 }}>
+            Steward works wherever you are. Native iOS app with push notifications, or full-featured web dashboard on any browser.
+          </p>
+        </div>
+
+        <div className="lnd-platform-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, maxWidth: 900, margin: '0 auto' }}>
+          {/* iOS App Card */}
+          <div className="landing-reveal" style={{ background: 'linear-gradient(135deg,rgba(42,92,69,0.3),rgba(15,32,24,0.2))', border: '1px solid rgba(110,231,183,0.15)', borderRadius: 24, padding: '40px 32px', position: 'relative', overflow: 'hidden' }}>
+            <div style={{ position: 'absolute', top: -30, right: -30, width: 120, height: 120, borderRadius: '50%', background: 'rgba(110,231,183,0.05)' }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+              <div style={{ width: 48, height: 48, borderRadius: 12, background: 'linear-gradient(135deg,rgba(110,231,183,0.2),rgba(42,92,69,0.4))', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill={S.mint}><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+              </div>
+              <div>
+                <div style={{ fontFamily: S.serif, fontSize: 20, fontWeight: 700, color: S.cream }}>iOS App</div>
+                <div style={{ fontSize: 12, color: 'rgba(247,246,243,0.4)' }}>Now live on the App Store</div>
+              </div>
+            </div>
+            <ul style={{ listStyle: 'none', padding: 0, display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 28 }}>
+              {['Native push notifications', 'Instant alerts on your lock screen', 'AI chat to create watches', 'Track prices, flights, restaurants', 'Works offline with smart sync', 'Face ID & biometric auth'].map(f => (
+                <li key={f} style={{ fontSize: 13.5, color: 'rgba(247,246,243,0.55)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ color: S.mint, fontSize: 12, fontWeight: 700, flexShrink: 0 }}>✓</span> {f}
+                </li>
+              ))}
+            </ul>
+            <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className="lnd-appstore-btn"
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, background: S.mint, color: S.forest, fontWeight: 700, padding: '14px 24px', borderRadius: 12, fontSize: 14, textDecoration: 'none', transition: 'all .3s' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+              Download on App Store
+            </a>
+          </div>
+
+          {/* Web App Card */}
+          <div className="landing-reveal" style={{ background: S.cardBg, border: `1px solid ${S.border}`, borderRadius: 24, padding: '40px 32px', position: 'relative', overflow: 'hidden', animationDelay: '100ms' }}>
+            <div style={{ position: 'absolute', top: -30, right: -30, width: 120, height: 120, borderRadius: '50%', background: 'rgba(255,255,255,0.02)' }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+              <div style={{ width: 48, height: 48, borderRadius: 12, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={S.mint} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+              </div>
+              <div>
+                <div style={{ fontFamily: S.serif, fontSize: 20, fontWeight: 700, color: S.cream }}>Web App</div>
+                <div style={{ fontSize: 12, color: 'rgba(247,246,243,0.4)' }}>Full dashboard on any browser</div>
+              </div>
+            </div>
+            <ul style={{ listStyle: 'none', padding: 0, display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 28 }}>
+              {['Full dashboard with analytics', 'Price history charts & insights', 'Email & SMS alert channels', 'Manage all watches at a glance', 'Works on desktop, tablet, mobile', 'No download required'].map(f => (
+                <li key={f} style={{ fontSize: 13.5, color: 'rgba(247,246,243,0.55)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ color: S.mint, fontSize: 12, fontWeight: 700, flexShrink: 0 }}>✓</span> {f}
+                </li>
+              ))}
+            </ul>
+            <Link href="/signup"
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, background: 'rgba(110,231,183,0.06)', border: '1px solid rgba(110,231,183,0.18)', color: S.mint, fontWeight: 700, padding: '14px 24px', borderRadius: 12, fontSize: 14, textDecoration: 'none', transition: 'all .3s' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+              Open Web App
+            </Link>
+          </div>
+        </div>
+
+        {/* Sync badge */}
+        <div className="landing-reveal" style={{ textAlign: 'center', marginTop: 40 }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: 'rgba(110,231,183,0.06)', border: '1px solid rgba(110,231,183,0.12)', borderRadius: 30, padding: '8px 20px' }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={S.mint} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            <span style={{ fontSize: 12.5, color: 'rgba(247,246,243,0.5)', fontWeight: 400 }}>Your watches sync across all devices in real-time</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
 // ── Pricing ───────────────────────────────────────────────────────────────────
 type Plan = {
   name: string; monthly: string; yearly: string; periodMonthly: string; periodYearly: string; featured: boolean; tag?: string
@@ -731,10 +820,17 @@ function FinalCTA() {
         <p style={{ fontSize: 16, lineHeight: 1.6, color: 'rgba(247,246,243,0.5)', fontWeight: 300, maxWidth: 600, margin: '0 auto 40px' }}>
           Steward monitors prices, tables, tickets, and campsites around the clock and pings you the moment something opens up. No scripts. No refreshing. Just results.
         </p>
-        <Link href="/signup" className="landing-btn-shimmer lnd-cta-primary"
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: S.mint, color: S.forest, fontSize: 17, fontWeight: 700, padding: '18px 40px', borderRadius: 14, textDecoration: 'none' }}>
-          Create Your Free Account →
-        </Link>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, flexWrap: 'wrap' as const }}>
+          <Link href="/signup" className="landing-btn-shimmer lnd-cta-primary"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: S.mint, color: S.forest, fontSize: 17, fontWeight: 700, padding: '18px 40px', borderRadius: 14, textDecoration: 'none' }}>
+            Start Free on Web →
+          </Link>
+          <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className="lnd-appstore-btn"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: S.cream, fontSize: 15, fontWeight: 600, padding: '16px 32px', borderRadius: 14, textDecoration: 'none', transition: 'all .35s' }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+            Download iOS App
+          </a>
+        </div>
       </div>
     </section>
   )
@@ -752,13 +848,18 @@ function Footer() {
         </div>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column' as const, alignItems: 'flex-end', gap: 8 }}>
-        <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' as const }}>
+        <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' as const, alignItems: 'center' }}>
           {[['Privacy', '/privacy'], ['Terms', '/terms'], ['Support', '/support'], ['Sign In', '/login']].map(([label, href]) => (
             <Link key={href} href={href} className="lnd-footer-link"
               style={{ fontSize: 12, color: 'rgba(247,246,243,0.35)', textDecoration: 'none', transition: 'color .25s' }}>
               {label}
             </Link>
           ))}
+          <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className="lnd-footer-link"
+            style={{ fontSize: 12, color: 'rgba(247,246,243,0.35)', textDecoration: 'none', transition: 'color .25s', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+            iOS App
+          </a>
         </div>
         <div style={{ fontSize: 11, color: 'rgba(247,246,243,0.25)' }}>
           Contact: <a href="mailto:hello@joinsteward.app" style={{ color: 'rgba(110,231,183,0.5)', textDecoration: 'none' }}>hello@joinsteward.app</a>
@@ -804,6 +905,7 @@ export function LandingClientPage() {
       <AIFeature />
       <LandingHIW />
       <LandingUseCases />
+      <PlatformShowcase />
       <Pricing />
       <FinalCTA />
       <Footer />
@@ -816,6 +918,7 @@ export function LandingClientPage() {
         .lnd-chip:hover        { background: rgba(110,231,183,0.12) !important; color: #6EE7B7 !important; transform: translateY(-1px); }
         .lnd-demo-btn:hover    { transform: scale(1.04); box-shadow: 0 4px 16px rgba(110,231,183,0.3); }
         .lnd-footer-link:hover { color: #6EE7B7 !important; }
+        .lnd-appstore-btn:hover { background: rgba(255,255,255,0.14) !important; border-color: rgba(255,255,255,0.25) !important; transform: translateY(-2px); }
 
         /* Pulse dot for notification indicators */
         .lnd-pulse-dot {
@@ -841,6 +944,7 @@ export function LandingClientPage() {
           .lnd-feature-grid   { grid-template-columns: 1fr !important; gap: 48px !important; direction: ltr !important; }
           .lnd-feature-reverse { direction: ltr !important; }
           .lnd-pricing-grid   { grid-template-columns: 1fr !important; max-width: 440px; margin: 0 auto; }
+          .lnd-platform-grid  { grid-template-columns: 1fr !important; max-width: 480px; margin: 0 auto; }
           .lnd-nav-links      { display: none !important; }
           .lnd-hamburger      { display: flex !important; }
         }
