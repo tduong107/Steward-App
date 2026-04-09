@@ -50,7 +50,7 @@ const S = {
 
 // ── Nav ───────────────────────────────────────────────────────────────────────
 const APP_STORE_URL = 'https://apps.apple.com/us/app/steward-concierge/id6760180137'
-const NAV_LINKS = [['#how-it-works', 'How it Works'], ['#why-steward', 'Why Steward'], ['#pricing', 'Pricing'], ['/blog', 'Blog']] as const
+const NAV_LINKS = [['#how-it-works', 'How it Works'], ['#why-steward', 'Why Steward'], ['#pricing', 'Pricing'], ['/blog', 'How We Differ']] as const
 
 function Nav() {
   const [scrolled, setScrolled] = useState(false)
@@ -1154,7 +1154,7 @@ function Footer() {
       </div>
       <div style={{ display: 'flex', flexDirection: 'column' as const, alignItems: 'flex-end', gap: 8 }}>
         <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' as const, alignItems: 'center' }}>
-          {[['Blog', '/blog'], ['Privacy', '/privacy'], ['Terms', '/terms'], ['Support', '/support'], ['Sign In', '/login']].map(([label, href]) => (
+          {[['How We Differ', '/blog'], ['Privacy', '/privacy'], ['Terms', '/terms'], ['Support', '/support'], ['Sign In', '/login']].map(([label, href]) => (
             <Link key={href} href={href} className="lnd-footer-link"
               style={{ fontSize: 12, color: 'rgba(247,246,243,0.35)', textDecoration: 'none', transition: 'color .25s' }}>
               {label}
