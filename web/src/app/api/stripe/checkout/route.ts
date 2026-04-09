@@ -34,11 +34,23 @@ export async function POST(request: NextRequest) {
 
     const origin = request.headers.get('origin') || process.env.NEXT_PUBLIC_SITE_URL || ''
 
+    // Get the best email: profile notification_email → auth email → OAuth email
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('notification_email')
+      .eq('id', user.id)
+      .single()
+
+    const customerEmail = profile?.notification_email
+      || user.email
+      || user.user_metadata?.email
+      || undefined
+
     const session = await getStripe().checkout.sessions.create({
       mode: 'subscription',
-      customer_email: user.email,
+      customer_email: customerEmail,
       line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${origin}/home/settings?session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${origin}/home?upgraded=${tier}`,
       cancel_url: `${origin}/home/settings`,
       metadata: {
         user_id: user.id,
