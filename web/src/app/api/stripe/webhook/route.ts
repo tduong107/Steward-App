@@ -63,16 +63,30 @@ export async function POST(request: NextRequest) {
 
       case 'customer.subscription.updated': {
         const subscription = event.data.object as Stripe.Subscription
-        // Handle subscription changes (upgrades/downgrades)
-        if (subscription.status === 'active') {
-          const userId = subscription.metadata?.user_id
+        const userId = subscription.metadata?.user_id
+
+        if (!userId) break
+
+        if (subscription.status === 'active' && !subscription.cancel_at_period_end) {
+          // Active subscription — update tier (handles upgrades/downgrades between tiers)
           const tier = subscription.metadata?.tier
-          if (userId && tier) {
+          if (tier) {
             await getSupabaseAdmin()
               .from('profiles')
               .update({ subscription_tier: tier, subscription_source: 'stripe' })
               .eq('id', userId)
+            console.log(`Subscription updated: user=${userId} tier=${tier}`)
           }
+        } else if (subscription.cancel_at_period_end) {
+          // User cancelled but subscription is still active until end of period
+          // Don't downgrade yet — they paid for this period
+          const cancelAt = subscription.cancel_at
+            ? new Date(subscription.cancel_at * 1000).toISOString()
+            : 'end of period'
+          console.log(`Subscription cancelling at ${cancelAt}: user=${userId}`)
+        } else if (subscription.status === 'past_due' || subscription.status === 'unpaid') {
+          // Payment issues — log but don't downgrade yet (Stripe will retry)
+          console.log(`Subscription ${subscription.status}: user=${userId}`)
         }
         break
       }

@@ -33,19 +33,17 @@ export default function DashboardPage() {
   const searchParams = useSearchParams()
   const [category, setCategory] = useState('')
   const [showPaywall, setShowPaywall] = useState(false)
-  const [showUpgradeSuccess, setShowUpgradeSuccess] = useState(false)
+  const [upgradedTier, setUpgradedTier] = useState<string | null>(null)
 
   // Show upgrade confirmation if redirected from Stripe checkout
   useEffect(() => {
     const upgraded = searchParams.get('upgraded')
     if (upgraded) {
-      setShowUpgradeSuccess(true)
-      // Clean up URL
+      setUpgradedTier(upgraded === 'premium' ? 'Premium' : 'Pro')
       const url = new URL(window.location.href)
       url.searchParams.delete('upgraded')
       window.history.replaceState({}, '', url.toString())
-      // Auto-dismiss after 6 seconds
-      setTimeout(() => setShowUpgradeSuccess(false), 6000)
+      setTimeout(() => setUpgradedTier(null), 6000)
     }
   }, [searchParams])
 
@@ -281,14 +279,14 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Upgrade Success Banner ── */}
-      {showUpgradeSuccess && (
+      {upgradedTier && (
         <div className="flex items-center gap-3 px-5 py-4 mb-5 rounded-[var(--radius-lg)] border border-[var(--color-accent)]/30 bg-[var(--color-accent-light)]">
           <span className="text-2xl">🎉</span>
           <div className="flex-1">
-            <p className="text-sm font-bold text-[var(--color-accent)]">Welcome to Steward {tier === 'premium' ? 'Premium' : 'Pro'}!</p>
+            <p className="text-sm font-bold text-[var(--color-accent)]">Welcome to Steward {upgradedTier}!</p>
             <p className="text-xs text-[var(--color-ink-mid)] mt-0.5">Your plan has been upgraded. A receipt has been sent to your email.</p>
           </div>
-          <button onClick={() => setShowUpgradeSuccess(false)} className="text-[var(--color-ink-light)] hover:text-[var(--color-ink)] text-lg cursor-pointer">×</button>
+          <button onClick={() => setUpgradedTier(null)} className="text-[var(--color-ink-light)] hover:text-[var(--color-ink)] text-lg cursor-pointer">×</button>
         </div>
       )}
 
