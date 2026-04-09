@@ -93,6 +93,13 @@ function Nav() {
             {label}
           </a>
         ))}
+        <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className="lnd-nav-ios"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 500, color: 'rgba(247,246,243,0.55)', textDecoration: 'none', transition: 'color .25s' }}
+          onMouseEnter={e => (e.currentTarget.style.color = S.mint)}
+          onMouseLeave={e => (e.currentTarget.style.color = 'rgba(247,246,243,0.55)')}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+          iOS App
+        </a>
         <Link href="/signup" className="landing-btn-shimmer" style={{
           background: S.mint, color: S.forest, fontWeight: 700, padding: '10px 24px',
           borderRadius: 10, fontSize: 13.5, textDecoration: 'none', display: 'inline-block',
@@ -686,7 +693,7 @@ function PlatformShowcase() {
 
           {/* ── iPhone Mockup (left) ─── */}
           <div className="lnd-phone-mockup" style={{
-            position: 'absolute', left: 'clamp(20px,8%,80px)', top: '50%', transform: 'translateY(-50%)',
+            position: 'absolute', left: 'clamp(40px,12%,120px)', top: '50%', transform: 'translateY(-50%)',
             width: 220, height: 440,
             background: 'linear-gradient(145deg,#1a1a1a,#0a0a0a)',
             borderRadius: 36, padding: 8,
@@ -751,7 +758,7 @@ function PlatformShowcase() {
           </div>
 
           {/* ── Sync Beam (center) ─── */}
-          <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', zIndex: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+          <div className="lnd-sync-center" style={{ position: 'absolute', left: '42%', top: '50%', transform: 'translate(-50%, -50%)', zIndex: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
             {/* Sync orb */}
             <div className="lnd-sync-orb" style={{
               width: 56, height: 56, borderRadius: '50%',
@@ -773,25 +780,30 @@ function PlatformShowcase() {
             }}>Synced</span>
 
             {/* Beam lines */}
-            <svg className="lnd-sync-beams" width="300" height="8" viewBox="0 0 300 8" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', overflow: 'visible' }}>
-              {/* Left beam (phone → center) */}
-              <line x1="-120" y1="4" x2="-20" y2="4" stroke={S.mint} strokeWidth="2" strokeLinecap="round"
-                style={{ opacity: step >= 2 ? 0.5 : 0, transition: 'opacity 0.4s 0.2s' }}
-                strokeDasharray="4 6" />
-              {/* Right beam (center → laptop) */}
-              <line x1="20" y1="4" x2="120" y2="4" stroke={S.mint} strokeWidth="2" strokeLinecap="round"
-                style={{ opacity: step >= 2 ? 0.5 : 0, transition: 'opacity 0.4s 0.4s' }}
-                strokeDasharray="4 6" />
-              {/* Traveling pulse left */}
-              {step >= 2 && <circle r="4" fill={S.mint} style={{ filter: 'blur(1px)' }}>
-                <animateMotion dur="1.5s" repeatCount="indefinite" path="M-120,4 L120,4" />
-              </circle>}
+            <svg className="lnd-sync-beams" width="200" height="8" viewBox="0 0 200 8" style={{ position: 'absolute', top: '28px', left: '50%', transform: 'translate(-50%, -50%)', overflow: 'visible' }}>
+              {/* Left beam (phone → orb) */}
+              <line x1="-80" y1="4" x2="-16" y2="4" stroke={S.mint} strokeWidth="1.5" strokeLinecap="round"
+                style={{ opacity: step >= 2 ? 0.4 : 0, transition: 'opacity 0.4s 0.2s' }}
+                strokeDasharray="3 5" />
+              {/* Right beam (orb → laptop) */}
+              <line x1="16" y1="4" x2="100" y2="4" stroke={S.mint} strokeWidth="1.5" strokeLinecap="round"
+                style={{ opacity: step >= 2 ? 0.4 : 0, transition: 'opacity 0.4s 0.4s' }}
+                strokeDasharray="3 5" />
+              {/* Traveling pulse */}
+              {step >= 2 && <>
+                <circle r="3" fill={S.mint} opacity="0.8" style={{ filter: 'blur(1px)' }}>
+                  <animateMotion dur="2s" repeatCount="indefinite" path="M-80,4 L100,4" />
+                </circle>
+                <circle r="3" fill={S.mint} opacity="0.5" style={{ filter: 'blur(1px)' }}>
+                  <animateMotion dur="2s" repeatCount="indefinite" begin="1s" path="M100,4 L-80,4" />
+                </circle>
+              </>}
             </svg>
           </div>
 
           {/* ── Laptop Mockup (right) ─── */}
           <div className="lnd-laptop-mockup" style={{
-            position: 'absolute', right: 'clamp(0px,4%,40px)', top: '50%', transform: 'translateY(-50%)',
+            position: 'absolute', right: 'clamp(20px,6%,60px)', top: '50%', transform: 'translateY(-50%)',
             width: 400,
             animation: 'platformFloat 6s 1s ease-in-out infinite',
           }}>
@@ -1179,8 +1191,7 @@ export function LandingClientPage() {
           .lnd-device-scene   { height: auto !important; min-height: 700px; flex-direction: column !important; }
           .lnd-phone-mockup   { position: relative !important; left: auto !important; top: auto !important; transform: none !important; margin-bottom: 40px; animation-name: platformFloatMobile !important; }
           .lnd-laptop-mockup  { position: relative !important; right: auto !important; top: auto !important; transform: none !important; width: 100% !important; max-width: 380px; animation-name: platformFloatMobile !important; }
-          .lnd-sync-beams     { display: none !important; }
-          .lnd-sync-orb       { display: none !important; }
+          .lnd-sync-center    { display: none !important; }
           .lnd-nav-links      { display: none !important; }
           .lnd-hamburger      { display: flex !important; }
         }
