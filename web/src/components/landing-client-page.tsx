@@ -328,10 +328,13 @@ function Hero() {
               style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: S.mint, color: S.forest, fontSize: 16, fontWeight: 700, padding: '18px 36px', borderRadius: 14, textDecoration: 'none', transition: 'all .35s cubic-bezier(.34,1.56,.64,1)' }}>
               Start for free <span>→</span>
             </Link>
-            <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className="lnd-appstore-btn"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: S.cream, fontSize: 14, fontWeight: 600, padding: '14px 24px', borderRadius: 14, textDecoration: 'none', transition: 'all .35s cubic-bezier(.34,1.56,.64,1)' }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
-              Download iOS App
+            <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className="lnd-appstore-hero"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(110,231,183,0.25)', color: S.cream, fontSize: 16, fontWeight: 600, padding: '18px 32px', borderRadius: 14, textDecoration: 'none', transition: 'all .35s cubic-bezier(.34,1.56,.64,1)' }}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill={S.mint}><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+              <span style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2 }}>
+                <span style={{ fontSize: 10, fontWeight: 400, color: 'rgba(247,246,243,0.5)', letterSpacing: '0.02em' }}>Download on the</span>
+                <span style={{ fontSize: 16, fontWeight: 700 }}>App Store</span>
+              </span>
             </a>
           </div>
 
@@ -626,82 +629,293 @@ function FeatLink({ href, children }: { href: string; children: React.ReactNode 
   )
 }
 
-// ── Platform Showcase ────────────────────────────────────────────────────────
+// ── Platform Showcase — Animated Device Scene ────────────────────────────────
+const PLATFORM_TAGLINES = [
+  'Set it up on your phone',
+  'Check it on your laptop',
+  'Get alerts everywhere',
+]
+
 function PlatformShowcase() {
+  const sectionRef = useRef<HTMLDivElement>(null)
+  const [step, setStep] = useState(0)  // 0=idle, 1=phone notif, 2=sync pulse, 3=laptop notif, 4=done
+  const [tagIdx, setTagIdx] = useState(0)
+
+  // Trigger the sync animation on scroll
+  useEffect(() => {
+    const obs = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting && step === 0) {
+        const seq: Array<[number, number]> = [[400, 1], [1200, 2], [2000, 3], [2800, 4]]
+        seq.forEach(([delay, s]) => setTimeout(() => setStep(s), delay))
+      }
+    }, { threshold: 0.3 })
+    if (sectionRef.current) obs.observe(sectionRef.current)
+    return () => obs.disconnect()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Rotate taglines
+  useEffect(() => {
+    const iv = setInterval(() => setTagIdx(i => (i + 1) % PLATFORM_TAGLINES.length), 3000)
+    return () => clearInterval(iv)
+  }, [])
+
   return (
-    <section id="platforms" style={{ padding: 'clamp(60px,10vh,120px) clamp(24px,8vw,60px)', background: S.bg, position: 'relative', overflow: 'hidden' }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 800px 600px at 50% 40%,rgba(42,92,69,0.25) 0%,transparent 60%)' }} />
+    <section id="platforms" ref={sectionRef} style={{ padding: 'clamp(80px,12vh,140px) clamp(24px,8vw,60px)', background: S.bg, position: 'relative', overflow: 'hidden' }}>
+      {/* Bg glow */}
+      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 900px 700px at 50% 45%,rgba(42,92,69,0.35) 0%,transparent 60%)' }} />
+
       <div style={{ position: 'relative', zIndex: 1, maxWidth: 1100, margin: '0 auto' }}>
-        <div className="landing-reveal" style={{ textAlign: 'center', maxWidth: 600, margin: '0 auto 60px' }}>
-          <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '0.2em', textTransform: 'uppercase' as const, color: S.mint, opacity: 0.7, marginBottom: 16 }}>Available everywhere</div>
-          <div style={{ fontFamily: S.serif, fontSize: 'clamp(36px,5vw,48px)', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-0.03em', color: S.cream, marginBottom: 16 }}>
-            Your concierge,<br /><em style={{ color: S.mint }}>any device</em>
+        {/* Header */}
+        <div className="landing-reveal" style={{ textAlign: 'center', maxWidth: 650, margin: '0 auto 60px' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(110,231,183,0.08)', border: '1px solid rgba(110,231,183,0.18)', borderRadius: 30, padding: '6px 16px', marginBottom: 24 }}>
+            <span style={{ fontSize: 13, color: S.mint }}>📱</span>
+            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase' as const, color: S.mint }}>Now on iOS &amp; Web</span>
+            <span style={{ fontSize: 13, color: S.mint }}>💻</span>
           </div>
-          <p style={{ fontSize: 16, lineHeight: 1.6, color: 'rgba(247,246,243,0.5)', fontWeight: 300 }}>
-            Steward works wherever you are. Native iOS app with push notifications, or full-featured web dashboard on any browser.
+          <div style={{ fontFamily: S.serif, fontSize: 'clamp(36px,5vw,52px)', fontWeight: 700, lineHeight: 1.08, letterSpacing: '-0.03em', color: S.cream, marginBottom: 16 }}>
+            One account.<br /><em style={{ color: S.mint }}>Every screen.</em>
+          </div>
+          <p style={{ fontSize: 16, lineHeight: 1.6, color: 'rgba(247,246,243,0.5)', fontWeight: 300, maxWidth: 500, margin: '0 auto' }}>
+            Create a watch on your phone. Manage it on your laptop. Alerts hit everywhere. Same account, perfectly synced.
           </p>
         </div>
 
-        <div className="lnd-platform-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, maxWidth: 900, margin: '0 auto' }}>
-          {/* iOS App Card */}
-          <div className="landing-reveal" style={{ background: 'linear-gradient(135deg,rgba(42,92,69,0.3),rgba(15,32,24,0.2))', border: '1px solid rgba(110,231,183,0.15)', borderRadius: 24, padding: '40px 32px', position: 'relative', overflow: 'hidden' }}>
-            <div style={{ position: 'absolute', top: -30, right: -30, width: 120, height: 120, borderRadius: '50%', background: 'rgba(110,231,183,0.05)' }} />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-              <div style={{ width: 48, height: 48, borderRadius: 12, background: 'linear-gradient(135deg,rgba(110,231,183,0.2),rgba(42,92,69,0.4))', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill={S.mint}><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+        {/* ── Device Scene ─────────────────────────────────────────── */}
+        <div className="landing-reveal lnd-device-scene" style={{ position: 'relative', maxWidth: 920, margin: '0 auto', height: 480, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+
+          {/* ── iPhone Mockup (left) ─── */}
+          <div className="lnd-phone-mockup" style={{
+            position: 'absolute', left: 'clamp(20px,8%,80px)', top: '50%', transform: 'translateY(-50%)',
+            width: 220, height: 440,
+            background: 'linear-gradient(145deg,#1a1a1a,#0a0a0a)',
+            borderRadius: 36, padding: 8,
+            border: '2px solid rgba(255,255,255,0.12)',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.5), 0 0 40px rgba(110,231,183,0.08)',
+            animation: 'platformFloat 6s ease-in-out infinite',
+          }}>
+            {/* Notch */}
+            <div style={{ position: 'absolute', top: 8, left: '50%', transform: 'translateX(-50%)', width: 80, height: 22, background: '#000', borderRadius: 14, zIndex: 5 }} />
+            {/* Screen */}
+            <div style={{ width: '100%', height: '100%', borderRadius: 28, overflow: 'hidden', background: '#0F2018', position: 'relative' }}>
+              {/* Status bar */}
+              <div style={{ padding: '28px 16px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 9, fontWeight: 600, color: 'rgba(247,246,243,0.5)' }}>9:41</span>
+                <div style={{ display: 'flex', gap: 3 }}>
+                  <div style={{ width: 12, height: 8, borderRadius: 2, background: 'rgba(247,246,243,0.4)' }} />
+                  <div style={{ width: 16, height: 8, borderRadius: 2, background: 'rgba(110,231,183,0.6)' }} />
+                </div>
               </div>
-              <div>
-                <div style={{ fontFamily: S.serif, fontSize: 20, fontWeight: 700, color: S.cream }}>iOS App</div>
-                <div style={{ fontSize: 12, color: 'rgba(247,246,243,0.4)' }}>Now live on the App Store</div>
+              {/* App header */}
+              <div style={{ padding: '6px 16px 10px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ width: 24, height: 24, borderRadius: 6, background: 'linear-gradient(135deg,#243D30,#0F2018)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: S.mint, fontWeight: 700 }}>S</div>
+                <span style={{ fontSize: 13, fontWeight: 700, color: S.cream, fontFamily: S.serif }}>Steward</span>
+              </div>
+              {/* Watch cards */}
+              <div style={{ padding: '0 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {[
+                  { emoji: '👟', name: 'Nike Dunk Low', price: '$89', badge: '↓ 26%', badgeColor: S.gold },
+                  { emoji: '✈️', name: 'SFO → Tokyo', price: '$1,247', badge: 'Monitoring', badgeColor: S.mint },
+                  { emoji: '🍽', name: 'Carbone NY', price: 'Fri 8pm', badge: 'Watching', badgeColor: S.mint },
+                ].map((w, i) => (
+                  <div key={i} style={{
+                    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)',
+                    borderRadius: 12, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10,
+                  }}>
+                    <span style={{ fontSize: 18 }}>{w.emoji}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 10.5, fontWeight: 600, color: S.cream, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{w.name}</div>
+                      <div style={{ fontSize: 9, color: 'rgba(247,246,243,0.4)' }}>{w.price}</div>
+                    </div>
+                    <span style={{ fontSize: 7.5, fontWeight: 700, padding: '2px 6px', borderRadius: 8, background: `${w.badgeColor}15`, border: `1px solid ${w.badgeColor}30`, color: w.badgeColor }}>{w.badge}</span>
+                  </div>
+                ))}
+              </div>
+              {/* Push notification overlay — slides in */}
+              <div style={{
+                position: 'absolute', top: 38, left: 10, right: 10,
+                background: 'rgba(30,60,45,0.95)', backdropFilter: 'blur(20px)',
+                border: '1px solid rgba(110,231,183,0.25)', borderRadius: 16, padding: '10px 12px',
+                display: 'flex', alignItems: 'center', gap: 10,
+                opacity: step >= 1 ? 1 : 0, transform: step >= 1 ? 'translateY(0)' : 'translateY(-30px)',
+                transition: 'all 0.5s cubic-bezier(.34,1.56,.64,1)',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+              }}>
+                <div style={{ width: 28, height: 28, borderRadius: 8, background: 'linear-gradient(135deg,#243D30,#0F2018)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: S.mint, fontWeight: 800, flexShrink: 0 }}>S</div>
+                <div>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: S.mint }}>🎉 Table found!</div>
+                  <div style={{ fontSize: 8, color: 'rgba(247,246,243,0.6)', lineHeight: 1.3 }}>Carbone NY · Fri 8pm for 2</div>
+                </div>
               </div>
             </div>
-            <ul style={{ listStyle: 'none', padding: 0, display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 28 }}>
-              {['Native push notifications', 'Instant alerts on your lock screen', 'AI chat to create watches', 'Track prices, flights, restaurants', 'Works offline with smart sync', 'Face ID & biometric auth'].map(f => (
-                <li key={f} style={{ fontSize: 13.5, color: 'rgba(247,246,243,0.55)', display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ color: S.mint, fontSize: 12, fontWeight: 700, flexShrink: 0 }}>✓</span> {f}
-                </li>
-              ))}
-            </ul>
-            <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className="lnd-appstore-btn"
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, background: S.mint, color: S.forest, fontWeight: 700, padding: '14px 24px', borderRadius: 12, fontSize: 14, textDecoration: 'none', transition: 'all .3s' }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
-              Download on App Store
-            </a>
           </div>
 
-          {/* Web App Card */}
-          <div className="landing-reveal" style={{ background: S.cardBg, border: `1px solid ${S.border}`, borderRadius: 24, padding: '40px 32px', position: 'relative', overflow: 'hidden', animationDelay: '100ms' }}>
-            <div style={{ position: 'absolute', top: -30, right: -30, width: 120, height: 120, borderRadius: '50%', background: 'rgba(255,255,255,0.02)' }} />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-              <div style={{ width: 48, height: 48, borderRadius: 12, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={S.mint} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          {/* ── Sync Beam (center) ─── */}
+          <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', zIndex: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+            {/* Sync orb */}
+            <div className="lnd-sync-orb" style={{
+              width: 56, height: 56, borderRadius: '50%',
+              background: step >= 2 ? 'radial-gradient(circle,rgba(110,231,183,0.25),rgba(110,231,183,0.05))' : 'rgba(110,231,183,0.05)',
+              border: `2px solid ${step >= 2 ? 'rgba(110,231,183,0.4)' : 'rgba(110,231,183,0.1)'}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              transition: 'all 0.6s ease',
+              boxShadow: step >= 2 ? '0 0 30px rgba(110,231,183,0.3), 0 0 60px rgba(110,231,183,0.1)' : 'none',
+            }}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={S.mint} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: step >= 2 ? 1 : 0.3, transition: 'opacity 0.5s' }}>
+                <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+              </svg>
+            </div>
+            <span style={{
+              fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' as const,
+              color: step >= 2 ? S.mint : 'rgba(110,231,183,0.3)',
+              transition: 'color 0.5s',
+            }}>Synced</span>
+
+            {/* Beam lines */}
+            <svg className="lnd-sync-beams" width="300" height="8" viewBox="0 0 300 8" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', overflow: 'visible' }}>
+              {/* Left beam (phone → center) */}
+              <line x1="-120" y1="4" x2="-20" y2="4" stroke={S.mint} strokeWidth="2" strokeLinecap="round"
+                style={{ opacity: step >= 2 ? 0.5 : 0, transition: 'opacity 0.4s 0.2s' }}
+                strokeDasharray="4 6" />
+              {/* Right beam (center → laptop) */}
+              <line x1="20" y1="4" x2="120" y2="4" stroke={S.mint} strokeWidth="2" strokeLinecap="round"
+                style={{ opacity: step >= 2 ? 0.5 : 0, transition: 'opacity 0.4s 0.4s' }}
+                strokeDasharray="4 6" />
+              {/* Traveling pulse left */}
+              {step >= 2 && <circle r="4" fill={S.mint} style={{ filter: 'blur(1px)' }}>
+                <animateMotion dur="1.5s" repeatCount="indefinite" path="M-120,4 L120,4" />
+              </circle>}
+            </svg>
+          </div>
+
+          {/* ── Laptop Mockup (right) ─── */}
+          <div className="lnd-laptop-mockup" style={{
+            position: 'absolute', right: 'clamp(0px,4%,40px)', top: '50%', transform: 'translateY(-50%)',
+            width: 400,
+            animation: 'platformFloat 6s 1s ease-in-out infinite',
+          }}>
+            {/* Screen */}
+            <div style={{
+              background: 'linear-gradient(145deg,#111,#0a0a0a)',
+              borderRadius: '12px 12px 0 0', padding: 6,
+              border: '2px solid rgba(255,255,255,0.1)', borderBottom: 'none',
+              boxShadow: '0 -10px 40px rgba(0,0,0,0.4), 0 0 40px rgba(110,231,183,0.06)',
+            }}>
+              {/* Browser chrome */}
+              <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '8px 8px 0 0', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  {['#ff5f57', '#febc2e', '#28c840'].map(c => (
+                    <div key={c} style={{ width: 8, height: 8, borderRadius: '50%', background: c, opacity: 0.7 }} />
+                  ))}
+                </div>
+                <div style={{ flex: 1, background: 'rgba(255,255,255,0.06)', borderRadius: 6, padding: '3px 10px', fontSize: 8.5, color: 'rgba(247,246,243,0.35)' }}>joinsteward.app/home</div>
               </div>
-              <div>
-                <div style={{ fontFamily: S.serif, fontSize: 20, fontWeight: 700, color: S.cream }}>Web App</div>
-                <div style={{ fontSize: 12, color: 'rgba(247,246,243,0.4)' }}>Full dashboard on any browser</div>
+              {/* Dashboard content */}
+              <div style={{ background: '#0F2018', borderRadius: '0 0 6px 6px', padding: 14, minHeight: 240 }}>
+                {/* Top bar */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{ width: 18, height: 18, borderRadius: 5, background: 'linear-gradient(135deg,#243D30,#0F2018)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 7, color: S.mint, fontWeight: 800 }}>S</div>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: S.cream }}>Dashboard</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <div style={{ fontSize: 7, padding: '3px 8px', borderRadius: 6, background: 'rgba(110,231,183,0.1)', color: S.mint, fontWeight: 600 }}>3 Active</div>
+                    <div style={{ fontSize: 7, padding: '3px 8px', borderRadius: 6, background: 'rgba(245,158,11,0.1)', color: S.gold, fontWeight: 600 }}>1 Triggered</div>
+                  </div>
+                </div>
+                {/* Watch grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                  {[
+                    { emoji: '👟', name: 'Nike Dunk Low', sub: 'nike.com', status: '$89 ↓26%', sColor: S.gold },
+                    { emoji: '✈️', name: 'SFO → Tokyo', sub: 'flights', status: 'Monitoring', sColor: S.mint },
+                    { emoji: '🍽', name: 'Carbone NY', sub: 'resy.com', status: 'Table found!', sColor: '#34d399' },
+                  ].map((w, i) => (
+                    <div key={i} style={{
+                      background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
+                      borderRadius: 10, padding: '10px',
+                      borderLeft: i === 2 ? '2px solid #34d399' : undefined,
+                    }}>
+                      <div style={{ fontSize: 16, marginBottom: 6 }}>{w.emoji}</div>
+                      <div style={{ fontSize: 9, fontWeight: 600, color: S.cream, marginBottom: 2 }}>{w.name}</div>
+                      <div style={{ fontSize: 7.5, color: 'rgba(247,246,243,0.35)', marginBottom: 6 }}>{w.sub}</div>
+                      <div style={{ fontSize: 7, fontWeight: 700, color: w.sColor }}>{w.status}</div>
+                    </div>
+                  ))}
+                </div>
+                {/* Notification toast on laptop */}
+                <div style={{
+                  position: 'absolute', bottom: 20, right: 20, left: 'auto',
+                  background: 'rgba(30,60,45,0.95)', backdropFilter: 'blur(12px)',
+                  border: '1px solid rgba(110,231,183,0.3)', borderRadius: 10, padding: '8px 12px',
+                  display: 'flex', alignItems: 'center', gap: 8, maxWidth: 200,
+                  opacity: step >= 3 ? 1 : 0, transform: step >= 3 ? 'translateY(0)' : 'translateY(12px)',
+                  transition: 'all 0.5s cubic-bezier(.34,1.56,.64,1)',
+                  boxShadow: '0 6px 20px rgba(0,0,0,0.4)',
+                }}>
+                  <span className="lnd-pulse-dot" />
+                  <div>
+                    <div style={{ fontSize: 8, fontWeight: 700, color: S.mint }}>🎉 Table found!</div>
+                    <div style={{ fontSize: 7, color: 'rgba(247,246,243,0.6)' }}>Carbone NY · Fri 8pm</div>
+                  </div>
+                </div>
               </div>
             </div>
-            <ul style={{ listStyle: 'none', padding: 0, display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 28 }}>
-              {['Full dashboard with analytics', 'Price history charts & insights', 'Email & SMS alert channels', 'Manage all watches at a glance', 'Works on desktop, tablet, mobile', 'No download required'].map(f => (
-                <li key={f} style={{ fontSize: 13.5, color: 'rgba(247,246,243,0.55)', display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ color: S.mint, fontSize: 12, fontWeight: 700, flexShrink: 0 }}>✓</span> {f}
-                </li>
-              ))}
-            </ul>
-            <Link href="/signup"
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, background: 'rgba(110,231,183,0.06)', border: '1px solid rgba(110,231,183,0.18)', color: S.mint, fontWeight: 700, padding: '14px 24px', borderRadius: 12, fontSize: 14, textDecoration: 'none', transition: 'all .3s' }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-              Open Web App
-            </Link>
+            {/* Keyboard base */}
+            <div style={{
+              height: 14, background: 'linear-gradient(180deg,#1a1a1a,#111)',
+              borderRadius: '0 0 12px 12px / 0 0 8px 8px',
+              border: '2px solid rgba(255,255,255,0.08)', borderTop: '1px solid rgba(255,255,255,0.04)',
+              position: 'relative',
+            }}>
+              <div style={{ position: 'absolute', bottom: -4, left: '50%', transform: 'translateX(-50%)', width: 60, height: 3, borderRadius: 3, background: 'rgba(255,255,255,0.06)' }} />
+            </div>
           </div>
         </div>
 
-        {/* Sync badge */}
-        <div className="landing-reveal" style={{ textAlign: 'center', marginTop: 40 }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: 'rgba(110,231,183,0.06)', border: '1px solid rgba(110,231,183,0.12)', borderRadius: 30, padding: '8px 20px' }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={S.mint} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-            <span style={{ fontSize: 12.5, color: 'rgba(247,246,243,0.5)', fontWeight: 400 }}>Your watches sync across all devices in real-time</span>
-          </div>
+        {/* ── Rotating tagline ─── */}
+        <div className="landing-reveal" style={{ textAlign: 'center', marginTop: 48, minHeight: 36 }}>
+          {PLATFORM_TAGLINES.map((tag, i) => (
+            <div key={tag} style={{
+              fontFamily: S.serif, fontSize: 22, fontWeight: 600, color: S.cream,
+              position: i === tagIdx ? 'relative' : 'absolute',
+              opacity: i === tagIdx ? 1 : 0, transform: i === tagIdx ? 'translateY(0)' : 'translateY(10px)',
+              transition: 'all 0.5s ease', pointerEvents: i === tagIdx ? 'auto' : 'none',
+              left: i === tagIdx ? undefined : 0, right: i === tagIdx ? undefined : 0,
+            }}>
+              {tag.split(' ').map((w, wi) => (
+                <span key={wi} style={{ color: wi === tag.split(' ').length - 1 ? S.mint : S.cream }}>{w}{wi < tag.split(' ').length - 1 ? ' ' : ''}</span>
+              ))}
+            </div>
+          ))}
+        </div>
+
+        {/* ── CTAs ─── */}
+        <div className="landing-reveal" style={{ display: 'flex', justifyContent: 'center', gap: 16, marginTop: 36, flexWrap: 'wrap' as const }}>
+          <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className="landing-btn-shimmer lnd-cta-primary"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: S.mint, color: S.forest, fontSize: 15, fontWeight: 700, padding: '16px 32px', borderRadius: 14, textDecoration: 'none', transition: 'all .35s cubic-bezier(.34,1.56,.64,1)' }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+            Download iOS App
+          </a>
+          <Link href="/signup"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: 'rgba(110,231,183,0.06)', border: '1px solid rgba(110,231,183,0.2)', color: S.mint, fontSize: 15, fontWeight: 700, padding: '16px 32px', borderRadius: 14, textDecoration: 'none', transition: 'all .35s' }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            Open Web App
+          </Link>
+        </div>
+
+        {/* Micro features */}
+        <div className="landing-reveal" style={{ display: 'flex', justifyContent: 'center', gap: 32, marginTop: 40, flexWrap: 'wrap' as const }}>
+          {[
+            { icon: '🔔', label: 'Push, Email & SMS alerts' },
+            { icon: '⚡', label: 'Real-time sync' },
+            { icon: '🔒', label: 'One account, all devices' },
+          ].map(f => (
+            <div key={f.label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 16 }}>{f.icon}</span>
+              <span style={{ fontSize: 13, color: 'rgba(247,246,243,0.45)', fontWeight: 400 }}>{f.label}</span>
+            </div>
+          ))}
         </div>
       </div>
     </section>
@@ -919,6 +1133,24 @@ export function LandingClientPage() {
         .lnd-demo-btn:hover    { transform: scale(1.04); box-shadow: 0 4px 16px rgba(110,231,183,0.3); }
         .lnd-footer-link:hover { color: #6EE7B7 !important; }
         .lnd-appstore-btn:hover { background: rgba(255,255,255,0.14) !important; border-color: rgba(255,255,255,0.25) !important; transform: translateY(-2px); }
+        .lnd-appstore-hero:hover { background: rgba(110,231,183,0.1) !important; border-color: rgba(110,231,183,0.4) !important; transform: translateY(-3px) scale(1.02); box-shadow: 0 8px 32px rgba(110,231,183,0.15) !important; }
+
+        /* Platform device scene */
+        @keyframes platformFloat {
+          0%, 100% { transform: translateY(-50%); }
+          50% { transform: translateY(calc(-50% - 10px)); }
+        }
+        .lnd-sync-orb { animation: syncPulse 3s ease-in-out infinite; }
+        @keyframes syncPulse {
+          0%, 100% { box-shadow: 0 0 20px rgba(110,231,183,0.1); }
+          50% { box-shadow: 0 0 40px rgba(110,231,183,0.3), 0 0 80px rgba(110,231,183,0.1); }
+        }
+        .lnd-sync-beams line { animation: beamDash 2s linear infinite; }
+        @keyframes beamDash { to { stroke-dashoffset: -20; } }
+        @keyframes platformFloatMobile {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-8px); }
+        }
 
         /* Pulse dot for notification indicators */
         .lnd-pulse-dot {
@@ -944,7 +1176,11 @@ export function LandingClientPage() {
           .lnd-feature-grid   { grid-template-columns: 1fr !important; gap: 48px !important; direction: ltr !important; }
           .lnd-feature-reverse { direction: ltr !important; }
           .lnd-pricing-grid   { grid-template-columns: 1fr !important; max-width: 440px; margin: 0 auto; }
-          .lnd-platform-grid  { grid-template-columns: 1fr !important; max-width: 480px; margin: 0 auto; }
+          .lnd-device-scene   { height: auto !important; min-height: 700px; flex-direction: column !important; }
+          .lnd-phone-mockup   { position: relative !important; left: auto !important; top: auto !important; transform: none !important; margin-bottom: 40px; animation-name: platformFloatMobile !important; }
+          .lnd-laptop-mockup  { position: relative !important; right: auto !important; top: auto !important; transform: none !important; width: 100% !important; max-width: 380px; animation-name: platformFloatMobile !important; }
+          .lnd-sync-beams     { display: none !important; }
+          .lnd-sync-orb       { display: none !important; }
           .lnd-nav-links      { display: none !important; }
           .lnd-hamburger      { display: flex !important; }
         }
