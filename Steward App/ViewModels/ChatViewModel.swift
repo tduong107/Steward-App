@@ -889,9 +889,20 @@ final class ChatViewModel {
             }
 
             // Use AI-specified frequency, fall back to user's default, then "Daily"
-            let frequency = payload.checkFrequency
+            var frequency = payload.checkFrequency
                 ?? UserDefaults.standard.string(forKey: "defaultCheckFrequency")
                 ?? "Daily"
+
+            // Enforce tier limits — free users can only use "Daily"
+            let tierMaxFrequencies: [String: [String]] = [
+                "Free": ["Daily"],
+                "Pro": ["Daily", "Every 12 hours"],
+                "Premium": ["Daily", "Every 12 hours", "Every 6 hours", "Every 4 hours", "Every 2 hours"],
+            ]
+            let allowed = tierMaxFrequencies[subscriptionTier.rawValue] ?? ["Daily"]
+            if !allowed.contains(frequency) {
+                frequency = allowed.last ?? "Daily"
+            }
 
             let watch = Watch(
                 emoji: payload.emoji ?? "👀",
