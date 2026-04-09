@@ -26,7 +26,11 @@ export async function updateSession(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
 
   // Redirect unauthenticated users away from dashboard
-  if (!user && !request.nextUrl.pathname.startsWith('/login') && !request.nextUrl.pathname.startsWith('/signup') && !request.nextUrl.pathname.startsWith('/forgot-password') && !request.nextUrl.pathname.startsWith('/welcome') && !request.nextUrl.pathname.startsWith('/shared') && !request.nextUrl.pathname.startsWith('/auth/callback') && !request.nextUrl.pathname.startsWith('/api/') && !request.nextUrl.pathname.startsWith('/privacy') && !request.nextUrl.pathname.startsWith('/terms') && !request.nextUrl.pathname.startsWith('/support') && request.nextUrl.pathname !== '/') {
+  // Allow static verification files and well-known paths through without auth
+  const path = request.nextUrl.pathname
+  const isStaticFile = path.endsWith('.xml') || path.endsWith('.txt') || path.endsWith('.json') || path.startsWith('/.well-known')
+
+  if (!user && !isStaticFile && !path.startsWith('/login') && !path.startsWith('/signup') && !path.startsWith('/forgot-password') && !path.startsWith('/welcome') && !path.startsWith('/shared') && !path.startsWith('/auth/callback') && !path.startsWith('/api/') && !path.startsWith('/privacy') && !path.startsWith('/terms') && !path.startsWith('/support') && path !== '/') {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
