@@ -73,8 +73,8 @@ When a user mentions a flight with enough details (origin city/airport + destina
   - For round trips: https://www.kayak.com/flights/{FROM}-{TO}/{DEPART}/{RETURN}
 - If the user gives a budget (e.g. "under $300"), use that as the condition: "Flight price below $300"
 - If no budget given, use condition: "Track flight prices" (will notify on any significant drop)
-- Confirm the details and show FREQUENCY chips (this is the confirmation step):
-  "I'll track flight prices from LAX to JFK on April 30! How often should I check?"
+- Confirm the details, fetch the current price, and show FREQUENCY chips:
+  "I'll track flight prices from LAX to JFK on April 30! [FETCH_PRICE]https://www.kayak.com/flights/LAX-JFK/2026-04-30[/FETCH_PRICE] How often should I check?"
   [SUGGESTIONS]Every 2 hours|Every 4 hours|Every 12 hours|Daily[/SUGGESTIONS]
 - When the user picks a frequency, THEN create:
   [CREATE_WATCH]{"emoji":"✈️","name":"LAX → JFK Apr 30","url":"https://www.kayak.com/flights/LAX-JFK/2026-04-30","condition":"Track flight prices","actionLabel":"Open booking page","actionType":"price","checkFrequency":"Every 2 hours"}[/CREATE_WATCH]
@@ -90,8 +90,8 @@ When a user mentions a hotel with enough details (city/location + dates):
   - Defaults: 2 guests if not specified
   - Use 2-letter state code for US cities (CA, NY, TX, FL, etc.), country name for international
 - If user gives a budget: "Hotel rate below $200/night". Otherwise: "Track hotel rates"
-- Confirm details and show FREQUENCY chips:
-  "I'll track hotel rates in Los Angeles, April 15-17 for 2 guests! How often should I check?"
+- Confirm details, fetch current rate, and show FREQUENCY chips:
+  "I'll track hotel rates in Los Angeles, April 15-17! [FETCH_PRICE]https://www.kayak.com/hotels/Los-Angeles,CA/2026-04-15/2026-04-17/2guests[/FETCH_PRICE] How often should I check?"
   [SUGGESTIONS]Every 2 hours|Every 4 hours|Every 12 hours|Daily[/SUGGESTIONS]
 - When the user picks a frequency, THEN create:
   [CREATE_WATCH]{"emoji":"🏨","name":"Hotel in LA Apr 15-17","url":"https://www.kayak.com/hotels/Los-Angeles,CA/2026-04-15/2026-04-17/2guests","condition":"Track hotel rates","actionLabel":"Open booking page","actionType":"price","checkFrequency":"Daily"}[/CREATE_WATCH]
@@ -106,8 +106,8 @@ When a user mentions a car rental with enough details (location + dates):
   - Example: "Car rental in Miami May 1-5" → https://www.kayak.com/cars/MIA/2026-05-01/2026-05-05
 - If user gives a budget: "Car rental below $50/day". Otherwise: "Track car rental prices"
 - If user mentions a specific company (Hertz, Enterprise, Avis), note it in the condition
-- Confirm details and show FREQUENCY chips:
-  "I'll track car rental prices at LAX, April 15-17! How often should I check?"
+- Confirm details, fetch current rate, and show FREQUENCY chips:
+  "I'll track car rental prices at LAX, April 15-17! [FETCH_PRICE]https://www.kayak.com/cars/LAX/2026-04-15/2026-04-17[/FETCH_PRICE] How often should I check?"
   [SUGGESTIONS]Every 2 hours|Every 4 hours|Every 12 hours|Daily[/SUGGESTIONS]
 - When the user picks a frequency, THEN create:
   [CREATE_WATCH]{"emoji":"🚗","name":"Car rental LAX Apr 15-17","url":"https://www.kayak.com/cars/LAX/2026-04-15/2026-04-17","condition":"Track car rental prices","actionLabel":"Open booking page","actionType":"price","checkFrequency":"Daily"}[/CREATE_WATCH]
@@ -148,8 +148,8 @@ When a user mentions tickets for an event:
 - If user gives a budget: "Tickets below $200". Otherwise: "Track ticket prices"
 - If user mentions StubHub specifically, use: https://www.stubhub.com/search?q={event+name}
 - If the event is too vague (just "concert" with no artist/team), ask for the specific event name
-- Confirm details and show FREQUENCY chips:
-  "I'll track ticket prices for Lakers vs Celtics! How often should I check?"
+- Confirm details, fetch current price, and show FREQUENCY chips:
+  "I'll track ticket prices for Lakers vs Celtics! [FETCH_PRICE]https://www.ticketmaster.com/search?q=lakers+vs+celtics[/FETCH_PRICE] How often should I check?"
   [SUGGESTIONS]Every 2 hours|Every 4 hours|Every 12 hours|Daily[/SUGGESTIONS]
 - When the user picks a frequency, THEN create:
   [CREATE_WATCH]{"emoji":"🎫","name":"Lakers vs Celtics","url":"https://www.ticketmaster.com/search?q=lakers+vs+celtics","condition":"Track ticket prices","actionLabel":"Open tickets page","actionType":"price","checkFrequency":"Every 4 hours"}[/CREATE_WATCH]
@@ -284,7 +284,13 @@ Write your message so it flows naturally around this marker, for example:
 "Great, I'll watch that for you! [FETCH_PRICE]https://a.co/d/abc123[/FETCH_PRICE] I'll alert you when it drops below $50. Does the current price look right?"
 IMPORTANT: If the price fetch fails or returns an error, do NOT show the error to the user. Instead say something like "I'll verify the current price on my first check." and proceed normally with watch creation.
 Never show "(Couldn't reach the page)" or technical error messages. Just move on gracefully.
-Only use [FETCH_PRICE] for price-related watches. Do not use it for stock checks, booking watches, etc.
+Use [FETCH_PRICE] for ALL price-tracking watches including:
+- Products (amazon, coach, nike, etc.)
+- Flights (kayak, google flights — use the Kayak URL)
+- Hotels (kayak hotels, booking.com)
+- Car rentals (kayak cars)
+- Event tickets (ticketmaster, stubhub)
+Do NOT use [FETCH_PRICE] for restaurant reservations, campsite availability, or stock/restock watches (these don't have prices to verify).
 
 PROPOSING A WATCH:
 When you have enough info (URL + condition + action), confirm the details and ask about check frequency in the SAME message. Use frequency [SUGGESTIONS] chips — these serve as both the frequency selector AND the confirmation.
@@ -764,30 +770,53 @@ async function enrichPriceCheck(responseText: string): Promise<string> {
   const replace = (text: string) =>
     responseText.replace(/\[FETCH_PRICE\][\s\S]*?\[\/FETCH_PRICE\]/, text);
 
-  // Extract product name from URL for Serper/Claude fallback
-  const pathSegments = new URL(url).pathname.split('/').filter(Boolean);
-  const productName = pathSegments
-    .filter(s => !s.match(/^[A-Z0-9]{5,}\.html$/) && s.length > 2)
-    .pop()
-    ?.replace(/[-_]/g, ' ')
-    ?.replace(/\.html$/i, '') || hostname;
+  // Extract search-friendly name from URL for Serper/Claude fallback
+  const urlObj = new URL(url);
+  const pathSegments = urlObj.pathname.split('/').filter(Boolean);
+  let productName = "";
 
-  // ── Tier 1: Direct fetch ──
-  try {
-    const res = await fetch(url, {
-      headers: { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" },
-      redirect: "follow",
-      signal: AbortSignal.timeout(Math.min(2000, timeLeft())),
-    });
-    if (res.ok) {
-      const html = await res.text();
-      const price = extractPriceFromHtml(html);
-      if (price !== null) {
-        console.log(`[ai-chat] Price fetch tier 1 (direct): $${price} from ${hostname}`);
-        return replace(`Currently **$${price.toFixed(2)}** on ${hostname}.`);
+  // Travel URLs need special parsing
+  if (hostname.includes("kayak.com")) {
+    const flightMatch = urlObj.pathname.match(/\/flights\/([A-Z]{3})-([A-Z]{3})\/(\d{4}-\d{2}-\d{2})/i);
+    const hotelMatch = urlObj.pathname.match(/\/hotels\/([^/]+)\//);
+    const carMatch = urlObj.pathname.match(/\/cars\/([A-Z]{3})\/(\d{4}-\d{2}-\d{2})/i);
+    if (flightMatch) productName = `flight ${flightMatch[1]} to ${flightMatch[2]} ${flightMatch[3]}`;
+    else if (hotelMatch) productName = `hotel ${hotelMatch[1].replace(/-/g,' ')}`;
+    else if (carMatch) productName = `car rental ${carMatch[1]} ${carMatch[2]}`;
+  } else if (hostname.includes("ticketmaster.com")) {
+    const q = urlObj.searchParams.get("q");
+    if (q) productName = q.replace(/\+/g, ' ');
+  }
+
+  if (!productName) {
+    productName = pathSegments
+      .filter(s => !s.match(/^[A-Z0-9]{5,}\.html$/) && s.length > 2 && !s.match(/^\d{4}-\d{2}-\d{2}$/))
+      .pop()
+      ?.replace(/[-_]/g, ' ')
+      ?.replace(/\.html$/i, '') || hostname;
+  }
+
+  // ── Tier 1: Direct fetch (skip for JS-heavy travel sites) ──
+  const skipDirectFetch = ["kayak.com","google.com/travel","expedia.com","ticketmaster.com","stubhub.com","seatgeek.com"]
+    .some(d => hostname.includes(d));
+
+  if (!skipDirectFetch) {
+    try {
+      const res = await fetch(url, {
+        headers: { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" },
+        redirect: "follow",
+        signal: AbortSignal.timeout(Math.min(2000, timeLeft())),
+      });
+      if (res.ok) {
+        const html = await res.text();
+        const price = extractPriceFromHtml(html);
+        if (price !== null) {
+          console.log(`[ai-chat] Price fetch tier 1 (direct): $${price} from ${hostname}`);
+          return replace(`Currently **$${price.toFixed(2)}** on ${hostname}.`);
+        }
       }
-    }
-  } catch { /* continue to next tier */ }
+    } catch { /* continue to next tier */ }
+  }
 
   if (timeLeft() < 500) return replace("I'll verify the current price on my first automated check — this may take a moment.");
 
