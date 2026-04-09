@@ -444,3 +444,12 @@ body {
   .hiw-desktop-layout { display: none; }
   .hiw-mobile-layout  { display: block; }
 }
+
+/* Blog category orb glow */
+@keyframes catOrbGlow {
+  0%, 100% { box-shadow: 0 0 8px rgba(110,231,183,0.15); }
+  50% { box-shadow: 0 0 20px rgba(110,231,183,0.35), 0 0 40px rgba(110,231,183,0.1); }
+}
+.cat-orb-active {
+  animation: catOrbGlow 3s ease-in-out infinite;
+}
