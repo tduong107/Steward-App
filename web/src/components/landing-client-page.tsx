@@ -94,9 +94,7 @@ function Nav() {
           </a>
         ))}
         <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className="lnd-nav-ios"
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 500, color: 'rgba(247,246,243,0.55)', textDecoration: 'none', transition: 'color .25s' }}
-          onMouseEnter={e => (e.currentTarget.style.color = S.mint)}
-          onMouseLeave={e => (e.currentTarget.style.color = 'rgba(247,246,243,0.55)')}>
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: S.cream, textDecoration: 'none', padding: '8px 16px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.2)', transition: 'all .25s' }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
           iOS App
         </a>
@@ -688,18 +686,18 @@ function PlatformShowcase() {
           </p>
         </div>
 
-        {/* ── Device Scene ─────────────────────────────────────────── */}
-        <div className="landing-reveal lnd-device-scene" style={{ position: 'relative', maxWidth: 920, margin: '0 auto', height: 480, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {/* ── Device Scene — flexbox layout for precise alignment ── */}
+        <div className="landing-reveal lnd-device-scene" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0, maxWidth: 920, margin: '0 auto' }}>
 
-          {/* ── iPhone Mockup (left) ─── */}
+          {/* ── iPhone Mockup ─── */}
           <div className="lnd-phone-mockup" style={{
-            position: 'absolute', left: 'clamp(40px,12%,120px)', top: '50%', transform: 'translateY(-50%)',
-            width: 220, height: 440,
+            width: 220, height: 440, flexShrink: 0,
             background: 'linear-gradient(145deg,#1a1a1a,#0a0a0a)',
             borderRadius: 36, padding: 8,
             border: '2px solid rgba(255,255,255,0.12)',
             boxShadow: '0 20px 60px rgba(0,0,0,0.5), 0 0 40px rgba(110,231,183,0.08)',
-            animation: 'platformFloat 6s ease-in-out infinite',
+            animation: 'platformFloatA 6s ease-in-out infinite',
+            position: 'relative',
           }}>
             {/* Notch */}
             <div style={{ position: 'absolute', top: 8, left: '50%', transform: 'translateX(-50%)', width: 80, height: 22, background: '#000', borderRadius: 14, zIndex: 5 }} />
@@ -738,7 +736,7 @@ function PlatformShowcase() {
                   </div>
                 ))}
               </div>
-              {/* Push notification overlay — slides in */}
+              {/* Push notification overlay */}
               <div style={{
                 position: 'absolute', top: 38, left: 10, right: 10,
                 background: 'rgba(30,60,45,0.95)', backdropFilter: 'blur(20px)',
@@ -757,9 +755,22 @@ function PlatformShowcase() {
             </div>
           </div>
 
-          {/* ── Sync Beam (center) ─── */}
-          <div className="lnd-sync-center" style={{ position: 'absolute', left: '42%', top: '50%', transform: 'translate(-50%, -50%)', zIndex: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-            {/* Sync orb */}
+          {/* ── Left beam (phone → orb) ─── */}
+          <div className="lnd-sync-beam-segment" style={{
+            flex: 1, height: 2, maxWidth: 80, position: 'relative',
+            background: step >= 2 ? `repeating-linear-gradient(90deg, ${S.mint}66 0, ${S.mint}66 3px, transparent 3px, transparent 8px)` : 'transparent',
+            transition: 'background 0.4s 0.2s',
+            overflow: 'visible',
+          }}>
+            {step >= 2 && <div className="lnd-beam-pulse" style={{
+              position: 'absolute', top: '50%', width: 8, height: 8, borderRadius: '50%',
+              background: S.mint, transform: 'translateY(-50%)', filter: 'blur(2px)',
+              animation: 'beamTravelRight 2s ease-in-out infinite',
+            }} />}
+          </div>
+
+          {/* ── Sync Orb (center) ─── */}
+          <div className="lnd-sync-center" style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '0 4px', zIndex: 10 }}>
             <div className="lnd-sync-orb" style={{
               width: 56, height: 56, borderRadius: '50%',
               background: step >= 2 ? 'radial-gradient(circle,rgba(110,231,183,0.25),rgba(110,231,183,0.05))' : 'rgba(110,231,183,0.05)',
@@ -775,37 +786,28 @@ function PlatformShowcase() {
             </div>
             <span style={{
               fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' as const,
-              color: step >= 2 ? S.mint : 'rgba(110,231,183,0.3)',
-              transition: 'color 0.5s',
+              color: step >= 2 ? S.mint : 'rgba(110,231,183,0.3)', transition: 'color 0.5s',
             }}>Synced</span>
-
-            {/* Beam lines */}
-            <svg className="lnd-sync-beams" width="200" height="8" viewBox="0 0 200 8" style={{ position: 'absolute', top: '28px', left: '50%', transform: 'translate(-50%, -50%)', overflow: 'visible' }}>
-              {/* Left beam (phone → orb) */}
-              <line x1="-80" y1="4" x2="-16" y2="4" stroke={S.mint} strokeWidth="1.5" strokeLinecap="round"
-                style={{ opacity: step >= 2 ? 0.4 : 0, transition: 'opacity 0.4s 0.2s' }}
-                strokeDasharray="3 5" />
-              {/* Right beam (orb → laptop) */}
-              <line x1="16" y1="4" x2="100" y2="4" stroke={S.mint} strokeWidth="1.5" strokeLinecap="round"
-                style={{ opacity: step >= 2 ? 0.4 : 0, transition: 'opacity 0.4s 0.4s' }}
-                strokeDasharray="3 5" />
-              {/* Traveling pulse */}
-              {step >= 2 && <>
-                <circle r="3" fill={S.mint} opacity="0.8" style={{ filter: 'blur(1px)' }}>
-                  <animateMotion dur="2s" repeatCount="indefinite" path="M-80,4 L100,4" />
-                </circle>
-                <circle r="3" fill={S.mint} opacity="0.5" style={{ filter: 'blur(1px)' }}>
-                  <animateMotion dur="2s" repeatCount="indefinite" begin="1s" path="M100,4 L-80,4" />
-                </circle>
-              </>}
-            </svg>
           </div>
 
-          {/* ── Laptop Mockup (right) ─── */}
+          {/* ── Right beam (orb → laptop) ─── */}
+          <div className="lnd-sync-beam-segment" style={{
+            flex: 1, height: 2, maxWidth: 80, position: 'relative',
+            background: step >= 2 ? `repeating-linear-gradient(90deg, ${S.mint}66 0, ${S.mint}66 3px, transparent 3px, transparent 8px)` : 'transparent',
+            transition: 'background 0.4s 0.4s',
+            overflow: 'visible',
+          }}>
+            {step >= 2 && <div className="lnd-beam-pulse" style={{
+              position: 'absolute', top: '50%', right: 0, width: 8, height: 8, borderRadius: '50%',
+              background: S.mint, transform: 'translateY(-50%)', filter: 'blur(2px)',
+              animation: 'beamTravelLeft 2s ease-in-out infinite',
+            }} />}
+          </div>
+
+          {/* ── Laptop Mockup ─── */}
           <div className="lnd-laptop-mockup" style={{
-            position: 'absolute', right: 'clamp(20px,6%,60px)', top: '50%', transform: 'translateY(-50%)',
-            width: 400,
-            animation: 'platformFloat 6s 1s ease-in-out infinite',
+            width: 420, flexShrink: 0,
+            animation: 'platformFloatB 6s ease-in-out infinite',
           }}>
             {/* Screen */}
             <div style={{
@@ -813,6 +815,7 @@ function PlatformShowcase() {
               borderRadius: '12px 12px 0 0', padding: 6,
               border: '2px solid rgba(255,255,255,0.1)', borderBottom: 'none',
               boxShadow: '0 -10px 40px rgba(0,0,0,0.4), 0 0 40px rgba(110,231,183,0.06)',
+              position: 'relative',
             }}>
               {/* Browser chrome */}
               <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '8px 8px 0 0', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -855,9 +858,9 @@ function PlatformShowcase() {
                     </div>
                   ))}
                 </div>
-                {/* Notification toast on laptop */}
+                {/* Notification toast */}
                 <div style={{
-                  position: 'absolute', bottom: 20, right: 20, left: 'auto',
+                  position: 'absolute', bottom: 20, right: 20,
                   background: 'rgba(30,60,45,0.95)', backdropFilter: 'blur(12px)',
                   border: '1px solid rgba(110,231,183,0.3)', borderRadius: 10, padding: '8px 12px',
                   display: 'flex', alignItems: 'center', gap: 8, maxWidth: 200,
@@ -1145,23 +1148,34 @@ export function LandingClientPage() {
         .lnd-demo-btn:hover    { transform: scale(1.04); box-shadow: 0 4px 16px rgba(110,231,183,0.3); }
         .lnd-footer-link:hover { color: #6EE7B7 !important; }
         .lnd-appstore-btn:hover { background: rgba(255,255,255,0.14) !important; border-color: rgba(255,255,255,0.25) !important; transform: translateY(-2px); }
+        .lnd-nav-ios:hover { border-color: rgba(110,231,183,0.4) !important; background: rgba(110,231,183,0.08) !important; color: #6EE7B7 !important; }
         .lnd-appstore-hero:hover { background: rgba(110,231,183,0.1) !important; border-color: rgba(110,231,183,0.4) !important; transform: translateY(-3px) scale(1.02); box-shadow: 0 8px 32px rgba(110,231,183,0.15) !important; }
 
         /* Platform device scene */
-        @keyframes platformFloat {
-          0%, 100% { transform: translateY(-50%); }
-          50% { transform: translateY(calc(-50% - 10px)); }
+        @keyframes platformFloatA {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-12px); }
+        }
+        @keyframes platformFloatB {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-8px); }
+        }
+        @keyframes beamTravelRight {
+          0% { left: 0; opacity: 0; }
+          10% { opacity: 1; }
+          90% { opacity: 1; }
+          100% { left: calc(100% - 8px); opacity: 0; }
+        }
+        @keyframes beamTravelLeft {
+          0% { right: 0; opacity: 0; }
+          10% { opacity: 1; }
+          90% { opacity: 1; }
+          100% { right: calc(100% - 8px); opacity: 0; }
         }
         .lnd-sync-orb { animation: syncPulse 3s ease-in-out infinite; }
         @keyframes syncPulse {
           0%, 100% { box-shadow: 0 0 20px rgba(110,231,183,0.1); }
           50% { box-shadow: 0 0 40px rgba(110,231,183,0.3), 0 0 80px rgba(110,231,183,0.1); }
-        }
-        .lnd-sync-beams line { animation: beamDash 2s linear infinite; }
-        @keyframes beamDash { to { stroke-dashoffset: -20; } }
-        @keyframes platformFloatMobile {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-8px); }
         }
 
         /* Pulse dot for notification indicators */
@@ -1188,10 +1202,11 @@ export function LandingClientPage() {
           .lnd-feature-grid   { grid-template-columns: 1fr !important; gap: 48px !important; direction: ltr !important; }
           .lnd-feature-reverse { direction: ltr !important; }
           .lnd-pricing-grid   { grid-template-columns: 1fr !important; max-width: 440px; margin: 0 auto; }
-          .lnd-device-scene   { height: auto !important; min-height: 700px; flex-direction: column !important; }
-          .lnd-phone-mockup   { position: relative !important; left: auto !important; top: auto !important; transform: none !important; margin-bottom: 40px; animation-name: platformFloatMobile !important; }
-          .lnd-laptop-mockup  { position: relative !important; right: auto !important; top: auto !important; transform: none !important; width: 100% !important; max-width: 380px; animation-name: platformFloatMobile !important; }
-          .lnd-sync-center    { display: none !important; }
+          .lnd-device-scene       { flex-direction: column !important; gap: 0 !important; }
+          .lnd-phone-mockup       { margin-bottom: 16px; }
+          .lnd-laptop-mockup      { width: 100% !important; max-width: 380px; }
+          .lnd-sync-center        { padding: 8px 0 !important; }
+          .lnd-sync-beam-segment  { display: none !important; }
           .lnd-nav-links      { display: none !important; }
           .lnd-hamburger      { display: flex !important; }
         }
