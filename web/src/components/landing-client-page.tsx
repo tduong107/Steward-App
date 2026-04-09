@@ -755,28 +755,51 @@ function PlatformShowcase() {
             </div>
           </div>
 
-          {/* ── Left beam (phone → orb) ─── */}
-          <div className="lnd-sync-beam-segment" style={{
-            flex: 1, height: 2, maxWidth: 80, position: 'relative',
-            background: step >= 2 ? `repeating-linear-gradient(90deg, ${S.mint}66 0, ${S.mint}66 3px, transparent 3px, transparent 8px)` : 'transparent',
-            transition: 'background 0.4s 0.2s',
-            overflow: 'visible',
+          {/* ── Sync connector: beam + orb + pulses ─── */}
+          <div className="lnd-sync-connector" style={{
+            flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            position: 'relative', minWidth: 80, maxWidth: 220, alignSelf: 'center',
           }}>
-            {step >= 2 && <div className="lnd-beam-pulse" style={{
-              position: 'absolute', top: '50%', width: 8, height: 8, borderRadius: '50%',
-              background: S.mint, transform: 'translateY(-50%)', filter: 'blur(2px)',
-              animation: 'beamTravelRight 2s ease-in-out infinite',
-            }} />}
-          </div>
+            {/* Dashed beam line — spans full connector width behind the orb */}
+            <div className="lnd-beam-track" style={{
+              position: 'absolute', left: 0, right: 0, top: '28px', height: 2,
+              background: step >= 2 ? `repeating-linear-gradient(90deg, ${S.mint}55 0, ${S.mint}55 3px, transparent 3px, transparent 8px)` : 'transparent',
+              transition: 'background 0.4s 0.2s',
+            }} />
 
-          {/* ── Sync Orb (center) ─── */}
-          <div className="lnd-sync-center" style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '0 4px', zIndex: 10 }}>
+            {/* Traveling pulses — full width, pass through the orb */}
+            {step >= 2 && <>
+              {/* Phone → Laptop pulse */}
+              <div className="lnd-pulse-track" style={{
+                position: 'absolute', left: 0, right: 0, top: '28px', height: 2, overflow: 'visible', pointerEvents: 'none',
+              }}>
+                <div className="lnd-pulse-dot-fwd" style={{
+                  position: 'absolute', top: '50%', width: 10, height: 10, borderRadius: '50%',
+                  background: S.mint, transform: 'translateY(-50%)',
+                  boxShadow: `0 0 8px ${S.mint}, 0 0 16px ${S.mint}80`,
+                  animation: 'beamPulseFullRight 2.5s linear infinite',
+                }} />
+              </div>
+              {/* Laptop → Phone pulse (offset) */}
+              <div className="lnd-pulse-track" style={{
+                position: 'absolute', left: 0, right: 0, top: '28px', height: 2, overflow: 'visible', pointerEvents: 'none',
+              }}>
+                <div className="lnd-pulse-dot-rev" style={{
+                  position: 'absolute', top: '50%', width: 10, height: 10, borderRadius: '50%',
+                  background: S.mint, transform: 'translateY(-50%)',
+                  boxShadow: `0 0 8px ${S.mint}, 0 0 16px ${S.mint}80`,
+                  animation: 'beamPulseFullLeft 2.5s linear infinite 1.25s',
+                }} />
+              </div>
+            </>}
+
+            {/* Sync orb — centered on top of beam */}
             <div className="lnd-sync-orb" style={{
               width: 56, height: 56, borderRadius: '50%',
               background: step >= 2 ? 'radial-gradient(circle,rgba(110,231,183,0.25),rgba(110,231,183,0.05))' : 'rgba(110,231,183,0.05)',
               border: `2px solid ${step >= 2 ? 'rgba(110,231,183,0.4)' : 'rgba(110,231,183,0.1)'}`,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              transition: 'all 0.6s ease',
+              transition: 'all 0.6s ease', position: 'relative', zIndex: 2,
               boxShadow: step >= 2 ? '0 0 30px rgba(110,231,183,0.3), 0 0 60px rgba(110,231,183,0.1)' : 'none',
             }}>
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={S.mint} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: step >= 2 ? 1 : 0.3, transition: 'opacity 0.5s' }}>
@@ -788,20 +811,6 @@ function PlatformShowcase() {
               fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' as const,
               color: step >= 2 ? S.mint : 'rgba(110,231,183,0.3)', transition: 'color 0.5s',
             }}>Synced</span>
-          </div>
-
-          {/* ── Right beam (orb → laptop) ─── */}
-          <div className="lnd-sync-beam-segment" style={{
-            flex: 1, height: 2, maxWidth: 80, position: 'relative',
-            background: step >= 2 ? `repeating-linear-gradient(90deg, ${S.mint}66 0, ${S.mint}66 3px, transparent 3px, transparent 8px)` : 'transparent',
-            transition: 'background 0.4s 0.4s',
-            overflow: 'visible',
-          }}>
-            {step >= 2 && <div className="lnd-beam-pulse" style={{
-              position: 'absolute', top: '50%', right: 0, width: 8, height: 8, borderRadius: '50%',
-              background: S.mint, transform: 'translateY(-50%)', filter: 'blur(2px)',
-              animation: 'beamTravelLeft 2s ease-in-out infinite',
-            }} />}
           </div>
 
           {/* ── Laptop Mockup ─── */}
@@ -1160,17 +1169,30 @@ export function LandingClientPage() {
           0%, 100% { transform: translateY(0); }
           50% { transform: translateY(-8px); }
         }
-        @keyframes beamTravelRight {
-          0% { left: 0; opacity: 0; }
-          10% { opacity: 1; }
-          90% { opacity: 1; }
-          100% { left: calc(100% - 8px); opacity: 0; }
+        @keyframes beamPulseFullRight {
+          0%   { left: -10px; opacity: 0; }
+          5%   { opacity: 1; }
+          95%  { opacity: 1; }
+          100% { left: calc(100% - 0px); opacity: 0; }
         }
-        @keyframes beamTravelLeft {
-          0% { right: 0; opacity: 0; }
-          10% { opacity: 1; }
-          90% { opacity: 1; }
-          100% { right: calc(100% - 8px); opacity: 0; }
+        @keyframes beamPulseFullLeft {
+          0%   { right: -10px; left: auto; opacity: 0; }
+          5%   { opacity: 1; }
+          95%  { opacity: 1; }
+          100% { right: calc(100% - 0px); left: auto; opacity: 0; }
+        }
+        /* Vertical pulse for mobile */
+        @keyframes beamPulseDown {
+          0%   { top: -10px; opacity: 0; }
+          5%   { opacity: 1; }
+          95%  { opacity: 1; }
+          100% { top: calc(100% - 0px); opacity: 0; }
+        }
+        @keyframes beamPulseUp {
+          0%   { bottom: -10px; top: auto; opacity: 0; }
+          5%   { opacity: 1; }
+          95%  { opacity: 1; }
+          100% { bottom: calc(100% - 0px); top: auto; opacity: 0; }
         }
         .lnd-sync-orb { animation: syncPulse 3s ease-in-out infinite; }
         @keyframes syncPulse {
@@ -1203,10 +1225,13 @@ export function LandingClientPage() {
           .lnd-feature-reverse { direction: ltr !important; }
           .lnd-pricing-grid   { grid-template-columns: 1fr !important; max-width: 440px; margin: 0 auto; }
           .lnd-device-scene       { flex-direction: column !important; gap: 0 !important; }
-          .lnd-phone-mockup       { margin-bottom: 16px; }
+          .lnd-phone-mockup       { margin-bottom: 0; }
           .lnd-laptop-mockup      { width: 100% !important; max-width: 380px; }
-          .lnd-sync-center        { padding: 8px 0 !important; }
-          .lnd-sync-beam-segment  { display: none !important; }
+          .lnd-sync-connector     { flex-direction: column !important; min-width: unset !important; max-width: unset !important; width: auto !important; min-height: 100px; padding: 8px 0 !important; }
+          .lnd-beam-track         { left: 50% !important; right: auto !important; top: 0 !important; bottom: 0 !important; width: 2px !important; height: auto !important; transform: translateX(-50%); background: repeating-linear-gradient(180deg, rgba(110,231,183,0.33) 0, rgba(110,231,183,0.33) 3px, transparent 3px, transparent 8px) !important; }
+          .lnd-pulse-track        { left: 50% !important; right: auto !important; top: 0 !important; bottom: 0 !important; width: 2px !important; height: auto !important; transform: translateX(-50%) !important; }
+          .lnd-pulse-dot-fwd      { width: 10px !important; height: 10px !important; top: auto !important; left: 50% !important; transform: translateX(-50%) !important; animation: beamPulseDown 2.5s linear infinite !important; }
+          .lnd-pulse-dot-rev      { width: 10px !important; height: 10px !important; top: auto !important; left: 50% !important; transform: translateX(-50%) !important; animation: beamPulseUp 2.5s linear infinite 1.25s !important; }
           .lnd-nav-links      { display: none !important; }
           .lnd-hamburger      { display: flex !important; }
         }
