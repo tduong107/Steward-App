@@ -1739,6 +1739,86 @@ serve(async (req) => {
       updateData.action_executed_at = null;
     }
 
+    // ─── Engagement: First Check Complete notification ────────────
+    // Send a one-time "Steward is working for you" push after the first successful check
+    if (!stillFailing && currentPrice !== null) {
+      try {
+        const firstCheckKey = `first_check_${watch.id}`;
+        const { data: alreadySent } = await supabase
+          .from("engagement_notifications_sent")
+          .select("id")
+          .eq("user_id", watch.user_id)
+          .eq("notification_key", firstCheckKey)
+          .maybeSingle();
+
+        if (!alreadySent) {
+          // Check if this is actually the first check_result for this watch
+          const { count } = await supabase
+            .from("check_results")
+            .select("id", { count: "exact", head: true })
+            .eq("watch_id", watch.id);
+
+          if ((count ?? 0) <= 1) {
+            await supabase.functions.invoke("notify-user", {
+              body: {
+                user_id: watch.user_id,
+                watch_id: watch.id,
+                notification_type: "engagement_first_check",
+                engagement_title: "✅ Steward is watching!",
+                engagement_body: `${watch.emoji ?? "👀"} ${watch.name} — first check complete. We'll alert you when something changes.`,
+              },
+            });
+            await supabase
+              .from("engagement_notifications_sent")
+              .upsert({ user_id: watch.user_id, notification_key: firstCheckKey }, { onConflict: "user_id,notification_key" });
+            console.log(`[check-watch] First check engagement sent for watch ${watch.id}`);
+          }
+        }
+      } catch (engErr: any) {
+        console.error(`[check-watch] First check engagement error: ${engErr.message}`);
+      }
+    }
+
+    // ─── Engagement: Price Trending Down notification ─────────────
+    // When price drops but hasn't hit target yet — build excitement
+    if (!changed && !stillFailing && currentPrice !== null && lastPrice !== null && currentPrice < lastPrice && watch.action_type === "price") {
+      try {
+        const today = new Date().toISOString().slice(0, 10);
+        const trendKey = `price_trending_${watch.id}_${today}`;
+        // Check if we sent a trending notification for this watch this week
+        const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        const { data: recentTrend } = await supabase
+          .from("engagement_notifications_sent")
+          .select("sent_at")
+          .eq("user_id", watch.user_id)
+          .like("notification_key", `price_trending_${watch.id}_%`)
+          .gte("sent_at", weekAgo)
+          .maybeSingle();
+
+        if (!recentTrend) {
+          const condition = watch.condition ?? "";
+          const targetMatch = condition.match(/\$?([\d,.]+)/);
+          const targetNote = targetMatch ? ` Your target: $${targetMatch[1]}.` : "";
+
+          await supabase.functions.invoke("notify-user", {
+            body: {
+              user_id: watch.user_id,
+              watch_id: watch.id,
+              notification_type: "engagement_trending",
+              engagement_title: "📉 Price is dropping!",
+              engagement_body: `${watch.emoji ?? "👀"} ${watch.name} dropped to $${currentPrice.toFixed(2)} (was $${lastPrice.toFixed(2)}).${targetNote}`,
+            },
+          });
+          await supabase
+            .from("engagement_notifications_sent")
+            .upsert({ user_id: watch.user_id, notification_key: trendKey }, { onConflict: "user_id,notification_key" });
+          console.log(`[check-watch] Price trending engagement sent for watch ${watch.id}: $${lastPrice.toFixed(2)} → $${currentPrice.toFixed(2)}`);
+        }
+      } catch (engErr: any) {
+        console.error(`[check-watch] Price trending engagement error: ${engErr.message}`);
+      }
+    }
+
     // Failure tracking: increment or reset
     if (stillFailing) {
       const newFailures = prevFailures + 1;

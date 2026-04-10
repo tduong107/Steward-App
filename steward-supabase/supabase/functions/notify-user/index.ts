@@ -288,13 +288,101 @@ serve(async (req) => {
   }
 
   try {
-    const { watch_id, user_id, action_url, notification_type } = await req.json();
+    const { watch_id, user_id, action_url, notification_type, engagement_title, engagement_body } = await req.json();
     const notificationType = notification_type ?? "triggered";
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
+
+    // ─── Engagement Notifications (push-only, no watch required) ──
+    const isEngagement = notificationType.startsWith("engagement_");
+
+    if (isEngagement) {
+      const title = engagement_title ?? "Steward";
+      const body = engagement_body ?? "Open Steward to check your watches";
+
+      // Get profile for device token
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("device_token, display_name")
+        .eq("id", user_id)
+        .single();
+
+      if (!profile?.device_token) {
+        return new Response(JSON.stringify({ sent: false, reason: "No device token" }), {
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Log activity
+      try {
+        await supabase.from("activities").insert({
+          id: crypto.randomUUID(),
+          user_id,
+          watch_id: watch_id || null,
+          icon: "lightbulb.fill",
+          icon_color_name: "mint",
+          label: title,
+          subtitle: body,
+          created_at: new Date().toISOString(),
+        });
+      } catch (e) { console.error(`[notify-user] Engagement activity insert failed: ${e.message}`); }
+
+      // Send push
+      const apnsKey = Deno.env.get("APNS_KEY");
+      if (!apnsKey) {
+        return new Response(JSON.stringify({ sent: false, reason: "APNs not configured" }), {
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const apnsEnv = Deno.env.get("APNS_ENVIRONMENT") ?? "development";
+      const apnsHost = apnsEnv === "production" ? "https://api.push.apple.com" : "https://api.sandbox.push.apple.com";
+      const bundleId = Deno.env.get("APNS_BUNDLE_ID") ?? "";
+      const jwt = await getAPNsJWT();
+
+      const payload = {
+        aps: {
+          alert: { title, body },
+          badge: 1,
+          sound: "default",
+        },
+        notification_type: notificationType,
+        ...(watch_id ? { watch_id } : {}),
+      };
+
+      const apnsResponse = await fetch(`${apnsHost}/3/device/${profile.device_token}`, {
+        method: "POST",
+        headers: {
+          Authorization: `bearer ${jwt}`,
+          "apns-topic": bundleId,
+          "apns-push-type": "alert",
+          "apns-priority": "5",
+          "apns-expiration": "0",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const sent = apnsResponse.status === 200;
+      if (!sent) {
+        try { const errBody = await apnsResponse.text(); console.error(`[notify-user] Engagement APNs ${apnsResponse.status}: ${errBody}`); } catch {}
+      } else {
+        console.log(`[notify-user] Engagement push sent to ${profile.display_name}: ${title}`);
+      }
+
+      return new Response(JSON.stringify({
+        sent,
+        channels: ["push"],
+        push: { sent, apns_status: apnsResponse.status },
+        user: profile.display_name,
+        notification_type: notificationType,
+      }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // Get the user's device token and phone number
     const { data: profile } = await supabase

@@ -360,6 +360,9 @@ verify_jwt = false
 [functions.check-watch]
 verify_jwt = false
 
+[functions.engagement-notifications]
+verify_jwt = false
+
 [edge_runtime]
 enabled = true
 # Supported request policies: `oneshot`, `per_worker`.
