@@ -74,14 +74,7 @@ final class ChatViewModel {
         // Allow sending if there's text OR an image
         guard !messageText.trimmingCharacters(in: .whitespaces).isEmpty || image != nil else { return }
 
-        // Track AI chat message in PostHog
-        AnalyticsService.shared.trackAIChatMessageSent(
-            messageLength: messageText.count,
-            hasURL: messageText.contains("http"),
-            hasImage: image != nil
-        )
-
-        // Handle price confirmation suggestions locally
+        // Handle price confirmation suggestions locally (don't track these as AI chat messages)
         if pendingPriceUpdateWatchId != nil {
             let trimmed = messageText.trimmingCharacters(in: .whitespaces)
 
@@ -199,6 +192,13 @@ final class ChatViewModel {
         inputText = ""
         pendingImage = nil
         isTyping = true
+
+        // Track actual AI chat message (after all early-return paths)
+        AnalyticsService.shared.trackAIChatMessageSent(
+            messageLength: messageText.count,
+            hasURL: messageText.contains("http"),
+            hasImage: image != nil
+        )
 
         // Compress image to JPEG for API (from original, not thumbnail)
         var imageData: Data?

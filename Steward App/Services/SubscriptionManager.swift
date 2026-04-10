@@ -233,6 +233,19 @@ final class SubscriptionManager {
                 // Update tier
                 await checkEntitlements()
 
+                // Track successful purchase in PostHog
+                let tierName = tier(for: product.id)?.rawValue ?? "unknown"
+                let billing = product.id.contains("year") ? "yearly" : "monthly"
+                AnalyticsService.shared.trackSubscriptionStarted(
+                    tier: tierName,
+                    price: product.displayPrice,
+                    billing: billing
+                )
+                AnalyticsService.shared.updateSuperProperties(
+                    tier: currentTier.rawValue,
+                    watchCount: 0 // Will be updated on next watch load
+                )
+
                 #if DEBUG
                 print("[SubscriptionManager] Purchased: \(product.id)")
                 #endif

@@ -106,6 +106,8 @@ final class AuthManager {
             self.currentUserId = session.user.id
             self.isAuthenticated = true
             Self.syncTokenToAppGroup(accessToken: session.accessToken, userId: session.user.id)
+            AnalyticsService.shared.identify(userId: session.user.id, properties: ["phone": phone, "name": name])
+            AnalyticsService.shared.trackSignUp(method: "phone_password")
 
             // Save profile data
             await saveProfile(userId: session.user.id, name: name, phone: phone)
@@ -132,6 +134,8 @@ final class AuthManager {
         self.currentUserId = session.user.id
         self.isAuthenticated = true
         Self.syncTokenToAppGroup(accessToken: session.accessToken, userId: session.user.id)
+        AnalyticsService.shared.identify(userId: session.user.id, properties: ["phone": phone, "name": name])
+        AnalyticsService.shared.trackSignUp(method: "phone_otp")
 
         // Save profile data after verification
         await saveProfile(userId: session.user.id, name: name, phone: phone)
@@ -151,6 +155,8 @@ final class AuthManager {
         self.currentUserId = session.user.id
         self.isAuthenticated = true
         Self.syncTokenToAppGroup(accessToken: session.accessToken, userId: session.user.id)
+        AnalyticsService.shared.identify(userId: session.user.id, properties: ["phone": phone])
+        AnalyticsService.shared.trackSignIn(method: "phone_password")
 
         // Fetch profile
         if let profile: ProfileDTO = try? await SupabaseConfig.client
@@ -188,6 +194,8 @@ final class AuthManager {
 
         // Sync auth token to App Group so Share Extension can use it
         Self.syncTokenToAppGroup(accessToken: session.accessToken, userId: session.user.id)
+        AnalyticsService.shared.identify(userId: session.user.id, properties: ["email": session.user.email ?? ""])
+        AnalyticsService.shared.trackSignIn(method: "apple")
 
         // Save display name if Apple provides it (only on first sign-in)
         if let fullName = credential.fullName {
@@ -235,6 +243,8 @@ final class AuthManager {
         self.authEmail = session.user.email
         self.authPhone = session.user.phone
         Self.syncTokenToAppGroup(accessToken: session.accessToken, userId: session.user.id)
+        AnalyticsService.shared.identify(userId: session.user.id, properties: ["email": session.user.email ?? ""])
+        AnalyticsService.shared.trackSignIn(method: "google")
 
         // Save display name and email from Google profile
         var profileData: [String: String] = ["id": session.user.id.uuidString]
