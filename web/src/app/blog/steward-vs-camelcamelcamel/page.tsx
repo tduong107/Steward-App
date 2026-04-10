@@ -254,7 +254,7 @@ export default function StewardVsCamelCamelCamelPage() {
             lineHeight: 1.5,
           }}
         >
-          One tracks Amazon. The other tracks everything.
+          CamelCamelCamel tracks Amazon, while Steward tracks everything.
         </p>
         <p
           style={{
@@ -302,13 +302,13 @@ export default function StewardVsCamelCamelCamelPage() {
             }}
           >
             <li>
-              CamelCamelCamel is an Amazon-only price tracker with browser
-              extension and email alerts
+              CamelCamelCamel is an Amazon exclusive price tracker with browser
+              extension and email alerts.
             </li>
             <li>
-              Steward works on any website — Amazon, Nike, Best Buy, Target,
-              Walmart, and thousands more — plus restaurants, campsites,
-              flights, and event tickets
+              Steward works on any website: Amazon, Nike, Best Buy, Target,
+              Walmart, and thousands more. Steward also checks for reservations
+              on restaurants, campsites, flights, and event tickets.
             </li>
             <li>
               Steward uses AI to understand any page you share. No browser
