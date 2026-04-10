@@ -191,7 +191,10 @@ final class SubscriptionManager {
             }
 
             if subscriptionSource == .stripe, let tierStr = info.subscriptionTier {
-                currentTier = SubscriptionTier(rawValue: tierStr) ?? .free
+                // Normalize case: Stripe webhook writes lowercase ("pro", "premium")
+                // but SubscriptionTier rawValues are capitalized ("Pro", "Premium")
+                let normalized = tierStr.prefix(1).uppercased() + tierStr.dropFirst().lowercased()
+                currentTier = SubscriptionTier(rawValue: normalized) ?? .free
                 syncToAppStorage()
             }
         } catch {
