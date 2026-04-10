@@ -279,6 +279,7 @@ final class SubscriptionManager {
         paywallHighlightedTier = tier
         paywallReason = reason
         showPaywall = true
+        AnalyticsService.shared.trackPaywallViewed(currentTier: currentTier.rawValue, reason: reason)
     }
 
     // MARK: - Helpers

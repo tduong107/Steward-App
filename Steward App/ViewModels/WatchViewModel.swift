@@ -498,6 +498,19 @@ final class WatchViewModel {
             fetchLocalWatches()
         }
 
+        // Track watch creation in PostHog
+        AnalyticsService.shared.trackWatchCreated(
+            watchId: watch.id,
+            name: watch.name,
+            actionType: watch.actionType.rawValue,
+            watchMode: watch.watchMode ?? "url",
+            frequency: watch.checkFrequency
+        )
+        AnalyticsService.shared.updateSuperProperties(
+            tier: subscriptionManager?.currentTier.rawValue ?? "Free",
+            watchCount: watches.count
+        )
+
         // Fetch product image in background, then push to Supabase
         Task {
             // Try to fetch og:image if no imageURL yet

@@ -54,6 +54,9 @@ struct Steward_AppApp: App {
                     }
                 }
                 .task {
+                    // Initialize PostHog analytics
+                    AnalyticsService.shared.configure()
+
                     notificationManager.configure(supabase: supabaseService)
                     await notificationManager.checkCurrentStatus()
                     // Auto-request permission if authenticated but never asked

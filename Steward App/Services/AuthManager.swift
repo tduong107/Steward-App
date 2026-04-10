@@ -44,6 +44,12 @@ final class AuthManager {
             self.authEmail = session.user.email
             self.authPhone = session.user.phone
 
+            // Identify user in PostHog analytics
+            AnalyticsService.shared.identify(userId: session.user.id, properties: [
+                "email": session.user.email ?? "",
+                "phone": session.user.phone ?? "",
+            ])
+
             // Sync auth token to App Group so Share Extension can use it
             Self.syncTokenToAppGroup(accessToken: session.accessToken, userId: session.user.id)
 
@@ -297,6 +303,7 @@ final class AuthManager {
         self.authEmail = nil
         self.authPhone = nil
         Self.clearTokenFromAppGroup()
+        AnalyticsService.shared.reset()
     }
 
     // MARK: - Profile Helpers

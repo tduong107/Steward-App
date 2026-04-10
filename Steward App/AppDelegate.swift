@@ -131,6 +131,12 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
             return
         }
 
+        // Track notification tap in PostHog
+        let notificationType = userInfo["notification_type"] as? String ?? "triggered"
+        Task { @MainActor in
+            AnalyticsService.shared.trackNotificationTapped(type: notificationType, watchId: watchIdString)
+        }
+
         if actionId == "OPEN_ACTION_URL",
            let actionURLString = userInfo["action_url"] as? String {
             // User tapped "Open & Act" — open the action URL directly
