@@ -114,24 +114,28 @@ function Nav() {
           {resourcesOpen && (
             <div style={{
               position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)',
-              marginTop: 12, width: 280, borderRadius: 14,
-              background: 'rgba(15,32,24,0.97)', backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(110,231,183,0.12)', boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
-              padding: 6, zIndex: 200,
+              paddingTop: 8, zIndex: 200,
             }}>
-              {RESOURCE_ITEMS.map(item => (
-                <Link key={item.label} href={item.href}
-                  onClick={() => setResourcesOpen(false)}
-                  style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 12px', borderRadius: 10, textDecoration: 'none', transition: 'background .15s' }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(110,231,183,0.06)')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                  <span style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>{item.icon}</span>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: S.cream, marginBottom: 2 }}>{item.label}</div>
-                    <div style={{ fontSize: 11, color: 'rgba(247,246,243,0.4)', lineHeight: 1.3 }}>{item.desc}</div>
-                  </div>
-                </Link>
-              ))}
+              <div style={{
+                width: 280, borderRadius: 14,
+                background: 'rgba(15,32,24,0.97)', backdropFilter: 'blur(20px)',
+                border: '1px solid rgba(110,231,183,0.12)', boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
+                padding: 6,
+              }}>
+                {RESOURCE_ITEMS.map(item => (
+                  <Link key={item.label} href={item.href}
+                    onClick={() => setResourcesOpen(false)}
+                    style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 12px', borderRadius: 10, textDecoration: 'none', transition: 'background .15s' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(110,231,183,0.06)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                    <span style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>{item.icon}</span>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: S.cream, marginBottom: 2 }}>{item.label}</div>
+                      <div style={{ fontSize: 11, color: 'rgba(247,246,243,0.4)', lineHeight: 1.3 }}>{item.desc}</div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
             </div>
           )}
         </div>
