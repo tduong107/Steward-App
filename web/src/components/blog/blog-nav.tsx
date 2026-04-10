@@ -74,7 +74,7 @@ export function BlogNav() {
         {/* Get Started */}
         <Link href="/signup"
           style={{ background: '#6EE7B7', color: '#0F2018', fontWeight: 700, padding: '10px 24px', borderRadius: 10, fontSize: 14.5, textDecoration: 'none', display: 'inline-block' }}>
-          Get Started
+          Get Started for Free
         </Link>
       </div>
 

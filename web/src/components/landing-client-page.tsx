@@ -153,7 +153,7 @@ function Nav() {
         <Link href="/signup" className="landing-btn-shimmer" style={{
           background: S.mint, color: S.forest, fontWeight: 700, padding: '10px 24px',
           borderRadius: 10, fontSize: 14.5, textDecoration: 'none', display: 'inline-block',
-        }}>Get Started</Link>
+        }}>Get Started for Free</Link>
       </div>
 
       {/* Hamburger — visible on mobile only via CSS */}
@@ -187,7 +187,7 @@ function Nav() {
           ))}
           <Link href="/signup" onClick={() => setMenuOpen(false)}
             style={{ background: S.mint, color: S.forest, fontWeight: 700, padding: '13px', borderRadius: 10, fontSize: 15, textDecoration: 'none', textAlign: 'center' as const, marginTop: 8, display: 'block' }}>
-            Get Started Free
+            Get Started for Free
           </Link>
           <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" onClick={() => setMenuOpen(false)}
             style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: S.cream, fontWeight: 600, padding: '13px', borderRadius: 10, fontSize: 14, textDecoration: 'none', marginTop: 6 }}>
@@ -1001,7 +1001,7 @@ const PLANS: Plan[] = [
   {
     name: 'Free', monthly: '$0', yearly: '$0', periodMonthly: '/ forever', periodYearly: '/ forever', featured: false,
     features: ['Up to 3 trackers', 'Checks once per day', 'Push notifications', 'AI chat setup'],
-    btnMonthly: 'Get Started Free', btnYearly: 'Get Started Free',
+    btnMonthly: 'Get Started for Free', btnYearly: 'Get Started for Free',
   },
   {
     name: 'Steward Pro', monthly: '$4.99', yearly: '$39.99', periodMonthly: '/ month', periodYearly: '/ year', featured: false,

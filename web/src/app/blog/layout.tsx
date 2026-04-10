@@ -25,7 +25,7 @@ export default function BlogLayout({ children }: { children: React.ReactNode }) 
       <footer style={{ borderTop: '1px solid rgba(255,255,255,0.06)', marginTop: 80 }}>
         <div style={{ maxWidth: 600, margin: '0 auto', textAlign: 'center' as const, padding: '64px 24px 48px' }}>
           <h2 style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontSize: 28, fontWeight: 700, margin: '0 0 8px', color: '#F7F6F3' }}>
-            Try Steward Free
+            Try Steward for Free
           </h2>
           <p style={{ color: 'rgba(247,246,243,0.55)', fontSize: 15, marginBottom: 28 }}>
             Track prices, restaurants, campsites, and more. Get notified the moment things change.
