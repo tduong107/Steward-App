@@ -1269,11 +1269,13 @@ serve(async (req) => {
               }
             }
           } else {
-            // For regular product sites: use Shopping API as before
+            // For regular product sites: use Shopping API with domain hint
+            let searchDomain = "";
+            try { searchDomain = new URL(fetchUrl).hostname.replace("www.", ""); } catch {}
             const serperRes = await fetch("https://google.serper.dev/shopping", {
               method: "POST",
               headers: { "X-API-KEY": SERPER_KEY, "Content-Type": "application/json" },
-              body: JSON.stringify({ q: watch.name, num: 5 }),
+              body: JSON.stringify({ q: `${watch.name} ${searchDomain}`, num: 5 }),
               signal: AbortSignal.timeout(5000),
             });
             if (serperRes.ok) {
@@ -1581,11 +1583,13 @@ serve(async (req) => {
       try {
         const SERPER_KEY = Deno.env.get("SERPER_API_KEY") ?? "";
         if (SERPER_KEY && timeRemaining() > 5000) {
-          console.log(`[check-watch] Fallback 3 — Serper Shopping for ${watch.id} (${watch.name})`);
+          let fb3Domain = "";
+          try { fb3Domain = new URL(fetchUrl).hostname.replace("www.", ""); } catch {}
+          console.log(`[check-watch] Fallback 3 — Serper Shopping for ${watch.id} (${watch.name}) domain=${fb3Domain}`);
           const serperRes = await fetch("https://google.serper.dev/shopping", {
             method: "POST",
             headers: { "X-API-KEY": SERPER_KEY, "Content-Type": "application/json" },
-            body: JSON.stringify({ q: watch.name, num: 5 }),
+            body: JSON.stringify({ q: `${watch.name} ${fb3Domain}`, num: 5 }),
             signal: AbortSignal.timeout(5000),
           });
           if (serperRes.ok) {
@@ -2873,8 +2877,14 @@ async function claudePriceFallback(
   const SERPER_KEY = Deno.env.get("SERPER_API_KEY") ?? "";
   if (!SERPER_KEY) return null;
 
+  // Extract domain from watch URL for domain-constrained searches
+  let watchDomain = "";
+  try { watchDomain = new URL(watch.url).hostname.replace("www.", ""); } catch {}
+
   // Step 1: Search for the product's current price via both Serper Shopping AND web search
-  const searchQuery = `${watch.name} current price`;
+  // Include site: constraint so results come from the original retailer
+  const sitePrefix = watchDomain ? `site:${watchDomain} ` : "";
+  const searchQuery = `${sitePrefix}${watch.name} current price`;
   let searchContext = "";
 
   // 1a: Serper Shopping API (most reliable for prices)
@@ -2882,12 +2892,21 @@ async function claudePriceFallback(
     const shoppingRes = await fetch("https://google.serper.dev/shopping", {
       method: "POST",
       headers: { "X-API-KEY": SERPER_KEY, "Content-Type": "application/json" },
-      body: JSON.stringify({ q: watch.name, num: 5 }),
+      body: JSON.stringify({ q: `${watch.name} ${watchDomain}`, num: 5 }),
       signal: AbortSignal.timeout(5000),
     });
     if (shoppingRes.ok) {
       const shoppingData = await shoppingRes.json();
-      for (const r of (shoppingData.shopping ?? []).slice(0, 5)) {
+      // Prefer results from the original domain, then fall back to any
+      const allResults = (shoppingData.shopping ?? []).slice(0, 10);
+      const domainResults = watchDomain
+        ? allResults.filter((r: any) => {
+            const source = (r.source || "").toLowerCase();
+            return source.includes(watchDomain.replace(".com", "").replace(".co", ""));
+          })
+        : [];
+      const results = domainResults.length > 0 ? domainResults.slice(0, 3) : allResults.slice(0, 5);
+      for (const r of results) {
         const price = r.price || "";
         searchContext += `${r.title} — ${price} (${r.source || "store"})\n`;
       }
@@ -2994,11 +3013,11 @@ async function claudePriceFallback(
       body: JSON.stringify({
         model: "claude-haiku-4-5-20251001",
         max_tokens: 100,
-        system: "You extract product prices from search results. Respond ONLY with a JSON object: {\"price\": NUMBER} where NUMBER is the current price as a float. If you cannot determine a price, respond {\"price\": null}. No other text.",
+        system: `You extract product prices from search results. IMPORTANT: Prioritize the price from the ORIGINAL retailer (${watchDomain || "the product URL's domain"}) over other retailers. If multiple prices exist, use the one from the original store. Respond ONLY with a JSON object: {"price": NUMBER} where NUMBER is the current price as a float. If you cannot determine a price from the original retailer, respond {"price": null}. No other text.`,
         messages: [
           {
             role: "user",
-            content: `Product: ${watch.name}\nURL: ${watch.url}\n${lastKnownPrice ? `Last known price: $${lastKnownPrice.toFixed(2)}` : ""}\n\nSearch results:\n${searchContext.substring(0, 4000)}\n\nWhat is the current price?`,
+            content: `Product: ${watch.name}\nOriginal retailer: ${watchDomain || "unknown"}\nURL: ${watch.url}\n${lastKnownPrice ? `Last known price: $${lastKnownPrice.toFixed(2)}` : ""}\n\nSearch results:\n${searchContext.substring(0, 4000)}\n\nWhat is the current price at ${watchDomain || "the original retailer"}?`,
           },
         ],
       }),

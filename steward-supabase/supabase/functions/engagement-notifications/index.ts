@@ -282,6 +282,75 @@ serve(async (req) => {
       }
     }
 
+    // ─── 6. Expired Watch Dates (cleanup) ────────────────────────
+    // Detect watches with dates in the condition/URL that have already passed
+    // e.g., restaurant reservations for April 5 when today is April 10
+    results.expired_dates = 0;
+    {
+      const { data: dateWatches } = await supabase
+        .from("watches")
+        .select("id, user_id, name, emoji, condition, url, action_type")
+        .in("status", ["watching", "triggered"])
+        .in("action_type", ["book", "notify"]);
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      for (const watch of dateWatches ?? []) {
+        // Try to extract a date from the condition or URL
+        const text = `${watch.condition ?? ""} ${watch.url ?? ""}`;
+
+        // Match patterns: "May 3", "Apr 6, 2026", "2026-05-03", "date=2026-04-05"
+        const datePatterns = [
+          /date=(\d{4}-\d{2}-\d{2})/i,
+          /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+(\d{1,2})(?:,?\s*(\d{4}))?/i,
+          /(\d{4})-(\d{2})-(\d{2})/,
+          /(\d{1,2})\/(d{1,2})\/(\d{4})/,
+        ];
+
+        let watchDate: Date | null = null;
+
+        for (const pattern of datePatterns) {
+          const match = text.match(pattern);
+          if (match) {
+            try {
+              if (pattern === datePatterns[0] || pattern === datePatterns[2]) {
+                // ISO format: date=2026-04-05 or 2026-04-05
+                const dateStr = match[1] || match[0];
+                const parsed = new Date(dateStr.includes("=") ? dateStr : match[0]);
+                if (!isNaN(parsed.getTime())) { watchDate = parsed; break; }
+              } else if (pattern === datePatterns[1]) {
+                // Month name format: "May 3" or "Apr 6, 2026"
+                const monthStr = match[1];
+                const day = parseInt(match[2]);
+                const year = match[3] ? parseInt(match[3]) : today.getFullYear();
+                const monthNames: Record<string, number> = {
+                  jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+                  jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
+                };
+                const month = monthNames[monthStr.toLowerCase().slice(0, 3)];
+                if (month !== undefined && day >= 1 && day <= 31) {
+                  watchDate = new Date(year, month, day);
+                  break;
+                }
+              }
+            } catch { /* parsing failed, try next pattern */ }
+          }
+        }
+
+        if (watchDate && watchDate < today) {
+          const sent = await sendEngagement(
+            watch.user_id,
+            `expired_date_${watch.id}`,
+            "📅 Watch date has passed",
+            `${watch.emoji ?? "👀"} "${watch.name}" was for ${watchDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })} which has passed. Update or remove this watch to free up a slot.`,
+            watch.id
+          );
+          if (sent) results.expired_dates++;
+        }
+      }
+    }
+
     console.log(`[engagement] Results: ${JSON.stringify(results)}`);
 
     return new Response(JSON.stringify({ success: true, results }), {
