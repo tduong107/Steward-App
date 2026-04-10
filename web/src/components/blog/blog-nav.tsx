@@ -6,20 +6,14 @@ import Link from 'next/link'
 const APP_STORE_URL = 'https://apps.apple.com/us/app/steward-concierge/id6760180137'
 
 const PLAIN_LINKS = [
-  ['/#how-it-works', 'How it Works'],
-  ['/#why-steward', 'Why Steward'],
-  ['/#pricing', 'Pricing'],
-] as const
-
-const RESOURCE_ITEMS = [
-  { label: 'How We Compare', href: '/blog/comparisons', desc: 'Steward vs Honey, CamelCamelCamel & more', icon: '⚡' },
-  { label: 'Guides', href: '/blog/guides', desc: 'Campsites, restaurants, flights & tickets', icon: '📖' },
-  { label: 'Insights', href: '/blog/insights', desc: 'Tips, trends & product updates', icon: '💡' },
+  ['/blog', 'Resources'],
+  ['/blog/comparisons', 'How We Compare'],
+  ['/blog/guides', 'Guides'],
+  ['/blog/insights', 'Insights'],
 ] as const
 
 export function BlogNav() {
   const [scrolled, setScrolled] = useState(false)
-  const [resourcesOpen, setResourcesOpen] = useState(false)
 
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 60)
@@ -62,69 +56,24 @@ export function BlogNav() {
       {/* Right side links */}
       <div className="blog-nav-links" style={{ display: 'flex', gap: 28, alignItems: 'center' }}>
         {PLAIN_LINKS.map(([href, label]) => (
-          <a key={href} href={href}
-            style={{ fontSize: 13.5, fontWeight: 500, color: 'rgba(247,246,243,0.55)', textDecoration: 'none', transition: 'color .25s' }}
+          <Link key={href} href={href}
+            style={{ fontSize: 15, fontWeight: 500, color: 'rgba(247,246,243,0.55)', textDecoration: 'none', transition: 'color .25s' }}
             onMouseEnter={e => (e.currentTarget.style.color = '#6EE7B7')}
             onMouseLeave={e => (e.currentTarget.style.color = 'rgba(247,246,243,0.55)')}>
             {label}
-          </a>
+          </Link>
         ))}
-
-        {/* Resources dropdown */}
-        <div
-          onMouseEnter={() => setResourcesOpen(true)}
-          onMouseLeave={() => setResourcesOpen(false)}
-          style={{ position: 'relative', zIndex: 200 }}
-        >
-          <button
-            onClick={() => setResourcesOpen(v => !v)}
-            style={{ fontSize: 13.5, fontWeight: 500, color: resourcesOpen ? '#6EE7B7' : 'rgba(247,246,243,0.55)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'inherit', transition: 'color .25s', padding: 0 }}
-          >
-            Resources
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ transform: resourcesOpen ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }}>
-              <path d="M2 4L5 7L8 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </button>
-          <div style={{
-            position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)',
-            width: 280, pointerEvents: resourcesOpen ? 'auto' : 'none',
-          }}>
-            <div style={{ height: 36 }} />
-            {resourcesOpen && (
-              <div style={{
-                width: 280, borderRadius: 14,
-                background: 'rgba(15,32,24,0.97)', backdropFilter: 'blur(20px)',
-                border: '1px solid rgba(110,231,183,0.12)', boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
-                padding: 6,
-              }}>
-                {RESOURCE_ITEMS.map(item => (
-                  <Link key={item.label} href={item.href}
-                    onClick={() => setResourcesOpen(false)}
-                    style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 12px', borderRadius: 10, textDecoration: 'none', transition: 'background .15s' }}
-                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(110,231,183,0.06)')}
-                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                    <span style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>{item.icon}</span>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: '#F7F6F3', marginBottom: 2 }}>{item.label}</div>
-                      <div style={{ fontSize: 11, color: 'rgba(247,246,243,0.4)', lineHeight: 1.3 }}>{item.desc}</div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
 
         {/* iOS App button */}
         <Link href={APP_STORE_URL} target="_blank" rel="noopener noreferrer"
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: '#F7F6F3', textDecoration: 'none', padding: '8px 16px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.2)', transition: 'all .25s' }}>
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 600, color: '#F7F6F3', textDecoration: 'none', padding: '9px 18px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.2)', transition: 'all .25s' }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
           iOS App
         </Link>
 
         {/* Get Started */}
         <Link href="/signup"
-          style={{ background: '#6EE7B7', color: '#0F2018', fontWeight: 700, padding: '10px 24px', borderRadius: 10, fontSize: 13.5, textDecoration: 'none', display: 'inline-block' }}>
+          style={{ background: '#6EE7B7', color: '#0F2018', fontWeight: 700, padding: '10px 24px', borderRadius: 10, fontSize: 14.5, textDecoration: 'none', display: 'inline-block' }}>
           Get Started
         </Link>
       </div>
