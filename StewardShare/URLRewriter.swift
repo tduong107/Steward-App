@@ -12,6 +12,8 @@ struct RewriteResult {
 /// Categories of websites, used to show contextually-relevant suggestion chips in the share extension.
 enum SiteCategory: String {
     case restaurant   // Resy, OpenTable, Yelp, Tock, SevenRooms
+    case booking      // Airbnb, Calendly, Zocdoc, salons, appointments
+    case camping      // Recreation.gov, ReserveCalifornia, ReserveAmerica, campgrounds
     case ticketing    // Ticketmaster, Eventbrite, StubHub, SeatGeek
     case ecommerce    // Amazon, eBay, Walmart, Target, etc.
     case general      // Everything else
@@ -41,17 +43,57 @@ enum URLRewriter {
             return .general
         }
 
-        // Restaurant / Booking platforms
+        // Restaurant / Dining reservation platforms
         let restaurantDomains = ["resy.com", "opentable.com", "exploretock.com",
                                  "sevenrooms.com", "yelp.com/reservations"]
         if restaurantDomains.contains(where: { host.contains($0) || urlString.lowercased().contains($0) }) {
             return .restaurant
         }
 
+        // Camping / Campground reservation platforms
+        let campingDomains = [
+            "recreation.gov", "reserveamerica.com", "reservecalifornia.com",
+            "hipcamp.com", "campspot.com", "koa.com", "thousandtrails.com",
+            "goingtocamp.com", "nps.gov",
+        ]
+        if campingDomains.contains(where: { host.contains($0) }) {
+            return .camping
+        }
+        // URL path heuristic for camping on general sites
+        let pathLower = url.path.lowercased()
+        if pathLower.contains("/campground") || pathLower.contains("/camping") {
+            return .camping
+        }
+
+        // Booking / Reservations / Appointments (non-restaurant, non-camping)
+        let bookingDomains = [
+            // Lodging & vacation rentals
+            "airbnb.com", "vrbo.com", "booking.com", "hotels.com", "expedia.com/hotels",
+            "hostelworld.com", "marriott.com", "hilton.com", "hyatt.com",
+            // Appointments & scheduling
+            "calendly.com", "acuityscheduling.com", "squareup.com/appointments",
+            "zocdoc.com", "healthgrades.com", "solv.com", "doctolib.",
+            // Fitness & classes
+            "classpass.com", "mindbodyonline.com",
+            // Salon / Spa / Beauty
+            "vagaro.com", "booksy.com", "styleseat.com", "fresha.com",
+        ]
+        if bookingDomains.contains(where: { host.contains($0) || urlString.lowercased().contains($0) }) {
+            return .booking
+        }
+
+        // URL path heuristics for booking sites not in the list
+        let bookingPathKeywords = ["/reservation", "/booking", "/appointment",
+                                    "/schedule", "/book-now", "/reserve"]
+        if bookingPathKeywords.contains(where: { pathLower.contains($0) }) {
+            return .booking
+        }
+
         // Ticketing / Events
         let ticketingDomains = ["ticketmaster.com", "eventbrite.com", "axs.com",
                                 "stubhub.com", "seatgeek.com", "vividseats.com",
-                                "dice.fm", "livenation.com"]
+                                "dice.fm", "livenation.com", "tickpick.com",
+                                "gametime.co", "rateyourseats.com", "megaseats.com"]
         if ticketingDomains.contains(where: { host.contains($0) }) {
             return .ticketing
         }
@@ -60,8 +102,35 @@ enum URLRewriter {
         let ecommerceDomains = ["amazon.", "ebay.com", "walmart.com", "target.com",
                                 "bestbuy.com", "nike.com", "adidas.com", "apple.com/shop",
                                 "newegg.com", "bhphotovideo.com", "costco.com",
-                                "etsy.com", "nordstrom.com", "macys.com", "zappos.com"]
+                                "etsy.com", "nordstrom.com", "macys.com", "zappos.com",
+                                "rei.com", "dickssportinggoods.com", "backcountry.com",
+                                "homedepot.com", "lowes.com", "wayfair.com", "overstock.com",
+                                "kohls.com", "jcpenney.com", "sephora.com", "ulta.com",
+                                "bloomingdales.com", "saksfifthavenue.com", "neimanmarcus.com",
+                                "anthropologie.com", "urbanoutfitters.com", "freepeople.com",
+                                "gap.com", "oldnavy.com", "bananarepublic.com",
+                                "hm.com", "zara.com", "uniqlo.com", "asos.com",
+                                "shopify.com", "shein.com", "poshmark.com", "mercari.com",
+                                "gamestop.com", "samsung.com", "dell.com", "hp.com",
+                                "ikea.com", "crateandbarrel.com", "potterybarn.com",
+                                "williams-sonoma.com", "pier1.com", "bedbathandbeyond.com",
+                                "chewy.com", "petco.com", "petsmart.com",
+                                "lululemon.com", "underarmour.com", "patagonia.com",
+                                "arcteryx.com", "thenorthface.com", "columbia.com"]
         if ecommerceDomains.contains(where: { host.contains($0) || urlString.lowercased().contains($0) }) {
+            return .ecommerce
+        }
+
+        // URL path heuristics for ecommerce on unlisted sites
+        // (e.g. boutique Shopify stores with /products/item-name paths)
+        let ecommercePathKeywords = ["/products/", "/product/", "/shop/", "/item/",
+                                     "/p/", "/dp/", "/buy/", "/cart"]
+        if ecommercePathKeywords.contains(where: { pathLower.contains($0) }) {
+            return .ecommerce
+        }
+
+        // Detect Shopify stores by common Shopify patterns in the URL
+        if host.contains("myshopify.com") || pathLower.contains("/collections/") {
             return .ecommerce
         }
 

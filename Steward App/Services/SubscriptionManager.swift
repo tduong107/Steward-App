@@ -49,7 +49,13 @@ final class SubscriptionManager {
         Task { [weak self] in
             for await result in Transaction.updates {
                 guard case .verified(let transaction) = result else { continue }
-                await transaction.finish()
+                do {
+                    await transaction.finish()
+                } catch {
+                    #if DEBUG
+                    print("[SubscriptionManager] Failed to finish transaction: \(error)")
+                    #endif
+                }
                 await self?.checkEntitlements()
             }
         }

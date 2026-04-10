@@ -89,8 +89,26 @@ enum ShareAPIService {
 
     // MARK: - Create Watch
 
+    /// Validates watch data before submission
+    private static func validateWatchData(_ data: ShareWatchDTO) throws {
+        // Validate URL
+        guard let watchURL = URL(string: data.url),
+              let scheme = watchURL.scheme,
+              ["http", "https"].contains(scheme.lowercased()),
+              watchURL.host != nil else {
+            throw ShareError.apiError("The URL doesn't look valid. Please try sharing from the website again.")
+        }
+        // Validate name length
+        guard !data.name.isEmpty, data.name.count <= 500 else {
+            throw ShareError.apiError("Watch name is too long. Please try a shorter name.")
+        }
+    }
+
     /// Inserts a watch into Supabase via the PostgREST API
     static func createWatch(_ watchData: ShareWatchDTO) async throws {
+        // Validate input before sending
+        try validateWatchData(watchData)
+
         guard let token = accessToken else {
             throw ShareError.notAuthenticated
         }

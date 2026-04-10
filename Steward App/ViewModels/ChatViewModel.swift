@@ -110,8 +110,7 @@ final class ChatViewModel {
             // Check if user typed a price number
             let cleaned = trimmed.replacingOccurrences(of: "$", with: "")
                 .replacingOccurrences(of: ",", with: "")
-            if let newPrice = Double(cleaned), newPrice > 0 {
-                let watchId = pendingPriceUpdateWatchId!
+            if let newPrice = Double(cleaned), newPrice > 0, let watchId = pendingPriceUpdateWatchId {
                 let userMsg = ChatMessage(role: .user, text: trimmed)
                 withAnimation(.spring(response: 0.3)) {
                     messages.append(userMsg)
@@ -146,7 +145,7 @@ final class ChatViewModel {
                 }
                 inputText = ""
 
-                let fix = pendingFix!
+                guard let fix = pendingFix else { return }
                 onWatchUpdate?(fix.watchName, fix.url)
                 pendingFix = nil
                 fixWatchName = nil
@@ -882,10 +881,14 @@ final class ChatViewModel {
             let payload = try JSONDecoder().decode(WatchPayload.self, from: data)
             let actionType = ActionType(rawValue: payload.actionType ?? "notify") ?? .notify
 
-            // Ensure URL has a protocol
+            // Ensure URL has a protocol and is valid
             var url = payload.url
-            if !url.lowercased().hasPrefix("http") {
+            if !url.lowercased().hasPrefix("http://") && !url.lowercased().hasPrefix("https://") {
                 url = "https://\(url)"
+            }
+            guard URL(string: url)?.host != nil else {
+                showWatchCreationError("That URL doesn't look right. Could you share the link again?")
+                return
             }
 
             // Use AI-specified frequency, fall back to user's default, then "Daily"

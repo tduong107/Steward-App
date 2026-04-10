@@ -68,10 +68,27 @@ final class AuthManager {
 
     // MARK: - Phone + Password Sign Up
 
+    /// Validates phone number format (E.164: +1XXXXXXXXXX)
+    private func isValidPhone(_ phone: String) -> Bool {
+        let digits = phone.replacingOccurrences(of: "[^0-9+]", with: "", options: .regularExpression)
+        // Must start with + and be 10-15 digits
+        return digits.hasPrefix("+") && digits.count >= 11 && digits.count <= 16
+    }
+
     /// Creates a new account with phone number and password.
     /// After sign-up, an OTP code is sent to the phone for verification.
     func signUp(phone: String, password: String, name: String) async throws {
         errorMessage = nil
+
+        guard isValidPhone(phone) else {
+            errorMessage = "Please enter a valid phone number"
+            return
+        }
+
+        guard password.count >= 6 else {
+            errorMessage = "Password must be at least 6 characters"
+            return
+        }
 
         let response = try await SupabaseConfig.client.auth.signUp(
             phone: phone,
@@ -391,7 +408,7 @@ final class AuthManager {
         // Add new item
         var addQuery = query
         addQuery[kSecValueData as String] = tokenData
-        addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
+        addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
         SecItemAdd(addQuery as CFDictionary, nil)
 
         // Store userId in App Group UserDefaults (non-sensitive)
