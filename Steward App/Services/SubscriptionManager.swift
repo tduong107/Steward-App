@@ -49,13 +49,7 @@ final class SubscriptionManager {
         Task { [weak self] in
             for await result in Transaction.updates {
                 guard case .verified(let transaction) = result else { continue }
-                do {
-                    await transaction.finish()
-                } catch {
-                    #if DEBUG
-                    print("[SubscriptionManager] Failed to finish transaction: \(error)")
-                    #endif
-                }
+                await transaction.finish()
                 await self?.checkEntitlements()
             }
         }
@@ -234,7 +228,7 @@ final class SubscriptionManager {
                 await checkEntitlements()
 
                 // Track successful purchase in PostHog
-                let tierName = tier(for: product.id)?.rawValue ?? "unknown"
+                let tierName = currentTier.rawValue
                 let billing = product.id.contains("year") ? "yearly" : "monthly"
                 AnalyticsService.shared.trackSubscriptionStarted(
                     tier: tierName,
