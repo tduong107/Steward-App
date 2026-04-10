@@ -894,18 +894,35 @@ final class WatchViewModel {
 
     // MARK: - Review Prompt
 
+    /// Shows in ActionModal after completing an action
     var shouldShowReviewPrompt: Bool {
         guard !reviewPromptDismissed else { return false }
         let defaults = UserDefaults.standard
         guard !defaults.bool(forKey: "hasLeftReview") else { return false }
-        guard defaults.integer(forKey: "completedActionCount") >= 3 else { return false }
-        guard defaults.integer(forKey: "reviewPromptDismissals") < 2 else { return false }
+        // Lower threshold: prompt after 1st completed action (was 3)
+        guard defaults.integer(forKey: "completedActionCount") >= 1 else { return false }
+        guard defaults.integer(forKey: "reviewPromptDismissals") < 3 else { return false }
         let last = defaults.double(forKey: "lastReviewPromptDate")
         if last > 0 {
+            // 14-day cooldown between prompts (was 60 days)
             let daysSince = (Date().timeIntervalSince1970 - last) / 86400
-            guard daysSince >= 60 else { return false }
+            guard daysSince >= 14 else { return false }
         }
         return true
+    }
+
+    /// Lightweight check: should we request a review after watch creation?
+    /// Triggers after the user creates their 2nd watch (moment of commitment).
+    var shouldRequestReviewAfterWatchCreation: Bool {
+        let defaults = UserDefaults.standard
+        guard !defaults.bool(forKey: "hasLeftReview") else { return false }
+        guard !defaults.bool(forKey: "hasRequestedReviewForWatchCreation") else { return false }
+        return watches.count >= 2
+    }
+
+    /// Mark that we used the watch-creation review trigger (one-time)
+    func markWatchCreationReviewRequested() {
+        UserDefaults.standard.set(true, forKey: "hasRequestedReviewForWatchCreation")
     }
 
     func markReviewLeft() {

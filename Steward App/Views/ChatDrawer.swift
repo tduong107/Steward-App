@@ -1,11 +1,13 @@
 import SwiftUI
 import PhotosUI
+import StoreKit
 
 struct ChatDrawer: View {
     @State private var chatVM = ChatViewModel()
     @Binding var isPresented: Bool
     @Environment(WatchViewModel.self) private var watchVM
     @Environment(SubscriptionManager.self) private var subscriptionManager
+    @Environment(\.requestReview) private var requestReview
 
     @FocusState private var isInputFocused: Bool
     @State private var selectedPhotoItem: PhotosPickerItem?
@@ -77,6 +79,15 @@ struct ChatDrawer: View {
                 }
                 chatVM.pendingWatch = nil
                 chatVM.pendingWatchInitialPrice = nil
+
+                // Request App Store review after 2nd watch (moment of commitment)
+                // Delayed slightly so the watch creation UI settles first
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                    if watchVM.shouldRequestReviewAfterWatchCreation {
+                        watchVM.markWatchCreationReviewRequested()
+                        requestReview()
+                    }
+                }
             }
         }
         .onChange(of: chatVM.pendingWishlistWatches.count) {

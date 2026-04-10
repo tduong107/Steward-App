@@ -1,10 +1,12 @@
 import SwiftUI
+import StoreKit
 
 struct HomeScreen: View {
     @Environment(WatchViewModel.self) private var viewModel
     @Environment(SubscriptionManager.self) private var subscriptionManager
     @Environment(NotificationManager.self) private var notificationManager
     @Environment(AuthManager.self) private var authManager
+    @Environment(\.requestReview) private var requestReview
 
     // Default frequency
     @AppStorage("defaultCheckFrequency") private var defaultCheckFrequency = "Daily"
@@ -123,6 +125,7 @@ struct HomeScreen: View {
         }
         .onAppear {
             autoCompleteTutorialSteps()
+            checkSessionBasedReview()
         }
         .onChange(of: viewModel.watches.count) { _, _ in
             autoCompleteTutorialSteps()
@@ -161,6 +164,24 @@ struct HomeScreen: View {
     private var hasUserPhone: Bool {
         if let p = authManager.effectivePhone, !p.isEmpty { return true }
         return false
+    }
+
+    /// Request App Store review based on session count (5th open with 1+ watches)
+    private func checkSessionBasedReview() {
+        let defaults = UserDefaults.standard
+        guard !defaults.bool(forKey: "hasLeftReview") else { return }
+        guard !defaults.bool(forKey: "hasRequestedSessionReview") else { return }
+
+        let sessionCount = defaults.integer(forKey: "appSessionCount") + 1
+        defaults.set(sessionCount, forKey: "appSessionCount")
+
+        // On the 5th session, if the user has at least 1 watch, request review
+        if sessionCount >= 5 && !viewModel.watches.isEmpty {
+            defaults.set(true, forKey: "hasRequestedSessionReview")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                requestReview()
+            }
+        }
     }
 
     /// Auto-complete tutorial steps based on actual app state and show congrats
