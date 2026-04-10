@@ -21,6 +21,7 @@ import {
   Mail,
   Smartphone,
 } from 'lucide-react'
+import posthog from 'posthog-js'
 import { createClient } from '@/lib/supabase/client'
 import { useSub } from '@/hooks/use-subscription'
 import type { Watch, CheckResult, CheckFrequency } from '@/lib/types'
@@ -152,6 +153,7 @@ export default function WatchDetailPage() {
   const handleTogglePause = useCallback(() => {
     if (!watch) return
     const newStatus = watch.status === 'paused' ? 'watching' : 'paused'
+    posthog.capture(newStatus === 'paused' ? 'watch_paused' : 'watch_resumed', { watch_id: watch.id, watch_name: watch.name })
     handleUpdate({ status: newStatus })
   }, [watch, handleUpdate])
 
@@ -163,6 +165,7 @@ export default function WatchDetailPage() {
         .from('watches')
         .update({ status: 'deleted' as const })
         .eq('id', watch.id)
+      posthog.capture('watch_deleted', { watch_id: watch.id, watch_name: watch.name, action_type: watch.action_type })
       router.push('/home')
     } catch (err) {
       console.error('Delete failed:', err)
@@ -183,6 +186,7 @@ export default function WatchDetailPage() {
       const data = await res.json()
       if (data.shareUrl) {
         setShareUrl(data.shareUrl)
+        posthog.capture('watch_shared', { watch_id: watch.id, watch_name: watch.name })
       }
     } catch (err) {
       console.error('Share failed:', err)

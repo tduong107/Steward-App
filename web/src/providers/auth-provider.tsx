@@ -3,6 +3,7 @@
 import { createContext, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import type { User } from '@supabase/supabase-js'
+import posthog from 'posthog-js'
 import { createClient } from '@/lib/supabase/client'
 import type { Profile } from '@/lib/types'
 
@@ -52,6 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user, fetchProfile])
 
   const signOut = useCallback(async () => {
+    posthog.reset()
     await supabaseRef.current.auth.signOut()
     setUser(null)
     setProfile(null)
@@ -73,12 +75,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
 
     // Listen for auth state changes (login, logout, token refresh)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mountedRef.current) return
       const currentUser = session?.user ?? null
       setUser(currentUser)
       if (currentUser) {
         fetchProfile(currentUser.id)
+        // Identify user in PostHog on sign-in events
+        if (event === 'SIGNED_IN') {
+          posthog.identify(currentUser.id, {
+            email: currentUser.email,
+            phone: currentUser.phone,
+          })
+        }
       } else {
         setProfile(null)
       }

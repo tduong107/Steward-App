@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Check, Apple } from 'lucide-react'
+import posthog from 'posthog-js'
 import { Dialog } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { useSub } from '@/hooks/use-subscription'
@@ -58,6 +59,12 @@ export function PaywallDialog({ open, onClose }: PaywallDialogProps) {
 
   const isAppleSub = source === 'apple'
 
+  useEffect(() => {
+    if (open) {
+      posthog.capture('paywall_viewed', { current_tier: currentTier })
+    }
+  }, [open, currentTier])
+
   const handleSubscribe = async (tierKey: string) => {
     if (tierKey === currentTier) return
 
@@ -87,6 +94,7 @@ export function PaywallDialog({ open, onClose }: PaywallDialogProps) {
     }
 
     setLoadingTier(tierKey)
+    posthog.capture('subscription_upgrade_started', { tier: tierKey, billing, current_tier: currentTier })
     try {
       const res = await fetch('/api/stripe/checkout', {
         method: 'POST',

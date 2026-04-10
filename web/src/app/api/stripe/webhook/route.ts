@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getStripe } from '@/lib/stripe'
 import { createClient } from '@supabase/supabase-js'
 import type Stripe from 'stripe'
+import { getPostHogClient } from '@/lib/posthog-server'
 
 // Lazy-initialize admin client (service role key may not be available at build time)
 function getSupabaseAdmin() {
@@ -54,6 +55,7 @@ export async function POST(request: NextRequest) {
             console.error(`Failed to update tier for user ${userId}:`, error.message)
           } else {
             console.log(`Checkout completed: user=${userId} tier=${tier} session=${session.id}`)
+            getPostHogClient().capture({ distinctId: userId, event: 'subscription_activated', properties: { tier, session_id: session.id } })
           }
         } else {
           console.warn('Checkout session missing user_id or tier metadata:', session.id)
@@ -125,6 +127,7 @@ export async function POST(request: NextRequest) {
             console.error(`Failed to reset tier for user ${userId}:`, error.message)
           } else {
             console.log(`Subscription deleted: user=${userId} subscription=${subscription.id}`)
+            getPostHogClient().capture({ distinctId: userId, event: 'subscription_cancelled', properties: { subscription_id: subscription.id } })
           }
         } else {
           // Fallback: look up by Stripe customer ID

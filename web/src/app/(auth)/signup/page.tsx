@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import posthog from 'posthog-js'
 import { createClient } from '@/lib/supabase/client'
 
 // Format raw phone input to E.164 for Supabase (+1XXXXXXXXXX)
@@ -99,6 +100,8 @@ export default function SignupPage() {
           sms_alerts: true,
         })
 
+        posthog.identify(data.user.id, { phone: e164, name: fullName.trim() })
+        posthog.capture('user_signed_up', { method: 'phone_password' })
         sessionStorage.setItem('steward_just_signed_in', '1')
         router.refresh()
         router.push('/home')
@@ -133,6 +136,7 @@ export default function SignupPage() {
   async function handleOAuth(provider: 'apple' | 'google') {
     setError(null)
     setOauthLoading(provider)
+    posthog.capture('oauth_sign_up_initiated', { provider })
     try {
       const supabase = createClient()
       const { error: oauthError } = await supabase.auth.signInWithOAuth({

@@ -3,6 +3,7 @@
 import { Suspense, useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import posthog from 'posthog-js'
 import { createClient } from '@/lib/supabase/client'
 
 function toE164(raw: string): string {
@@ -78,6 +79,7 @@ function LoginContent() {
 
       if (signInError) { setError(signInError.message); return }
 
+      posthog.capture('user_signed_in', { method: 'phone_password' })
       sessionStorage.setItem('steward_just_signed_in', '1')
       router.refresh()
       router.push('/home')
@@ -91,6 +93,7 @@ function LoginContent() {
   async function handleOAuth(provider: 'apple' | 'google') {
     setError(null)
     setOauthLoading(provider)
+    posthog.capture('oauth_sign_in_initiated', { provider })
     try {
       const supabase = createClient()
       const { error: oauthError } = await supabase.auth.signInWithOAuth({

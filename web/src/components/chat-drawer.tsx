@@ -3,6 +3,7 @@
 import Image from 'next/image'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import posthog from 'posthog-js'
 import { X, SendHorizontal, RotateCcw, ImagePlus, Mic, Square } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useChat, WATCH_LIMITS } from '@/hooks/use-chat'
@@ -255,6 +256,7 @@ export function ChatDrawer({ open, onClose }: ChatDrawerProps) {
     } else {
       sendMessage(text)
     }
+    posthog.capture('ai_chat_message_sent', { has_image: !!pendingImage, message_length: text.length })
   }, [input, isLoading, sendMessage, pendingImage])
 
   const handleSuggestionClick = useCallback(

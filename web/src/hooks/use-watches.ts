@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Watch } from '@/lib/types'
+import posthog from 'posthog-js'
 import { useAuth } from '@/hooks/use-auth'
 
 export function useWatches() {
@@ -150,6 +151,14 @@ export function useWatches() {
       setWatches((prev) => {
         if (prev.some(w => w.id === newWatch.id)) return prev
         return [newWatch, ...prev]
+      })
+      // Track watch creation in PostHog
+      posthog.capture('watch_created', {
+        watch_id: newWatch.id,
+        watch_name: newWatch.name,
+        action_type: newWatch.action_type,
+        watch_mode: newWatch.watch_mode,
+        check_frequency: newWatch.check_frequency,
       })
       return newWatch
     },

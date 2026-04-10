@@ -5,6 +5,7 @@ import './globals.css'
 import { AuthProvider } from '@/providers/auth-provider'
 import { SubscriptionProvider } from '@/providers/subscription-provider'
 import { ThemeProvider } from '@/providers/theme-provider'
+import { PostHogProvider } from '@/providers/posthog-provider'
 
 export const viewport = {
   width: 'device-width',
@@ -136,13 +137,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body style={{ fontFamily: 'var(--font-body)' }}>
-        <ThemeProvider>
-          <AuthProvider>
-            <SubscriptionProvider>
-              {children}
-            </SubscriptionProvider>
-          </AuthProvider>
-        </ThemeProvider>
+        <PostHogProvider>
+          <ThemeProvider>
+            <AuthProvider>
+              <SubscriptionProvider>
+                {children}
+              </SubscriptionProvider>
+            </AuthProvider>
+          </ThemeProvider>
+        </PostHogProvider>
         <Analytics />
         <SpeedInsights />
       </body>

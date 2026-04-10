@@ -11,6 +11,7 @@ import {
   Search,
   Zap,
 } from 'lucide-react'
+import posthog from 'posthog-js'
 import { createClient } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { useWatches } from '@/hooks/use-watches'
@@ -287,7 +288,7 @@ export default function DashboardPage() {
       {!loading && isAtLimit && (
         <button
           type="button"
-          onClick={() => setShowPaywall(true)}
+          onClick={() => { posthog.capture('upgrade_banner_clicked', { current_tier: tier, is_over_limit: isOverLimit }); setShowPaywall(true) }}
           className={`w-full flex items-center gap-3 rounded-2xl px-4 py-3.5 text-left transition-all duration-200 hover:opacity-90 animate-fade-in-up [animation-delay:50ms] cursor-pointer ${
             isOverLimit
               ? 'bg-red-500/10 border border-red-500/30'
@@ -382,6 +383,7 @@ export default function DashboardPage() {
               key={watch.id}
               className="rounded-[var(--radius-lg)] border border-[var(--color-accent)] bg-[var(--color-accent-light)] px-5 py-4 cursor-pointer transition-all hover:shadow-[var(--shadow-sm)]"
               onClick={() => {
+                posthog.capture('watch_triggered_cta_clicked', { watch_id: watch.id, action_type: watch.action_type, watch_name: watch.name })
                 if (watch.action_url) window.open(watch.action_url, '_blank', 'noopener,noreferrer')
                 else router.push(`/home/watch/${watch.id}`)
               }}

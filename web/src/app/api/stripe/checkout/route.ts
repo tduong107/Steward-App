@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getStripe, getStripePriceId } from '@/lib/stripe'
 import { createClient } from '@/lib/supabase/server'
+import { getPostHogClient } from '@/lib/posthog-server'
 
 export async function POST(request: NextRequest) {
   try {
@@ -71,6 +72,7 @@ export async function POST(request: NextRequest) {
             .eq('id', user.id)
 
           console.log(`Subscription upgraded: user=${user.id} to=${tier} sub=${updatedSub.id}`)
+          getPostHogClient().capture({ distinctId: user.id, event: 'subscription_checkout_started', properties: { tier, billing, type: 'upgrade' } })
           // Return a redirect URL instead of a Stripe checkout URL
           return NextResponse.json({ url: `${origin}/home?upgraded=${tier}` })
         }
@@ -94,6 +96,7 @@ export async function POST(request: NextRequest) {
     }
 
     const session = await stripe.checkout.sessions.create(sessionParams as any)
+    getPostHogClient().capture({ distinctId: user.id, event: 'subscription_checkout_started', properties: { tier, billing, type: 'new' } })
     return NextResponse.json({ url: session.url })
   } catch (err) {
     console.error('Stripe checkout error:', err)
