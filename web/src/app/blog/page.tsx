@@ -62,7 +62,7 @@ export default function BlogIndexPage() {
       </section>
 
       {/* Guides */}
-      <section>
+      <section id="guides" style={{ scrollMarginTop: 80 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
           <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: S.mint, background: 'rgba(110,231,183,0.08)', border: '1px solid rgba(110,231,183,0.18)', borderRadius: 20, padding: '4px 12px' }}>
             Guides
@@ -73,6 +73,23 @@ export default function BlogIndexPage() {
           {guides.map(article => (
             <ArticleCard key={article.slug} article={article} />
           ))}
+        </div>
+      </section>
+
+      {/* Insights */}
+      <section id="insights" style={{ marginTop: 48, scrollMarginTop: 80 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
+          <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(168,130,255,0.9)', background: 'rgba(168,130,255,0.08)', border: '1px solid rgba(168,130,255,0.18)', borderRadius: 20, padding: '4px 12px' }}>
+            Insights
+          </span>
+          <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} />
+        </div>
+        <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 18, padding: '40px 32px', textAlign: 'center' }}>
+          <span style={{ fontSize: 32, display: 'block', marginBottom: 12 }}>💡</span>
+          <p style={{ fontFamily: S.serif, fontSize: 18, fontWeight: 700, color: S.cream, marginBottom: 8 }}>Coming soon</p>
+          <p style={{ fontSize: 14, color: 'rgba(247,246,243,0.4)', maxWidth: 400, margin: '0 auto' }}>
+            Tips on saving money, tracking strategies, product updates, and behind-the-scenes looks at how Steward works.
+          </p>
         </div>
       </section>
     </div>

@@ -31,7 +31,7 @@ export default function BlogLayout({ children }: { children: React.ReactNode }) 
         }}
       >
         <Link
-          href="/blog"
+          href="/"
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -40,47 +40,37 @@ export default function BlogLayout({ children }: { children: React.ReactNode }) 
             color: '#F7F6F3',
           }}
         >
-          {/* Logo mark */}
+          {/* SVG Logo — matches landing page exactly */}
+          <svg width="30" height="30" viewBox="0 0 1024 1024" fill="none">
+            <rect width="1024" height="1024" rx="224" fill="url(#bl1)"/>
+            <path d="M448 488Q445 536 425 579Q405 622 367 649Q329 676 270 676Q208 676 175 641Q142 606 142 559Q142 517 166 488Q190 460 228 438Q267 417 310 397Q348 380 386 360Q424 341 455 316Q486 291 504 256Q523 222 523 174Q523 119 495 76Q468 33 416 8Q364 -16 289 -16Q244 -16 196 -3Q148 10 111 35L116 -8H64L58 205H97Q102 117 158 71Q214 26 293 26Q332 26 365 40Q398 55 417 83Q437 111 437 151Q437 196 413 226Q389 256 351 278Q313 300 270 320Q232 337 195 356Q158 375 127 399Q97 424 78 458Q60 492 60 540Q60 566 69 596Q78 626 100 653Q123 681 162 698Q202 716 263 716Q301 716 348 705Q396 695 437 665L433 708H484V488Z"
+              transform="translate(388.55,660.22) scale(0.4235,-0.4235)" fill="url(#bl2)"/>
+            <g transform="translate(607,355)">
+              <circle cx="0" cy="0" r="22" fill="rgba(110,231,183,0.15)"/>
+              <path d="M0 -14 L3.5 -3.5 L14 0 L3.5 3.5 L0 14 L-3.5 3.5 L-14 0 L-3.5 -3.5 Z" fill="url(#bl3)"/>
+            </g>
+            <defs>
+              <linearGradient id="bl1" x1="512" y1="0" x2="512" y2="1024">
+                <stop offset="0%" stopColor="#243D30"/><stop offset="100%" stopColor="#0F2018"/>
+              </linearGradient>
+              <linearGradient id="bl2" x1="512" y1="357" x2="512" y2="667">
+                <stop offset="0%" stopColor="#FFFFFF"/><stop offset="50%" stopColor="#D1FAE5"/><stop offset="100%" stopColor="#6EE7B7"/>
+              </linearGradient>
+              <radialGradient id="bl3" cx="30%" cy="30%" r="70%">
+                <stop offset="0%" stopColor="#FFFFFF"/><stop offset="100%" stopColor="#6EE7B7"/>
+              </radialGradient>
+            </defs>
+          </svg>
           <span
             style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: 32,
-              height: 32,
-              borderRadius: 8,
-              background: '#2A5C45',
               fontFamily: 'Georgia, "Times New Roman", serif',
               fontWeight: 700,
-              fontSize: 16,
-              color: '#6EE7B7',
-            }}
-          >
-            S
-          </span>
-          <span
-            style={{
-              fontWeight: 600,
-              fontSize: 17,
-              letterSpacing: '-0.01em',
+              fontSize: 22,
+              letterSpacing: '-0.02em',
+              color: '#F7F6F3',
             }}
           >
             Steward
-          </span>
-          <span
-            style={{
-              fontSize: 11,
-              fontWeight: 600,
-              letterSpacing: '0.04em',
-              textTransform: 'uppercase' as const,
-              padding: '3px 8px',
-              borderRadius: 6,
-              background: 'rgba(110,231,183,0.1)',
-              color: '#6EE7B7',
-              border: '1px solid rgba(110,231,183,0.2)',
-            }}
-          >
-            Blog
           </span>
         </Link>
 
