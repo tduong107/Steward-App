@@ -81,10 +81,10 @@ function Nav() {
       transition: 'all 0.4s',
       flexWrap: 'wrap' as const,
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <a href="#" onClick={e => { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }) }} style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', cursor: 'pointer' }}>
         <Logo />
         <span style={{ fontFamily: S.serif, fontSize: 22, fontWeight: 700, color: S.cream, letterSpacing: '-0.02em' }}>Steward</span>
-      </div>
+      </a>
       <div className="lnd-nav-links" style={{ display: 'flex', gap: 28, alignItems: 'center' }}>
         {NAV_LINKS.map(([href, label]) => (
           <a key={href} href={href} style={{ fontSize: 13.5, fontWeight: 500, color: 'rgba(247,246,243,0.55)', textDecoration: 'none', transition: 'color .25s' }}
