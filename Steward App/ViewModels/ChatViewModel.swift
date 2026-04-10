@@ -907,6 +907,23 @@ final class ChatViewModel {
                 frequency = allowed.last ?? "Daily"
             }
 
+            // Validate AI-generated imageURL — only allow http/https with valid host
+            var safeImageURL: String? = nil
+            if let img = payload.imageURL, let parsed = URL(string: img),
+               let scheme = parsed.scheme?.lowercased(),
+               (scheme == "https" || scheme == "http"),
+               parsed.host != nil {
+                safeImageURL = img
+            }
+
+            // Validate searchQuery — reject path traversal and SQL patterns
+            var safeSearchQuery: String? = payload.searchQuery
+            if let sq = safeSearchQuery {
+                if sq.contains("..") || sq.contains(";") || sq.lowercased().contains("drop ") || sq.lowercased().contains("delete ") {
+                    safeSearchQuery = nil
+                }
+            }
+
             let watch = Watch(
                 emoji: payload.emoji ?? "👀",
                 name: payload.name,
@@ -915,9 +932,9 @@ final class ChatViewModel {
                 actionLabel: payload.actionLabel ?? actionType.displayName,
                 actionType: actionType,
                 checkFrequency: frequency,
-                imageURL: payload.imageURL,
+                imageURL: safeImageURL,
                 watchMode: payload.watchMode ?? "url",
-                searchQuery: payload.searchQuery
+                searchQuery: safeSearchQuery
             )
 
             // Apply global "notify on any price drop" default for price watches
@@ -1021,7 +1038,11 @@ final class ChatViewModel {
                    let match = regex.firstMatch(in: html, range: NSRange(html.startIndex..., in: html)),
                    let range = Range(match.range(at: 1), in: html) {
                     let imageURL = String(html[range]).trimmingCharacters(in: .whitespacesAndNewlines)
-                    if !imageURL.isEmpty, imageURL.hasPrefix("http") {
+                    // Validate: must be https/http, must have valid host, block data:/javascript:/file: schemes
+                    if let parsed = URL(string: imageURL),
+                       let scheme = parsed.scheme?.lowercased(),
+                       (scheme == "https" || scheme == "http"),
+                       parsed.host != nil {
                         return imageURL
                     }
                 }
