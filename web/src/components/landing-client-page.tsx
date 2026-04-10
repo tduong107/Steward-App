@@ -99,11 +99,14 @@ function Nav() {
             {label}
           </a>
         ))}
-        {/* Resources dropdown */}
-        <div style={{ position: 'relative' }}
+        {/* Resources dropdown — wrapper sized to cover full dropdown area */}
+        <div
           onMouseEnter={() => setResourcesOpen(true)}
-          onMouseLeave={() => setResourcesOpen(false)}>
+          onMouseLeave={() => setResourcesOpen(false)}
+          style={{ position: 'relative', zIndex: 200 }}
+        >
           <button
+            onClick={() => setResourcesOpen(v => !v)}
             style={{ fontSize: 13.5, fontWeight: 500, color: resourcesOpen ? S.mint : 'rgba(247,246,243,0.55)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'inherit', transition: 'color .25s', padding: 0 }}
           >
             Resources
@@ -111,11 +114,14 @@ function Nav() {
               <path d="M2 4L5 7L8 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </button>
-          {resourcesOpen && (
-            <div style={{
-              position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)',
-              paddingTop: 8, zIndex: 200,
-            }}>
+          {/* Invisible bridge + dropdown — positioned so the entire panel is inside the hover zone */}
+          <div style={{
+            position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)',
+            width: 280, pointerEvents: resourcesOpen ? 'auto' : 'none',
+          }}>
+            {/* Spacer to push dropdown below the button */}
+            <div style={{ height: 36 }} />
+            {resourcesOpen && (
               <div style={{
                 width: 280, borderRadius: 14,
                 background: 'rgba(15,32,24,0.97)', backdropFilter: 'blur(20px)',
@@ -136,8 +142,8 @@ function Nav() {
                   </Link>
                 ))}
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
         <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className="lnd-nav-ios"
           style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: S.cream, textDecoration: 'none', padding: '8px 16px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.2)', transition: 'all .25s' }}>
