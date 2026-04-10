@@ -138,12 +138,12 @@ const faqs = [
   {
     question: 'Can Steward find coupon codes?',
     answer:
-      'Steward focuses on price tracking and monitoring, not coupon codes. It watches for real price drops, availability changes, and restocks across any website \u2014 including restaurants, campsites, flights, and events that Honey cannot track at all. If you want coupons and price monitoring, you can use both tools together.',
+      'Steward focuses on price tracking and monitoring, unlike Honey which focuses only on coupon codes. Steward watches for real price drops, availability changes, and restocks across any website including: restaurants, campsites, flights, and events. If you want coupons and price monitoring, you can use both tools together.',
   },
   {
     question: 'Does Steward cost more than Honey?',
     answer:
-      'Steward has a free tier with 3 active trackers and push notifications. The Pro plan unlocks unlimited trackers, email and SMS alerts, faster check intervals, and premium features like fake deal detection. Honey is free but only covers coupon codes at checkout.',
+      'Steward has a free tier with 3 active trackers and push notifications. Steward\'s Pro plan unlocks unlimited trackers, email and SMS alerts, faster check intervals, and premium features like fake deal detection. Honey is free browser extension, but it only covers coupon codes at checkout.',
   },
 ]
 
@@ -239,7 +239,7 @@ export default function StewardVsHoneyPage() {
             maxWidth: 560,
           }}
         >
-          One finds coupons at checkout. The other watches the entire web for you.
+          Honey finds coupons at checkout, while Steward watches the entire web for deals.
         </p>
         <p
           style={{

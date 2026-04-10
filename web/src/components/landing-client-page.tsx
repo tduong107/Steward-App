@@ -676,7 +676,7 @@ function PlatformShowcase() {
             <span style={{ fontSize: 13, color: S.mint }}>💻</span>
           </div>
           <h2 style={{ fontFamily: S.serif, fontSize: 'clamp(36px,5vw,52px)', fontWeight: 700, lineHeight: 1.08, letterSpacing: '-0.03em', color: S.cream, margin: 0, marginBottom: 16 }}>
-            One account.<br /><em style={{ color: S.mint }}>Every screen.</em>
+            One account<br /><em style={{ color: S.mint }}>Every screen</em>
           </h2>
           <p style={{ fontSize: 16, lineHeight: 1.6, color: 'rgba(247,246,243,0.5)', fontWeight: 300, maxWidth: 500, margin: '0 auto' }}>
             Create a watch on your phone. Manage it on your laptop. Alerts hit everywhere. Same account, perfectly synced.
