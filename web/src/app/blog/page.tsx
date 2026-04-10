@@ -1,13 +1,12 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { articles } from './_data/articles'
 
 export const metadata: Metadata = {
-  title: 'Blog — Price Tracking, Reservations & More',
-  description: 'Steward blog: comparisons with Honey, CamelCamelCamel, and guides on tracking campsites, restaurant reservations, flights, and event tickets.',
+  title: 'Resources — Comparisons, Guides & Insights',
+  description: 'Steward resources: see how we compare to Honey and CamelCamelCamel, read guides on tracking campsites and restaurants, and get insights on saving money.',
   alternates: { canonical: 'https://www.joinsteward.app/blog' },
   openGraph: {
-    title: 'Steward Blog — Price Tracking, Reservations & More',
+    title: 'Steward Resources — Comparisons, Guides & Insights',
     description: 'Comparisons, guides, and tips on tracking prices, restaurants, campsites, flights, and event tickets with Steward.',
     url: 'https://www.joinsteward.app/blog',
     type: 'website',
@@ -16,26 +15,49 @@ export const metadata: Metadata = {
 
 const S = {
   mint: '#6EE7B7',
-  forest: '#0F2018',
-  green: '#1C3D2E',
-  green2: '#2A5C45',
   gold: '#F59E0B',
   cream: '#F7F6F3',
-  bg: '#080A08',
   serif: 'Georgia, "Times New Roman", serif',
 }
 
-export default function BlogIndexPage() {
-  const comparisons = articles.filter(a => a.category === 'comparison')
-  const guides = articles.filter(a => a.category === 'guide')
+const CATEGORIES = [
+  {
+    title: 'How We Compare',
+    desc: 'See how Steward stacks up against Honey, CamelCamelCamel, and other price trackers.',
+    href: '/blog/comparisons',
+    icon: '⚡',
+    accent: S.gold,
+    accentBg: 'rgba(245,158,11,0.08)',
+    accentBorder: 'rgba(245,158,11,0.2)',
+  },
+  {
+    title: 'Guides',
+    desc: 'Step-by-step guides on tracking campsites, restaurants, flights, and event tickets.',
+    href: '/blog/guides',
+    icon: '📖',
+    accent: S.mint,
+    accentBg: 'rgba(110,231,183,0.08)',
+    accentBorder: 'rgba(110,231,183,0.18)',
+  },
+  {
+    title: 'Insights',
+    desc: 'Tips on saving money, tracking strategies, product updates, and behind-the-scenes looks.',
+    href: '/blog/insights',
+    icon: '💡',
+    accent: 'rgba(168,130,255,0.9)',
+    accentBg: 'rgba(168,130,255,0.08)',
+    accentBorder: 'rgba(168,130,255,0.18)',
+  },
+]
 
+export default function BlogIndexPage() {
   return (
     <div style={{ maxWidth: 900, margin: '0 auto', padding: '60px 24px 80px' }}>
       {/* Hero */}
       <div style={{ textAlign: 'center', marginBottom: 60 }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(110,231,183,0.08)', border: '1px solid rgba(110,231,183,0.18)', borderRadius: 30, padding: '6px 16px', marginBottom: 24 }}>
           <span style={{ fontSize: 13, color: S.mint }}>✦</span>
-          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: S.mint }}>Steward Blog</span>
+          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: S.mint }}>Resources</span>
         </div>
         <h1 style={{ fontFamily: S.serif, fontSize: 'clamp(32px,5vw,48px)', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-0.03em', color: S.cream, margin: '0 0 16px' }}>
           Comparisons, guides &amp;{' '}
@@ -46,86 +68,36 @@ export default function BlogIndexPage() {
         </p>
       </div>
 
-      {/* Comparisons */}
-      <section style={{ marginBottom: 48 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
-          <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: S.gold, background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 20, padding: '4px 12px' }}>
-            Comparisons
-          </span>
-          <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} />
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
-          {comparisons.map(article => (
-            <ArticleCard key={article.slug} article={article} />
-          ))}
-        </div>
-      </section>
-
-      {/* Guides */}
-      <section id="guides" style={{ scrollMarginTop: 80 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
-          <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: S.mint, background: 'rgba(110,231,183,0.08)', border: '1px solid rgba(110,231,183,0.18)', borderRadius: 20, padding: '4px 12px' }}>
-            Guides
-          </span>
-          <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} />
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
-          {guides.map(article => (
-            <ArticleCard key={article.slug} article={article} />
-          ))}
-        </div>
-      </section>
-
-      {/* Insights */}
-      <section id="insights" style={{ marginTop: 48, scrollMarginTop: 80 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
-          <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(168,130,255,0.9)', background: 'rgba(168,130,255,0.08)', border: '1px solid rgba(168,130,255,0.18)', borderRadius: 20, padding: '4px 12px' }}>
-            Insights
-          </span>
-          <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} />
-        </div>
-        <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 18, padding: '40px 32px', textAlign: 'center' }}>
-          <span style={{ fontSize: 32, display: 'block', marginBottom: 12 }}>💡</span>
-          <p style={{ fontFamily: S.serif, fontSize: 18, fontWeight: 700, color: S.cream, marginBottom: 8 }}>Coming soon</p>
-          <p style={{ fontSize: 14, color: 'rgba(247,246,243,0.4)', maxWidth: 400, margin: '0 auto' }}>
-            Tips on saving money, tracking strategies, product updates, and behind-the-scenes looks at how Steward works.
-          </p>
-        </div>
-      </section>
-    </div>
-  )
-}
-
-function ArticleCard({ article }: { article: typeof articles[number] }) {
-  return (
-    <Link
-      href={`/blog/${article.slug}`}
-      style={{
-        display: 'block',
-        background: 'rgba(255,255,255,0.02)',
-        border: '1px solid rgba(255,255,255,0.06)',
-        borderRadius: 18,
-        padding: 24,
-        textDecoration: 'none',
-        transition: 'all 0.3s ease',
-      }}
-      onMouseEnter={undefined}
-    >
-      <div style={{ fontSize: 32, marginBottom: 16 }}>{article.icon}</div>
-      <h2 style={{ fontFamily: S.serif, fontSize: 18, fontWeight: 700, color: S.cream, lineHeight: 1.3, margin: '0 0 10px' }}>
-        {article.title}
-      </h2>
-      <p style={{ fontSize: 14, color: 'rgba(247,246,243,0.45)', lineHeight: 1.5, margin: '0 0 16px' }}>
-        {article.description}
-      </p>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 12, color: 'rgba(247,246,243,0.25)' }}>
-          {new Date(article.publishedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-        </span>
-        <span style={{ fontSize: 13, fontWeight: 600, color: S.mint }}>
-          Read →
-        </span>
+      {/* Category cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 20 }}>
+        {CATEGORIES.map(cat => (
+          <Link
+            key={cat.title}
+            href={cat.href}
+            style={{
+              display: 'flex', flexDirection: 'column', gap: 16,
+              background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)',
+              borderRadius: 20, padding: '32px 28px', textDecoration: 'none', transition: 'all 0.3s ease',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 24 }}>{cat.icon}</span>
+              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: cat.accent, background: cat.accentBg, border: `1px solid ${cat.accentBorder}`, borderRadius: 20, padding: '3px 10px' }}>
+                {cat.title}
+              </span>
+            </div>
+            <h2 style={{ fontFamily: S.serif, fontSize: 22, fontWeight: 700, color: S.cream, lineHeight: 1.2, margin: 0 }}>
+              {cat.title}
+            </h2>
+            <p style={{ fontSize: 14, color: 'rgba(247,246,243,0.45)', lineHeight: 1.5, margin: 0, flex: 1 }}>
+              {cat.desc}
+            </p>
+            <span style={{ fontSize: 13, fontWeight: 600, color: S.mint }}>
+              Explore →
+            </span>
+          </Link>
+        ))}
       </div>
-    </Link>
+    </div>
   )
 }

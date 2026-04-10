@@ -52,9 +52,9 @@ const S = {
 const APP_STORE_URL = 'https://apps.apple.com/us/app/steward-concierge/id6760180137'
 const NAV_LINKS = [['#how-it-works', 'How it Works'], ['#why-steward', 'Why Steward'], ['#pricing', 'Pricing']] as const
 const RESOURCE_ITEMS = [
-  { label: 'How We Compare', href: '/blog', desc: 'Steward vs Honey, CamelCamelCamel & more', icon: '⚡' },
-  { label: 'Guides', href: '/blog#guides', desc: 'Campsites, restaurants, flights & tickets', icon: '📖' },
-  { label: 'Insights', href: '/blog#insights', desc: 'Tips, trends & product updates', icon: '💡' },
+  { label: 'How We Compare', href: '/blog/comparisons', desc: 'Steward vs Honey, CamelCamelCamel & more', icon: '⚡' },
+  { label: 'Guides', href: '/blog/guides', desc: 'Campsites, restaurants, flights & tickets', icon: '📖' },
+  { label: 'Insights', href: '/blog/insights', desc: 'Tips, trends & product updates', icon: '💡' },
 ] as const
 
 function Nav() {
