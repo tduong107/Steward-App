@@ -13,8 +13,10 @@ final class AnalyticsService {
 
     /// Call once at app startup (in Steward_AppApp.swift)
     func configure() {
-        let config = PostHogConfig(apiKey: "phc_AVWWXk2iXjdwtnpdc9NnFAzHZwYgzz8zqNENfPpgRcM3")
-        config.host = "https://us.i.posthog.com"
+        let config = PostHogConfig(
+            apiKey: "phc_AVWWXk2iXjdwtnpdc9NnFAzHZwYgzz8zqNENfPpgRcM3",
+            host: "https://us.i.posthog.com"
+        )
         config.captureScreenViews = true // Auto-track screen views
         config.captureApplicationLifecycleEvents = true // App open, background, etc.
         config.flushAt = 5 // Send events in batches of 5
