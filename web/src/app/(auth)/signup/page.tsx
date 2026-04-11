@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import posthog from 'posthog-js'
+import { track } from '@vercel/analytics'
 import { createClient } from '@/lib/supabase/client'
 
 // Format raw phone input to E.164 for Supabase (+1XXXXXXXXXX)
@@ -50,6 +51,7 @@ export default function SignupPage() {
     if (digits.length < 10) { setError('Please enter a valid 10-digit US phone number'); return }
     if (password.length < 6) { setError('Password must be at least 6 characters'); return }
 
+    track('create_account_click')
     setLoading(true)
     try {
       const supabase = createClient()

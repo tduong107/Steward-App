@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Check, Apple } from 'lucide-react'
 import posthog from 'posthog-js'
+import { track } from '@vercel/analytics'
 import { Dialog } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { useSub } from '@/hooks/use-subscription'
@@ -95,6 +96,7 @@ export function PaywallDialog({ open, onClose }: PaywallDialogProps) {
 
     setLoadingTier(tierKey)
     posthog.capture('subscription_upgrade_started', { tier: tierKey, billing, current_tier: currentTier })
+    track('stripe_checkout_initiated', { tier: tierKey, billing })
     try {
       const res = await fetch('/api/stripe/checkout', {
         method: 'POST',
