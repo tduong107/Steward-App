@@ -663,9 +663,12 @@ serve(async (req) => {
             .eq("enabled", true);
 
           if (affiliateConfigs?.length) {
-            const config = affiliateConfigs.find((c: any) =>
-              watchDomain === c.domain || watchDomain.endsWith("." + c.domain)
+            const domainConfig = affiliateConfigs.find((c: any) =>
+              c.domain !== "*" && (watchDomain === c.domain || watchDomain.endsWith("." + c.domain))
             );
+            // Fall back to Skimlinks catch-all (domain='*') if no domain-specific config
+            const skimlinksConfig = affiliateConfigs.find((c: any) => c.domain === "*" && c.network === "skimlinks");
+            const config = domainConfig || skimlinksConfig;
 
             if (config && !JSON.stringify(config.affiliate_params).includes("PLACEHOLDER")) {
               const originalUrl = watch.url.match(/^https?:\/\//i) ? watch.url : `https://${watch.url}`;
@@ -694,6 +697,9 @@ serve(async (req) => {
                   affiliateUrl = `${originalUrl}${sep}mkevt=1&mkcid=1&mkrid=711-53200-19255-0&campid=${config.affiliate_params.campaign_id || ""}&toolid=10001&customid=steward`;
                   break;
                 }
+                case "skimlinks":
+                  affiliateUrl = `https://go.skimresources.com?id=${config.affiliate_params.publisher_id}&url=${encodeURIComponent(originalUrl)}`;
+                  break;
                 case "direct": {
                   const sep = originalUrl.includes("?") ? "&" : "?";
                   affiliateUrl = `${originalUrl}${sep}${config.affiliate_params.param}=${config.affiliate_params.value}`;
