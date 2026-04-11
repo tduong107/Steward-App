@@ -39,6 +39,9 @@ extension Watch {
         self.altSourceDomain = dto.altSourceDomain
         self.altSourcePrice = dto.altSourcePrice
         self.altSourceFoundAt = dto.altSourceFoundAt
+        self.affiliateNetwork = dto.affiliateNetwork
+        self.affiliateUrl = dto.affiliateUrl
+        self.isAffiliated = dto.isAffiliated
     }
 
     /// Convert to DTO for uploading to Supabase
@@ -74,7 +77,10 @@ extension Watch {
             couponCode: self.couponCode,
             autoAct: self.autoActEnabled,
             spendingLimit: self.spendingLimit,
-            notifyAnyPriceDrop: self.notifyAnyPriceDrop
+            notifyAnyPriceDrop: self.notifyAnyPriceDrop,
+            affiliateNetwork: self.affiliateNetwork,
+            affiliateUrl: self.affiliateUrl,
+            isAffiliated: self.isAffiliated
         )
     }
 }

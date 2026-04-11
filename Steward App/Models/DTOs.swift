@@ -49,6 +49,11 @@ struct WatchDTO: Codable, Identifiable, Sendable {
     var spendingLimit: Double?
     var notifyAnyPriceDrop: Bool
 
+    // Affiliate tracking
+    var affiliateNetwork: String?
+    var affiliateUrl: String?
+    var isAffiliated: Bool
+
     enum CodingKeys: String, CodingKey {
         case id
         case userId = "user_id"
@@ -81,6 +86,9 @@ struct WatchDTO: Codable, Identifiable, Sendable {
         case autoAct = "auto_act"
         case spendingLimit = "spending_limit"
         case notifyAnyPriceDrop = "notify_any_price_drop"
+        case affiliateNetwork = "affiliate_network"
+        case affiliateUrl = "affiliate_url"
+        case isAffiliated = "is_affiliated"
     }
 
     // Explicit memberwise init (required because we provide a custom Decodable init)
@@ -95,7 +103,8 @@ struct WatchDTO: Codable, Identifiable, Sendable {
          altSourceUrl: String? = nil, altSourceDomain: String? = nil,
          altSourcePrice: Double? = nil, altSourceFoundAt: Date? = nil,
          couponCode: String? = nil, autoAct: Bool = false, spendingLimit: Double? = nil,
-         notifyAnyPriceDrop: Bool = false) {
+         notifyAnyPriceDrop: Bool = false,
+         affiliateNetwork: String? = nil, affiliateUrl: String? = nil, isAffiliated: Bool = false) {
         self.id = id; self.userId = userId; self.emoji = emoji; self.name = name
         self.url = url; self.condition = condition; self.actionLabel = actionLabel
         self.actionType = actionType; self.status = status; self.checkFrequency = checkFrequency
@@ -110,6 +119,8 @@ struct WatchDTO: Codable, Identifiable, Sendable {
         self.altSourcePrice = altSourcePrice; self.altSourceFoundAt = altSourceFoundAt
         self.couponCode = couponCode; self.autoAct = autoAct
         self.spendingLimit = spendingLimit; self.notifyAnyPriceDrop = notifyAnyPriceDrop
+        self.affiliateNetwork = affiliateNetwork; self.affiliateUrl = affiliateUrl
+        self.isAffiliated = isAffiliated
     }
 
     // Custom decoder: use decodeIfPresent with defaults for new columns
@@ -150,6 +161,9 @@ struct WatchDTO: Codable, Identifiable, Sendable {
         autoAct = try c.decodeIfPresent(Bool.self, forKey: .autoAct) ?? false
         spendingLimit = try c.decodeIfPresent(Double.self, forKey: .spendingLimit)
         notifyAnyPriceDrop = try c.decodeIfPresent(Bool.self, forKey: .notifyAnyPriceDrop) ?? false
+        affiliateNetwork = try c.decodeIfPresent(String.self, forKey: .affiliateNetwork)
+        affiliateUrl = try c.decodeIfPresent(String.self, forKey: .affiliateUrl)
+        isAffiliated = try c.decodeIfPresent(Bool.self, forKey: .isAffiliated) ?? false
     }
 }
 

@@ -212,6 +212,8 @@ struct ActionModal: View {
                         if let code = watch.couponCode, !code.isEmpty {
                             UIPasteboard.general.string = code
                         }
+                        // Track affiliate link click
+                        AnalyticsService.shared.trackActionCompleted(watchId: watch.id, actionType: watch.actionType.rawValue)
                         showActionBrowser = true
                     } else {
                         viewModel.runAction()

@@ -131,6 +131,11 @@ final class Watch {
     // Action enhancement — coupon code detected on the page when triggered
     var couponCode: String?
 
+    // Affiliate link tracking
+    var affiliateNetwork: String?
+    var affiliateUrl: String?
+    var isAffiliated: Bool = false
+
     // Auto-act: execute action server-side when condition is met (Premium feature)
     var autoActEnabled: Bool = false
     var spendingLimit: Double?

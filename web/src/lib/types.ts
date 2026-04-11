@@ -38,6 +38,9 @@ export interface Watch {
   coupon_code: string | null
   action_executed: boolean
   action_executed_at: string | null
+  affiliate_network: string | null
+  affiliate_url: string | null
+  is_affiliated: boolean
   created_at: string
   updated_at: string
 }

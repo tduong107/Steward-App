@@ -648,6 +648,73 @@ serve(async (req) => {
       // Fall through to standard check if API fails
     }
 
+    // ─── Affiliate Link Rewriting (on first check) ──────────────
+    // If this watch hasn't been affiliated yet, look up the domain in affiliate_config
+    // and store the affiliate URL on the watch for future use
+    if (!watch.is_affiliated && watch.action_type === "price") {
+      try {
+        let watchDomain = "";
+        try { watchDomain = new URL(watch.url.match(/^https?:\/\//i) ? watch.url : `https://${watch.url}`).hostname.replace("www.", ""); } catch {}
+
+        if (watchDomain) {
+          const { data: affiliateConfigs } = await supabase
+            .from("affiliate_config")
+            .select("*")
+            .eq("enabled", true);
+
+          if (affiliateConfigs?.length) {
+            const config = affiliateConfigs.find((c: any) =>
+              watchDomain === c.domain || watchDomain.endsWith("." + c.domain)
+            );
+
+            if (config && !JSON.stringify(config.affiliate_params).includes("PLACEHOLDER")) {
+              const originalUrl = watch.url.match(/^https?:\/\//i) ? watch.url : `https://${watch.url}`;
+              let affiliateUrl = originalUrl;
+
+              switch (config.network) {
+                case "amazon": {
+                  const sep = originalUrl.includes("?") ? "&" : "?";
+                  affiliateUrl = `${originalUrl}${sep}tag=${config.affiliate_params.tag}`;
+                  break;
+                }
+                case "cj":
+                  affiliateUrl = `https://www.anrdoezrs.net/click-${config.affiliate_params.pid}-${config.affiliate_params.sid}?url=${encodeURIComponent(originalUrl)}`;
+                  break;
+                case "shareasale":
+                  affiliateUrl = `https://www.shareasale.com/r.cfm?u=${config.affiliate_params.uid}&b=${config.affiliate_params.bid}&m=${config.affiliate_params.mid}&urllink=${encodeURIComponent(originalUrl)}`;
+                  break;
+                case "impact":
+                  affiliateUrl = `https://${config.affiliate_params.program}.sjv.io/c/${config.affiliate_params.pid}/${config.affiliate_params.sid}?u=${encodeURIComponent(originalUrl)}`;
+                  break;
+                case "rakuten":
+                  affiliateUrl = `https://click.linksynergy.com/deeplink?id=${config.affiliate_params.lid}&murl=${encodeURIComponent(originalUrl)}`;
+                  break;
+                case "direct": {
+                  const sep = originalUrl.includes("?") ? "&" : "?";
+                  affiliateUrl = `${originalUrl}${sep}${config.affiliate_params.param}=${config.affiliate_params.value}`;
+                  break;
+                }
+              }
+
+              if (affiliateUrl !== originalUrl) {
+                // Store affiliate info on the watch
+                await supabase.from("watches").update({
+                  affiliate_url: affiliateUrl,
+                  affiliate_network: config.network,
+                  is_affiliated: true,
+                  action_url: affiliateUrl, // Set action_url to affiliate link
+                }).eq("id", watch.id);
+
+                console.log(`[check-watch] Affiliate link set for ${watch.id}: ${config.network} (${watchDomain})`);
+              }
+            }
+          }
+        }
+      } catch (affErr: any) {
+        console.error(`[check-watch] Affiliate rewrite error: ${affErr.message}`);
+      }
+    }
+
     // Ensure URL has protocol
     let fetchUrl = watch.url;
     if (!fetchUrl.match(/^https?:\/\//i)) {
@@ -1718,7 +1785,8 @@ serve(async (req) => {
       // Generate action URL for actionable watch types (pass page HTML for Shopify detection)
       actionUrl = generateActionURL(watch, pageText);
       if (actionUrl) {
-        updateData.action_url = actionUrl;
+        // Use affiliate URL if available, otherwise use the generated action URL
+        updateData.action_url = watch.affiliate_url || actionUrl;
       }
 
       // Append fare hold info to change note if available
