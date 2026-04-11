@@ -728,11 +728,11 @@ serve(async (req) => {
     }
 
     // ─── Affiliate Link Setup (on first check) ──────────────────
-    // Mark the watch with its affiliate network info. The actual affiliate URL
-    // is generated at trigger time using the action URL (which may differ from
-    // watch.url for Shopify carts, add-to-cart pages, etc.)
+    // Generate the affiliated action_url IMMEDIATELY so the user earns commission
+    // even if they click through before the watch triggers (couldn't wait for price drop).
     // IMPORTANT: watch.url is NEVER modified — it always points to the original
     // product page so Steward can fetch and check prices normally.
+    // Only action_url (what the user clicks) gets the affiliate link.
     if (!watch.is_affiliated && watch.action_type === "price") {
       try {
         let watchDomain = "";
@@ -752,17 +752,35 @@ serve(async (req) => {
             const config = domainConfig || skimlinksConfig;
 
             if (config && !JSON.stringify(config.affiliate_params).includes("PLACEHOLDER")) {
-              // Store affiliate network info on the watch (but DON'T set action_url yet — that happens at trigger time)
-              await supabase.from("watches").update({
-                affiliate_network: config.network,
-                is_affiliated: true,
-              }).eq("id", watch.id);
+              // Generate affiliate URL from watch.url immediately
+              const originalUrl = watch.url.match(/^https?:\/\//i) ? watch.url : `https://${watch.url}`;
+              const affiliateUrl = await applyAffiliateLink(originalUrl, config.network, watch);
 
-              // Update local watch object so trigger logic below can use it
-              watch.affiliate_network = config.network;
-              watch.is_affiliated = true;
+              if (affiliateUrl) {
+                // Store affiliate info AND set action_url immediately
+                await supabase.from("watches").update({
+                  affiliate_url: affiliateUrl,
+                  affiliate_network: config.network,
+                  is_affiliated: true,
+                  action_url: affiliateUrl, // Set immediately so any click earns commission
+                }).eq("id", watch.id);
 
-              console.log(`[check-watch] Affiliate config matched for ${watch.id}: ${config.network} (${watchDomain})`);
+                // Update local watch object so trigger logic below can use it
+                watch.affiliate_url = affiliateUrl;
+                watch.affiliate_network = config.network;
+                watch.is_affiliated = true;
+
+                console.log(`[check-watch] Affiliate link set for ${watch.id}: ${config.network} (${watchDomain}) → action_url updated`);
+              } else {
+                // applyAffiliateLink returned null — store network info without URL
+                await supabase.from("watches").update({
+                  affiliate_network: config.network,
+                  is_affiliated: true,
+                }).eq("id", watch.id);
+                watch.affiliate_network = config.network;
+                watch.is_affiliated = true;
+                console.log(`[check-watch] Affiliate matched but URL rewrite failed for ${watch.id}: ${config.network}`);
+              }
             }
           }
         }
