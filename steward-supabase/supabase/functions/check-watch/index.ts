@@ -689,6 +689,11 @@ serve(async (req) => {
                 case "rakuten":
                   affiliateUrl = `https://click.linksynergy.com/deeplink?id=${config.affiliate_params.lid}&murl=${encodeURIComponent(originalUrl)}`;
                   break;
+                case "ebay": {
+                  const sep = originalUrl.includes("?") ? "&" : "?";
+                  affiliateUrl = `${originalUrl}${sep}mkevt=1&mkcid=1&mkrid=711-53200-19255-0&campid=${config.affiliate_params.campaign_id || ""}&toolid=10001&customid=steward`;
+                  break;
+                }
                 case "direct": {
                   const sep = originalUrl.includes("?") ? "&" : "?";
                   affiliateUrl = `${originalUrl}${sep}${config.affiliate_params.param}=${config.affiliate_params.value}`;
