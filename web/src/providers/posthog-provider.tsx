@@ -5,16 +5,8 @@ import { PostHogProvider as PHProvider, usePostHog } from 'posthog-js/react'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { useEffect, Suspense } from 'react'
 
-// Initialize PostHog once on client side
-if (typeof window !== 'undefined' && !posthog.__loaded) {
-  posthog.init(process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN!, {
-    api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST || 'https://us.i.posthog.com',
-    capture_pageview: false, // We capture manually below for SPA route changes
-    capture_pageleave: true,
-    autocapture: true, // Auto-capture clicks, form submissions, etc.
-    persistence: 'localStorage+cookie',
-  })
-}
+// PostHog is initialized in instrumentation-client.ts (created by PostHog wizard)
+// This provider only handles page view tracking and React context
 
 // Track page views on route change (SPA navigation)
 function PostHogPageView() {
