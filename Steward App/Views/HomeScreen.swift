@@ -573,7 +573,7 @@ struct HomeScreen: View {
 
     private var expiredWatches: [Watch] {
         viewModel.watches.filter { watch in
-            watch.status != "deleted" && watch.status != "paused" && !watch.triggered && watch.hasExpiredDate
+            watch.status == .watching && !watch.triggered && watch.hasExpiredDate
         }
     }
 
@@ -943,7 +943,7 @@ struct HomeScreen: View {
                 }
             }
 
-            VStack(spacing: 10) {
+            LazyVStack(spacing: 10) {
                 ForEach(filteredWatches) { watch in
                     HStack(spacing: 12) {
                         if isEditMode {

@@ -164,7 +164,7 @@ struct DetailScreen: View {
         }
         .task {
             // Force sync to get latest needs_attention state from Supabase
-            await viewModel.syncFromCloud(force: true)
+            await viewModel.syncFromCloud() // Don't force — uses 3-second throttle to avoid redundant API calls
             await loadCheckResults()
             if showsPriceChart {
                 await loadPriceHistory()
