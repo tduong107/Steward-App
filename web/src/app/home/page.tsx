@@ -343,7 +343,7 @@ export default function DashboardPage() {
 
       {/* ── AI Command Bar (compact) ── */}
       <button
-        onClick={openChat}
+        onClick={() => openChat()}
         className="w-full flex items-center gap-3 bg-[var(--color-bg-card)] rounded-[var(--radius-lg)] border border-[var(--color-border)] px-4 py-3 mb-5 cursor-pointer transition-all hover:border-[var(--color-green)] hover:shadow-[0_0_0_3px_rgba(5,150,105,0.08)] text-left"
       >
         <div
@@ -439,7 +439,8 @@ export default function DashboardPage() {
           {expiredWatches.map((watch) => (
             <div
               key={`expired-${watch.id}`}
-              className="rounded-[var(--radius-lg)] border border-orange-500/30 bg-orange-500/5 px-5 py-4"
+              className="rounded-[var(--radius-lg)] border border-orange-500/30 bg-orange-500/5 px-5 py-4 transition-all duration-300"
+              style={{ opacity: 1 }}
             >
               <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-orange-500/15 text-orange-500 text-[11px] font-bold tracking-wide mb-3">
                 <span>📅</span> DATE PASSED
@@ -455,14 +456,25 @@ export default function DashboardPage() {
                 </div>
                 <div className="flex gap-2 shrink-0">
                   <button
-                    onClick={() => router.push(`/home/watch/${watch.id}`)}
+                    onClick={() => {
+                      openChat(`I need to update my "${watch.name}" watch. The date has passed. Can you help me set a new date?`)
+                    }}
                     className="px-4 py-2 rounded-[var(--radius-md)] bg-orange-500/10 text-orange-500 text-[13px] font-bold hover:bg-orange-500/20 transition-colors"
                   >
                     Update
                   </button>
                   <button
-                    onClick={async () => {
-                      await supabaseRef.current.from('watches').update({ status: 'deleted' }).eq('id', watch.id)
+                    onClick={async (e) => {
+                      const card = (e.target as HTMLElement).closest('[class*="rounded-"]') as HTMLElement
+                      if (card) {
+                        card.style.opacity = '0'
+                        card.style.transform = 'translateX(100px)'
+                        card.style.maxHeight = card.scrollHeight + 'px'
+                        requestAnimationFrame(() => { card.style.maxHeight = '0'; card.style.marginBottom = '0'; card.style.padding = '0'; card.style.overflow = 'hidden' })
+                      }
+                      setTimeout(async () => {
+                        await supabaseRef.current.from('watches').update({ status: 'deleted' }).eq('id', watch.id)
+                      }, 350)
                     }}
                     className="px-4 py-2 rounded-[var(--radius-md)] bg-red-500/10 text-red-500 text-[13px] font-bold hover:bg-red-500/20 transition-colors"
                   >
@@ -533,7 +545,7 @@ export default function DashboardPage() {
           <p className="mt-4 text-base font-semibold text-[var(--color-ink)]">No watches yet</p>
           <p className="mt-1 text-sm text-[var(--color-ink-mid)] text-center">Tell Steward what you want to watch — prices, restocks, tickets, and more.</p>
           <button
-            onClick={openChat}
+            onClick={() => openChat()}
             className="mt-5 flex items-center gap-2 rounded-full text-sm font-semibold text-white px-5 py-2.5 cursor-pointer transition-all hover:-translate-y-px"
             style={{ background: 'linear-gradient(180deg, #22C55E 0%, #16A34A 100%)', fontFamily: 'inherit' }}
           >

@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils'
 import { useChat, WATCH_LIMITS } from '@/hooks/use-chat'
 import { useWatches } from '@/hooks/use-watches'
 import { useSub } from '@/hooks/use-subscription'
+import { useChatDrawer } from '@/providers/chat-provider'
 import { ChatMessage } from '@/components/chat-message'
 import { PaywallDialog } from '@/components/paywall-dialog'
 import type { Watch } from '@/lib/types'
@@ -56,6 +57,7 @@ export function ChatDrawer({ open, onClose }: ChatDrawerProps) {
   const { tier } = useSub()
   const { messages, sendMessage, isLoading, clearMessages, addMessage } = useChat(tier)
   const { watches, createWatch } = useWatches()
+  const { consumeInitialMessage } = useChatDrawer()
   const [input, setInput] = useState('')
   const [isCreating, setIsCreating] = useState(false)
   const [mounted, setMounted] = useState(false)
@@ -149,6 +151,22 @@ export function ChatDrawer({ open, onClose }: ChatDrawerProps) {
       inputRef.current.focus()
     }
   }, [visible])
+
+  // Auto-send prefilled message when drawer opens with context
+  useEffect(() => {
+    if (open && visible) {
+      const prefill = consumeInitialMessage()
+      if (prefill) {
+        setInput(prefill)
+        // Auto-send after a short delay so the UI renders first
+        setTimeout(() => {
+          sendMessage(prefill)
+          setInput('')
+        }, 500)
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, visible])
 
   // Auto-scroll on new messages
   useEffect(() => {
