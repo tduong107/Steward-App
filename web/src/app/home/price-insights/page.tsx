@@ -14,6 +14,8 @@ import {
   Minus,
   AlertTriangle,
   Lock,
+  Info,
+  ChevronDown,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
@@ -68,90 +70,226 @@ function analyzeDeal(
 
 const RATING_CONFIG: Record<
   DealRating,
-  { label: string; color: string; bgColor: string; icon: typeof Star; emoji: string }
+  { label: string; color: string; bgColor: string; hex: string; icon: typeof Star; emoji: string }
 > = {
   greatDeal: {
     label: 'Great Deal',
     color: 'text-emerald-500',
     bgColor: 'bg-emerald-500/10',
+    hex: '#10b981',
     icon: Star,
-    emoji: '🌟',
+    emoji: '\u{1F31F}',
   },
   goodPrice: {
     label: 'Good Price',
     color: 'text-green-500',
     bgColor: 'bg-green-500/10',
+    hex: '#22c55e',
     icon: ThumbsUp,
-    emoji: '👍',
+    emoji: '\u{1F44D}',
   },
   fairPrice: {
     label: 'Fair Price',
     color: 'text-blue-500',
     bgColor: 'bg-blue-500/10',
+    hex: '#3b82f6',
     icon: Minus,
-    emoji: '➖',
+    emoji: '\u2796',
   },
   overpriced: {
     label: 'Overpriced',
     color: 'text-orange-500',
     bgColor: 'bg-orange-500/10',
+    hex: '#f97316',
     icon: TrendingUp,
-    emoji: '📈',
+    emoji: '\u{1F4C8}',
   },
   suspiciousDeal: {
     label: 'Suspicious Deal',
     color: 'text-red-500',
     bgColor: 'bg-red-500/10',
+    hex: '#ef4444',
     icon: AlertTriangle,
-    emoji: '⚠️',
+    emoji: '\u26A0\uFE0F',
   },
 }
 
-// ── Mini sparkline chart (SVG) ──
+// ── Enhanced Sparkline chart (SVG) ──
 function Sparkline({
   prices,
   low,
   high,
   current,
+  expanded,
 }: {
   prices: number[]
   low: number
   high: number
   current: number
+  expanded?: boolean
 }) {
   if (prices.length < 2) return null
-  const width = 120
-  const height = 40
-  const padding = 4
+  const width = expanded ? 260 : 220
+  const height = expanded ? 64 : 52
+  const padding = 6
   const range = high - low || 1
 
   const points = prices.map((p, i) => {
     const x = padding + (i / (prices.length - 1)) * (width - padding * 2)
     const y = padding + (1 - (p - low) / range) * (height - padding * 2)
-    return `${x},${y}`
+    return { x, y }
   })
 
-  const isDown = prices.length >= 2 && prices[prices.length - 1] < prices[0]
+  const polylinePoints = points.map((pt) => `${pt.x},${pt.y}`).join(' ')
+
+  // Gradient fill area
+  const areaPath = [
+    `M ${points[0].x},${points[0].y}`,
+    ...points.slice(1).map((pt) => `L ${pt.x},${pt.y}`),
+    `L ${points[points.length - 1].x},${height}`,
+    `L ${points[0].x},${height}`,
+    'Z',
+  ].join(' ')
+
+  const isDown = prices[prices.length - 1] < prices[0]
+  const gradientId = `sparkGrad-${Math.random().toString(36).slice(2, 8)}`
   const strokeColor = isDown ? '#10b981' : '#f97316'
 
+  const lastPt = points[points.length - 1]
+
   return (
-    <svg width={width} height={height} className="shrink-0">
+    <svg
+      width={width}
+      height={height}
+      className="shrink-0"
+      style={{ transition: 'all 0.3s ease' }}
+    >
+      <defs>
+        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={strokeColor} stopOpacity="0.2" />
+          <stop offset="100%" stopColor={strokeColor} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={areaPath} fill={`url(#${gradientId})`} />
       <polyline
-        points={points.join(' ')}
+        points={polylinePoints}
         fill="none"
         stroke={strokeColor}
         strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      {/* Current price dot */}
-      <circle
-        cx={padding + ((prices.length - 1) / (prices.length - 1)) * (width - padding * 2)}
-        cy={padding + (1 - (current - low) / range) * (height - padding * 2)}
-        r="3"
-        fill={strokeColor}
-      />
+      {/* Current price dot with glow */}
+      <circle cx={lastPt.x} cy={lastPt.y} r="6" fill={strokeColor} opacity="0.2" />
+      <circle cx={lastPt.x} cy={lastPt.y} r="3.5" fill={strokeColor} />
     </svg>
+  )
+}
+
+// ── Price Range Bar ──
+function PriceRangeBar({
+  low,
+  avg,
+  high,
+  current,
+}: {
+  low: number
+  avg: number
+  high: number
+  current: number
+}) {
+  const range = high - low || 1
+  const avgPercent = ((avg - low) / range) * 100
+  const currentPercent = ((current - low) / range) * 100
+
+  return (
+    <div className="w-full space-y-1.5">
+      <div className="flex justify-between text-[10px] font-medium text-[var(--color-ink-light)]">
+        <span className="text-emerald-500">${low.toFixed(2)}</span>
+        <span className="text-[var(--color-ink-mid)]">${avg.toFixed(2)}</span>
+        <span className="text-orange-500">${high.toFixed(2)}</span>
+      </div>
+      <div className="relative h-2 w-full rounded-full bg-[var(--color-bg-deep)] overflow-hidden">
+        {/* Gradient track */}
+        <div
+          className="absolute inset-0 rounded-full"
+          style={{
+            background: 'linear-gradient(to right, #10b981, #3b82f6, #f97316)',
+            opacity: 0.25,
+          }}
+        />
+        {/* Average marker */}
+        <div
+          className="absolute top-0 h-full w-0.5 bg-[var(--color-ink-light)] opacity-40"
+          style={{ left: `${avgPercent}%` }}
+        />
+        {/* Current price indicator */}
+        <div
+          className="absolute top-1/2 -translate-y-1/2 h-3.5 w-3.5 rounded-full border-2 border-white shadow-md"
+          style={{
+            left: `${Math.max(2, Math.min(98, currentPercent))}%`,
+            transform: `translateX(-50%) translateY(-50%)`,
+            background:
+              currentPercent < 40 ? '#10b981' : currentPercent < 70 ? '#3b82f6' : '#f97316',
+          }}
+        />
+      </div>
+      <div className="flex justify-between text-[9px] text-[var(--color-ink-light)]">
+        <span>Low</span>
+        <span>Avg</span>
+        <span>High</span>
+      </div>
+    </div>
+  )
+}
+
+// ── Deal Rating Guide Tooltip ──
+function DealGuideTooltip() {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <div className="relative inline-block">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-1 rounded-full bg-[var(--color-bg-deep)] px-2.5 py-1 text-[11px] font-medium text-[var(--color-ink-mid)] transition-all duration-200 hover:bg-[var(--color-border)]"
+      >
+        <Info size={12} />
+        Deal Ratings
+        <ChevronDown
+          size={12}
+          className="transition-transform duration-200"
+          style={{ transform: open ? 'rotate(180deg)' : 'rotate(0deg)' }}
+        />
+      </button>
+      {open && (
+        <div
+          className="absolute left-0 top-full z-20 mt-2 w-72 rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-4 shadow-xl"
+          style={{
+            animation: 'fade-in-up 0.25s cubic-bezier(0.25,0.46,0.45,0.94) both',
+            backdropFilter: 'blur(20px)',
+          }}
+        >
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-ink-mid)] mb-3">
+            Deal Rating Guide
+          </p>
+          <div className="space-y-2">
+            {(
+              Object.entries(RATING_CONFIG) as [DealRating, (typeof RATING_CONFIG)[DealRating]][]
+            ).map(([key, config]) => (
+              <div key={key} className="flex items-center gap-2.5">
+                <span
+                  className="flex h-6 w-6 items-center justify-center rounded-full text-xs"
+                  style={{ background: `${config.hex}18` }}
+                >
+                  {config.emoji}
+                </span>
+                <span className={`text-xs font-medium ${config.color}`}>{config.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -163,6 +301,7 @@ export default function PriceInsightsPage() {
   const [checkResults, setCheckResults] = useState<CheckResult[]>([])
   const [loading, setLoading] = useState(true)
   const [showPaywall, setShowPaywall] = useState(false)
+  const [hoveredCard, setHoveredCard] = useState<string | null>(null)
   const supabaseRef = useRef(createClient())
 
   // Gate for free users
@@ -269,7 +408,13 @@ export default function PriceInsightsPage() {
 
     // Sort: great deals first, then by biggest % drop
     items.sort((a, b) => {
-      const ratingOrder: DealRating[] = ['greatDeal', 'goodPrice', 'fairPrice', 'overpriced', 'suspiciousDeal']
+      const ratingOrder: DealRating[] = [
+        'greatDeal',
+        'goodPrice',
+        'fairPrice',
+        'overpriced',
+        'suspiciousDeal',
+      ]
       const aIdx = ratingOrder.indexOf(a.rating)
       const bIdx = ratingOrder.indexOf(b.rating)
       if (aIdx !== bIdx) return aIdx - bIdx
@@ -300,34 +445,94 @@ export default function PriceInsightsPage() {
 
   return (
     <div className="space-y-6">
+      {/* Scoped animations */}
+      <style>{`
+        @keyframes pi-fadeSlideUp {
+          from { opacity: 0; transform: translateY(16px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes pi-glowPulse {
+          0%, 100% { box-shadow: 0 0 8px var(--glow-color, transparent); }
+          50% { box-shadow: 0 0 20px var(--glow-color, transparent); }
+        }
+        @keyframes pi-countIn {
+          from { opacity: 0; transform: translateY(8px) scale(0.9); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes pi-shimmer {
+          0% { background-position: -200% 0; }
+          100% { background-position: 200% 0; }
+        }
+        .pi-stagger { animation: pi-fadeSlideUp 0.5s cubic-bezier(0.25,0.46,0.45,0.94) both; }
+        .pi-card-hover {
+          transition: transform 0.25s cubic-bezier(0.25,0.46,0.45,0.94),
+                      box-shadow 0.25s cubic-bezier(0.25,0.46,0.45,0.94),
+                      border-color 0.25s ease;
+        }
+        .pi-card-hover:hover {
+          transform: translateY(-3px);
+          box-shadow: 0 12px 32px rgba(0,0,0,0.1), 0 2px 8px rgba(0,0,0,0.06);
+        }
+        .pi-badge-glow {
+          animation: pi-glowPulse 2.5s ease-in-out infinite;
+        }
+      `}</style>
+
       {/* Header */}
-      <div>
-        <div className="flex items-center gap-2">
-          <h2 className="text-2xl font-extrabold tracking-tight text-[var(--color-ink)]">
-            Price Insights
-          </h2>
-          <BarChart3 size={20} className="text-[var(--color-accent)]" />
+      <div className="pi-stagger" style={{ animationDelay: '0ms' }}>
+        <div className="flex items-center gap-3">
+          <div
+            className="flex h-10 w-10 items-center justify-center rounded-2xl"
+            style={{
+              background: 'linear-gradient(135deg, var(--color-accent), var(--color-accent-mid, var(--color-accent)))',
+              boxShadow: '0 4px 16px color-mix(in srgb, var(--color-accent) 30%, transparent)',
+            }}
+          >
+            <BarChart3 size={20} className="text-white" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-extrabold tracking-tight text-[var(--color-ink)]">
+              Price Insights
+            </h2>
+            <p className="text-sm text-[var(--color-ink-mid)]">
+              Deal quality analysis & price trends
+            </p>
+          </div>
         </div>
-        <p className="mt-1 text-sm text-[var(--color-ink-mid)]">
-          Deal quality analysis & price trends for your watches
-        </p>
       </div>
 
       {/* Free user overlay */}
       {isFree && (
-        <div className="flex flex-col items-center justify-center rounded-[var(--radius-lg)] border border-dashed border-[var(--color-border)] bg-[var(--color-bg-card)] py-16 px-6">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--color-bg-deep)]">
-            <Lock className="h-6 w-6 text-[var(--color-ink-light)]" />
+        <div
+          className="pi-stagger flex flex-col items-center justify-center rounded-3xl border border-dashed border-[var(--color-border)] py-16 px-6"
+          style={{
+            animationDelay: '100ms',
+            background: 'linear-gradient(135deg, var(--color-bg-card) 0%, var(--color-bg-deep) 100%)',
+            backdropFilter: 'blur(12px)',
+          }}
+        >
+          <div
+            className="flex h-16 w-16 items-center justify-center rounded-full"
+            style={{
+              background: 'linear-gradient(135deg, var(--color-bg-deep), var(--color-border))',
+            }}
+          >
+            <Lock className="h-7 w-7 text-[var(--color-ink-light)]" />
           </div>
-          <p className="mt-4 text-base font-semibold text-[var(--color-ink)]">
+          <p className="mt-5 text-lg font-bold text-[var(--color-ink)]">
             Unlock Price Insights
           </p>
-          <p className="mt-1 text-sm text-[var(--color-ink-mid)] text-center max-w-xs">
-            Upgrade to Pro to see deal quality ratings, price history charts, and trend analysis for all your watches.
+          <p className="mt-2 text-sm text-[var(--color-ink-mid)] text-center max-w-sm leading-relaxed">
+            Upgrade to Pro to see deal quality ratings, price history charts, and trend analysis for
+            all your watches.
           </p>
           <button
             onClick={() => setShowPaywall(true)}
-            className="mt-5 flex items-center gap-2 rounded-full bg-[var(--color-accent)] px-5 py-2.5 text-sm font-medium text-white transition-all duration-200 hover:opacity-90 hover:shadow-md active:scale-95"
+            className="mt-6 flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold text-white transition-all duration-300 hover:shadow-lg active:scale-95"
+            style={{
+              background: 'linear-gradient(135deg, var(--color-accent), color-mix(in srgb, var(--color-accent) 80%, #000))',
+              boxShadow: '0 4px 16px color-mix(in srgb, var(--color-accent) 30%, transparent)',
+            }}
           >
             <BarChart3 size={16} />
             Upgrade to Pro
@@ -338,200 +543,287 @@ export default function PriceInsightsPage() {
       {/* Loading */}
       {loading && !isFree && (
         <div className="space-y-4">
-          <Skeleton className="h-48 w-full rounded-[var(--radius-lg)]" />
-          <Skeleton className="h-20 w-full" />
-          <Skeleton className="h-20 w-full" />
+          <Skeleton className="h-48 w-full rounded-3xl" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <Skeleton className="h-56 rounded-2xl" />
+            <Skeleton className="h-56 rounded-2xl" />
+            <Skeleton className="h-56 rounded-2xl" />
+          </div>
         </div>
       )}
 
       {!loading && !isFree && (
         <>
-          {/* ── Summary Card (matches iOS summaryCard) ── */}
+          {/* ── Glass Hero Summary Card ── */}
           {insights.length > 0 && (
-            <Card className="overflow-hidden border-[var(--color-accent)]/20">
-              <CardContent className="space-y-4 py-5">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--color-ink-mid)]">
-                      Tracking
-                    </p>
-                    <p className="text-2xl font-bold tracking-tight text-[var(--color-ink)]">
-                      {summaryStats.trackingCount} price{summaryStats.trackingCount === 1 ? '' : 's'}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--color-ink-mid)]">
-                      30-Day Avg
-                    </p>
-                    <div className="flex items-center gap-1 justify-end">
+            <div
+              className="pi-stagger relative overflow-hidden rounded-3xl border border-[var(--color-accent)]/15 p-6"
+              style={{
+                animationDelay: '80ms',
+                background:
+                  'linear-gradient(135deg, color-mix(in srgb, var(--color-accent) 8%, var(--color-bg-card)), color-mix(in srgb, var(--color-accent) 3%, var(--color-bg-card)))',
+                backdropFilter: 'blur(20px)',
+              }}
+            >
+              {/* Decorative gradient orbs */}
+              <div
+                className="pointer-events-none absolute -top-16 -right-16 h-48 w-48 rounded-full opacity-[0.07]"
+                style={{
+                  background: 'radial-gradient(circle, var(--color-accent), transparent)',
+                }}
+              />
+              <div
+                className="pointer-events-none absolute -bottom-12 -left-12 h-32 w-32 rounded-full opacity-[0.05]"
+                style={{
+                  background: 'radial-gradient(circle, var(--color-accent), transparent)',
+                }}
+              />
+
+              <div className="relative z-10 flex items-start justify-between gap-4">
+                {/* Left: tracking count */}
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[var(--color-ink-mid)]">
+                    Tracking
+                  </p>
+                  <p
+                    className="text-4xl font-extrabold tracking-tight text-[var(--color-ink)] mt-1"
+                    style={{
+                      animation: 'pi-countIn 0.6s cubic-bezier(0.25,0.46,0.45,0.94) 0.2s both',
+                    }}
+                  >
+                    {summaryStats.trackingCount}
+                    <span className="text-lg font-semibold text-[var(--color-ink-mid)] ml-1.5">
+                      price{summaryStats.trackingCount === 1 ? '' : 's'}
+                    </span>
+                  </p>
+                </div>
+
+                {/* Right: 30-day avg */}
+                <div className="text-right">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[var(--color-ink-mid)]">
+                    30-Day Avg
+                  </p>
+                  <div
+                    className="flex items-center gap-1.5 justify-end mt-1"
+                    style={{
+                      animation: 'pi-countIn 0.6s cubic-bezier(0.25,0.46,0.45,0.94) 0.35s both',
+                    }}
+                  >
+                    <div
+                      className="flex h-8 w-8 items-center justify-center rounded-full"
+                      style={{
+                        background:
+                          summaryStats.avgChange <= 0
+                            ? 'rgba(16,185,129,0.12)'
+                            : 'rgba(249,115,22,0.12)',
+                      }}
+                    >
                       {summaryStats.avgChange <= 0 ? (
                         <ArrowDownRight size={16} className="text-emerald-500" />
                       ) : (
                         <ArrowUpRight size={16} className="text-orange-500" />
                       )}
-                      <span
-                        className={`text-lg font-bold ${
-                          summaryStats.avgChange <= 0 ? 'text-emerald-500' : 'text-orange-500'
-                        }`}
-                      >
-                        {Math.abs(summaryStats.avgChange).toFixed(1)}%
-                      </span>
                     </div>
+                    <span
+                      className={`text-3xl font-extrabold tracking-tight ${
+                        summaryStats.avgChange <= 0 ? 'text-emerald-500' : 'text-orange-500'
+                      }`}
+                    >
+                      {Math.abs(summaryStats.avgChange).toFixed(1)}%
+                    </span>
                   </div>
                 </div>
+              </div>
 
-                {/* Rating distribution badges */}
-                <div className="flex flex-wrap gap-2">
-                  {(Object.entries(summaryStats.ratingCounts) as [DealRating, number][])
-                    .filter(([, count]) => count > 0)
-                    .map(([rating, count]) => {
-                      const config = RATING_CONFIG[rating]
-                      return (
-                        <div
-                          key={rating}
-                          className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 ${config.bgColor}`}
+              {/* Rating distribution pills */}
+              <div className="relative z-10 mt-5 flex flex-wrap gap-2">
+                {(Object.entries(summaryStats.ratingCounts) as [DealRating, number][])
+                  .filter(([, count]) => count > 0)
+                  .map(([rating, count], idx) => {
+                    const config = RATING_CONFIG[rating]
+                    return (
+                      <div
+                        key={rating}
+                        className="flex items-center gap-1.5 rounded-full px-3 py-1.5 border"
+                        style={{
+                          animation: `pi-fadeSlideUp 0.4s cubic-bezier(0.25,0.46,0.45,0.94) ${0.4 + idx * 0.08}s both`,
+                          background: `${config.hex}0D`,
+                          borderColor: `${config.hex}20`,
+                        }}
+                      >
+                        <span className="text-xs">{config.emoji}</span>
+                        <span
+                          className={`text-[11px] font-bold ${config.color}`}
                         >
-                          <span className="text-xs">{config.emoji}</span>
-                          <span className={`text-[11px] font-semibold ${config.color}`}>
-                            {count} {config.label}
-                          </span>
-                        </div>
-                      )
-                    })}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* ── Deal Rating Legend (matches iOS) ── */}
-          {insights.length > 0 && (
-            <div className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] p-4">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-mid)] mb-3">
-                Deal Rating Guide
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                {(Object.entries(RATING_CONFIG) as [DealRating, typeof RATING_CONFIG[DealRating]][]).map(
-                  ([key, config]) => (
-                    <div key={key} className="flex items-center gap-2">
-                      <span className="text-sm">{config.emoji}</span>
-                      <span className={`text-xs font-medium ${config.color}`}>{config.label}</span>
-                    </div>
-                  ),
-                )}
+                          {count}
+                        </span>
+                        <span className="text-[11px] font-medium text-[var(--color-ink-mid)]">
+                          {config.label}
+                        </span>
+                      </div>
+                    )
+                  })}
               </div>
             </div>
           )}
 
-          {/* ── Per-Watch Price Insights (matches iOS priceRows) ── */}
+          {/* ── Per-Watch Price Insights Grid ── */}
           {insights.length > 0 && (
-            <div className="space-y-3">
-              <h3 className="text-lg font-semibold tracking-tight text-[var(--color-ink)]">
-                Your Watches
-              </h3>
+            <div className="space-y-4">
+              <div
+                className="pi-stagger flex items-center justify-between"
+                style={{ animationDelay: '160ms' }}
+              >
+                <h3 className="text-lg font-bold tracking-tight text-[var(--color-ink)]">
+                  Your Watches
+                </h3>
+                <DealGuideTooltip />
+              </div>
 
-              {insights.map((insight) => {
-                const config = RATING_CONFIG[insight.rating]
-                const isDown = insight.priceChange30d < 0
-                const isAtLow = Math.abs(insight.currentPrice - insight.lowestPrice) < 0.01
-                const isAtHigh = Math.abs(insight.currentPrice - insight.highestPrice) < 0.01
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {insights.map((insight, idx) => {
+                  const config = RATING_CONFIG[insight.rating]
+                  const isDown = insight.priceChange30d < 0
+                  const isAtLow =
+                    Math.abs(insight.currentPrice - insight.lowestPrice) < 0.01
+                  const isAtHigh =
+                    Math.abs(insight.currentPrice - insight.highestPrice) < 0.01
+                  const isHovered = hoveredCard === insight.watchId
 
-                return (
-                  <Card
-                    key={insight.watchId}
-                    className="cursor-pointer transition-all hover:shadow-md hover:border-[var(--color-accent-mid)]"
-                    onClick={() => router.push(`/home/watch/${insight.watchId}`)}
-                  >
-                    <CardContent className="py-3 space-y-3">
-                      {/* Top: emoji + name + rating badge */}
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-bg-deep)]">
-                          <span className="text-lg">{insight.watch.emoji || '👀'}</span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="truncate text-sm font-semibold text-[var(--color-ink)]">
-                            {insight.watch.name}
-                          </p>
-                          <div className="flex items-center gap-1.5 mt-0.5">
-                            <span className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${config.bgColor} ${config.color}`}>
-                              {config.emoji} {config.label}
-                            </span>
-                            {isAtLow && (
-                              <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-500">
-                                Low
+                  return (
+                    <div
+                      key={insight.watchId}
+                      className="pi-stagger pi-card-hover cursor-pointer rounded-2xl border border-[var(--color-border)] overflow-hidden"
+                      style={{
+                        animationDelay: `${200 + idx * 60}ms`,
+                        background: 'var(--color-bg-card)',
+                        borderColor: isHovered ? `${config.hex}40` : undefined,
+                      }}
+                      onClick={() => router.push(`/home/watch/${insight.watchId}`)}
+                      onMouseEnter={() => setHoveredCard(insight.watchId)}
+                      onMouseLeave={() => setHoveredCard(null)}
+                    >
+                      {/* Card top accent line */}
+                      <div
+                        className="h-1 w-full transition-opacity duration-300"
+                        style={{
+                          background: `linear-gradient(90deg, ${config.hex}, ${config.hex}60)`,
+                          opacity: isHovered ? 1 : 0.5,
+                        }}
+                      />
+
+                      <div className="p-4 space-y-4">
+                        {/* Header: emoji + name + badge */}
+                        <div className="flex items-start gap-3">
+                          <div
+                            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-transform duration-300"
+                            style={{
+                              background: 'var(--color-bg-deep)',
+                              transform: isHovered ? 'scale(1.08)' : 'scale(1)',
+                            }}
+                          >
+                            <span className="text-xl">{insight.watch.emoji || '\u{1F440}'}</span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="truncate text-sm font-bold text-[var(--color-ink)]">
+                              {insight.watch.name}
+                            </p>
+                            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                              <span
+                                className="pi-badge-glow flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold border"
+                                style={{
+                                  '--glow-color': `${config.hex}30`,
+                                  background: `${config.hex}10`,
+                                  borderColor: `${config.hex}25`,
+                                  color: config.hex,
+                                } as React.CSSProperties}
+                              >
+                                {config.emoji} {config.label}
                               </span>
-                            )}
-                            {isAtHigh && (
-                              <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] font-semibold text-red-500">
-                                High
-                              </span>
-                            )}
+                              {isAtLow && (
+                                <span className="rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-500">
+                                  At Low
+                                </span>
+                              )}
+                              {isAtHigh && (
+                                <span className="rounded-full bg-red-500/10 border border-red-500/20 px-2 py-0.5 text-[10px] font-bold text-red-500">
+                                  At High
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
-                        {/* Current price */}
-                        <div className="shrink-0 text-right">
-                          <p className="text-base font-bold text-[var(--color-ink)]">
-                            ${insight.currentPrice.toFixed(2)}
-                          </p>
-                          <div className={`flex items-center gap-0.5 justify-end text-[11px] font-medium ${isDown ? 'text-emerald-500' : insight.priceChange30d > 0 ? 'text-orange-500' : 'text-[var(--color-ink-light)]'}`}>
+
+                        {/* Price + change */}
+                        <div className="flex items-end justify-between">
+                          <div>
+                            <p className="text-2xl font-extrabold tracking-tight text-[var(--color-ink)]">
+                              ${insight.currentPrice.toFixed(2)}
+                            </p>
+                          </div>
+                          <div
+                            className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold ${
+                              isDown
+                                ? 'bg-emerald-500/10 text-emerald-500'
+                                : insight.priceChange30d > 0
+                                  ? 'bg-orange-500/10 text-orange-500'
+                                  : 'bg-[var(--color-bg-deep)] text-[var(--color-ink-light)]'
+                            }`}
+                          >
                             {isDown ? (
-                              <ArrowDownRight size={12} />
+                              <ArrowDownRight size={14} />
                             ) : insight.priceChange30d > 0 ? (
-                              <ArrowUpRight size={12} />
+                              <ArrowUpRight size={14} />
                             ) : null}
                             {insight.priceChange30d !== 0
                               ? `${Math.abs(insight.percentChange30d).toFixed(1)}%`
                               : 'No change'}
                           </div>
                         </div>
-                      </div>
 
-                      {/* Sparkline chart */}
-                      <div className="flex items-center gap-3">
-                        <Sparkline
-                          prices={insight.prices.map((p) => p.price)}
+                        {/* Sparkline chart */}
+                        <div className="flex justify-center">
+                          <Sparkline
+                            prices={insight.prices.map((p) => p.price)}
+                            low={insight.lowestPrice}
+                            high={insight.highestPrice}
+                            current={insight.currentPrice}
+                            expanded={isHovered}
+                          />
+                        </div>
+
+                        {/* Price range bar */}
+                        <PriceRangeBar
                           low={insight.lowestPrice}
+                          avg={insight.averagePrice}
                           high={insight.highestPrice}
                           current={insight.currentPrice}
                         />
-                        <div className="flex-1 flex items-center justify-between text-[10px] text-[var(--color-ink-light)]">
-                          <div>
-                            <span className="block font-medium">Low</span>
-                            <span className="text-emerald-500 font-semibold">
-                              ${insight.lowestPrice.toFixed(2)}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="block font-medium">Avg</span>
-                            <span className="font-semibold text-[var(--color-ink-mid)]">
-                              ${insight.averagePrice.toFixed(2)}
-                            </span>
-                          </div>
-                          <div className="text-right">
-                            <span className="block font-medium">High</span>
-                            <span className="text-orange-500 font-semibold">
-                              ${insight.highestPrice.toFixed(2)}
-                            </span>
-                          </div>
-                        </div>
                       </div>
-                    </CardContent>
-                  </Card>
-                )
-              })}
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           )}
 
           {/* Empty state */}
           {!loading && insights.length === 0 && (
-            <div className="flex flex-col items-center justify-center rounded-[var(--radius-lg)] border border-dashed border-[var(--color-border)] bg-[var(--color-bg-card)] py-12">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--color-bg-deep)]">
-                <BarChart3 className="h-5 w-5 text-[var(--color-ink-light)]" />
+            <div
+              className="pi-stagger flex flex-col items-center justify-center rounded-3xl border border-dashed border-[var(--color-border)] py-14 px-6"
+              style={{
+                animationDelay: '100ms',
+                background:
+                  'linear-gradient(135deg, var(--color-bg-card) 0%, var(--color-bg-deep) 100%)',
+              }}
+            >
+              <div className="animate-float flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--color-bg-deep)]">
+                <BarChart3 className="h-6 w-6 text-[var(--color-ink-light)]" />
               </div>
-              <p className="mt-3 text-sm font-medium text-[var(--color-ink)]">
-                No price data yet
-              </p>
-              <p className="mt-1 text-xs text-[var(--color-ink-mid)] text-center max-w-xs">
-                When Steward collects enough price data from your watches, deal ratings and trends will appear here.
+              <p className="mt-4 text-base font-bold text-[var(--color-ink)]">No price data yet</p>
+              <p className="mt-1.5 text-sm text-[var(--color-ink-mid)] text-center max-w-xs leading-relaxed">
+                When Steward collects enough price data from your watches, deal ratings and trends
+                will appear here.
               </p>
             </div>
           )}

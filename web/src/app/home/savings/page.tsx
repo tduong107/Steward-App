@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { PiggyBank, TrendingDown, ArrowDownRight, ArrowUpRight, ArrowRight, ChevronDown } from 'lucide-react'
+import { PiggyBank, TrendingDown, ArrowDownRight, ArrowUpRight, ArrowRight, ChevronDown, Sparkles } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { useWatches } from '@/hooks/use-watches'
@@ -65,6 +65,39 @@ type SortOption = 'newest' | 'oldest' | 'biggest' | 'name'
 
 const rankEmoji = (i: number) => ['🥇', '🥈', '🥉'][i] ?? '•'
 
+// ── Animated counter hook ──
+function useCountUp(target: number, duration: number = 1200, enabled: boolean = true) {
+  const [value, setValue] = useState(0)
+  const rafRef = useRef<number>(0)
+
+  useEffect(() => {
+    if (!enabled || target === 0) {
+      setValue(target)
+      return
+    }
+
+    const startTime = performance.now()
+    const startValue = 0
+
+    const animate = (now: number) => {
+      const elapsed = now - startTime
+      const progress = Math.min(elapsed / duration, 1)
+      // ease-out cubic
+      const eased = 1 - Math.pow(1 - progress, 3)
+      setValue(startValue + (target - startValue) * eased)
+
+      if (progress < 1) {
+        rafRef.current = requestAnimationFrame(animate)
+      }
+    }
+
+    rafRef.current = requestAnimationFrame(animate)
+    return () => cancelAnimationFrame(rafRef.current)
+  }, [target, duration, enabled])
+
+  return value
+}
+
 export default function SavingsPage() {
   const { user } = useAuth()
   const { watches } = useWatches()
@@ -73,6 +106,11 @@ export default function SavingsPage() {
   const [sort, setSort] = useState<SortOption>('newest')
   const [sortOpen, setSortOpen] = useState(false)
   const supabaseRef = useRef(createClient())
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   // Filter to price-related watches only (matches iOS logic)
   const priceWatches = useMemo(
@@ -240,64 +278,81 @@ export default function SavingsPage() {
   const next = nextMilestone(totalSaved)
   const progress = milestoneProgress(totalSaved)
 
+  const animatedTotal = useCountUp(totalSaved, 1400, mounted && !loading)
+  const animatedProgress = useCountUp(progress * 100, 1000, mounted && !loading)
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <div className="flex items-center gap-2">
-          <h2 className="text-2xl font-extrabold tracking-tight text-[var(--color-ink)]">
-            Potential Savings
-          </h2>
-          <span className="text-[var(--color-accent)]">✦</span>
+    <div className="sv-page space-y-8 pb-28">
+      {/* ===== HERO HEADER ===== */}
+      <div className="sv-fade-slide-up" style={{ animationDelay: '0.05s' }}>
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--color-accent)] to-[var(--color-accent)]/70 shadow-lg shadow-[var(--color-accent)]/20">
+            <PiggyBank className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-extrabold tracking-tight text-[var(--color-ink)]">
+              Potential Savings
+            </h2>
+            <p className="text-sm text-[var(--color-ink-mid)]">
+              Prices Steward caught dropping for you
+            </p>
+          </div>
         </div>
-        <p className="mt-1 text-sm text-[var(--color-ink-mid)]">
-          Prices Steward caught dropping for you
-        </p>
       </div>
 
       {/* Loading */}
       {loading && (
         <div className="space-y-4">
-          <Skeleton className="h-48 w-full rounded-[var(--radius-lg)]" />
-          <Skeleton className="h-16 w-full" />
-          <Skeleton className="h-16 w-full" />
+          <Skeleton className="h-56 w-full rounded-[var(--radius-xl)]" />
+          <Skeleton className="h-16 w-full rounded-[var(--radius-lg)]" />
+          <Skeleton className="h-16 w-full rounded-[var(--radius-lg)]" />
         </div>
       )}
 
       {!loading && (
         <>
-          {/* ── Milestone Card (matches iOS SavingsMilestoneCard) ── */}
-          <Card className="overflow-hidden border-[var(--color-accent)]/20">
-            <CardContent className="space-y-4 py-5">
+          {/* ===== SAVINGS HERO CARD ===== */}
+          <div
+            className="sv-fade-slide-up sv-hero-card relative overflow-hidden rounded-[var(--radius-xl)] border border-[var(--color-accent)]/20 bg-[var(--color-bg-card)] shadow-[var(--shadow-lg)]"
+            style={{ animationDelay: '0.1s' }}
+          >
+            {/* Gradient accent strip at top */}
+            <div className="h-1 w-full bg-gradient-to-r from-[var(--color-accent)]/60 via-[var(--color-accent)] to-[var(--color-green)]" />
+
+            {/* Ambient glow */}
+            <div className="pointer-events-none absolute -top-20 -right-20 h-48 w-48 rounded-full bg-[var(--color-accent)]/8 blur-3xl" />
+            <div className="pointer-events-none absolute -bottom-16 -left-16 h-40 w-40 rounded-full bg-[var(--color-green)]/6 blur-3xl" />
+
+            <div className="relative space-y-5 p-6">
               {/* Top row: milestone badge + total + rank badge */}
-              <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[var(--color-accent-light)]">
-                  <span className="text-2xl">{milestone?.emoji ?? '✨'}</span>
+              <div className="flex items-center gap-4">
+                <div className="sv-pulse-glow flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--color-accent-light)] to-[var(--color-accent-light)]/50 shadow-inner">
+                  <span className="text-3xl">{milestone?.emoji ?? '✨'}</span>
                 </div>
                 <div className="flex-1">
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--color-ink-mid)]">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[var(--color-ink-mid)]">
                     Potential Savings
                   </p>
-                  <p className="text-2xl font-bold tracking-tight text-[var(--color-accent)]">
-                    ${totalSaved.toFixed(2)}
+                  <p className="sv-total-amount text-3xl font-extrabold tracking-tight text-[var(--color-accent)]">
+                    ${animatedTotal.toFixed(2)}
                   </p>
                 </div>
                 {milestone && (
-                  <div className="flex flex-col items-center gap-0.5 rounded-[var(--radius-md)] border border-[var(--color-accent)]/20 bg-[var(--color-accent-light)] px-3 py-1.5">
-                    <span className="text-xs">{milestone.emoji}</span>
-                    <span className="text-[9px] font-bold text-[var(--color-accent)]">
+                  <div className="sv-milestone-badge flex flex-col items-center gap-1 rounded-2xl border border-[var(--color-accent)]/20 bg-gradient-to-b from-[var(--color-accent-light)] to-[var(--color-accent-light)]/40 px-4 py-2 shadow-sm">
+                    <span className="text-base">{milestone.emoji}</span>
+                    <span className="text-[9px] font-bold tracking-wide text-[var(--color-accent)]">
                       {milestone.label}
                     </span>
                   </div>
                 )}
               </div>
 
-              {/* Progress bar */}
-              <div className="space-y-1.5">
-                <div className="h-2.5 w-full overflow-hidden rounded-full bg-[var(--color-bg-deep)]">
+              {/* Animated progress bar */}
+              <div className="space-y-2">
+                <div className="h-3 w-full overflow-hidden rounded-full bg-[var(--color-bg-deep)] shadow-inner">
                   <div
-                    className="h-full rounded-full bg-gradient-to-r from-[var(--color-accent)]/60 via-[var(--color-accent)] to-[var(--color-green)] transition-all duration-700"
-                    style={{ width: `${Math.max(2, progress * 100)}%` }}
+                    className="sv-progress-bar h-full rounded-full bg-gradient-to-r from-[var(--color-accent)]/60 via-[var(--color-accent)] to-[var(--color-green)] shadow-[0_0_12px_var(--color-accent)/30]"
+                    style={{ width: `${Math.max(2, animatedProgress)}%` }}
                   />
                 </div>
                 <div className="flex justify-between text-[10px] font-medium">
@@ -314,7 +369,7 @@ export default function SavingsPage() {
                     </span>
                   ) : (
                     <span className="flex items-center gap-1 text-[var(--color-accent)]">
-                      ✦ All milestones reached!
+                      <Sparkles className="h-3 w-3" /> All milestones reached!
                     </span>
                   )}
                 </div>
@@ -322,19 +377,30 @@ export default function SavingsPage() {
 
               {/* Top 3 watch breakdown with rank */}
               {savingsEntries.length > 0 && (
-                <div className="rounded-[var(--radius-md)] bg-[var(--color-bg-deep)]/50 p-3 space-y-2">
+                <div className="space-y-1.5 rounded-2xl bg-[var(--color-bg-deep)]/50 p-4 backdrop-blur-sm">
                   {savingsEntries.slice(0, 3).map((entry, i) => (
-                    <div key={entry.watchId} className="flex items-center gap-2.5">
+                    <div
+                      key={entry.watchId}
+                      className="sv-fade-slide-up flex items-center gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-[var(--color-bg-card)]/60"
+                      style={{ animationDelay: `${0.3 + i * 0.1}s` }}
+                    >
                       <span className="text-sm">{rankEmoji(i)}</span>
                       {entry.watchImageUrl ? (
                         /* eslint-disable-next-line @next/next/no-img-element */
-                        <img src={entry.watchImageUrl} alt="" className="h-5 w-5 rounded-sm object-cover shrink-0" />
+                        <img src={entry.watchImageUrl} alt="" className="h-6 w-6 rounded-lg object-cover shrink-0 shadow-sm" />
                       ) : (
                         <span className="text-sm">{entry.watchEmoji}</span>
                       )}
                       <span className="flex-1 truncate text-xs font-medium text-[var(--color-ink)]">
                         {entry.watchName}
                       </span>
+                      {/* Mini savings bar */}
+                      <div className="hidden sm:block h-1.5 w-16 overflow-hidden rounded-full bg-[var(--color-bg-deep)]">
+                        <div
+                          className="h-full rounded-full bg-[var(--color-green)]/60"
+                          style={{ width: `${totalSaved > 0 ? Math.min(100, (entry.saved / totalSaved) * 100) : 0}%` }}
+                        />
+                      </div>
                       <span className="text-xs font-bold text-[var(--color-green)]">
                         -${entry.saved.toFixed(2)}
                       </span>
@@ -344,53 +410,59 @@ export default function SavingsPage() {
               )}
 
               {/* Branding footer */}
-              <div className="flex items-center justify-between text-[10px] text-[var(--color-ink-light)]">
+              <div className="flex items-center justify-between border-t border-[var(--color-border)]/50 pt-4 text-[10px] text-[var(--color-ink-light)]">
                 <div className="flex items-center gap-1.5">
-                  <div className="flex h-3.5 w-3.5 items-center justify-center rounded bg-[var(--color-accent)] text-[7px] font-bold text-white">
+                  <div className="flex h-4 w-4 items-center justify-center rounded-md bg-[var(--color-accent)] text-[7px] font-bold text-white shadow-sm">
                     S
                   </div>
                   <span className="font-medium">Steward</span>
                 </div>
                 <span>Prices tracked automatically</span>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
-          {/* ── Price Changes Section (matches iOS) ── */}
+          {/* ===== PRICE CHANGES TIMELINE ===== */}
           {sortedChanges.length > 0 && (
             <>
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold tracking-tight text-[var(--color-ink)]">
-                  Price Changes
-                </h3>
+              <div className="sv-fade-slide-up flex items-center justify-between" style={{ animationDelay: '0.2s' }}>
+                <div className="flex items-center gap-2">
+                  <TrendingDown className="h-5 w-5 text-[var(--color-accent)]" />
+                  <h3 className="text-lg font-bold tracking-tight text-[var(--color-ink)]">
+                    Price Changes
+                  </h3>
+                  <span className="rounded-full bg-[var(--color-accent-light)] px-2 py-0.5 text-[10px] font-bold text-[var(--color-accent)]">
+                    {sortedChanges.length}
+                  </span>
+                </div>
                 {/* Sort dropdown */}
                 <div className="relative">
                   <button
                     type="button"
                     onClick={() => setSortOpen(!sortOpen)}
-                    className="flex items-center gap-1 rounded-full bg-[var(--color-accent-light)] px-3 py-1.5 text-[11px] font-semibold text-[var(--color-accent)] transition-colors hover:bg-[var(--color-accent-light)]/80"
+                    className="flex items-center gap-1.5 rounded-full bg-[var(--color-bg-card)] border border-[var(--color-border)] px-3.5 py-2 text-[11px] font-semibold text-[var(--color-accent)] shadow-sm transition-all hover:shadow-md hover:border-[var(--color-accent)]/30"
                   >
-                    <ArrowDownRight className="h-2.5 w-2.5" />
+                    <ArrowDownRight className="h-3 w-3" />
                     {sortLabels[sort]}
-                    <ChevronDown className="h-3 w-3" />
+                    <ChevronDown className={`h-3 w-3 transition-transform ${sortOpen ? 'rotate-180' : ''}`} />
                   </button>
                   {sortOpen && (
                     <>
                       <div className="fixed inset-0 z-10" onClick={() => setSortOpen(false)} />
-                      <div className="absolute right-0 top-full z-20 mt-1 w-40 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-bg-card)] py-1 shadow-lg">
+                      <div className="absolute right-0 top-full z-20 mt-1.5 w-44 overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-card)] py-1 shadow-xl backdrop-blur-lg">
                         {(Object.entries(sortLabels) as [SortOption, string][]).map(([key, label]) => (
                           <button
                             key={key}
                             type="button"
                             onClick={() => { setSort(key); setSortOpen(false) }}
-                            className={`flex w-full items-center justify-between px-3 py-2 text-xs transition-colors hover:bg-[var(--color-bg-deep)] ${
+                            className={`flex w-full items-center justify-between px-4 py-2.5 text-xs transition-all hover:bg-[var(--color-bg-deep)] ${
                               sort === key
-                                ? 'font-semibold text-[var(--color-accent)]'
+                                ? 'font-semibold text-[var(--color-accent)] bg-[var(--color-accent-light)]/50'
                                 : 'text-[var(--color-ink)]'
                             }`}
                           >
                             {label}
-                            {sort === key && <span className="text-[var(--color-accent)]">✓</span>}
+                            {sort === key && <span className="text-[var(--color-accent)]">&#10003;</span>}
                           </button>
                         ))}
                       </div>
@@ -399,42 +471,46 @@ export default function SavingsPage() {
                 </div>
               </div>
 
-              {/* Price change rows */}
-              <div className="space-y-2">
-                {sortedChanges.map((item) => (
-                  <Card key={item.id}>
-                    <CardContent className="flex items-center gap-3 py-3">
+              {/* Price change cards */}
+              <div className="space-y-3">
+                {sortedChanges.map((item, idx) => (
+                  <div
+                    key={item.id}
+                    className="sv-fade-slide-up sv-change-card group relative overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-card)] shadow-sm transition-all duration-300 hover:shadow-lg hover:border-[var(--color-border)]/80 hover:-translate-y-0.5"
+                    style={{ animationDelay: `${0.25 + idx * 0.05}s` }}
+                  >
+                    <div className="flex items-center gap-4 p-4">
                       {/* Watch image or emoji */}
-                      <div className="h-10 w-10 shrink-0 rounded-[var(--radius-md)] overflow-hidden bg-[var(--color-bg-deep)]">
+                      <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-[var(--color-bg-deep)] to-[var(--color-bg-deep)]/60 shadow-inner">
                         {item.watchImageUrl ? (
                           /* eslint-disable-next-line @next/next/no-img-element */
-                          <img src={item.watchImageUrl} alt="" className="h-full w-full object-cover" />
+                          <img src={item.watchImageUrl} alt="" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-110" />
                         ) : (
                           <div className="flex h-full w-full items-center justify-center">
-                            <span className="text-lg">{item.watchEmoji}</span>
+                            <span className="text-xl">{item.watchEmoji}</span>
                           </div>
                         )}
                       </div>
 
                       {/* Name + date */}
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold text-[var(--color-ink)]">
+                        <p className="truncate text-sm font-semibold text-[var(--color-ink)] transition-colors group-hover:text-[var(--color-accent)]">
                           {item.watchName}
                         </p>
-                        <p className="text-[11px] text-[var(--color-ink-light)]">
+                        <p className="mt-0.5 text-[11px] text-[var(--color-ink-light)]">
                           {timeAgo(item.date)}
                         </p>
                       </div>
 
-                      {/* Price change + percent */}
-                      <div className="shrink-0 text-right">
-                        <div className="flex items-center gap-1 justify-end">
-                          <span className="text-xs text-[var(--color-ink-light)] line-through">
+                      {/* Price change + percent badge */}
+                      <div className="shrink-0 text-right space-y-1.5">
+                        <div className="flex items-center gap-1.5 justify-end">
+                          <span className="text-xs text-[var(--color-ink-light)] line-through decoration-[var(--color-ink-light)]/50">
                             ${item.oldPrice.toFixed(2)}
                           </span>
-                          <ArrowRight className="h-2.5 w-2.5 text-[var(--color-ink-light)]" />
+                          <ArrowRight className="h-3 w-3 text-[var(--color-ink-light)]/60" />
                           <span
-                            className={`text-sm font-semibold ${
+                            className={`text-sm font-bold ${
                               item.isDecrease ? 'text-[var(--color-green)]' : 'text-[var(--color-red,#ef4444)]'
                             }`}
                           >
@@ -442,8 +518,10 @@ export default function SavingsPage() {
                           </span>
                         </div>
                         <div
-                          className={`flex items-center gap-0.5 justify-end text-[11px] font-medium ${
-                            item.isDecrease ? 'text-[var(--color-green)]' : 'text-[var(--color-red,#ef4444)]'
+                          className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                            item.isDecrease
+                              ? 'bg-[var(--color-green)]/10 text-[var(--color-green)] shadow-[0_0_8px_var(--color-green)/15]'
+                              : 'bg-[var(--color-red,#ef4444)]/10 text-[var(--color-red,#ef4444)] shadow-[0_0_8px_var(--color-red,#ef4444)/15]'
                           }`}
                         >
                           {item.isDecrease ? (
@@ -454,8 +532,15 @@ export default function SavingsPage() {
                           {Math.abs(item.percentChange).toFixed(1)}%
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
+                    </div>
+
+                    {/* Bottom accent line on hover */}
+                    <div className={`h-0.5 w-full transition-opacity duration-300 opacity-0 group-hover:opacity-100 ${
+                      item.isDecrease
+                        ? 'bg-gradient-to-r from-transparent via-[var(--color-green)]/40 to-transparent'
+                        : 'bg-gradient-to-r from-transparent via-[var(--color-red,#ef4444)]/40 to-transparent'
+                    }`} />
+                  </div>
                 ))}
               </div>
             </>
@@ -463,20 +548,142 @@ export default function SavingsPage() {
 
           {/* Empty state */}
           {savingsEntries.length === 0 && sortedChanges.length === 0 && (
-            <div className="flex flex-col items-center justify-center rounded-[var(--radius-lg)] border border-dashed border-[var(--color-border)] bg-[var(--color-bg-card)] py-12">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--color-bg-deep)]">
-                <TrendingDown className="h-5 w-5 text-[var(--color-ink-light)]" />
+            <div
+              className="sv-fade-slide-up flex flex-col items-center justify-center rounded-[var(--radius-xl)] border border-dashed border-[var(--color-border)] bg-[var(--color-bg-card)] py-16 shadow-sm"
+              style={{ animationDelay: '0.15s' }}
+            >
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--color-bg-deep)] to-[var(--color-bg-deep)]/60 shadow-inner">
+                <TrendingDown className="h-7 w-7 text-[var(--color-ink-light)]" />
               </div>
-              <p className="mt-3 text-sm font-medium text-[var(--color-ink)]">
+              <p className="mt-4 text-sm font-semibold text-[var(--color-ink)]">
                 No price changes yet
               </p>
-              <p className="mt-1 text-xs text-[var(--color-ink-mid)]">
+              <p className="mt-1.5 max-w-[260px] text-center text-xs text-[var(--color-ink-mid)]">
                 When Steward detects price changes on your watches, they&apos;ll appear here.
               </p>
             </div>
           )}
         </>
       )}
+
+      {/* ===== CSS ANIMATIONS ===== */}
+      <style jsx>{`
+        /* Staggered fade + slide up entrance */
+        .sv-fade-slide-up {
+          opacity: 0;
+          transform: translateY(16px);
+          animation: svFadeSlideUp 0.5s ease-out forwards;
+        }
+
+        @keyframes svFadeSlideUp {
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        /* Hero card glass effect */
+        .sv-hero-card {
+          backdrop-filter: blur(20px);
+          -webkit-backdrop-filter: blur(20px);
+        }
+
+        /* Subtle glow pulse on milestone emoji */
+        .sv-pulse-glow {
+          animation: svPulseGlow 3s ease-in-out infinite;
+        }
+
+        @keyframes svPulseGlow {
+          0%, 100% {
+            box-shadow: 0 0 0 0 var(--color-accent-light);
+          }
+          50% {
+            box-shadow: 0 0 20px 4px var(--color-accent-light);
+          }
+        }
+
+        /* Milestone badge shimmer */
+        .sv-milestone-badge {
+          position: relative;
+          overflow: hidden;
+        }
+        .sv-milestone-badge::after {
+          content: '';
+          position: absolute;
+          top: -50%;
+          left: -50%;
+          width: 200%;
+          height: 200%;
+          background: linear-gradient(
+            45deg,
+            transparent 40%,
+            rgba(255, 255, 255, 0.08) 50%,
+            transparent 60%
+          );
+          animation: svShimmer 4s ease-in-out infinite;
+        }
+
+        @keyframes svShimmer {
+          0% {
+            transform: translateX(-100%) rotate(0deg);
+          }
+          100% {
+            transform: translateX(100%) rotate(0deg);
+          }
+        }
+
+        /* Progress bar glow */
+        .sv-progress-bar {
+          position: relative;
+          transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .sv-progress-bar::after {
+          content: '';
+          position: absolute;
+          right: 0;
+          top: 50%;
+          transform: translateY(-50%);
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background: white;
+          box-shadow: 0 0 8px var(--color-accent);
+          opacity: 0.8;
+        }
+
+        /* Total amount number glow */
+        .sv-total-amount {
+          text-shadow: 0 0 30px color-mix(in srgb, var(--color-accent) 20%, transparent);
+        }
+
+        /* Change card hover lift */
+        .sv-change-card {
+          will-change: transform, box-shadow;
+        }
+
+        /* Page-level entry animation */
+        .sv-page > * {
+          animation-fill-mode: both;
+        }
+
+        /* Reduced motion support */
+        @media (prefers-reduced-motion: reduce) {
+          .sv-fade-slide-up {
+            animation: none;
+            opacity: 1;
+            transform: none;
+          }
+          .sv-pulse-glow {
+            animation: none;
+          }
+          .sv-milestone-badge::after {
+            animation: none;
+          }
+          .sv-progress-bar {
+            transition: none;
+          }
+        }
+      `}</style>
     </div>
   )
 }

@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { useActivities } from '@/hooks/use-activities'
 import { useAuth } from '@/hooks/use-auth'
 import { createClient } from '@/lib/supabase/client'
 import { ActivityTimeline } from '@/components/activity-timeline'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Eye, Clock, Zap, MousePointerClick } from 'lucide-react'
 import type { IconColorName } from '@/lib/types'
 
 type FilterKey = 'all' | 'alerts' | 'actions' | 'lifecycle'
@@ -22,6 +23,30 @@ const filterColors: Record<FilterKey, IconColorName[]> = {
   alerts: ['red', 'gold'],
   actions: ['accent', 'blue'],
   lifecycle: ['inkLight', 'green'],
+}
+
+/* ── Animated counter hook ── */
+function useCountUp(target: number, duration = 1200) {
+  const [value, setValue] = useState(0)
+  const rafRef = useRef<number>(0)
+
+  useEffect(() => {
+    if (target === 0) { setValue(0); return }
+    const start = performance.now()
+    const from = 0
+    const step = (now: number) => {
+      const elapsed = now - start
+      const progress = Math.min(elapsed / duration, 1)
+      // ease-out cubic
+      const eased = 1 - Math.pow(1 - progress, 3)
+      setValue(Math.round(from + (target - from) * eased))
+      if (progress < 1) rafRef.current = requestAnimationFrame(step)
+    }
+    rafRef.current = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(rafRef.current)
+  }, [target, duration])
+
+  return value
 }
 
 export default function ActivityPage() {
@@ -65,42 +90,84 @@ export default function ActivityPage() {
     return activities.filter((a) => colors.includes(a.icon_color_name))
   }, [activities, filter])
 
-  return (
-    <div className="animate-fade-up">
-      <h1 className="text-2xl font-extrabold tracking-tight text-[var(--color-ink)] mb-1">Activity</h1>
-      <p className="text-[13px] text-[var(--color-ink-mid)] mb-5">Everything happening with your watches</p>
+  const filterCounts = useMemo(() => {
+    const counts: Record<FilterKey, number> = { all: activities.length, alerts: 0, actions: 0, lifecycle: 0 }
+    for (const a of activities) {
+      if (filterColors.alerts.includes(a.icon_color_name)) counts.alerts++
+      if (filterColors.actions.includes(a.icon_color_name)) counts.actions++
+      if (filterColors.lifecycle.includes(a.icon_color_name)) counts.lifecycle++
+    }
+    return counts
+  }, [activities])
 
-      {/* Stats card (matches iOS Steward's Work) */}
+  /* Animated stat values */
+  const animChecks = useCountUp(weeklyChecks)
+  const animTriggers = useCountUp(weeklyTriggers)
+  const animActions = useCountUp(actionCount)
+
+  const stats = [
+    { icon: Eye, label: 'Checks', value: animChecks, display: String(animChecks), color: 'var(--color-accent)', bg: 'var(--color-accent-light)' },
+    { icon: Clock, label: 'Time Saved', value: weeklyChecks, display: timeSavedLabel, color: 'var(--color-blue)', bg: 'var(--color-blue-light)' },
+    { icon: Zap, label: 'Triggers', value: animTriggers, display: String(animTriggers), color: 'var(--color-gold)', bg: 'var(--color-gold-light)' },
+    { icon: MousePointerClick, label: 'Actions', value: animActions, display: String(animActions), color: 'var(--color-accent)', bg: 'var(--color-accent-light)' },
+  ]
+
+  return (
+    <div className="act-page">
+      {/* Header */}
+      <div className="act-header">
+        <h1 className="text-2xl font-extrabold tracking-tight text-[var(--color-ink)] mb-1">
+          Activity
+        </h1>
+        <p className="text-[13px] text-[var(--color-ink-mid)]">
+          Everything happening with your watches
+        </p>
+      </div>
+
+      {/* Stats Dashboard */}
       {weeklyChecks > 0 && (
-        <div className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-5 py-4 mb-5">
-          <div className="text-[14px] font-bold text-[var(--color-ink)] mb-1">Steward&apos;s Work (Last 7 Days)</div>
-          <div className="text-[12px] text-[var(--color-ink-light)] mb-3">{weeklyChecks} follow-up checks · {timeSavedLabel} of browsing saved</div>
-          <div className="flex items-center gap-6">
-            <div className="text-center"><div className="text-lg font-extrabold text-[var(--color-ink)]">{weeklyChecks}</div><div className="text-[11px] text-[var(--color-ink-light)]">Checks</div></div>
-            <div className="w-px h-6 bg-[var(--color-border)]" />
-            <div className="text-center"><div className="text-lg font-extrabold text-[var(--color-ink)]">{timeSavedLabel}</div><div className="text-[11px] text-[var(--color-ink-light)]">Time saved</div></div>
-            <div className="w-px h-6 bg-[var(--color-border)]" />
-            <div className="text-center"><div className="text-lg font-extrabold text-[var(--color-gold)]">{weeklyTriggers}</div><div className="text-[11px] text-[var(--color-ink-light)]">Triggers</div></div>
-            <div className="w-px h-6 bg-[var(--color-border)]" />
-            <div className="text-center"><div className="text-lg font-extrabold text-[var(--color-accent)]">{actionCount}</div><div className="text-[11px] text-[var(--color-ink-light)]">Actions</div></div>
+        <div className="act-stats-card">
+          <div className="act-stats-header">
+            <div className="act-stats-glow" />
+            <h2 className="text-[14px] font-bold text-[var(--color-ink)] relative z-10">
+              Steward&apos;s Work
+            </h2>
+            <span className="text-[11px] text-[var(--color-ink-light)] relative z-10">Last 7 days</span>
+          </div>
+          <div className="act-stats-grid">
+            {stats.map((stat, i) => {
+              const Icon = stat.icon
+              return (
+                <div key={stat.label} className="act-stat-item" style={{ animationDelay: `${i * 80}ms` }}>
+                  <div className="act-stat-icon" style={{ backgroundColor: stat.bg, color: stat.color }}>
+                    <Icon className="h-4 w-4" />
+                  </div>
+                  <div className="act-stat-number" style={{ color: stat.color }}>
+                    {stat.display}
+                  </div>
+                  <div className="act-stat-label">{stat.label}</div>
+                </div>
+              )
+            })}
           </div>
         </div>
       )}
 
-      {/* Tab bar */}
-      <div className="flex gap-1.5 mb-5">
+      {/* Pill Filter Tabs */}
+      <div className="act-pills">
         {filterTabs.map((tab) => (
           <button
             key={tab.key}
             onClick={() => setFilter(tab.key)}
-            className={`px-4 py-[7px] rounded-[var(--radius-md)] text-[13px] font-medium cursor-pointer transition-all border ${
-              filter === tab.key
-                ? 'bg-[var(--color-accent)] text-[var(--color-bg)] border-transparent shadow-[var(--shadow-xs)]'
-                : 'bg-[var(--color-bg-deep)] text-[var(--color-ink-mid)] border-[var(--color-border)] hover:border-[var(--color-border-mid)] hover:text-[var(--color-ink)]'
-            }`}
+            className={`act-pill ${filter === tab.key ? 'act-pill-active' : 'act-pill-inactive'}`}
             style={{ fontFamily: 'inherit' }}
           >
             {tab.label}
+            {filterCounts[tab.key] > 0 && (
+              <span className={`act-pill-badge ${filter === tab.key ? 'act-pill-badge-active' : ''}`}>
+                {filterCounts[tab.key]}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -109,12 +176,13 @@ export default function ActivityPage() {
       {loading && (
         <div className="space-y-4">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="flex items-start gap-3">
-              <Skeleton className="h-[30px] w-[30px] rounded-full" />
-              <div className="flex-1 space-y-1.5">
+            <div key={i} className="flex items-start gap-3 p-4 rounded-[var(--radius-lg)] bg-[var(--color-bg-card)] border border-[var(--color-border)]">
+              <Skeleton className="h-10 w-10 rounded-full" />
+              <div className="flex-1 space-y-2">
                 <Skeleton className="h-4 w-3/4" />
                 <Skeleton className="h-3 w-1/2" />
               </div>
+              <Skeleton className="h-3 w-12" />
             </div>
           ))}
         </div>
@@ -122,10 +190,179 @@ export default function ActivityPage() {
 
       {/* Timeline */}
       {!loading && (
-        <div className="bg-[var(--color-bg-card)] rounded-[var(--radius-lg)] border border-[var(--color-border)] overflow-hidden">
-          <ActivityTimeline activities={filtered} />
-        </div>
+        <ActivityTimeline activities={filtered} />
       )}
+
+      {/* ===== Page-level styles ===== */}
+      <style>{`
+        .act-page {
+          animation: act-fadeUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+
+        @keyframes act-fadeUp {
+          from { opacity: 0; transform: translateY(12px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Header */
+        .act-header {
+          margin-bottom: 20px;
+          animation: act-fadeUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+
+        /* Stats card - glass gradient */
+        .act-stats-card {
+          position: relative;
+          overflow: hidden;
+          border-radius: var(--radius-lg);
+          border: 1px solid var(--color-border);
+          background: linear-gradient(135deg, var(--color-bg-card), var(--color-accent-light));
+          padding: 20px;
+          margin-bottom: 20px;
+          animation: act-fadeUp 0.45s 0.05s cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+
+        .act-stats-header {
+          display: flex;
+          align-items: baseline;
+          gap: 8px;
+          margin-bottom: 16px;
+        }
+
+        .act-stats-glow {
+          position: absolute;
+          top: -40px;
+          right: -40px;
+          width: 120px;
+          height: 120px;
+          border-radius: 50%;
+          background: radial-gradient(circle, var(--color-accent) 0%, transparent 70%);
+          opacity: 0.06;
+          animation: act-pulseGlow 4s ease-in-out infinite;
+        }
+
+        @keyframes act-pulseGlow {
+          0%, 100% { opacity: 0.06; transform: scale(1); }
+          50% { opacity: 0.12; transform: scale(1.15); }
+        }
+
+        .act-stats-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 12px;
+        }
+
+        @media (max-width: 480px) {
+          .act-stats-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        .act-stat-item {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 6px;
+          padding: 14px 8px;
+          border-radius: var(--radius-md);
+          background: var(--color-bg-card);
+          border: 1px solid var(--color-border);
+          box-shadow: var(--shadow-xs);
+          animation: act-statPop 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+          transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .act-stat-item:hover {
+          transform: translateY(-2px);
+          box-shadow: var(--shadow-md);
+        }
+
+        @keyframes act-statPop {
+          from { opacity: 0; transform: translateY(10px) scale(0.95); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .act-stat-icon {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 36px;
+          height: 36px;
+          border-radius: 50%;
+        }
+
+        .act-stat-number {
+          font-size: 22px;
+          font-weight: 800;
+          line-height: 1;
+          letter-spacing: -0.02em;
+          font-variant-numeric: tabular-nums;
+        }
+
+        .act-stat-label {
+          font-size: 11px;
+          color: var(--color-ink-light);
+          font-weight: 500;
+        }
+
+        /* Pill filters */
+        .act-pills {
+          display: flex;
+          gap: 8px;
+          margin-bottom: 20px;
+          animation: act-fadeUp 0.5s 0.1s cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+
+        .act-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 7px 14px;
+          border-radius: 999px;
+          font-size: 13px;
+          font-weight: 500;
+          cursor: pointer;
+          border: 1px solid transparent;
+          transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+          font-family: inherit;
+        }
+
+        .act-pill-active {
+          background: var(--color-accent);
+          color: var(--color-bg);
+          border-color: transparent;
+          box-shadow: 0 2px 8px color-mix(in srgb, var(--color-accent) 30%, transparent);
+        }
+
+        .act-pill-inactive {
+          background: var(--color-bg-deep);
+          color: var(--color-ink-mid);
+          border-color: var(--color-border);
+        }
+
+        .act-pill-inactive:hover {
+          border-color: var(--color-border-mid);
+          color: var(--color-ink);
+          background: var(--color-bg-card);
+        }
+
+        .act-pill-badge {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-width: 18px;
+          height: 18px;
+          padding: 0 5px;
+          border-radius: 999px;
+          font-size: 11px;
+          font-weight: 600;
+          background: color-mix(in srgb, var(--color-ink) 10%, transparent);
+          color: var(--color-ink-mid);
+        }
+
+        .act-pill-badge-active {
+          background: color-mix(in srgb, var(--color-bg) 25%, transparent);
+          color: var(--color-bg);
+        }
+      `}</style>
     </div>
   )
 }
