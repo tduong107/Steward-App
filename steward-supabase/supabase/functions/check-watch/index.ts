@@ -619,14 +619,18 @@ serve(async (req) => {
     // IMPORTANT: watch.url is NEVER modified — only action_url gets the affiliate link.
     // This runs before flight/hotel/restaurant handlers so ALL watch types get affiliated.
     // Domains that are NOT shopping sites — skip affiliate for these
+    // Domains that are NOT shopping sites — skip affiliate for these
+    // NOTE: shopping.yahoo.com and shopping.google.com ARE shopping — they're excluded from this list
     const NON_SHOPPING_DOMAINS = [
-      "msn.com", "yahoo.com", "cnn.com", "bbc.com", "nytimes.com",
+      "msn.com", "cnn.com", "bbc.com", "nytimes.com",
       "washingtonpost.com", "forbes.com", "businessinsider.com",
-      "reddit.com", "twitter.com", "facebook.com", "instagram.com",
+      "reddit.com", "twitter.com", "x.com", "facebook.com", "instagram.com",
       "youtube.com", "tiktok.com", "pinterest.com",
-      "google.com", "bing.com", "duckduckgo.com",
+      "bing.com", "duckduckgo.com",
       "wikipedia.org", "medium.com", "substack.com",
     ];
+    // Shopping subdomains that should NOT be skipped even if parent is in the list
+    const SHOPPING_SUBDOMAINS = ["shopping.yahoo.com", "shopping.google.com"];
 
     let watchDomain = "";
     if (!watch.is_affiliated) {
@@ -634,7 +638,8 @@ serve(async (req) => {
         try { watchDomain = new URL(watch.url.match(/^https?:\/\//i) ? watch.url : `https://${watch.url}`).hostname.replace("www.", ""); } catch {}
 
         // Skip affiliate for non-shopping domains (news, social, search)
-        if (NON_SHOPPING_DOMAINS.some(d => watchDomain === d || watchDomain.endsWith("." + d))) {
+        const isShoppingSubdomain = SHOPPING_SUBDOMAINS.some(s => watchDomain === s || watchDomain.endsWith(s));
+        if (!isShoppingSubdomain && NON_SHOPPING_DOMAINS.some(d => watchDomain === d || watchDomain.endsWith("." + d))) {
           // Mark as affiliated (to prevent re-checking) but don't set an affiliate URL
           await supabase.from("watches").update({ is_affiliated: true, affiliate_network: "skipped" }).eq("id", watch.id);
           watch.is_affiliated = true;

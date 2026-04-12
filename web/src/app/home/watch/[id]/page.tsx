@@ -537,7 +537,10 @@ export default function WatchDetailPage() {
             const latestText = typeof checkResults[0].result_data === 'object'
               ? ((checkResults[0].result_data as Record<string, unknown>).text as string || '')
               : ''
-            const source = latestText.includes('via AI search') ? { icon: '✨', color: 'orange', label: 'AI price estimate', detail: 'Price from search results — may differ from retailer', badge: 'Estimated' }
+            const source = latestText.includes('tables available') || latestText.includes('reservation') ? { icon: '🍽', color: 'green', label: 'Live availability', detail: 'Real-time from Resy / OpenTable', badge: 'Live' }
+              : latestText.includes('Campground') || latestText.includes('campsite') ? { icon: '🏕', color: 'green', label: 'Live availability', detail: 'Real-time from Recreation.gov', badge: 'Live' }
+              : latestText.includes('→') && (latestText.includes('Airlines') || latestText.includes('Spirit') || latestText.includes('Delta') || latestText.includes('United') || latestText.includes('Frontier')) ? { icon: '✈️', color: 'blue', label: 'Live flight data', detail: 'Real-time from airline APIs', badge: 'Live' }
+              : latestText.includes('via AI search') ? { icon: '✨', color: 'orange', label: 'AI price estimate', detail: 'Price from search results — may differ from retailer', badge: 'Estimated' }
               : latestText.includes('estimated') ? { icon: '✨', color: 'orange', label: 'AI price estimate', detail: 'Approximate price from AI analysis', badge: 'Estimated' }
               : latestText.includes('Best:') ? { icon: '🔍', color: 'blue', label: 'Best price found', detail: 'Compared across multiple stores', badge: 'Compared' }
               : latestText.includes('(via ') ? { icon: '🌐', color: 'cyan', label: 'Cross-checked price', detail: 'Verified from alternative source', badge: 'Checked' }
