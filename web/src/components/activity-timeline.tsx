@@ -92,8 +92,14 @@ export function ActivityTimeline({ activities }: ActivityTimelineProps) {
     grouped[grouped.length - 1].items.push(activity)
   }
 
-  // Track global item index for staggered animation delays
-  let globalIndex = 0
+  // Pre-compute global index for each item (avoids mutation during render)
+  const globalIndexMap = new Map<string, number>()
+  let idx = 0
+  for (const group of grouped) {
+    for (const item of group.items) {
+      globalIndexMap.set(item.id, idx++)
+    }
+  }
 
   return (
     <div className="atl-root">
@@ -113,7 +119,7 @@ export function ActivityTimeline({ activities }: ActivityTimelineProps) {
               const iconName = mapIcon(activity.icon)
               const IconComponent = lucideIcons[iconName] || Circle
               const color = iconColor(activity.icon_color_name)
-              const itemIndex = globalIndex++
+              const itemIndex = globalIndexMap.get(activity.id) ?? 0
 
               return (
                 <div

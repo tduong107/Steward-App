@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useActivities } from '@/hooks/use-activities'
 import { useAuth } from '@/hooks/use-auth'
 import { createClient } from '@/lib/supabase/client'
@@ -25,28 +25,24 @@ const filterColors: Record<FilterKey, IconColorName[]> = {
   lifecycle: ['inkLight', 'green'],
 }
 
-/* ── Animated counter hook ── */
-function useCountUp(target: number, duration = 1200) {
-  const [value, setValue] = useState(0)
-  const rafRef = useRef<number>(0)
-
+/* ── Animated number (ref-based, no re-renders) ── */
+function AnimatedNumber({ value, duration = 1200 }: { value: number; duration?: number }) {
+  const ref = useRef<HTMLSpanElement>(null)
   useEffect(() => {
-    if (target === 0) { setValue(0); return }
+    if (!ref.current || value === 0) return
     const start = performance.now()
-    const from = 0
-    const step = (now: number) => {
-      const elapsed = now - start
-      const progress = Math.min(elapsed / duration, 1)
-      // ease-out cubic
+    let frame: number
+    const animate = (now: number) => {
+      const progress = Math.min((now - start) / duration, 1)
       const eased = 1 - Math.pow(1 - progress, 3)
-      setValue(Math.round(from + (target - from) * eased))
-      if (progress < 1) rafRef.current = requestAnimationFrame(step)
+      const current = eased * value
+      if (ref.current) ref.current.textContent = String(Math.round(current))
+      if (progress < 1) frame = requestAnimationFrame(animate)
     }
-    rafRef.current = requestAnimationFrame(step)
-    return () => cancelAnimationFrame(rafRef.current)
-  }, [target, duration])
-
-  return value
+    frame = requestAnimationFrame(animate)
+    return () => cancelAnimationFrame(frame)
+  }, [value, duration])
+  return <span ref={ref}>0</span>
 }
 
 export default function ActivityPage() {
@@ -100,16 +96,11 @@ export default function ActivityPage() {
     return counts
   }, [activities])
 
-  /* Animated stat values */
-  const animChecks = useCountUp(weeklyChecks)
-  const animTriggers = useCountUp(weeklyTriggers)
-  const animActions = useCountUp(actionCount)
-
   const stats = [
-    { icon: Eye, label: 'Checks', value: animChecks, display: String(animChecks), color: 'var(--color-accent)', bg: 'var(--color-accent-light)' },
-    { icon: Clock, label: 'Time Saved', value: weeklyChecks, display: timeSavedLabel, color: 'var(--color-blue)', bg: 'var(--color-blue-light)' },
-    { icon: Zap, label: 'Triggers', value: animTriggers, display: String(animTriggers), color: 'var(--color-gold)', bg: 'var(--color-gold-light)' },
-    { icon: MousePointerClick, label: 'Actions', value: animActions, display: String(animActions), color: 'var(--color-accent)', bg: 'var(--color-accent-light)' },
+    { icon: Eye, label: 'Checks', animatedValue: weeklyChecks, staticDisplay: null, color: 'var(--color-accent)', bg: 'var(--color-accent-light)' },
+    { icon: Clock, label: 'Time Saved', animatedValue: null, staticDisplay: timeSavedLabel, color: 'var(--color-blue)', bg: 'var(--color-blue-light)' },
+    { icon: Zap, label: 'Triggers', animatedValue: weeklyTriggers, staticDisplay: null, color: 'var(--color-gold)', bg: 'var(--color-gold-light)' },
+    { icon: MousePointerClick, label: 'Actions', animatedValue: actionCount, staticDisplay: null, color: 'var(--color-accent)', bg: 'var(--color-accent-light)' },
   ]
 
   return (
@@ -143,7 +134,7 @@ export default function ActivityPage() {
                     <Icon className="h-4 w-4" />
                   </div>
                   <div className="act-stat-number" style={{ color: stat.color }}>
-                    {stat.display}
+                    {stat.staticDisplay ? stat.staticDisplay : <AnimatedNumber value={stat.animatedValue!} />}
                   </div>
                   <div className="act-stat-label">{stat.label}</div>
                 </div>

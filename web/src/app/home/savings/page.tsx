@@ -65,37 +65,24 @@ type SortOption = 'newest' | 'oldest' | 'biggest' | 'name'
 
 const rankEmoji = (i: number) => ['🥇', '🥈', '🥉'][i] ?? '•'
 
-// ── Animated counter hook ──
-function useCountUp(target: number, duration: number = 1200, enabled: boolean = true) {
-  const [value, setValue] = useState(0)
-  const rafRef = useRef<number>(0)
-
+// ── Animated number (ref-based, no re-renders) ──
+function AnimatedNumber({ value, duration = 1400, prefix = '', suffix = '', decimals = 0 }: { value: number; duration?: number; prefix?: string; suffix?: string; decimals?: number }) {
+  const ref = useRef<HTMLSpanElement>(null)
   useEffect(() => {
-    if (!enabled || target === 0) {
-      setValue(target)
-      return
-    }
-
-    const startTime = performance.now()
-    const startValue = 0
-
+    if (!ref.current || value === 0) return
+    const start = performance.now()
+    let frame: number
     const animate = (now: number) => {
-      const elapsed = now - startTime
-      const progress = Math.min(elapsed / duration, 1)
-      // ease-out cubic
+      const progress = Math.min((now - start) / duration, 1)
       const eased = 1 - Math.pow(1 - progress, 3)
-      setValue(startValue + (target - startValue) * eased)
-
-      if (progress < 1) {
-        rafRef.current = requestAnimationFrame(animate)
-      }
+      const current = eased * value
+      if (ref.current) ref.current.textContent = `${prefix}${decimals > 0 ? current.toFixed(decimals) : Math.round(current).toLocaleString()}${suffix}`
+      if (progress < 1) frame = requestAnimationFrame(animate)
     }
-
-    rafRef.current = requestAnimationFrame(animate)
-    return () => cancelAnimationFrame(rafRef.current)
-  }, [target, duration, enabled])
-
-  return value
+    frame = requestAnimationFrame(animate)
+    return () => cancelAnimationFrame(frame)
+  }, [value, duration, prefix, suffix, decimals])
+  return <span ref={ref}>{prefix}0{suffix}</span>
 }
 
 export default function SavingsPage() {
@@ -278,8 +265,7 @@ export default function SavingsPage() {
   const next = nextMilestone(totalSaved)
   const progress = milestoneProgress(totalSaved)
 
-  const animatedTotal = useCountUp(totalSaved, 1400, mounted && !loading)
-  const animatedProgress = useCountUp(progress * 100, 1000, mounted && !loading)
+  const animatedProgressValue = mounted && !loading ? progress * 100 : 0
 
   return (
     <div className="sv-page space-y-8 pb-28">
@@ -334,7 +320,7 @@ export default function SavingsPage() {
                     Potential Savings
                   </p>
                   <p className="sv-total-amount text-3xl font-extrabold tracking-tight text-[var(--color-accent)]">
-                    ${animatedTotal.toFixed(2)}
+                    {mounted && !loading ? <AnimatedNumber value={totalSaved} duration={1400} prefix="$" decimals={2} /> : '$0.00'}
                   </p>
                 </div>
                 {milestone && (
@@ -352,7 +338,7 @@ export default function SavingsPage() {
                 <div className="h-3 w-full overflow-hidden rounded-full bg-[var(--color-bg-deep)] shadow-inner">
                   <div
                     className="sv-progress-bar h-full rounded-full bg-gradient-to-r from-[var(--color-accent)]/60 via-[var(--color-accent)] to-[var(--color-green)] shadow-[0_0_12px_var(--color-accent)/30]"
-                    style={{ width: `${Math.max(2, animatedProgress)}%` }}
+                    style={{ width: `${Math.max(2, animatedProgressValue)}%` }}
                   />
                 </div>
                 <div className="flex justify-between text-[10px] font-medium">
@@ -387,7 +373,7 @@ export default function SavingsPage() {
                       <span className="text-sm">{rankEmoji(i)}</span>
                       {entry.watchImageUrl ? (
                         /* eslint-disable-next-line @next/next/no-img-element */
-                        <img src={entry.watchImageUrl} alt="" className="h-6 w-6 rounded-lg object-cover shrink-0 shadow-sm" />
+                        <img src={entry.watchImageUrl} alt="" loading="lazy" className="h-6 w-6 rounded-lg object-cover shrink-0 shadow-sm" />
                       ) : (
                         <span className="text-sm">{entry.watchEmoji}</span>
                       )}
@@ -477,14 +463,14 @@ export default function SavingsPage() {
                   <div
                     key={item.id}
                     className="sv-fade-slide-up sv-change-card group relative overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-card)] shadow-sm transition-all duration-300 hover:shadow-lg hover:border-[var(--color-border)]/80 hover:-translate-y-0.5"
-                    style={{ animationDelay: `${0.25 + idx * 0.05}s` }}
+                    style={{ animationDelay: `${Math.min(0.25 + idx * 0.05, 1)}s` }}
                   >
                     <div className="flex items-center gap-4 p-4">
                       {/* Watch image or emoji */}
                       <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-[var(--color-bg-deep)] to-[var(--color-bg-deep)]/60 shadow-inner">
                         {item.watchImageUrl ? (
                           /* eslint-disable-next-line @next/next/no-img-element */
-                          <img src={item.watchImageUrl} alt="" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-110" />
+                          <img src={item.watchImageUrl} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-110" />
                         ) : (
                           <div className="flex h-full w-full items-center justify-center">
                             <span className="text-xl">{item.watchEmoji}</span>
@@ -582,11 +568,7 @@ export default function SavingsPage() {
           }
         }
 
-        /* Hero card glass effect */
-        .sv-hero-card {
-          backdrop-filter: blur(20px);
-          -webkit-backdrop-filter: blur(20px);
-        }
+        /* Hero card */
 
         /* Subtle glow pulse on milestone emoji */
         .sv-pulse-glow {
@@ -657,8 +639,8 @@ export default function SavingsPage() {
         }
 
         /* Change card hover lift */
-        .sv-change-card {
-          will-change: transform, box-shadow;
+        .sv-change-card:hover {
+          will-change: transform;
         }
 
         /* Page-level entry animation */

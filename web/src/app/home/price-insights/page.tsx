@@ -8,7 +8,6 @@ import {
   TrendingUp,
   ArrowDownRight,
   ArrowUpRight,
-  Shield,
   Star,
   ThumbsUp,
   Minus,
@@ -22,7 +21,6 @@ import { useAuth } from '@/hooks/use-auth'
 import { useWatches } from '@/hooks/use-watches'
 import { useSub } from '@/hooks/use-subscription'
 import { PaywallDialog } from '@/components/paywall-dialog'
-import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { timeAgo } from '@/lib/utils'
 import type { CheckResult, Watch } from '@/lib/types'
@@ -120,17 +118,17 @@ function Sparkline({
   low,
   high,
   current,
-  expanded,
+  uniqueId,
 }: {
   prices: number[]
   low: number
   high: number
   current: number
-  expanded?: boolean
+  uniqueId: string
 }) {
   if (prices.length < 2) return null
-  const width = expanded ? 260 : 220
-  const height = expanded ? 64 : 52
+  const width = 220
+  const height = 52
   const padding = 6
   const range = high - low || 1
 
@@ -152,7 +150,7 @@ function Sparkline({
   ].join(' ')
 
   const isDown = prices[prices.length - 1] < prices[0]
-  const gradientId = `sparkGrad-${Math.random().toString(36).slice(2, 8)}`
+  const gradientId = `sparkGrad-${uniqueId}`
   const strokeColor = isDown ? '#10b981' : '#f97316'
 
   const lastPt = points[points.length - 1]
@@ -266,7 +264,6 @@ function DealGuideTooltip() {
           className="absolute left-0 top-full z-20 mt-2 w-72 rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-4 shadow-xl"
           style={{
             animation: 'fade-in-up 0.25s cubic-bezier(0.25,0.46,0.45,0.94) both',
-            backdropFilter: 'blur(20px)',
           }}
         >
           <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-ink-mid)] mb-3">
@@ -301,7 +298,6 @@ export default function PriceInsightsPage() {
   const [checkResults, setCheckResults] = useState<CheckResult[]>([])
   const [loading, setLoading] = useState(true)
   const [showPaywall, setShowPaywall] = useState(false)
-  const [hoveredCard, setHoveredCard] = useState<string | null>(null)
   const supabaseRef = useRef(createClient())
 
   // Gate for free users
@@ -473,8 +469,11 @@ export default function PriceInsightsPage() {
           transform: translateY(-3px);
           box-shadow: 0 12px 32px rgba(0,0,0,0.1), 0 2px 8px rgba(0,0,0,0.06);
         }
-        .pi-badge-glow {
-          animation: pi-glowPulse 2.5s ease-in-out infinite;
+        .pi-card-hover:hover .pi-card-accent {
+          opacity: 1;
+        }
+        .pi-card-hover:hover .pi-emoji-icon {
+          transform: scale(1.08);
         }
       `}</style>
 
@@ -562,7 +561,6 @@ export default function PriceInsightsPage() {
                 animationDelay: '80ms',
                 background:
                   'linear-gradient(135deg, color-mix(in srgb, var(--color-accent) 8%, var(--color-bg-card)), color-mix(in srgb, var(--color-accent) 3%, var(--color-bg-card)))',
-                backdropFilter: 'blur(20px)',
               }}
             >
               {/* Decorative gradient orbs */}
@@ -688,7 +686,6 @@ export default function PriceInsightsPage() {
                     Math.abs(insight.currentPrice - insight.lowestPrice) < 0.01
                   const isAtHigh =
                     Math.abs(insight.currentPrice - insight.highestPrice) < 0.01
-                  const isHovered = hoveredCard === insight.watchId
 
                   return (
                     <div
@@ -697,18 +694,14 @@ export default function PriceInsightsPage() {
                       style={{
                         animationDelay: `${200 + idx * 60}ms`,
                         background: 'var(--color-bg-card)',
-                        borderColor: isHovered ? `${config.hex}40` : undefined,
                       }}
                       onClick={() => router.push(`/home/watch/${insight.watchId}`)}
-                      onMouseEnter={() => setHoveredCard(insight.watchId)}
-                      onMouseLeave={() => setHoveredCard(null)}
                     >
                       {/* Card top accent line */}
                       <div
-                        className="h-1 w-full transition-opacity duration-300"
+                        className="h-1 w-full opacity-50 transition-opacity duration-300 pi-card-accent"
                         style={{
                           background: `linear-gradient(90deg, ${config.hex}, ${config.hex}60)`,
-                          opacity: isHovered ? 1 : 0.5,
                         }}
                       />
 
@@ -716,10 +709,9 @@ export default function PriceInsightsPage() {
                         {/* Header: emoji + name + badge */}
                         <div className="flex items-start gap-3">
                           <div
-                            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-transform duration-300"
+                            className="pi-emoji-icon flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-transform duration-300"
                             style={{
                               background: 'var(--color-bg-deep)',
-                              transform: isHovered ? 'scale(1.08)' : 'scale(1)',
                             }}
                           >
                             <span className="text-xl">{insight.watch.emoji || '\u{1F440}'}</span>
@@ -730,7 +722,7 @@ export default function PriceInsightsPage() {
                             </p>
                             <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                               <span
-                                className="pi-badge-glow flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold border"
+                                className="flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold border"
                                 style={{
                                   '--glow-color': `${config.hex}30`,
                                   background: `${config.hex}10`,
@@ -788,7 +780,7 @@ export default function PriceInsightsPage() {
                             low={insight.lowestPrice}
                             high={insight.highestPrice}
                             current={insight.currentPrice}
-                            expanded={isHovered}
+                            uniqueId={insight.watchId}
                           />
                         </div>
 
