@@ -613,6 +613,79 @@ serve(async (req) => {
       );
     }
 
+    // ─── Expired Date Detection ──────────────────────────────────
+    // Auto-pause watches with dates that have already passed
+    // (e.g., restaurant reservation for April 6 when today is April 12)
+    {
+      const text = `${watch.condition ?? ""} ${watch.url ?? ""}`;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const datePatterns = [
+        /date=(\d{4}-\d{2}-\d{2})/i,
+        /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+(\d{1,2})(?:,?\s*(\d{4}))?/i,
+        /(\d{4})-(\d{2})-(\d{2})/,
+      ];
+
+      const monthNames: Record<string, number> = {
+        jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+        jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
+      };
+
+      let watchDate: Date | null = null;
+      for (const pattern of datePatterns) {
+        const match = text.match(pattern);
+        if (match) {
+          try {
+            if (pattern === datePatterns[0]) {
+              // date=2026-04-05
+              watchDate = new Date(match[1]);
+            } else if (pattern === datePatterns[2]) {
+              // 2026-04-05
+              watchDate = new Date(`${match[1]}-${match[2]}-${match[3]}`);
+            } else if (pattern === datePatterns[1]) {
+              // "Apr 6, 2026" or "May 3"
+              const month = monthNames[match[1].toLowerCase().slice(0, 3)];
+              const day = parseInt(match[2]);
+              const year = match[3] ? parseInt(match[3]) : today.getFullYear();
+              if (month !== undefined && day >= 1 && day <= 31) {
+                watchDate = new Date(year, month, day);
+              }
+            }
+            if (watchDate && !isNaN(watchDate.getTime())) break;
+          } catch { watchDate = null; }
+        }
+      }
+
+      if (watchDate && watchDate < today) {
+        console.log(`[check-watch] Watch ${watch.id} has expired date: ${watchDate.toISOString().slice(0, 10)}`);
+        await supabase.from("watches").update({
+          status: "paused",
+          needs_attention: true,
+          change_note: `This watch was for ${watchDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} which has passed. Update the date or remove this watch.`,
+          last_checked: new Date().toISOString(),
+        }).eq("id", watch.id);
+
+        // Notify user
+        try {
+          await supabase.functions.invoke("notify-user", {
+            body: {
+              user_id: watch.user_id,
+              watch_id: watch.id,
+              notification_type: "engagement_expired",
+              engagement_title: "📅 Watch date has passed",
+              engagement_body: `"${watch.name}" was for ${watchDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })} which has passed. Update or remove to free up a watch slot.`,
+            },
+          });
+        } catch { /* non-critical */ }
+
+        return new Response(
+          JSON.stringify({ expired: true, date: watchDate.toISOString().slice(0, 10) }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
     // ─── Affiliate Link Setup (runs BEFORE any special handler) ──────
     // Generate the affiliated action_url IMMEDIATELY so the user earns commission
     // even if they click through before the watch triggers.
