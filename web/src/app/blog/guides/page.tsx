@@ -20,7 +20,7 @@ export default function GuidesPage() {
   return (
     <div style={{ maxWidth: 900, margin: '0 auto', padding: '60px 24px 80px' }}>
       <div style={{ marginBottom: 48 }}>
-        <Link href="/blog" style={{ fontSize: 13, color: 'rgba(247,246,243,0.4)', textDecoration: 'none' }}>
+        <Link href="/blog" style={{ fontSize: 14, fontWeight: 500, color: '#6EE7B7', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
           ← Back to Resources
         </Link>
       </div>

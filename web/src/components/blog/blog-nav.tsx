@@ -6,6 +6,7 @@ import Link from 'next/link'
 const APP_STORE_URL = 'https://apps.apple.com/us/app/steward-concierge/id6760180137'
 
 const PLAIN_LINKS = [
+  ['/', 'Home'],
   ['/blog', 'Resources'],
   ['/blog/comparisons', 'How We Compare'],
   ['/blog/guides', 'Guides'],
