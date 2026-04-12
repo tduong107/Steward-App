@@ -10,3 +10,6 @@ posthog.init(process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN!, {
   capture_exceptions: true,
   debug: process.env.NODE_ENV === "development",
 });
+
+// Register super property so 'platform: web' is sent with every event automatically
+posthog.register({ platform: "web" });

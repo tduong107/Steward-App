@@ -609,7 +609,7 @@ struct HomeScreen: View {
 
                         VStack(spacing: 6) {
                             Button {
-                                viewModel.openDetail(for: watch)
+                                viewModel.openChatWithContext("I need to update my \"\(watch.name)\" watch. The date has passed. Can you help me set a new date?")
                             } label: {
                                 Text("Update")
                                     .font(Theme.body(12, weight: .semibold))

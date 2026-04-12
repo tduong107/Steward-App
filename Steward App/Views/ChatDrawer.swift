@@ -152,6 +152,12 @@ struct ChatDrawer: View {
                 watchVM.pendingFixContext = nil
                 chatVM.send(fixContext)
             }
+
+            // If there's a prefilled message (e.g., expired watch update), auto-send it
+            if let prefill = watchVM.chatPrefillMessage {
+                watchVM.chatPrefillMessage = nil
+                chatVM.send(prefill)
+            }
         }
     }
 

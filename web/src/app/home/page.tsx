@@ -404,9 +404,8 @@ export default function DashboardPage() {
               key={watch.id}
               className="rounded-[var(--radius-lg)] border border-[var(--color-accent)] bg-[var(--color-accent-light)] px-5 py-4 cursor-pointer transition-all hover:shadow-[var(--shadow-sm)]"
               onClick={() => {
-                posthog.capture('watch_triggered_cta_clicked', { watch_id: watch.id, action_type: watch.action_type, watch_name: watch.name })
-                if (watch.action_url) window.open(watch.action_url, '_blank', 'noopener,noreferrer')
-                else router.push(`/home/watch/${watch.id}`)
+                posthog.capture('watch_triggered_cta_clicked', { watch_id: watch.id, action_type: watch.action_type, watch_name: watch.name, platform: 'web' })
+                router.push(`/home/watch/${watch.id}`)
               }}
             >
               {/* Badge */}
@@ -424,9 +423,24 @@ export default function DashboardPage() {
                     {watch.change_note || 'Condition met'}
                   </div>
                 </div>
-                <div className="shrink-0 px-4 py-2.5 rounded-[var(--radius-md)] bg-[var(--color-accent)] text-[var(--color-bg)] text-[13px] font-bold cursor-pointer hover:opacity-90 transition-opacity">
-                  {watch.action_type === 'book' ? 'Open & Reserve →' : watch.action_type === 'price' ? 'Open & Buy →' : 'View →'}
-                </div>
+                {watch.action_url ? (
+                  <a
+                    href={watch.action_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      posthog.capture('action_completed', { watch_id: watch.id, action_type: watch.action_type, platform: 'web' })
+                    }}
+                    className="shrink-0 px-4 py-2.5 rounded-[var(--radius-md)] bg-[var(--color-accent)] text-[var(--color-bg)] text-[13px] font-bold cursor-pointer hover:opacity-90 transition-opacity no-underline"
+                  >
+                    {watch.action_type === 'book' ? 'Open & Reserve →' : watch.action_type === 'price' ? 'Open & Buy →' : 'View →'}
+                  </a>
+                ) : (
+                  <div className="shrink-0 px-4 py-2.5 rounded-[var(--radius-md)] bg-[var(--color-accent)] text-[var(--color-bg)] text-[13px] font-bold cursor-pointer hover:opacity-90 transition-opacity">
+                    View Details →
+                  </div>
+                )}
               </div>
             </div>
           ))}

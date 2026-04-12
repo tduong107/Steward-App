@@ -24,6 +24,13 @@ final class WatchViewModel {
     // Chat
     var isChatOpen = false
     var pendingChatURL: String?  // URL shared via Share Extension
+    var chatPrefillMessage: String?  // Pre-populated message for chat (e.g., expired watch update)
+
+    /// Opens the chat drawer with an optional pre-filled message
+    func openChatWithContext(_ message: String? = nil) {
+        chatPrefillMessage = message
+        isChatOpen = true
+    }
     var pendingFixContext: String?  // Context for "Ask AI to fix" broken watch
 
     // Action modal
