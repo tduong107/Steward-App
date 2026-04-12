@@ -49,6 +49,9 @@ struct WatchDTO: Codable, Identifiable, Sendable {
     var spendingLimit: Double?
     var notifyAnyPriceDrop: Bool
 
+    // Price confidence
+    var priceConfidence: String?
+
     // Affiliate tracking
     var affiliateNetwork: String?
     var affiliateUrl: String?
@@ -86,6 +89,7 @@ struct WatchDTO: Codable, Identifiable, Sendable {
         case autoAct = "auto_act"
         case spendingLimit = "spending_limit"
         case notifyAnyPriceDrop = "notify_any_price_drop"
+        case priceConfidence = "price_confidence"
         case affiliateNetwork = "affiliate_network"
         case affiliateUrl = "affiliate_url"
         case isAffiliated = "is_affiliated"
@@ -104,6 +108,7 @@ struct WatchDTO: Codable, Identifiable, Sendable {
          altSourcePrice: Double? = nil, altSourceFoundAt: Date? = nil,
          couponCode: String? = nil, autoAct: Bool = false, spendingLimit: Double? = nil,
          notifyAnyPriceDrop: Bool = false,
+         priceConfidence: String? = nil,
          affiliateNetwork: String? = nil, affiliateUrl: String? = nil, isAffiliated: Bool = false) {
         self.id = id; self.userId = userId; self.emoji = emoji; self.name = name
         self.url = url; self.condition = condition; self.actionLabel = actionLabel
@@ -119,6 +124,7 @@ struct WatchDTO: Codable, Identifiable, Sendable {
         self.altSourcePrice = altSourcePrice; self.altSourceFoundAt = altSourceFoundAt
         self.couponCode = couponCode; self.autoAct = autoAct
         self.spendingLimit = spendingLimit; self.notifyAnyPriceDrop = notifyAnyPriceDrop
+        self.priceConfidence = priceConfidence
         self.affiliateNetwork = affiliateNetwork; self.affiliateUrl = affiliateUrl
         self.isAffiliated = isAffiliated
     }
@@ -161,6 +167,7 @@ struct WatchDTO: Codable, Identifiable, Sendable {
         autoAct = try c.decodeIfPresent(Bool.self, forKey: .autoAct) ?? false
         spendingLimit = try c.decodeIfPresent(Double.self, forKey: .spendingLimit)
         notifyAnyPriceDrop = try c.decodeIfPresent(Bool.self, forKey: .notifyAnyPriceDrop) ?? false
+        priceConfidence = try c.decodeIfPresent(String.self, forKey: .priceConfidence)
         affiliateNetwork = try c.decodeIfPresent(String.self, forKey: .affiliateNetwork)
         affiliateUrl = try c.decodeIfPresent(String.self, forKey: .affiliateUrl)
         isAffiliated = try c.decodeIfPresent(Bool.self, forKey: .isAffiliated) ?? false

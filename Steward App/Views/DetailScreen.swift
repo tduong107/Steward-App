@@ -251,7 +251,7 @@ struct DetailScreen: View {
                         showBrowser = true
                     } label: {
                         HStack(spacing: 4) {
-                            Text(watch.url)
+                            Text(watch.actionURL ?? watch.url)
                                 .font(Theme.body(12))
                                 .foregroundStyle(Theme.accent)
                                 .lineLimit(1)
@@ -333,6 +333,34 @@ struct DetailScreen: View {
                     PriceHistoryChart(points: priceHistory, accentColor: Theme.accent)
                         .padding(.bottom, 4)
                 }
+            }
+
+            // Price Confidence Indicator
+            if showsPriceChart, let confidence = watch.priceConfidence, !confidence.isEmpty {
+                HStack(spacing: 8) {
+                    Image(systemName: confidenceIcon(confidence))
+                        .font(.system(size: 12))
+                        .foregroundStyle(confidenceColor(confidence))
+                    Text("Price confidence: \(confidenceLabel(confidence))")
+                        .font(Theme.body(12))
+                        .foregroundStyle(Theme.inkMid)
+                    Spacer()
+                    if confidence == "none" || confidence == "low" {
+                        Text("Estimated")
+                            .font(Theme.body(10, weight: .semibold))
+                            .foregroundStyle(.orange)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Color.orange.opacity(0.1))
+                            .clipShape(Capsule())
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(Theme.bgCard)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.border, lineWidth: 1))
+                .padding(.bottom, 4)
             }
 
             // Deal Quality Badge (only when we have real price analysis + paid tier)
@@ -916,6 +944,35 @@ struct DetailScreen: View {
     }
 
     /// Whether the watch's URL is on a retailer that supports server-side cart-add.
+    // MARK: - Price Confidence Helpers
+
+    private func confidenceIcon(_ confidence: String) -> String {
+        switch confidence {
+        case "high": return "checkmark.shield.fill"
+        case "medium": return "shield.lefthalf.filled"
+        case "low": return "exclamationmark.shield"
+        default: return "questionmark.circle"
+        }
+    }
+
+    private func confidenceColor(_ confidence: String) -> Color {
+        switch confidence {
+        case "high": return .green
+        case "medium": return .yellow
+        case "low": return .orange
+        default: return .gray
+        }
+    }
+
+    private func confidenceLabel(_ confidence: String) -> String {
+        switch confidence {
+        case "high": return "High — price verified from page"
+        case "medium": return "Medium — price detected with some uncertainty"
+        case "low": return "Low — price from search results"
+        default: return "Estimated — could not verify from retailer"
+        }
+    }
+
     private func autoActSupportedForURL(_ url: String) -> Bool {
         let lower = url.lowercased()
         let supportedDomains = [
@@ -997,7 +1054,7 @@ struct DetailScreen: View {
                             .font(Theme.body(13, weight: .semibold))
                             .foregroundStyle(Theme.ink)
 
-                        Text(watch.url)
+                        Text(watch.actionURL ?? watch.url)
                             .font(Theme.body(11))
                             .foregroundStyle(Theme.inkLight)
                             .lineLimit(1)
@@ -1023,7 +1080,7 @@ struct DetailScreen: View {
 
             // Copy URL button
             Button {
-                UIPasteboard.general.string = watch.url
+                UIPasteboard.general.string = watch.actionURL ?? watch.url
                 withAnimation(.spring(response: 0.3)) { urlCopied = true }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                     withAnimation { urlCopied = false }

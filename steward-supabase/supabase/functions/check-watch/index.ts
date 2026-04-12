@@ -1850,6 +1850,7 @@ serve(async (req) => {
     // Update the watch with last_checked (always) and trigger fields (if condition met)
     const updateData: Record<string, unknown> = {
       last_checked: now,
+      price_confidence: priceConfidence || "none",
     };
 
     let actionUrl: string | null = null;

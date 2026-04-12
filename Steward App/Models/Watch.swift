@@ -131,6 +131,9 @@ final class Watch {
     // Action enhancement — coupon code detected on the page when triggered
     var couponCode: String?
 
+    // Price confidence level (high, medium, low, none)
+    var priceConfidence: String?
+
     // Affiliate link tracking
     var affiliateNetwork: String?
     var affiliateUrl: String?
