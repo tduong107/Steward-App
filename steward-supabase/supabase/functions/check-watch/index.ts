@@ -1823,6 +1823,42 @@ serve(async (req) => {
 
     const needsFallback = (isCheckFailure || (currentPrice === null && watch.action_type === "price")) && !changed;
 
+    // ─── Fallback 0: Claude Web Search (most accurate — uses real-time web search) ────
+    // Only for price watches on blocked domains where direct fetch fails consistently
+    const isBlockedDomain = serperFallbackDomains.some(d => fetchDomain.includes(d)) || serperPrimaryDomains.some(d => fetchDomain.includes(d));
+    if (needsFallback && !autoFixed && ANTHROPIC_API_KEY && watch.name && isBlockedDomain && timeRemaining() > 22000) {
+      const wsStart = Date.now();
+      try {
+        console.log(`[check-watch] Fallback 0 — Claude Web Search for ${watch.id} (${watch.name})`);
+        const wsResult = await claudeWebSearchPrice(watch, lastKnownPrice);
+        if (wsResult !== null) {
+          currentPrice = wsResult.price;
+          resultText = wsResult.resultText;
+          priceConfidence = wsResult.confidence === "high" ? "high" : wsResult.confidence === "medium" ? "medium" : "low";
+          autoFixed = true;
+          fixedVia = "claude_web_search";
+          methodLog.push({ method: "claude_web_search", status: "ok", duration_ms: Date.now() - wsStart, price_found: wsResult.price, confidence: wsResult.confidence });
+          console.log(`[check-watch] Claude Web Search found $${wsResult.price} (${wsResult.confidence}) for ${watch.id}`);
+
+          // Re-evaluate condition with the web search price
+          if (watch.action_type === "price" && lastKnownPrice !== null) {
+            if (wsResult.price < lastKnownPrice * 0.97) {
+              changed = true;
+              resultText = `Price dropped to $${wsResult.price.toFixed(2)} (was $${lastKnownPrice.toFixed(2)})`;
+            } else if (watch.notify_any_price_drop && wsResult.price < lastKnownPrice) {
+              changed = true;
+              resultText = `Price dropped to $${wsResult.price.toFixed(2)} (was $${lastKnownPrice.toFixed(2)})`;
+            }
+          }
+        } else {
+          methodLog.push({ method: "claude_web_search", status: "no_price", duration_ms: Date.now() - wsStart });
+        }
+      } catch (wsErr: any) {
+        methodLog.push({ method: "claude_web_search", status: "error", error: wsErr.message, duration_ms: Date.now() - wsStart });
+        console.log(`[check-watch] Claude Web Search failed: ${wsErr.message}`);
+      }
+    }
+
     // ─── Fallback 1: Claude AI (Serper search → Claude extracts price) ────────────
     if (needsFallback && !autoFixed && ANTHROPIC_API_KEY && watch.name && timeRemaining() > 8000) {
       const claudeStart = Date.now();
@@ -3198,8 +3234,89 @@ function findPriceInJsonLd(obj: any): number | null {
 }
 
 // ────────────────────────────────────────────────────────────────
-// Claude AI Price Fallback — last resort when page fetch + Serper fail
-// Uses Serper web search to find current price info, then Claude to extract it
+// Claude Web Search — uses Claude's native web search tool for real-time pricing
+// More accurate than Serper+Claude because Claude can visit and understand full pages
+// ────────────────────────────────────────────────────────────────
+
+async function claudeWebSearchPrice(
+  watch: any,
+  lastKnownPrice: number | null
+): Promise<{ price: number; resultText: string; confidence: string } | null> {
+  if (!ANTHROPIC_API_KEY) return null;
+
+  let watchDomain = "";
+  try { watchDomain = new URL(watch.url).hostname.replace("www.", ""); } catch {}
+
+  try {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2025-01-01",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 300,
+        tools: [{
+          type: "web_search",
+          name: "web_search",
+          max_uses: 3,
+        }],
+        system: `You are a price verification assistant. Your job is to find the CURRENT retail price of a specific product on a specific retailer's website. Use web search to find the actual current price — not the MSRP or list price, but what the product is actually selling for RIGHT NOW including any sales or discounts. Respond with ONLY a JSON object: {"price": NUMBER, "confidence": "high"|"medium"|"low", "source": "brief description of where you found the price"}. If you truly cannot find the current price, respond {"price": null, "confidence": "none"}.`,
+        messages: [{
+          role: "user",
+          content: `Find the current price of this product:\n\nProduct: ${watch.name}\nRetailer: ${watchDomain || "unknown"}\nURL: ${watch.url}\n${lastKnownPrice ? `Last known price: $${lastKnownPrice.toFixed(2)}` : ""}\n\nSearch for the actual current selling price on ${watchDomain || "the retailer's website"}. Look for sale prices, not just MSRP.`,
+        }],
+      }),
+      signal: AbortSignal.timeout(20000),
+    });
+
+    if (!response.ok) {
+      console.log(`[claudeWebSearch] API HTTP ${response.status}`);
+      return null;
+    }
+
+    const data = await response.json();
+
+    // Extract text from the response (may have multiple content blocks due to tool use)
+    let resultText = "";
+    for (const block of data.content ?? []) {
+      if (block.type === "text") {
+        resultText += block.text;
+      }
+    }
+
+    // Parse JSON response
+    const jsonMatch = resultText.match(/\{\s*"price"\s*:\s*([\d.]+|null)/);
+    if (!jsonMatch) return null;
+
+    if (jsonMatch[1] === "null") return null;
+
+    const price = parseFloat(jsonMatch[1]);
+    if (isNaN(price) || price <= 0 || price > 100000) return null;
+
+    const confMatch = resultText.match(/"confidence"\s*:\s*"(\w+)"/);
+    const confidence = confMatch?.[1] || "medium";
+    const sourceMatch = resultText.match(/"source"\s*:\s*"([^"]+)"/);
+    const source = sourceMatch?.[1] || "web search";
+
+    console.log(`[claudeWebSearch] Found $${price} (${confidence}) for ${watch.id}: ${source}`);
+
+    return {
+      price,
+      resultText: `$${price.toFixed(2)} (verified via web search)`,
+      confidence,
+    };
+  } catch (err: any) {
+    console.log(`[claudeWebSearch] Error: ${err.message}`);
+    return null;
+  }
+}
+
+// ────────────────────────────────────────────────────────────────
+// Claude AI Price Fallback — uses Serper search + Claude to extract price
+// Used when Claude Web Search is not available or fails
 // ────────────────────────────────────────────────────────────────
 
 async function claudePriceFallback(
