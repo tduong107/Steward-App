@@ -473,7 +473,7 @@ export default function DashboardPage() {
                     onClick={() => {
                       openChat(`I need to update my "${watch.name}" watch. The date has passed. Can you help me set a new date?`)
                     }}
-                    className="px-4 py-2 rounded-[var(--radius-md)] bg-orange-500/10 text-orange-500 text-[13px] font-bold hover:bg-orange-500/20 transition-colors"
+                    className="shrink-0 px-4 py-2.5 rounded-[var(--radius-md)] bg-orange-500/15 text-orange-500 text-[13px] font-bold cursor-pointer hover:bg-orange-500/25 transition-colors"
                   >
                     Update
                   </button>
@@ -490,7 +490,7 @@ export default function DashboardPage() {
                         await supabaseRef.current.from('watches').update({ status: 'deleted' }).eq('id', watch.id)
                       }, 350)
                     }}
-                    className="px-4 py-2 rounded-[var(--radius-md)] bg-red-500/10 text-red-500 text-[13px] font-bold hover:bg-red-500/20 transition-colors"
+                    className="shrink-0 px-4 py-2.5 rounded-[var(--radius-md)] bg-red-500/10 text-red-500 text-[13px] font-bold cursor-pointer hover:bg-red-500/20 transition-colors"
                   >
                     Remove
                   </button>
