@@ -69,7 +69,7 @@ function DashboardLayoutInner({ children }: { children: ReactNode }) {
 
       <div className="flex h-dvh overflow-hidden bg-[var(--color-bg)]" style={{ fontFamily: 'var(--font-body)' }}>
         {/* Sidebar */}
-        <Sidebar onChatOpen={openChat} />
+        <Sidebar onChatOpen={() => openChat()} />
 
         {/* Main content area */}
         <div className="flex-1 min-w-0 flex flex-col">

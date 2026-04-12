@@ -17,7 +17,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [initialMessage, setInitialMessage] = useState<string | null>(null)
 
   const openChat = useCallback((prefill?: string) => {
-    if (prefill) setInitialMessage(prefill)
+    // Type guard: only accept actual strings, not MouseEvents passed from onClick handlers
+    if (prefill && typeof prefill === 'string') setInitialMessage(prefill)
     setIsChatOpen(true)
   }, [])
 
