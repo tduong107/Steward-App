@@ -117,13 +117,10 @@ export default function WatchDetailPage() {
   // Price history data
   const priceHistory = useMemo(() => {
     return checkResults
-      .filter((cr) => {
-        const data = cr.result_data as Record<string, unknown>
-        return typeof data?.price === 'number'
-      })
+      .filter((cr) => cr.price != null && cr.price > 0)
       .map((cr) => ({
         date: cr.checked_at,
-        price: (cr.result_data as Record<string, unknown>).price as number,
+        price: cr.price as number,
       }))
       .reverse()
   }, [checkResults])
@@ -351,9 +348,9 @@ export default function WatchDetailPage() {
                 )}
               </div>
 
-              {/* Domain link */}
+              {/* Domain link — uses affiliate action_url when available */}
               <a
-                href={watch.url}
+                href={watch.action_url || watch.url}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="mt-2 inline-flex items-center gap-1.5 text-sm text-[var(--color-accent)] hover:underline transition-colors"
