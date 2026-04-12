@@ -114,7 +114,8 @@ struct DetailScreen: View {
             ShareWatchSheet(watch: watch)
         }
         .sheet(isPresented: $showBrowser) {
-            if let url = watch.fullURL {
+            // Use affiliate URL if available, otherwise fall back to original URL
+            if let url = watch.actionFullURL ?? watch.fullURL {
                 InAppBrowser(initialURL: url) { capturedURL in
                     // If the watch needs attention, use captured URL to fix it
                     if watch.needsAttention {
