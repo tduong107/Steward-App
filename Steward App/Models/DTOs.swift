@@ -48,6 +48,9 @@ struct WatchDTO: Codable, Identifiable, Sendable {
     var autoAct: Bool
     var spendingLimit: Double?
     var notifyAnyPriceDrop: Bool
+    var responseMode: String
+    var actionExecuted: Bool
+    var actionExecutedAt: Date?
 
     // Price confidence
     var priceConfidence: String?
@@ -89,6 +92,9 @@ struct WatchDTO: Codable, Identifiable, Sendable {
         case autoAct = "auto_act"
         case spendingLimit = "spending_limit"
         case notifyAnyPriceDrop = "notify_any_price_drop"
+        case responseMode = "response_mode"
+        case actionExecuted = "action_executed"
+        case actionExecutedAt = "action_executed_at"
         case priceConfidence = "price_confidence"
         case affiliateNetwork = "affiliate_network"
         case affiliateUrl = "affiliate_url"
@@ -108,6 +114,9 @@ struct WatchDTO: Codable, Identifiable, Sendable {
          altSourcePrice: Double? = nil, altSourceFoundAt: Date? = nil,
          couponCode: String? = nil, autoAct: Bool = false, spendingLimit: Double? = nil,
          notifyAnyPriceDrop: Bool = false,
+         responseMode: String = "notify",
+         actionExecuted: Bool = false,
+         actionExecutedAt: Date? = nil,
          priceConfidence: String? = nil,
          affiliateNetwork: String? = nil, affiliateUrl: String? = nil, isAffiliated: Bool = false) {
         self.id = id; self.userId = userId; self.emoji = emoji; self.name = name
@@ -124,6 +133,8 @@ struct WatchDTO: Codable, Identifiable, Sendable {
         self.altSourcePrice = altSourcePrice; self.altSourceFoundAt = altSourceFoundAt
         self.couponCode = couponCode; self.autoAct = autoAct
         self.spendingLimit = spendingLimit; self.notifyAnyPriceDrop = notifyAnyPriceDrop
+        self.responseMode = responseMode; self.actionExecuted = actionExecuted
+        self.actionExecutedAt = actionExecutedAt
         self.priceConfidence = priceConfidence
         self.affiliateNetwork = affiliateNetwork; self.affiliateUrl = affiliateUrl
         self.isAffiliated = isAffiliated
@@ -167,6 +178,9 @@ struct WatchDTO: Codable, Identifiable, Sendable {
         autoAct = try c.decodeIfPresent(Bool.self, forKey: .autoAct) ?? false
         spendingLimit = try c.decodeIfPresent(Double.self, forKey: .spendingLimit)
         notifyAnyPriceDrop = try c.decodeIfPresent(Bool.self, forKey: .notifyAnyPriceDrop) ?? false
+        responseMode = try c.decodeIfPresent(String.self, forKey: .responseMode) ?? "notify"
+        actionExecuted = try c.decodeIfPresent(Bool.self, forKey: .actionExecuted) ?? false
+        actionExecutedAt = try c.decodeIfPresent(Date.self, forKey: .actionExecutedAt)
         priceConfidence = try c.decodeIfPresent(String.self, forKey: .priceConfidence)
         affiliateNetwork = try c.decodeIfPresent(String.self, forKey: .affiliateNetwork)
         affiliateUrl = try c.decodeIfPresent(String.self, forKey: .affiliateUrl)

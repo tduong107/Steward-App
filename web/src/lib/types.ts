@@ -39,6 +39,9 @@ export interface Watch {
   action_executed: boolean
   action_executed_at: string | null
   price_confidence: string | null
+  notify_any_price_drop: boolean
+  last_price: number | null
+  last_result_text: string | null
   affiliate_network: string | null
   affiliate_url: string | null
   is_affiliated: boolean
