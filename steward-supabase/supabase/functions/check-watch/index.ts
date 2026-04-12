@@ -686,6 +686,77 @@ serve(async (req) => {
       }
     }
 
+    // ─── Problematic URL/Domain Detection ─────────────────────────
+    // Flag watches pointing to news articles, unsupported sites, or problematic URLs
+    {
+      let urlDomain = "";
+      try { urlDomain = new URL(watch.url.match(/^https?:\/\//i) ? watch.url : `https://${watch.url}`).hostname.replace("www.", ""); } catch {}
+
+      // Article/news URLs that aren't product pages
+      const ARTICLE_PATTERNS = ["/article", "/ar-", "/news/", "/blog/", "/story/", "/lifestyle/"];
+      const isArticleUrl = ARTICLE_PATTERNS.some(p => watch.url.includes(p));
+      const NEWS_DOMAINS = ["msn.com", "yahoo.com", "cnn.com", "bbc.com", "nytimes.com", "forbes.com", "businessinsider.com"];
+      const isNewsDomain = NEWS_DOMAINS.some(d => urlDomain === d || urlDomain.endsWith("." + d));
+
+      if ((isArticleUrl || isNewsDomain) && !watch.needs_attention && watch.action_type === "price") {
+        // Flag once — don't repeatedly flag
+        const flagKey = `article_url_${watch.id}`;
+        const { data: alreadyFlagged } = await supabase
+          .from("engagement_notifications_sent")
+          .select("id")
+          .eq("user_id", watch.user_id)
+          .eq("notification_key", flagKey)
+          .maybeSingle();
+
+        if (!alreadyFlagged) {
+          await supabase.from("watches").update({
+            needs_attention: true,
+            last_error: "This watch points to a news article, not a product page. Price tracking may be inaccurate. Please update the URL to the actual retailer.",
+          }).eq("id", watch.id);
+
+          try {
+            await supabase.functions.invoke("notify-user", {
+              body: {
+                user_id: watch.user_id,
+                watch_id: watch.id,
+                notification_type: "engagement_article",
+                engagement_title: "⚠️ Watch URL needs update",
+                engagement_body: `"${watch.name}" points to a news article. Update the URL to the actual retailer for accurate price tracking.`,
+              },
+            });
+            await supabase.from("engagement_notifications_sent").upsert(
+              { user_id: watch.user_id, notification_key: flagKey },
+              { onConflict: "user_id,notification_key" }
+            );
+          } catch { /* non-critical */ }
+        }
+      }
+
+      // Unsupported/highly-problematic domains — warn but don't block
+      const PROBLEMATIC_DOMAINS = ["temu.com", "shein.com", "wish.com"];
+      if (PROBLEMATIC_DOMAINS.some(d => urlDomain === d || urlDomain.endsWith("." + d)) && !watch.needs_attention) {
+        const flagKey = `problematic_domain_${watch.id}`;
+        const { data: alreadyFlagged } = await supabase
+          .from("engagement_notifications_sent")
+          .select("id")
+          .eq("user_id", watch.user_id)
+          .eq("notification_key", flagKey)
+          .maybeSingle();
+
+        if (!alreadyFlagged) {
+          await supabase.from("watches").update({
+            needs_attention: true,
+            last_error: `${urlDomain} uses heavy anti-bot protection. Price tracking may be unreliable. Prices shown are AI estimates and may not reflect the actual current price.`,
+          }).eq("id", watch.id);
+
+          await supabase.from("engagement_notifications_sent").upsert(
+            { user_id: watch.user_id, notification_key: flagKey },
+            { onConflict: "user_id,notification_key" }
+          ).catch(() => {});
+        }
+      }
+    }
+
     // ─── Affiliate Link Setup (runs BEFORE any special handler) ──────
     // Generate the affiliated action_url IMMEDIATELY so the user earns commission
     // even if they click through before the watch triggers.
@@ -951,19 +1022,24 @@ serve(async (req) => {
     })();
 
     // Domains where direct fetch almost always fails — go straight to Serper Shopping
-    const serperPrimaryDomains = ["temu.com", "shein.com"];
-    // Domains where direct fetch is flaky — try direct briefly, but rely on Serper
-    const serperFallbackDomains = ["coach.com", "bloomingdales.com", "dickssportinggoods.com", "rei.com", "arcteryx.com"];
+    const serperPrimaryDomains = ["temu.com", "shein.com", "zara.com", "hm.com"];
+    // Domains where direct fetch is flaky — try direct briefly, but rely on Serper/Claude
+    const serperFallbackDomains = [
+      "coach.com", "bloomingdales.com", "dickssportinggoods.com", "rei.com", "arcteryx.com",
+      "nordstrom.com", "macys.com", "gap.com", "oldnavy.com", "bananarepublic.com",
+      "lululemon.com", "sephora.com", "ulta.com", "anthropologie.com", "freepeople.com",
+    ];
 
-    // Build fetch headers with realistic browser fingerprint + rotating UA
+    // Build fetch headers with realistic browser fingerprint + rotating UA (updated to 2026)
     const USER_AGENTS = [
-      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15",
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0",
-      "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36 Edg/123.0.0.0",
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.2 Safari/605.1.15",
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:131.0) Gecko/20100101 Firefox/131.0",
+      "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0",
+      "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1",
     ];
     const ua = USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
 
@@ -1240,8 +1316,10 @@ serve(async (req) => {
       const sdStart = Date.now();
       try {
         console.log(`[check-watch] Trying Scrape.do for ${watch.id}`);
-        const sdUrl = `https://api.scrape.do/?token=${SCRAPE_DO_KEY}&url=${encodeURIComponent(fetchUrl)}&render=true&super=true`;
-        const sdRes = await fetch(sdUrl, { signal: AbortSignal.timeout(10000) });
+        // Use longer wait for JS-heavy sites that need more render time
+        const needsExtraWait = serperFallbackDomains.some(d => fetchDomain.includes(d));
+        const sdUrl = `https://api.scrape.do/?token=${SCRAPE_DO_KEY}&url=${encodeURIComponent(fetchUrl)}&render=true&super=true${needsExtraWait ? "&wait=5000" : ""}`;
+        const sdRes = await fetch(sdUrl, { signal: AbortSignal.timeout(needsExtraWait ? 15000 : 10000) });
         if (sdRes.ok) {
           pageText = await sdRes.text();
           fetchSuccess = true;
@@ -1940,6 +2018,10 @@ serve(async (req) => {
     if (insertError) {
       console.error(`[check-watch] check_results insert failed: ${JSON.stringify(insertError)}`);
     }
+
+    // SAFETY: update last_checked immediately after check_result insert
+    // This prevents stale last_checked if the function times out before the full updateData
+    await supabase.from("watches").update({ last_checked: now }).eq("id", watch.id);
 
     // Update the watch with last_checked (always) and trigger fields (if condition met)
     const updateData: Record<string, unknown> = {
