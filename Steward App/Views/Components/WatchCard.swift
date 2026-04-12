@@ -52,6 +52,14 @@ struct WatchCard: View {
                                 Circle().stroke(Theme.bgCard, lineWidth: 2)
                             )
                             .offset(x: 3, y: -3)
+                    } else if watch.hasExpiredDate {
+                        Circle()
+                            .fill(.orange)
+                            .frame(width: 10, height: 10)
+                            .overlay(
+                                Circle().stroke(Theme.bgCard, lineWidth: 2)
+                            )
+                            .offset(x: 3, y: -3)
                     }
                 }
 

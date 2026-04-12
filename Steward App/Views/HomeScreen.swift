@@ -70,6 +70,7 @@ struct HomeScreen: View {
 
                     stewardSummaryCard
                     triggeredAlerts
+                    expiredDateAlerts
                     priceInsightsCard
                     categoryFilterBar
 
@@ -561,6 +562,88 @@ struct HomeScreen: View {
                     TriggeredAlertCard(watch: watch) {
                         viewModel.presentAction(for: watch)
                     }
+                }
+            }
+            .padding(.horizontal, 24)
+            .padding(.bottom, 16)
+        }
+    }
+
+    // MARK: - Expired Date Alerts
+
+    private var expiredWatches: [Watch] {
+        viewModel.watches.filter { watch in
+            watch.status != "deleted" && watch.status != "paused" && !watch.triggered && watch.hasExpiredDate
+        }
+    }
+
+    @ViewBuilder
+    private var expiredDateAlerts: some View {
+        if !expiredWatches.isEmpty {
+            VStack(spacing: 10) {
+                ForEach(expiredWatches) { watch in
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 6) {
+                                Text("📅")
+                                    .font(.system(size: 12))
+                                Text("DATE PASSED")
+                                    .font(Theme.body(10, weight: .bold))
+                                    .foregroundStyle(.orange)
+                                    .tracking(0.5)
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(Color.orange.opacity(0.1))
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+
+                            Text("\(watch.emoji) \(watch.name)")
+                                .font(Theme.body(15, weight: .bold))
+                                .foregroundStyle(Theme.ink)
+
+                            Text("The date has passed. Update or remove to free up a slot.")
+                                .font(Theme.body(12))
+                                .foregroundStyle(Theme.inkMid)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                        VStack(spacing: 6) {
+                            Button {
+                                viewModel.openDetail(for: watch)
+                            } label: {
+                                Text("Update")
+                                    .font(Theme.body(12, weight: .semibold))
+                                    .foregroundStyle(.orange)
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 8)
+                                    .background(Color.orange.opacity(0.1))
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                            }
+                            .buttonStyle(.plain)
+
+                            Button {
+                                withAnimation(.spring(response: 0.3)) {
+                                    viewModel.removeWatch(watch)
+                                }
+                            } label: {
+                                Text("Remove")
+                                    .font(Theme.body(12, weight: .semibold))
+                                    .foregroundStyle(.red)
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 8)
+                                    .background(Color.red.opacity(0.1))
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(16)
+                    .background(Color.orange.opacity(0.04))
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14)
+                            .stroke(Color.orange.opacity(0.2), lineWidth: 1)
+                    )
                 }
             }
             .padding(.horizontal, 24)

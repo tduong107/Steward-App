@@ -308,8 +308,8 @@ struct DetailScreen: View {
                 warningBanner
             }
 
-            // Expired date warning
-            if let expiredDate = watchExpiredDate {
+            // Expired date warning (uses shared Watch.expiredDateString)
+            if let expiredDate = watch.expiredDateString {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 6) {
                         Image(systemName: "calendar.badge.exclamationmark")

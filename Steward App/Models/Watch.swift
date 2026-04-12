@@ -216,6 +216,55 @@ extension Watch {
     /// Whether this watch has an error that needs user attention
     var hasError: Bool { needsAttention && lastError != nil }
 
+    /// Returns the expired date string if the watch has a date that has already passed, nil otherwise
+    var expiredDateString: String? {
+        let text = "\(condition) \(url)"
+        let today = Calendar.current.startOfDay(for: Date())
+        let months: [String: Int] = ["jan":1,"feb":2,"mar":3,"apr":4,"may":5,"jun":6,"jul":7,"aug":8,"sep":9,"oct":10,"nov":11,"dec":12]
+
+        // Try date=YYYY-MM-DD
+        if let range = text.range(of: #"date=(\d{4}-\d{2}-\d{2})"#, options: .regularExpression),
+           let dateStr = text[range].split(separator: "=").last {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd"
+            if let date = formatter.date(from: String(dateStr)), date < today {
+                let display = DateFormatter()
+                display.dateFormat = "MMM d, yyyy"
+                return display.string(from: date)
+            }
+        }
+
+        // Try "Apr 6, 2026" or "May 3"
+        let pattern = #"(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+(\d{1,2})(?:,?\s*(\d{4}))?"#
+        if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
+           let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) {
+            let monthStr = String(text[Range(match.range(at: 1), in: text)!]).lowercased().prefix(3)
+            let day = Int(text[Range(match.range(at: 2), in: text)!]) ?? 0
+            let year: Int
+            if match.range(at: 3).location != NSNotFound, let y = Int(text[Range(match.range(at: 3), in: text)!]) {
+                year = y
+            } else {
+                year = Calendar.current.component(.year, from: Date())
+            }
+            if let month = months[String(monthStr)], day >= 1, day <= 31 {
+                var components = DateComponents()
+                components.year = year
+                components.month = month
+                components.day = day
+                if let date = Calendar.current.date(from: components), date < today {
+                    let display = DateFormatter()
+                    display.dateFormat = "MMM d, yyyy"
+                    return display.string(from: date)
+                }
+            }
+        }
+
+        return nil
+    }
+
+    /// Whether this watch has an expired date
+    var hasExpiredDate: Bool { expiredDateString != nil }
+
     /// The full URL with https:// prepended if missing
     var fullURL: URL? {
         var urlString = url
