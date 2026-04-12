@@ -444,6 +444,40 @@ export default function WatchDetailPage() {
         </div>
       )}
 
+      {/* Expired date warning */}
+      {(() => {
+        const text = `${watch.condition || ''} ${watch.url || ''}`
+        const today = new Date(); today.setHours(0,0,0,0)
+        const dateMatch = text.match(/date=(\d{4}-\d{2}-\d{2})/i) ||
+          text.match(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+(\d{1,2})(?:,?\s*(\d{4}))?/i)
+        if (dateMatch) {
+          let watchDate: Date | null = null
+          if (dateMatch[0].includes('=')) {
+            watchDate = new Date(dateMatch[1])
+          } else {
+            const months: Record<string, number> = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11}
+            const m = months[dateMatch[1].toLowerCase().slice(0,3)]
+            const d = parseInt(dateMatch[2])
+            const y = dateMatch[3] ? parseInt(dateMatch[3]) : today.getFullYear()
+            if (m !== undefined) watchDate = new Date(y, m, d)
+          }
+          if (watchDate && !isNaN(watchDate.getTime()) && watchDate < today) {
+            return (
+              <div className="wd-section flex items-start gap-3 rounded-[var(--radius-lg)] p-4 border border-orange-500/20" style={{ background: 'rgba(245,158,11,0.06)' }}>
+                <span className="text-xl mt-0.5">📅</span>
+                <div>
+                  <p className="text-sm font-semibold text-orange-500">Date has passed</p>
+                  <p className="text-xs text-[var(--color-ink-mid)] mt-1">
+                    This watch was for {watchDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} which has already passed. Update the date or remove this watch to free up a slot.
+                  </p>
+                </div>
+              </div>
+            )
+          }
+        }
+        return null
+      })()}
+
       {/* Alternative source suggestion */}
       {watch.alt_source_url && watch.alt_source_domain && (
         <div className="wd-glass-card relative overflow-hidden rounded-[var(--radius-lg)] p-5 border border-[var(--color-accent-mid)]" style={{ background: 'linear-gradient(135deg, var(--color-accent-light), rgba(110,231,183,0.06))' }}>
