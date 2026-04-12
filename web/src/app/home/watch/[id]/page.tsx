@@ -531,6 +531,33 @@ export default function WatchDetailPage() {
             Price History
           </h3>
           <PriceHistoryChart data={priceHistory} />
+
+          {/* Price Confidence Indicator */}
+          {watch.price_confidence && (
+            <div className={`flex items-center gap-2 mt-2 px-3 py-2 rounded-[var(--radius-md)] text-xs ${
+              watch.price_confidence === 'high' ? 'bg-green-500/10 text-green-600' :
+              watch.price_confidence === 'medium' ? 'bg-yellow-500/10 text-yellow-600' :
+              watch.price_confidence === 'low' ? 'bg-orange-500/10 text-orange-600' :
+              'bg-gray-500/10 text-[var(--color-ink-light)]'
+            }`}>
+              <span className="text-sm">
+                {watch.price_confidence === 'high' ? '🛡️' :
+                 watch.price_confidence === 'medium' ? '🛡️' :
+                 watch.price_confidence === 'low' ? '⚠️' : '❓'}
+              </span>
+              <span className="font-medium">
+                {watch.price_confidence === 'high' ? 'High confidence — price verified from page' :
+                 watch.price_confidence === 'medium' ? 'Medium confidence — price detected with some uncertainty' :
+                 watch.price_confidence === 'low' ? 'Low confidence — price from search results' :
+                 'Estimated — could not verify from retailer'}
+              </span>
+              {(watch.price_confidence === 'none' || watch.price_confidence === 'low') && (
+                <span className="ml-auto px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-500 text-[10px] font-bold">
+                  Estimated
+                </span>
+              )}
+            </div>
+          )}
         </div>
       )}
 
