@@ -126,7 +126,7 @@ export function Sidebar({ onChatOpen }: SidebarProps) {
               {label}
               {isProLocked && <Lock size={12} className="ml-auto text-[var(--color-ink-light)]" />}
               {label === 'Home' && triggeredCount > 0 && (
-                <span className="ml-auto text-[10px] font-bold px-[6px] py-px rounded-full bg-[var(--color-accent)] text-[var(--color-ink)]">
+                <span className="ml-auto text-[10px] font-bold px-[6px] py-px rounded-full bg-[var(--color-accent)] text-[#0F2018]">
                   {triggeredCount}
                 </span>
               )}

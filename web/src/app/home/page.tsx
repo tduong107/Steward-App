@@ -53,6 +53,27 @@ export default function DashboardPage() {
   const isAtLimit = activeWatches.length >= limit
   const isOverLimit = activeWatches.length > limit
   const triggeredWatches = activeWatches.filter((w) => w.triggered)
+
+  // Detect watches with expired dates (client-side)
+  const expiredWatches = activeWatches.filter((w) => {
+    if (w.triggered || w.status === 'paused') return false
+    const text = `${w.condition || ''} ${w.url || ''}`
+    const today = new Date(); today.setHours(0,0,0,0)
+    const dateMatch = text.match(/date=(\d{4}-\d{2}-\d{2})/i) ||
+      text.match(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+(\d{1,2})(?:,?\s*(\d{4}))?/i)
+    if (!dateMatch) return false
+    let watchDate: Date | null = null
+    if (dateMatch[0].includes('=')) {
+      watchDate = new Date(dateMatch[1])
+    } else {
+      const months: Record<string, number> = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11}
+      const m = months[dateMatch[1].toLowerCase().slice(0,3)]
+      const d = parseInt(dateMatch[2])
+      const y = dateMatch[3] ? parseInt(dateMatch[3]) : today.getFullYear()
+      if (m !== undefined) watchDate = new Date(y, m, d)
+    }
+    return watchDate && !isNaN(watchDate.getTime()) && watchDate < today
+  })
   const filteredWatches = category
     ? activeWatches.filter((w) => {
         const cat = watchCategory(w)
@@ -405,6 +426,48 @@ export default function DashboardPage() {
                 </div>
                 <div className="shrink-0 px-4 py-2.5 rounded-[var(--radius-md)] bg-[var(--color-accent)] text-[var(--color-bg)] text-[13px] font-bold cursor-pointer hover:opacity-90 transition-opacity">
                   {watch.action_type === 'book' ? 'Open & Reserve →' : watch.action_type === 'price' ? 'Open & Buy →' : 'View →'}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── Expired Date Watches ── */}
+      {!loading && expiredWatches.length > 0 && (
+        <div className="space-y-3 mb-5">
+          {expiredWatches.map((watch) => (
+            <div
+              key={`expired-${watch.id}`}
+              className="rounded-[var(--radius-lg)] border border-orange-500/30 bg-orange-500/5 px-5 py-4"
+            >
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-orange-500/15 text-orange-500 text-[11px] font-bold tracking-wide mb-3">
+                <span>📅</span> DATE PASSED
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="text-[16px] font-bold text-[var(--color-ink)]">
+                    {watch.emoji} {watch.name}
+                  </div>
+                  <div className="text-[13px] text-orange-500/80 mt-1">
+                    The date for this watch has passed. Update or remove to free up a slot.
+                  </div>
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <button
+                    onClick={() => router.push(`/home/watch/${watch.id}`)}
+                    className="px-4 py-2 rounded-[var(--radius-md)] bg-orange-500/10 text-orange-500 text-[13px] font-bold hover:bg-orange-500/20 transition-colors"
+                  >
+                    Update
+                  </button>
+                  <button
+                    onClick={async () => {
+                      await supabaseRef.current.from('watches').update({ status: 'deleted' }).eq('id', watch.id)
+                    }}
+                    className="px-4 py-2 rounded-[var(--radius-md)] bg-red-500/10 text-red-500 text-[13px] font-bold hover:bg-red-500/20 transition-colors"
+                  >
+                    Remove
+                  </button>
                 </div>
               </div>
             </div>
