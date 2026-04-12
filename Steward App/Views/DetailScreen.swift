@@ -335,31 +335,35 @@ struct DetailScreen: View {
                 }
             }
 
-            // Price Confidence Indicator
-            if showsPriceChart, let confidence = watch.priceConfidence, !confidence.isEmpty {
+            // Price Source Indicator — computed from latest check result
+            if showsPriceChart, let latestResult = checkResults.first {
+                let sourceInfo = computePriceSource(from: latestResult)
                 HStack(spacing: 8) {
-                    Image(systemName: confidenceIcon(confidence))
-                        .font(.system(size: 12))
-                        .foregroundStyle(confidenceColor(confidence))
-                    Text("Price confidence: \(confidenceLabel(confidence))")
-                        .font(Theme.body(12))
-                        .foregroundStyle(Theme.inkMid)
-                    Spacer()
-                    if confidence == "none" || confidence == "low" {
-                        Text("Estimated")
-                            .font(Theme.body(10, weight: .semibold))
-                            .foregroundStyle(.orange)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(Color.orange.opacity(0.1))
-                            .clipShape(Capsule())
+                    Image(systemName: sourceInfo.icon)
+                        .font(.system(size: 13))
+                        .foregroundStyle(sourceInfo.color)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(sourceInfo.label)
+                            .font(Theme.body(12, weight: .semibold))
+                            .foregroundStyle(Theme.ink)
+                        Text(sourceInfo.detail)
+                            .font(Theme.body(11))
+                            .foregroundStyle(Theme.inkLight)
                     }
+                    Spacer()
+                    Text(sourceInfo.badge)
+                        .font(Theme.body(10, weight: .bold))
+                        .foregroundStyle(sourceInfo.color)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(sourceInfo.color.opacity(0.1))
+                        .clipShape(Capsule())
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
                 .background(Theme.bgCard)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.border, lineWidth: 1))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(sourceInfo.color.opacity(0.2), lineWidth: 1))
                 .padding(.bottom, 4)
             }
 
@@ -944,33 +948,71 @@ struct DetailScreen: View {
     }
 
     /// Whether the watch's URL is on a retailer that supports server-side cart-add.
-    // MARK: - Price Confidence Helpers
+    // MARK: - Price Source Computation
 
-    private func confidenceIcon(_ confidence: String) -> String {
-        switch confidence {
-        case "high": return "checkmark.shield.fill"
-        case "medium": return "shield.lefthalf.filled"
-        case "low": return "exclamationmark.shield"
-        default: return "questionmark.circle"
-        }
+    struct PriceSourceInfo {
+        let icon: String
+        let color: Color
+        let label: String
+        let detail: String
+        let badge: String
     }
 
-    private func confidenceColor(_ confidence: String) -> Color {
-        switch confidence {
-        case "high": return .green
-        case "medium": return .yellow
-        case "low": return .orange
-        default: return .gray
-        }
-    }
+    private func computePriceSource(from result: CheckResultDTO) -> PriceSourceInfo {
+        let text = result.resultText ?? ""
 
-    private func confidenceLabel(_ confidence: String) -> String {
-        switch confidence {
-        case "high": return "High — price verified from page"
-        case "medium": return "Medium — price detected with some uncertainty"
-        case "low": return "Low — price from search results"
-        default: return "Estimated — could not verify from retailer"
+        // Flight API data
+        if text.contains("→") && (text.contains("Airlines") || text.contains("Spirit") || text.contains("Delta") || text.contains("United") || text.contains("American") || text.contains("JetBlue") || text.contains("Alaska") || text.contains("Southwest") || text.contains("Frontier")) {
+            return PriceSourceInfo(icon: "airplane", color: .blue, label: "Live flight data", detail: "Real-time from airline APIs", badge: "Live")
         }
+
+        // Restaurant availability
+        if text.contains("tables available") || text.contains("reservation") {
+            return PriceSourceInfo(icon: "fork.knife", color: .green, label: "Live availability", detail: "Real-time from Resy / OpenTable", badge: "Live")
+        }
+
+        // Campsite availability
+        if text.contains("Campground") || text.contains("campsite") || text.contains("Recreation.gov") {
+            return PriceSourceInfo(icon: "tent", color: .green, label: "Live availability", detail: "Real-time from Recreation.gov", badge: "Live")
+        }
+
+        // AI search estimate
+        if text.contains("(via AI search)") {
+            return PriceSourceInfo(icon: "sparkles", color: .orange, label: "AI price estimate", detail: "Price from search results — may differ from retailer", badge: "Estimated")
+        }
+
+        // Claude direct estimate
+        if text.contains("(estimated") {
+            return PriceSourceInfo(icon: "sparkles", color: .orange, label: "AI price estimate", detail: "Approximate price from AI analysis", badge: "Estimated")
+        }
+
+        // Cross-store search result
+        if text.contains("Best:") && text.contains(" at ") {
+            return PriceSourceInfo(icon: "magnifyingglass", color: .blue, label: "Best price found", detail: "Compared across multiple stores", badge: "Compared")
+        }
+
+        // Via specific source
+        if text.contains("(via ") {
+            return PriceSourceInfo(icon: "globe", color: .cyan, label: "Cross-checked price", detail: "Verified from alternative source", badge: "Checked")
+        }
+
+        // Could not reach
+        if text.contains("Could not reach") {
+            return PriceSourceInfo(icon: "wifi.slash", color: .red, label: "Page unreachable", detail: "Couldn't connect to the retailer", badge: "Error")
+        }
+
+        // Price not found
+        if text.contains("Price not found") {
+            return PriceSourceInfo(icon: "questionmark.circle", color: .gray, label: "Price not found", detail: "Page loaded but no price detected", badge: "Unknown")
+        }
+
+        // Direct fetch success (no change / price dropped)
+        if text.contains("— no change") || text.contains("Price dropped") || text.contains("Current price:") {
+            return PriceSourceInfo(icon: "checkmark.seal.fill", color: .green, label: "Verified from retailer", detail: "Price fetched directly from the product page", badge: "Verified")
+        }
+
+        // Default
+        return PriceSourceInfo(icon: "circle", color: .gray, label: "Price data", detail: "Steward is monitoring this product", badge: "Tracked")
     }
 
     private func autoActSupportedForURL(_ url: String) -> Bool {

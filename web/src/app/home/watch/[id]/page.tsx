@@ -532,32 +532,34 @@ export default function WatchDetailPage() {
           </h3>
           <PriceHistoryChart data={priceHistory} />
 
-          {/* Price Confidence Indicator */}
-          {watch.price_confidence && (
-            <div className={`flex items-center gap-2 mt-2 px-3 py-2 rounded-[var(--radius-md)] text-xs ${
-              watch.price_confidence === 'high' ? 'bg-green-500/10 text-green-600' :
-              watch.price_confidence === 'medium' ? 'bg-yellow-500/10 text-yellow-600' :
-              watch.price_confidence === 'low' ? 'bg-orange-500/10 text-orange-600' :
-              'bg-gray-500/10 text-[var(--color-ink-light)]'
-            }`}>
-              <span className="text-sm">
-                {watch.price_confidence === 'high' ? '🛡️' :
-                 watch.price_confidence === 'medium' ? '🛡️' :
-                 watch.price_confidence === 'low' ? '⚠️' : '❓'}
-              </span>
-              <span className="font-medium">
-                {watch.price_confidence === 'high' ? 'High confidence — price verified from page' :
-                 watch.price_confidence === 'medium' ? 'Medium confidence — price detected with some uncertainty' :
-                 watch.price_confidence === 'low' ? 'Low confidence — price from search results' :
-                 'Estimated — could not verify from retailer'}
-              </span>
-              {(watch.price_confidence === 'none' || watch.price_confidence === 'low') && (
-                <span className="ml-auto px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-500 text-[10px] font-bold">
-                  Estimated
+          {/* Price Source Indicator — computed from latest check result */}
+          {checkResults.length > 0 && (() => {
+            const latestText = typeof checkResults[0].result_data === 'object'
+              ? ((checkResults[0].result_data as Record<string, unknown>).text as string || '')
+              : ''
+            const source = latestText.includes('via AI search') ? { icon: '✨', color: 'orange', label: 'AI price estimate', detail: 'Price from search results — may differ from retailer', badge: 'Estimated' }
+              : latestText.includes('estimated') ? { icon: '✨', color: 'orange', label: 'AI price estimate', detail: 'Approximate price from AI analysis', badge: 'Estimated' }
+              : latestText.includes('Best:') ? { icon: '🔍', color: 'blue', label: 'Best price found', detail: 'Compared across multiple stores', badge: 'Compared' }
+              : latestText.includes('(via ') ? { icon: '🌐', color: 'cyan', label: 'Cross-checked price', detail: 'Verified from alternative source', badge: 'Checked' }
+              : latestText.includes('Could not reach') ? { icon: '📡', color: 'red', label: 'Page unreachable', detail: "Couldn't connect to the retailer", badge: 'Error' }
+              : latestText.includes('Price not found') ? { icon: '❓', color: 'gray', label: 'Price not found', detail: 'Page loaded but no price detected', badge: 'Unknown' }
+              : (latestText.includes('no change') || latestText.includes('Price dropped') || latestText.includes('Current price')) ? { icon: '✅', color: 'green', label: 'Verified from retailer', detail: 'Price fetched directly from the product page', badge: 'Verified' }
+              : latestText.includes('→') ? { icon: '✈️', color: 'blue', label: 'Live flight data', detail: 'Real-time from airline APIs', badge: 'Live' }
+              : { icon: '📊', color: 'gray', label: 'Price data', detail: 'Steward is monitoring this product', badge: 'Tracked' }
+            const colorMap: Record<string, string> = { orange: 'bg-orange-500/10 text-orange-600', blue: 'bg-blue-500/10 text-blue-600', green: 'bg-green-500/10 text-green-600', red: 'bg-red-500/10 text-red-600', cyan: 'bg-cyan-500/10 text-cyan-600', gray: 'bg-gray-500/10 text-[var(--color-ink-light)]' }
+            return (
+              <div className={`flex items-center gap-2 mt-2 px-3 py-2.5 rounded-[var(--radius-md)] text-xs ${colorMap[source.color] || colorMap.gray}`}>
+                <span className="text-sm">{source.icon}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold text-[var(--color-ink)] text-[12px]">{source.label}</div>
+                  <div className="text-[11px] text-[var(--color-ink-mid)]">{source.detail}</div>
+                </div>
+                <span className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold ${colorMap[source.color] || colorMap.gray}`}>
+                  {source.badge}
                 </span>
-              )}
-            </div>
-          )}
+              </div>
+            )
+          })()}
         </div>
       )}
 

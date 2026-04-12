@@ -618,12 +618,28 @@ serve(async (req) => {
     // even if they click through before the watch triggers.
     // IMPORTANT: watch.url is NEVER modified — only action_url gets the affiliate link.
     // This runs before flight/hotel/restaurant handlers so ALL watch types get affiliated.
+    // Domains that are NOT shopping sites — skip affiliate for these
+    const NON_SHOPPING_DOMAINS = [
+      "msn.com", "yahoo.com", "cnn.com", "bbc.com", "nytimes.com",
+      "washingtonpost.com", "forbes.com", "businessinsider.com",
+      "reddit.com", "twitter.com", "facebook.com", "instagram.com",
+      "youtube.com", "tiktok.com", "pinterest.com",
+      "google.com", "bing.com", "duckduckgo.com",
+      "wikipedia.org", "medium.com", "substack.com",
+    ];
+
     let watchDomain = "";
     if (!watch.is_affiliated) {
       try {
         try { watchDomain = new URL(watch.url.match(/^https?:\/\//i) ? watch.url : `https://${watch.url}`).hostname.replace("www.", ""); } catch {}
 
-        if (watchDomain) {
+        // Skip affiliate for non-shopping domains (news, social, search)
+        if (NON_SHOPPING_DOMAINS.some(d => watchDomain === d || watchDomain.endsWith("." + d))) {
+          // Mark as affiliated (to prevent re-checking) but don't set an affiliate URL
+          await supabase.from("watches").update({ is_affiliated: true, affiliate_network: "skipped" }).eq("id", watch.id);
+          watch.is_affiliated = true;
+          console.log(`[check-watch] Skipped affiliate for non-shopping domain: ${watchDomain}`);
+        } else if (watchDomain) {
           const { data: affiliateConfigs } = await supabase
             .from("affiliate_config")
             .select("*")
