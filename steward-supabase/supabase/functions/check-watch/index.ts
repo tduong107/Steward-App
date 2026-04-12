@@ -4795,11 +4795,33 @@ async function checkOpenTableWatch(
       updateData.triggered = true;
       updateData.status = "triggered";
       updateData.change_note = resultText;
-      updateData.action_url = watch.url; // Open original OpenTable page
+
+      // Build OpenTable booking URL with date/time/party pre-filled
+      // Format: /restaurant/profile/ID?dateTime=2026-04-06T19:00&covers=2&ref=steward
+      let bookingUrl = watch.url;
+      try {
+        const otUrl = new URL(watch.url.match(/^https?:\/\//i) ? watch.url : `https://${watch.url}`);
+        // Parse time from condition (e.g., "7:00 PM" → "19:00")
+        const timeMatch = (watch.condition || "").match(/(\d{1,2}):(\d{2})\s*(am|pm)/i);
+        let timeStr = "19:00"; // default 7pm
+        if (timeMatch) {
+          let hour = parseInt(timeMatch[1]);
+          const minute = timeMatch[2];
+          const ampm = timeMatch[3].toLowerCase();
+          if (ampm === "pm" && hour < 12) hour += 12;
+          if (ampm === "am" && hour === 12) hour = 0;
+          timeStr = `${hour.toString().padStart(2, "0")}:${minute}`;
+        }
+        otUrl.searchParams.set("dateTime", `${reservationDate}T${timeStr}`);
+        otUrl.searchParams.set("covers", partySize.toString());
+        bookingUrl = otUrl.toString();
+      } catch { /* fallback to original URL */ }
+
+      updateData.action_url = bookingUrl;
 
       try {
         await supabase.functions.invoke("notify-user", {
-          body: { watch_id: watch.id, user_id: watch.user_id, action_url: watch.url },
+          body: { watch_id: watch.id, user_id: watch.user_id, action_url: bookingUrl },
         });
       } catch { /* non-critical */ }
     }
@@ -4835,9 +4857,18 @@ async function checkOpenTableWatch(
           const resyData = await resySearch.json();
           for (const r of (resyData.organic ?? [])) {
             if (r.link?.includes("resy.com/cities/")) {
-              console.log(`[check-watch] OpenTable: found Resy alternative: ${r.link}`);
+              // Build Resy URL with date and party size params
+              let resyUrl = r.link;
+              try {
+                const ru = new URL(resyUrl);
+                if (reservationDate) ru.searchParams.set("date", reservationDate);
+                ru.searchParams.set("seats", partySize.toString());
+                resyUrl = ru.toString();
+              } catch { /* use as-is */ }
+
+              console.log(`[check-watch] OpenTable: found Resy alternative: ${resyUrl}`);
               await supabase.from("watches").update({
-                alt_source_url: r.link,
+                alt_source_url: resyUrl,
                 alt_source_domain: "resy.com",
                 alt_source_found_at: now,
               }).eq("id", watch.id);

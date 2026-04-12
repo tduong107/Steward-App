@@ -610,13 +610,19 @@ struct DetailScreen: View {
                     .tracking(0.5)
             }
 
-            if let domain = watch.altSourceDomain, let price = watch.altSourcePrice {
-                Text("\(watch.name) is available on \(domain) for $\(String(format: "%.2f", price))")
-                    .font(Theme.body(14, weight: .semibold))
-                    .foregroundStyle(Theme.ink)
+            if let domain = watch.altSourceDomain {
+                if let price = watch.altSourcePrice {
+                    Text("\(watch.name) is also on \(domain) for $\(String(format: "%.2f", price))")
+                        .font(Theme.body(14, weight: .semibold))
+                        .foregroundStyle(Theme.ink)
+                } else {
+                    Text("\(watch.name) is also on \(domain)")
+                        .font(Theme.body(14, weight: .semibold))
+                        .foregroundStyle(Theme.ink)
+                }
             }
 
-            Text("Would you like to switch to tracking this source instead?")
+            Text(altSourceExplanation)
                 .font(Theme.body(12))
                 .foregroundStyle(Theme.inkMid)
 
@@ -1013,6 +1019,21 @@ struct DetailScreen: View {
 
         // Default
         return PriceSourceInfo(icon: "circle", color: .gray, label: "Price data", detail: "Steward is monitoring this product", badge: "Tracked")
+    }
+
+    private var altSourceExplanation: String {
+        guard let domain = watch.altSourceDomain else { return "This source may provide more accurate information." }
+        switch domain.lowercased() {
+        case "resy.com":
+            return "Resy shows real-time cancellations and last-minute openings. Steward can monitor Resy directly for faster, more accurate availability alerts."
+        case "opentable.com":
+            return "OpenTable shows live reservation slots. Switching may give more accurate availability data."
+        default:
+            if let altPrice = watch.altSourcePrice {
+                return "This source has the product for $\(String(format: "%.2f", altPrice)). Switching could save you money."
+            }
+            return "This source may provide more accurate or up-to-date information."
+        }
     }
 
     private func autoActSupportedForURL(_ url: String) -> Bool {

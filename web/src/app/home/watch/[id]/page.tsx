@@ -377,11 +377,17 @@ export default function WatchDetailPage() {
             </span>
           </div>
           <p className="text-sm font-medium text-[var(--color-ink)] mb-1">
-            {watch.name} is available on {watch.alt_source_domain}
+            {watch.name} is also on {watch.alt_source_domain}
             {watch.alt_source_price != null && ` for $${watch.alt_source_price.toFixed(2)}`}
           </p>
           <p className="text-xs text-[var(--color-ink-mid)] mb-3">
-            Would you like to switch to tracking this source instead?
+            {watch.alt_source_domain === 'resy.com'
+              ? 'Resy shows real-time cancellations and last-minute openings. Steward can monitor Resy directly for faster, more accurate availability alerts.'
+              : watch.alt_source_domain === 'opentable.com'
+              ? 'OpenTable shows live reservation slots. Switching may give more accurate availability data.'
+              : watch.alt_source_price != null
+              ? `This source has the product for $${watch.alt_source_price.toFixed(2)}. Switching could save you money.`
+              : 'This source may provide more accurate or up-to-date information.'}
           </p>
           <div className="flex gap-2">
             <Button
