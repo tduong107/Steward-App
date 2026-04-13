@@ -12,6 +12,7 @@ final class SupabaseService {
         try await SupabaseConfig.client
             .from("watches")
             .select()
+            .neq("status", value: "deleted")
             .order("created_at", ascending: false)
             .execute()
             .value
