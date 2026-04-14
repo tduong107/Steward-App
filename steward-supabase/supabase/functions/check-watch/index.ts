@@ -1178,6 +1178,50 @@ serve(async (req) => {
       } catch { /* fall through to HTML fetch */ }
     }
 
+    // ─── Blocked-domain fast path: Claude Web Search BEFORE any fetch ────
+    // Domains in serperFallbackDomains (rei.com, coach.com, etc.) almost
+    // always block our direct fetch and ScrapeDo. The old flow burned
+    // ~25 seconds on those failing attempts and then had no budget left
+    // for the high-quality Claude Web Search fallback (which needs ~20s).
+    //
+    // For these domains we now invoke Claude Web Search FIRST, while we
+    // still have the full 24-second function budget. Claude navigates the
+    // actual URL via its web_search tool and returns the live price. If
+    // it succeeds, the rest of the fetch chain is skipped.
+    //
+    // Cost: this adds one Claude API call per check for blocked-domain
+    // watches. Worth it because (a) the alternative was recording random
+    // prices from Google Shopping, and (b) we previously made a Claude
+    // call anyway via the late-stage Fallback 1, just at a useless time.
+    let claudeEarlyPrice: number | null = null;
+    let claudeEarlyConfidence: "high" | "medium" | "low" | "none" = "none";
+    let claudeEarlyResultText: string | null = null;
+    const isKnownBlockedDomain = serperFallbackDomains.some(d => fetchDomain.includes(d));
+    if (
+      isKnownBlockedDomain &&
+      ANTHROPIC_API_KEY &&
+      watch.action_type === "price" &&
+      timeRemaining() > 21000
+    ) {
+      const wsStart = Date.now();
+      try {
+        console.log(`[check-watch] Blocked-domain fast-path: Claude Web Search for ${watch.id} (${fetchDomain})`);
+        const wsResult = await claudeWebSearchPrice(watch, watch.last_price ?? null);
+        if (wsResult !== null) {
+          claudeEarlyPrice = wsResult.price;
+          claudeEarlyConfidence = wsResult.confidence === "high" ? "high"
+                                : wsResult.confidence === "medium" ? "medium"
+                                : "low";
+          claudeEarlyResultText = wsResult.resultText;
+          console.log(`[check-watch] Blocked-domain fast-path success: $${wsResult.price} (${wsResult.confidence}) in ${Date.now() - wsStart}ms`);
+        } else {
+          console.log(`[check-watch] Blocked-domain fast-path returned no price for ${watch.id} after ${Date.now() - wsStart}ms — falling through to normal chain`);
+        }
+      } catch (e: any) {
+        console.log(`[check-watch] Blocked-domain fast-path error after ${Date.now() - wsStart}ms: ${e.message}`);
+      }
+    }
+
     // ─── Serper-primary domains: skip direct fetch, use Google Shopping API ────
     let serperPrimaryPrice: number | null = null;
     if (serperPrimaryDomains.some(d => fetchDomain.includes(d)) && watch.name) {
@@ -1229,15 +1273,27 @@ serve(async (req) => {
     // Detailed per-method logging for failure diagnostics
     const methodLog: Array<{ method: string; status: string; error?: string; duration_ms: number; price_found?: number }> = [];
 
-    // Method memory: if a non-direct method worked last time, skip direct fetch to save time
+    // Method memory: if a non-direct method worked last time, skip direct fetch to save time.
+    // Also skip if the blocked-domain fast path above already found a price — no point
+    // wasting the budget on a fetch we expect to fail.
     const preferredMethod = watch.preferred_fetch_method;
     const skipDirectFetch = serperPrimaryDomains.some(d => fetchDomain.includes(d)) ||
+      claudeEarlyPrice !== null ||
       (preferredMethod && preferredMethod !== "direct" && preferredMethod !== "direct_desktop_ua");
 
     if (skipDirectFetch) {
       if (preferredMethod) console.log(`[check-watch] Skipping direct fetch for ${watch.id} — preferred method is ${preferredMethod}`);
-      fetchSuccess = false;
-      pageText = "";
+      if (claudeEarlyPrice !== null) {
+        // Claude Web Search already succeeded — treat as a successful fetch
+        // so evaluateConditionAsync runs the condition against the price
+        // rather than returning "Could not reach page".
+        console.log(`[check-watch] Skipping direct fetch for ${watch.id} — blocked-domain fast path returned $${claudeEarlyPrice}`);
+        fetchSuccess = true;
+        pageText = "";
+      } else {
+        fetchSuccess = false;
+        pageText = "";
+      }
     } else {
     try {
       const response = await fetch(fetchUrl, {
@@ -1317,8 +1373,10 @@ serve(async (req) => {
 
     // ─── Scrape.do fallback for bot-blocked or unreachable pages ────────────
     // Skip Scrape.do for domains where it consistently fails (save API credits)
+    // and when the blocked-domain fast path already found a price.
     const SCRAPE_DO_KEY = Deno.env.get("SCRAPE_DO_API_KEY") ?? "";
-    const skipScrapeDo = serperPrimaryDomains.some(d => fetchDomain.includes(d));
+    const skipScrapeDo = serperPrimaryDomains.some(d => fetchDomain.includes(d)) ||
+      claudeEarlyPrice !== null;
     if ((!fetchSuccess || pageText === "") && SCRAPE_DO_KEY && timeRemaining() > 12000 && !skipScrapeDo) {
       const sdStart = Date.now();
       try {
@@ -1344,8 +1402,9 @@ serve(async (req) => {
     }
 
     // Extract current price from raw HTML (structured selectors work best on raw HTML)
-    // Use Shopify API price if available, otherwise extract from HTML
-    let currentPrice = ebayPrice ?? shopifyPrice ?? (fetchSuccess ? extractPrice(pageText) : null);
+    // Use blocked-domain fast-path price first (Claude Web Search ran before fetch),
+    // then Shopify API price, then HTML extraction.
+    let currentPrice = claudeEarlyPrice ?? ebayPrice ?? shopifyPrice ?? (fetchSuccess ? extractPrice(pageText) : null);
 
     // ─── Scrape.do retry for JS-heavy sites where price extraction failed ────────────
     // If we got HTML but couldn't find a price, the page likely renders prices via JavaScript.
@@ -1390,7 +1449,11 @@ serve(async (req) => {
 
     // ─── Price Confidence Assessment ──────────────────────────────────
     let priceConfidence: "high" | "medium" | "low" | "none" = "none";
-    if (currentPrice !== null) {
+    if (claudeEarlyPrice !== null && currentPrice === claudeEarlyPrice) {
+      // Blocked-domain fast path: trust Claude Web Search's own confidence,
+      // since it navigated to the actual URL via its web_search tool.
+      priceConfidence = claudeEarlyConfidence;
+    } else if (currentPrice !== null) {
       const hasJsonLd = /<script[^>]*type="application\/ld\+json"/i.test(pageText);
       const hasOgPrice = /property="(?:og|product):price:amount"/i.test(pageText);
       priceConfidence = (hasJsonLd || hasOgPrice) ? "high" : "medium";
@@ -1775,6 +1838,15 @@ serve(async (req) => {
       priceForAI
     );
 
+    // If the blocked-domain fast path provided the price, override the
+    // result text with Claude's own "verified via web search" copy (the
+    // evaluator otherwise produces a generic "$X — price unchanged" line
+    // because pageText is empty). autoFixed/fixedVia are set later once
+    // they're in scope (see below, just after the failure detection block).
+    if (claudeEarlyPrice !== null && currentPrice === claudeEarlyPrice && !changed && claudeEarlyResultText) {
+      resultText = claudeEarlyResultText;
+    }
+
     // ─── Price Reconciliation: prefer AI's contextual price over regex extraction ───
     if (resultText) {
       const aiPriceMatch = resultText.match(/\$\s*([\d,]+\.?\d{0,2})/);
@@ -1815,9 +1887,19 @@ serve(async (req) => {
     let autoFixed = false;
     let fixedVia: string | null = null;
 
+    // If the blocked-domain fast path already won, mark autoFixed now that
+    // the flag is in scope. methodLog entry is written separately below so
+    // it appears in the "direct" slot labeled accordingly.
+    if (claudeEarlyPrice !== null && currentPrice === claudeEarlyPrice) {
+      autoFixed = true;
+      fixedVia = "claude_web_search_early";
+    }
+
     // Log the initial direct fetch result
     methodLog.push({
-      method: skipDirectFetch ? "direct (skipped)" : "direct",
+      method: claudeEarlyPrice !== null
+        ? "claude_web_search_early"
+        : (skipDirectFetch ? "direct (skipped)" : "direct"),
       status: fetchSuccess ? "ok" : "failed",
       error: fetchSuccess ? undefined : resultText,
       duration_ms: Date.now() - funcStartTime,
@@ -3308,14 +3390,15 @@ async function claudeWebSearchPrice(
       method: "POST",
       headers: {
         "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2025-01-01",
+        "anthropic-version": "2023-06-01",
+        "anthropic-beta": "web-search-2025-03-05",
         "content-type": "application/json",
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
-        max_tokens: 300,
+        max_tokens: 1024,
         tools: [{
-          type: "web_search",
+          type: "web_search_20250305",
           name: "web_search",
           max_uses: 3,
         }],
@@ -3329,7 +3412,8 @@ async function claudeWebSearchPrice(
     });
 
     if (!response.ok) {
-      console.log(`[claudeWebSearch] API HTTP ${response.status}`);
+      const errBody = await response.text().catch(() => "");
+      console.log(`[claudeWebSearch] API HTTP ${response.status}: ${errBody.substring(0, 500)}`);
       return null;
     }
 
