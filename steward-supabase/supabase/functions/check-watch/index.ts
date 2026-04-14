@@ -2072,6 +2072,22 @@ serve(async (req) => {
       price_confidence: priceConfidence || "none",
     };
 
+    // Persist the most recent observation on every successful check, so
+    // (a) the trending-down comparison at line ~2165 has something to read,
+    // (b) the client can show a quick "last seen at $X" without hitting the
+    //     check_results table, and
+    // (c) we have a denormalized cache for analytics.
+    // Only write when we actually have a valid observation — never overwrite
+    // last_price with null on a failed check.
+    if (!stillFailing) {
+      if (currentPrice !== null) {
+        updateData.last_price = currentPrice;
+      }
+      if (resultText) {
+        updateData.last_result_text = resultText;
+      }
+    }
+
     let actionUrl: string | null = null;
     if (changed) {
       updateData.triggered = true;
