@@ -187,7 +187,7 @@ struct SettingsScreen: View {
         }
         .sheet(isPresented: $showEmailEntry) {
             emailEntrySheet
-                .presentationDetents([.height(340)])
+                .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
     }
@@ -247,7 +247,7 @@ struct SettingsScreen: View {
         }
         .sheet(isPresented: $showPhoneEntry) {
             phoneEntrySheet
-                .presentationDetents([.height(400)])
+                .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
     }
@@ -373,56 +373,57 @@ struct SettingsScreen: View {
 
     private var emailEntrySheet: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 16) {
-                Text("Add your email")
-                    .font(Theme.serif(20, weight: .bold))
-                    .foregroundStyle(Theme.ink)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Add your email")
+                        .font(Theme.serif(20, weight: .bold))
+                        .foregroundStyle(Theme.ink)
 
-                Text("We'll send watch alerts to this email address.")
-                    .font(Theme.body(13))
-                    .foregroundStyle(Theme.inkLight)
+                    Text("We'll send watch alerts to this email address.")
+                        .font(Theme.body(13))
+                        .foregroundStyle(Theme.inkLight)
 
-                TextField("you@example.com", text: $emailInput)
-                    .font(Theme.body(15))
-                    .keyboardType(.emailAddress)
-                    .textContentType(.emailAddress)
-                    .autocorrectionDisabled()
-                    .textInputAutocapitalization(.never)
-                    .padding(14)
-                    .background(Theme.bgDeep)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Theme.border, lineWidth: 1)
-                    )
+                    TextField("you@example.com", text: $emailInput)
+                        .font(Theme.body(15))
+                        .keyboardType(.emailAddress)
+                        .textContentType(.emailAddress)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                        .padding(14)
+                        .background(Theme.bgDeep)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Theme.border, lineWidth: 1)
+                        )
 
-                Button {
-                    let trimmed = emailInput.trimmingCharacters(in: .whitespacesAndNewlines)
-                    Task {
-                        await authManager.saveNotificationEmail(trimmed)
-                        notifyEmail = true
-                        showEmailEntry = false
-                        emailInput = ""
+                    Button {
+                        let trimmed = emailInput.trimmingCharacters(in: .whitespacesAndNewlines)
+                        Task {
+                            await authManager.saveNotificationEmail(trimmed)
+                            notifyEmail = true
+                            showEmailEntry = false
+                            emailInput = ""
+                        }
+                    } label: {
+                        Text("Save & enable email alerts")
+                            .font(Theme.body(14, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(isValidEmail(emailInput) ? Theme.accent : Theme.accent.opacity(0.3))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
                     }
-                } label: {
-                    Text("Save & enable email alerts")
-                        .font(Theme.body(14, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(isValidEmail(emailInput) ? Theme.accent : Theme.accent.opacity(0.3))
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .disabled(!isValidEmail(emailInput))
+
+                    Text("By saving, you agree to receive watch alert emails from Steward. You can turn this off anytime in Settings.")
+                        .font(Theme.body(11))
+                        .foregroundStyle(Theme.inkLight)
+                        .lineSpacing(2)
                 }
-                .disabled(!isValidEmail(emailInput))
-
-                Text("By saving, you agree to receive watch alert emails from Steward. You can turn this off anytime in Settings.")
-                    .font(Theme.body(11))
-                    .foregroundStyle(Theme.inkLight)
-                    .lineSpacing(2)
-
-                Spacer()
+                .padding(24)
             }
-            .padding(24)
+            .scrollDismissesKeyboard(.interactively)
             .background(Theme.bg)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -438,57 +439,58 @@ struct SettingsScreen: View {
 
     private var phoneEntrySheet: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 16) {
-                Text("Add your phone number")
-                    .font(Theme.serif(20, weight: .bold))
-                    .foregroundStyle(Theme.ink)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Add your phone number")
+                        .font(Theme.serif(20, weight: .bold))
+                        .foregroundStyle(Theme.ink)
 
-                Text("We'll send text alerts to this number.")
-                    .font(Theme.body(13))
-                    .foregroundStyle(Theme.inkLight)
+                    Text("We'll send text alerts to this number.")
+                        .font(Theme.body(13))
+                        .foregroundStyle(Theme.inkLight)
 
-                TextField("(555) 123-4567", text: $phoneInput)
-                    .font(Theme.body(15))
-                    .keyboardType(.phonePad)
-                    .textContentType(.telephoneNumber)
-                    .padding(14)
-                    .background(Theme.bgDeep)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Theme.border, lineWidth: 1)
-                    )
+                    TextField("(555) 123-4567", text: $phoneInput)
+                        .font(Theme.body(15))
+                        .keyboardType(.phonePad)
+                        .textContentType(.telephoneNumber)
+                        .padding(14)
+                        .background(Theme.bgDeep)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Theme.border, lineWidth: 1)
+                        )
 
-                Button {
-                    let trimmed = phoneInput.trimmingCharacters(in: .whitespacesAndNewlines)
-                    Task {
-                        // Records phone number + sms_consent_at in a single
-                        // call so we never have a phone-without-consent row.
-                        await authManager.enableSMSAlerts(phone: trimmed)
-                        notifySMS = true
-                        showPhoneEntry = false
-                        phoneInput = ""
+                    Button {
+                        let trimmed = phoneInput.trimmingCharacters(in: .whitespacesAndNewlines)
+                        Task {
+                            // Records phone number + sms_consent_at in a single
+                            // call so we never have a phone-without-consent row.
+                            await authManager.enableSMSAlerts(phone: trimmed)
+                            notifySMS = true
+                            showPhoneEntry = false
+                            phoneInput = ""
+                        }
+                    } label: {
+                        Text("Agree & enable SMS alerts")
+                            .font(Theme.body(14, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(isValidPhone(phoneInput) ? Theme.accent : Theme.accent.opacity(0.3))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
                     }
-                } label: {
-                    Text("Agree & enable SMS alerts")
-                        .font(Theme.body(14, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(isValidPhone(phoneInput) ? Theme.accent : Theme.accent.opacity(0.3))
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .disabled(!isValidPhone(phoneInput))
+
+                    Text("By tapping above, you agree to receive recurring automated price-drop and watch alerts from Steward at this number. Message frequency varies. Msg & data rates may apply. Reply **STOP** to cancel, **HELP** for help. Consent is not a condition of purchase. See our [Privacy Policy](https://www.joinsteward.app/privacy) and [Terms](https://www.apple.com/legal/internet-services/itunes/dev/stdeula/).")
+                        .font(Theme.body(11))
+                        .foregroundStyle(Theme.inkLight)
+                        .tint(Theme.accent)
+                        .lineSpacing(2)
                 }
-                .disabled(!isValidPhone(phoneInput))
-
-                Text("By tapping above, you agree to receive recurring automated price-drop and watch alerts from Steward at this number. Message frequency varies. Msg & data rates may apply. Reply **STOP** to cancel, **HELP** for help. Consent is not a condition of purchase. See our [Privacy Policy](https://www.joinsteward.app/privacy) and [Terms](https://www.apple.com/legal/internet-services/itunes/dev/stdeula/).")
-                    .font(Theme.body(11))
-                    .foregroundStyle(Theme.inkLight)
-                    .tint(Theme.accent)
-                    .lineSpacing(2)
-
-                Spacer()
+                .padding(24)
             }
-            .padding(24)
+            .scrollDismissesKeyboard(.interactively)
             .background(Theme.bg)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
