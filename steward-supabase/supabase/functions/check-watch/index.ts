@@ -1196,7 +1196,14 @@ serve(async (req) => {
     let claudeEarlyPrice: number | null = null;
     let claudeEarlyConfidence: "high" | "medium" | "low" | "none" = "none";
     let claudeEarlyResultText: string | null = null;
-    const isKnownBlockedDomain = serperFallbackDomains.some(d => fetchDomain.includes(d));
+    // Run the fast path for BOTH tiers of known-blocked domains:
+    //   - serperFallbackDomains: rei, coach, nordstrom, etc. (flaky direct)
+    //   - serperPrimaryDomains:  temu, shein, zara, hm        (always blocked)
+    // For serperPrimaryDomains the existing Serper-only fallback still runs
+    // below as a cheaper backup if Claude Web Search fails or is disabled.
+    const isKnownBlockedDomain =
+      serperFallbackDomains.some(d => fetchDomain.includes(d)) ||
+      serperPrimaryDomains.some(d => fetchDomain.includes(d));
     if (
       isKnownBlockedDomain &&
       ANTHROPIC_API_KEY &&
@@ -1223,8 +1230,9 @@ serve(async (req) => {
     }
 
     // ─── Serper-primary domains: skip direct fetch, use Google Shopping API ────
+    // Skipped when the blocked-domain fast path already found a price above.
     let serperPrimaryPrice: number | null = null;
-    if (serperPrimaryDomains.some(d => fetchDomain.includes(d)) && watch.name) {
+    if (serperPrimaryDomains.some(d => fetchDomain.includes(d)) && watch.name && claudeEarlyPrice === null) {
       const SERPER_KEY = Deno.env.get("SERPER_API_KEY") ?? "";
       if (SERPER_KEY) {
         try {
