@@ -1383,6 +1383,11 @@ serve(async (req) => {
     // Skip Scrape.do for domains where it consistently fails (save API credits)
     // and when the blocked-domain fast path already found a price.
     const SCRAPE_DO_KEY = Deno.env.get("SCRAPE_DO_API_KEY") ?? "";
+    // If the first ScrapeDo call returns 401/402/403 (auth failure,
+    // expired subscription, or missing credits) we flip this flag and
+    // skip the second ScrapeDo call site below rather than re-hitting
+    // the same broken upstream and paying the latency again.
+    let scrapeDoAuthFailed = false;
     const skipScrapeDo = serperPrimaryDomains.some(d => fetchDomain.includes(d)) ||
       claudeEarlyPrice !== null;
     if ((!fetchSuccess || pageText === "") && SCRAPE_DO_KEY && timeRemaining() > 12000 && !skipScrapeDo) {
@@ -1398,6 +1403,13 @@ serve(async (req) => {
           fetchSuccess = true;
           methodLog.push({ method: "scrape_do", status: "ok", duration_ms: Date.now() - sdStart });
           console.log(`[check-watch] Scrape.do recovered ${watch.id} (${pageText.length} chars)`);
+        } else if (sdRes.status === 401 || sdRes.status === 402 || sdRes.status === 403) {
+          // Auth / billing failure — don't retry this invocation, and surface
+          // an actionable warning so the operator knows to fix the Scrape.do
+          // subscription or regenerate the API key.
+          scrapeDoAuthFailed = true;
+          console.warn(`[check-watch] Scrape.do auth failure (HTTP ${sdRes.status}) — check SCRAPE_DO_API_KEY / billing at https://scrape.do/dashboard. Skipping remaining Scrape.do calls this invocation.`);
+          methodLog.push({ method: "scrape_do", status: "auth_failed", error: `HTTP ${sdRes.status}`, duration_ms: Date.now() - sdStart });
         } else {
           methodLog.push({ method: "scrape_do", status: "failed", error: `HTTP ${sdRes.status}`, duration_ms: Date.now() - sdStart });
         }
@@ -1417,7 +1429,8 @@ serve(async (req) => {
     // ─── Scrape.do retry for JS-heavy sites where price extraction failed ────────────
     // If we got HTML but couldn't find a price, the page likely renders prices via JavaScript.
     // Scrape.do with render=true executes JS and returns the fully rendered page.
-    if (currentPrice === null && fetchSuccess && pageText.length > 500 && SCRAPE_DO_KEY && timeRemaining() > 12000 && !skipScrapeDo) {
+    // Skipped if the first Scrape.do call already returned an auth failure.
+    if (currentPrice === null && fetchSuccess && pageText.length > 500 && SCRAPE_DO_KEY && timeRemaining() > 12000 && !skipScrapeDo && !scrapeDoAuthFailed) {
       const hasJsFramework = /__NEXT_DATA__|window\.__INITIAL_STATE__|__NUXT__|window\.__APP|react|vue/i.test(pageText.substring(0, 10000));
       const hasNoStructuredPrice = !/<script[^>]*type="application\/ld\+json"/i.test(pageText) && !/property="(?:og|product):price:amount"/i.test(pageText);
 
@@ -1436,6 +1449,10 @@ serve(async (req) => {
             } else {
               console.log(`[check-watch] Scrape.do rendered page but still no price for ${watch.id}`);
             }
+          } else if (sdRes.status === 401 || sdRes.status === 402 || sdRes.status === 403) {
+            // Matches the auth-failure path above — log once, don't retry.
+            scrapeDoAuthFailed = true;
+            console.warn(`[check-watch] Scrape.do auth failure on JS retry (HTTP ${sdRes.status}) — check SCRAPE_DO_API_KEY / billing.`);
           }
         } catch (sdErr: any) {
           console.log(`[check-watch] Scrape.do JS retry failed: ${sdErr.message}`);
