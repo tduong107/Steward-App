@@ -1936,7 +1936,22 @@ serve(async (req) => {
     }
 
     // ─── Fallback 3: Serper Shopping (cross-retailer price lookup) ────────────
-    if (needsFallback && !autoFixed && watch.name && !isDynamicPricingSite) {
+    // Detect when watch.name is essentially just a hostname (e.g. "www.rei.com")
+    // — this happens when the share extension couldn't extract a real product
+    // name from the page (because the page was bot-blocked at share time).
+    // Sending such a name to Serper Shopping produces a meaningless query
+    // ("www.rei.com rei.com") that returns random unrelated products at
+    // arbitrary prices — strictly worse than no result.
+    const watchNameLooksLikeHostname = (() => {
+      const n = (watch.name ?? "").trim().toLowerCase();
+      if (!n) return true;
+      // hostnames have no spaces, end in a TLD-ish suffix, and are short
+      if (n.includes(" ")) return false;
+      if (n.length > 60) return false;
+      return /^(www\.)?[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(n);
+    })();
+
+    if (needsFallback && !autoFixed && watch.name && !isDynamicPricingSite && !watchNameLooksLikeHostname) {
       const serperStart = Date.now();
       try {
         const SERPER_KEY = Deno.env.get("SERPER_API_KEY") ?? "";
@@ -1971,26 +1986,36 @@ serve(async (req) => {
                 }
               } catch { /* skip bad items */ }
             }
-            if (bestPrice !== null) {
+            if (bestPrice !== null && !isCrossDomain) {
+              // Same-domain match: this is the actual product page reached
+              // via Google Shopping rather than direct fetch. Treat as the
+              // canonical price (low confidence — Google Shopping snippets
+              // can lag behind the live page).
               currentPrice = bestPrice;
               resultText = `$${bestPrice.toFixed(2)} (via ${bestSource})`;
+              priceConfidence = "low";
               autoFixed = true;
               fixedVia = "serper_shopping";
               methodLog.push({ method: "serper_shopping", status: "ok", duration_ms: Date.now() - serperStart, price_found: bestPrice });
               console.log(`[check-watch] Serper Shopping found $${bestPrice} via ${bestSource} for ${watch.id}`);
-              if (isCrossDomain && bestUrl) {
-                updateData.alt_source_url = bestUrl;
-                updateData.alt_source_domain = bestSource;
-                updateData.alt_source_price = bestPrice;
-                updateData.alt_source_found_at = new Date().toISOString();
-                console.log(`[check-watch] Saved alt source: ${bestSource} at $${bestPrice}`);
-              }
               const condLower = watch.condition.toLowerCase();
               const priceThresholdMatch = condLower.match(/price\s+(?:drops?\s+)?(?:below|under|less\s+than)\s+\$?([\d,]+\.?\d*)/);
               if (priceThresholdMatch) {
                 const threshold = parseFloat(priceThresholdMatch[1].replace(/,/g, ""));
                 if (bestPrice < threshold) { changed = true; resultText = `Price dropped to $${bestPrice.toFixed(2)} (below $${threshold})`; }
               }
+            } else if (bestPrice !== null && isCrossDomain && bestUrl) {
+              // Cross-domain match: we found this product cheaper at a
+              // different retailer. Save as an alt-source suggestion only —
+              // do NOT contaminate currentPrice/resultText with someone
+              // else's product price. The iOS DetailScreen surfaces this
+              // as "Found at {bestSource} for ${bestPrice} — switch?".
+              updateData.alt_source_url = bestUrl;
+              updateData.alt_source_domain = bestSource;
+              updateData.alt_source_price = bestPrice;
+              updateData.alt_source_found_at = new Date().toISOString();
+              methodLog.push({ method: "serper_shopping", status: "alt_only", duration_ms: Date.now() - serperStart, price_found: bestPrice });
+              console.log(`[check-watch] Serper Shopping cross-domain only — saved alt source ${bestSource} at $${bestPrice}, NOT recording as canonical price`);
             } else {
               methodLog.push({ method: "serper_shopping", status: "no_match", duration_ms: Date.now() - serperStart });
             }
@@ -2077,9 +2102,15 @@ serve(async (req) => {
     // (b) the client can show a quick "last seen at $X" without hitting the
     //     check_results table, and
     // (c) we have a denormalized cache for analytics.
-    // Only write when we actually have a valid observation — never overwrite
-    // last_price with null on a failed check.
-    if (!stillFailing) {
+    //
+    // Only write when:
+    //   - The check didn't fail, AND
+    //   - We actually have a price, AND
+    //   - We have non-zero confidence in that price.
+    // The confidence gate prevents garbage-in-garbage-out from low-quality
+    // fallback paths (e.g. Serper Shopping returning a random product when
+    // it had no useful query terms to work with).
+    if (!stillFailing && priceConfidence !== "none") {
       if (currentPrice !== null) {
         updateData.last_price = currentPrice;
       }
