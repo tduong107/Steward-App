@@ -221,12 +221,21 @@ struct SettingsScreen: View {
                     set: { newValue in
                         if newValue {
                             if hasPhone {
+                                // Re-enable SMS alerts for a user who
+                                // previously turned them off. Re-records
+                                // consent with a fresh timestamp.
                                 notifySMS = true
+                                if let phone = authManager.effectivePhone {
+                                    Task { await authManager.enableSMSAlerts(phone: phone) }
+                                }
                             } else {
                                 showPhoneEntry = true
                             }
                         } else {
                             notifySMS = false
+                            // App-side STOP: clear the consent record so the
+                            // notify-user edge function stops sending SMS.
+                            Task { await authManager.disableSMSAlerts() }
                         }
                     }
                 ))
@@ -453,7 +462,9 @@ struct SettingsScreen: View {
                 Button {
                     let trimmed = phoneInput.trimmingCharacters(in: .whitespacesAndNewlines)
                     Task {
-                        await authManager.savePhoneNumber(trimmed)
+                        // Records phone number + sms_consent_at in a single
+                        // call so we never have a phone-without-consent row.
+                        await authManager.enableSMSAlerts(phone: trimmed)
                         notifySMS = true
                         showPhoneEntry = false
                         phoneInput = ""
@@ -469,7 +480,7 @@ struct SettingsScreen: View {
                 }
                 .disabled(!isValidPhone(phoneInput))
 
-                Text("By enabling, you consent to receive automated SMS watch alerts from Steward at this number. Msg frequency varies. Msg & data rates may apply. Reply STOP to opt out. See our [Privacy Policy](https://www.joinsteward.app/privacy) and [Terms](https://www.apple.com/legal/internet-services/itunes/dev/stdeula/).")
+                Text("By tapping above, you agree to receive recurring automated price-drop and watch alerts from Steward at this number. Message frequency varies. Msg & data rates may apply. Reply **STOP** to cancel, **HELP** for help. Consent is not a condition of purchase. See our [Privacy Policy](https://www.joinsteward.app/privacy) and [Terms](https://www.apple.com/legal/internet-services/itunes/dev/stdeula/).")
                     .font(Theme.body(11))
                     .foregroundStyle(Theme.inkLight)
                     .tint(Theme.accent)

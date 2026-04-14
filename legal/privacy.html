@@ -113,19 +113,21 @@
   <div class="container">
     <div class="logo">Steward</div>
     <h1>Privacy Policy</h1>
-    <p class="effective">Effective date: March 6, 2026</p>
+    <p class="effective">Effective date: April 13, 2026</p>
 
     <p>Steward ("we", "our", or "the app") is a mobile application that helps you monitor websites for changes like price drops, restocks, and availability. This Privacy Policy explains what data we collect, how we use it, and your rights.</p>
 
     <h2>1. Data We Collect</h2>
 
     <h3>Account information</h3>
-    <p>When you sign in with Apple, we receive:</p>
+    <p>When you create an account, we receive:</p>
     <ul>
-      <li><strong>Display name</strong> (first and last name) &mdash; only if you choose to share it during Apple Sign In. Stored on our servers to personalize your experience.</li>
-      <li><strong>Email address</strong> &mdash; provided by Apple (may be a private relay address). Used for account identification only.</li>
+      <li><strong>Display name</strong> (first and last name) &mdash; only if you choose to share it. Stored on our servers to personalize your experience.</li>
+      <li><strong>Phone number</strong> &mdash; if you sign up with phone + password, we store your number to authenticate you and, with your opt-in, to send SMS alerts when your watches trigger. See Section 4 (SMS / Text Messaging) below.</li>
+      <li><strong>Email address</strong> &mdash; if you sign in with Apple, provided by Apple (may be a private relay address) and used only for account identification.</li>
+      <li><strong>SMS consent record</strong> &mdash; the timestamp and exact disclosure text you agreed to when opting into SMS alerts. Kept as an audit trail for carrier compliance.</li>
     </ul>
-    <p>We do not store your Apple ID password or credentials. Authentication is handled securely through Apple's Sign In with Apple service.</p>
+    <p>We do not store your passwords in the clear. Authentication is handled by Supabase Auth (phone + password) or Sign In with Apple.</p>
 
     <h3>Watch data</h3>
     <p>When you create a watch, we store:</p>
@@ -176,22 +178,52 @@
     <h3>Serper (product search)</h3>
     <p>When you share a product screenshot in chat, a search query may be sent to <a href="https://serper.dev" target="_blank">Serper.dev</a> to find matching product listings. Only the product search query is sent &mdash; no personal information.</p>
 
-    <h3>Apple (authentication &amp; payments)</h3>
-    <p>Sign In with Apple handles authentication. All subscription payments are processed entirely by Apple through the App Store. We never receive or store your payment information.</p>
+    <h3>Apple &amp; Google (authentication)</h3>
+    <p>Sign In with Apple and Google Sign-In handle authentication when you choose those options. Your Apple ID / Google credentials are never shared with us.</p>
 
-    <h2>4. Data We Do NOT Collect</h2>
+    <h3>Payments (Apple In-App Purchase &amp; Stripe)</h3>
+    <p>Subscriptions purchased from the iOS app are processed entirely by Apple through the App Store. Subscriptions purchased from the web app (joinsteward.app) are processed by <a href="https://stripe.com" target="_blank">Stripe</a>. In both cases we never receive or store your full card details &mdash; we only receive a transaction identifier, subscription status, and the last four digits of the card (Stripe only) for billing support.</p>
+
+    <h3>Twilio (SMS delivery)</h3>
+    <p>If you opt in to SMS alerts, we transmit your phone number and the text of each message to <a href="https://www.twilio.com" target="_blank">Twilio</a> solely so they can deliver the message to your wireless carrier. Twilio is a processor; we do not use Twilio for marketing, profiling, or any purpose other than message delivery.</p>
+
+    <h3>Product analytics (web)</h3>
+    <p>The web app (joinsteward.app) uses <a href="https://posthog.com" target="_blank">PostHog</a> and <a href="https://vercel.com/analytics" target="_blank">Vercel Analytics</a> to measure aggregate product usage &mdash; page views, clicks, and conversion funnels &mdash; so we can improve the app. These tools may record your user ID, coarse geolocation (country/region), and device type. We do not use them for advertising, cross-site tracking, or selling data to third parties. The iOS app does not use these tools.</p>
+
+    <h2>4. SMS / Text Messaging</h2>
+    <p>If you sign up with your phone number and affirmatively opt in at the point of signup, Steward may send you recurring automated text messages to the number you provided.</p>
+
+    <h3>Types of messages you'll receive</h3>
     <ul>
-      <li>We do not collect payment or credit card information</li>
-      <li>We do not use analytics SDKs or third-party tracking tools</li>
+      <li><strong>Transactional</strong> &mdash; one-time verification codes (OTP) and password-reset codes. These are required to use the service and cannot be opted out of.</li>
+      <li><strong>Alerts</strong> &mdash; price-drop, restock, and watch-triggered notifications based on the watches you create. These require your explicit opt-in and can be stopped at any time.</li>
+    </ul>
+
+    <h3>Opt-in</h3>
+    <p>You opt in to alert messages by checking the SMS consent box on the signup screen. Consent is <strong>not a condition of purchase</strong> or of using Steward &mdash; you can use Apple or Google sign-in and the in-app / push notification channels instead. We record the timestamp and the exact disclosure text you agreed to as an audit trail.</p>
+
+    <h3>Frequency &amp; cost</h3>
+    <p>Message frequency varies based on how many watches you've created and how often their conditions are met. Message and data rates may apply from your wireless carrier. Steward does not charge you for SMS.</p>
+
+    <h3>Opt-out and help</h3>
+    <p>You can opt out of alert messages at any time by replying <strong>STOP</strong> to any Steward text message, or by turning off SMS alerts in the app's Settings screen. For help, reply <strong>HELP</strong> or email <a href="mailto:hello@joinsteward.app">hello@joinsteward.app</a>. After you reply STOP you will receive one confirmation message and no further alerts. You may re-opt-in at any time by re-enabling SMS alerts in Settings.</p>
+
+    <h3>Sharing of SMS data</h3>
+    <p><strong>No mobile information will be shared with third parties or affiliates for marketing or promotional purposes. All categories of personal information exclude text messaging originator opt-in data and consent; this information will not be shared with any third parties or affiliates.</strong> Phone numbers and the content of alert messages are transmitted only to our SMS delivery provider (Twilio) solely to deliver the message to your carrier.</p>
+
+    <h2>5. Data We Do NOT Collect</h2>
+    <ul>
+      <li>We do not store full credit card numbers &mdash; payments are handled entirely by Apple or Stripe</li>
       <li>We do not serve advertisements</li>
       <li>We do not sell, rent, or share your personal data with third parties for marketing</li>
       <li>We do not track you across other apps or websites</li>
+      <li>We do not use advertising SDKs, ad networks, or third-party ad trackers</li>
     </ul>
 
-    <h2>5. Data Retention</h2>
+    <h2>6. Data Retention</h2>
     <p>Your data is retained as long as your account is active. Watch check results are kept to power price history and insights. If you delete your account, all associated data (profile, watches, activities, and check results) will be permanently removed from our servers within 30 days.</p>
 
-    <h2>6. Data Security</h2>
+    <h2>7. Data Security</h2>
     <p>We protect your data using:</p>
     <ul>
       <li>HTTPS encryption for all data in transit</li>
@@ -200,7 +232,7 @@
       <li>Rate limiting on all server endpoints to prevent abuse</li>
     </ul>
 
-    <h2>7. Your Rights</h2>
+    <h2>8. Your Rights</h2>
     <p>You have the right to:</p>
     <ul>
       <li><strong>Access</strong> your data &mdash; all your watches, activity, and profile are visible in the app</li>
@@ -209,16 +241,16 @@
       <li><strong>Revoke Apple Sign In</strong> &mdash; go to Settings &rarr; Apple ID &rarr; Sign-In &amp; Security &rarr; Sign in with Apple to stop using your Apple ID with Steward</li>
     </ul>
 
-    <h2>8. Children's Privacy</h2>
+    <h2>9. Children's Privacy</h2>
     <p>Steward is not intended for children under 13. We do not knowingly collect personal information from children. If you believe a child has provided us with personal data, please contact us and we will promptly delete it.</p>
 
-    <h2>9. Changes to This Policy</h2>
+    <h2>10. Changes to This Policy</h2>
     <p>We may update this Privacy Policy from time to time. If we make material changes, we will notify you through the app or by updating the effective date at the top of this page. Your continued use of Steward after changes constitutes acceptance of the updated policy.</p>
 
-    <h2>10. Contact Us</h2>
+    <h2>11. Contact Us</h2>
     <p>If you have questions about this Privacy Policy or want to request data deletion, contact us at:</p>
     <div class="card">
-      <p><strong>Email:</strong> <a href="mailto:support@steward.app">support@steward.app</a></p>
+      <p><strong>Email:</strong> <a href="mailto:hello@joinsteward.app">hello@joinsteward.app</a></p>
     </div>
 
     <div class="footer">

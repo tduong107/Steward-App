@@ -26,6 +26,7 @@ struct AuthScreen: View {
     @State private var showForgotPassword = false
     @State private var forgotPasswordStep: ForgotStep = .enterPhone
     @State private var isSubmitting = false
+    @State private var smsConsent = false
 
     enum AuthMode: String {
         case signIn = "Sign In"
@@ -143,6 +144,13 @@ struct AuthScreen: View {
                         .font(.system(size: 12, weight: .medium)).foregroundStyle(mint.opacity(0.6))
                 }
                 .frame(maxWidth: .infinity, alignment: .trailing).padding(.top, -8)
+            }
+
+            // SMS consent (TCPA / A2P 10DLC) — required affirmative opt-in
+            // before we send any marketing / price-drop alerts to this number.
+            if authMode == .signUp {
+                smsConsentRow
+                    .transition(.opacity.combined(with: .move(edge: .top)))
             }
 
             // Error
@@ -320,6 +328,34 @@ struct AuthScreen: View {
         }
     }
 
+    private var smsConsentRow: some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.15)) { smsConsent.toggle() }
+        } label: {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: smsConsent ? "checkmark.square.fill" : "square")
+                    .font(.system(size: 16, weight: .regular))
+                    .foregroundStyle(smsConsent ? mint : mint.opacity(0.4))
+                    .frame(width: 18, height: 18)
+                    .padding(.top, 1)
+
+                (
+                    Text("I agree to receive recurring automated price-drop and watch alerts from Steward at the number above. Message frequency varies. Msg & data rates may apply. Reply ")
+                    + Text("STOP").fontWeight(.semibold).foregroundColor(.white.opacity(0.85))
+                    + Text(" to cancel, ")
+                    + Text("HELP").fontWeight(.semibold).foregroundColor(.white.opacity(0.85))
+                    + Text(" for help. Consent is not a condition of purchase.")
+                )
+                .font(.system(size: 11))
+                .foregroundStyle(mint.opacity(0.55))
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .buttonStyle(.plain)
+    }
+
     private var termsView: some View {
         VStack(spacing: 4) {
             Text(authMode == .signUp ? "By creating an account, you agree to our" : "By signing in, you agree to our")
@@ -360,7 +396,12 @@ struct AuthScreen: View {
 
     private var isFormValid: Bool {
         let phoneValid = normalizedPhone.count >= 10
-        if authMode == .signUp { return phoneValid && !fullName.trimmingCharacters(in: .whitespaces).isEmpty && password.count >= 6 }
+        if authMode == .signUp {
+            return phoneValid
+                && !fullName.trimmingCharacters(in: .whitespaces).isEmpty
+                && password.count >= 6
+                && smsConsent
+        }
         return phoneValid && password.count >= 6
     }
 
@@ -384,7 +425,7 @@ struct AuthScreen: View {
         isSubmitting = true; authManager.errorMessage = nil
         do {
             if authMode == .signUp {
-                try await authManager.signUp(phone: normalizedPhone, password: password, name: fullName.trimmingCharacters(in: .whitespaces))
+                try await authManager.signUp(phone: normalizedPhone, password: password, name: fullName.trimmingCharacters(in: .whitespaces), smsConsent: smsConsent)
                 if !authManager.isAuthenticated { withAnimation(.spring(response: 0.3)) { showOTPStep = true } }
             } else {
                 try await authManager.signIn(phone: normalizedPhone, password: password)
@@ -402,7 +443,7 @@ struct AuthScreen: View {
 
     private func handleResendOTP() async {
         isSubmitting = true; authManager.errorMessage = nil
-        do { try await authManager.signUp(phone: normalizedPhone, password: password, name: fullName.trimmingCharacters(in: .whitespaces)) }
+        do { try await authManager.signUp(phone: normalizedPhone, password: password, name: fullName.trimmingCharacters(in: .whitespaces), smsConsent: smsConsent) }
         catch { authManager.errorMessage = friendlyError(error) }
         isSubmitting = false
     }

@@ -240,8 +240,10 @@ async function sendSMSNotification(
     return { sent: false, error: "Twilio not configured" };
   }
 
-  // Build concise SMS message (160 char limit for single segment)
-  let message = `${watchEmoji} ${watchName}: ${changeNote}`;
+  // Build concise SMS message. The "Steward:" brand prefix is required for
+  // A2P 10DLC (carriers look for it on every message), and "Reply STOP to
+  // opt out" is required by CTIA on every marketing / informational message.
+  let message = `Steward: ${watchEmoji} ${watchName}: ${changeNote}`;
   if (actionUrl) {
     message += `\n${actionUrl}`;
   }
@@ -384,10 +386,13 @@ serve(async (req) => {
       });
     }
 
-    // Get the user's device token and phone number
+    // Get the user's device token, phone number, and SMS consent record.
+    // `sms_consent_at` is the single source of truth for whether we are
+    // allowed to send SMS alerts to this user (TCPA / A2P 10DLC). NULL means
+    // no opt-in on file and we MUST NOT send alert SMS to that number.
     const { data: profile } = await supabase
       .from("profiles")
-      .select("device_token, display_name, phone_number")
+      .select("device_token, display_name, phone_number, sms_consent_at")
       .eq("id", user_id)
       .single();
 
@@ -552,16 +557,24 @@ serve(async (req) => {
       }
     }
 
-    // ─── SMS Notification (Twilio) — skip for needs_attention ──
+    // ─── SMS Notification (Twilio) ──────────────────────────────
+    // Gating rules (do not relax without legal review):
+    //   1. User must have a phone number on file.
+    //   2. User must have an affirmative SMS consent record
+    //      (profile.sms_consent_at != NULL). This proves TCPA / A2P 10DLC
+    //      opt-in. Users who replied STOP or toggled SMS off in-app will
+    //      have this column cleared to NULL.
+    //   3. The watch must have "sms" in its notify_channels.
     if (notifyChannels.includes("sms")) {
       if (!profile?.phone_number) {
         console.log(`[notify-user] No phone number for user ${user_id}`);
         results.sms = { sent: false, reason: "No phone number" };
+      } else if (!profile?.sms_consent_at) {
+        console.log(
+          `[notify-user] SMS blocked for user ${user_id}: no sms_consent_at on file (opted out or never opted in)`
+        );
+        results.sms = { sent: false, reason: "No SMS consent on file" };
       } else {
-        // For needs_attention, customize the SMS content
-        const smsBody = isNeedsAttention
-          ? `${watchEmoji} ${watchName} needs attention. ${changeNote} Open Steward to fix it.`
-          : undefined; // Default content
         results.sms = await sendSMSNotification(
           profile.phone_number,
           watchEmoji,

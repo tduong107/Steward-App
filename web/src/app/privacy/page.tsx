@@ -45,7 +45,7 @@ export default function PrivacyPolicyPage() {
             Privacy Policy
           </h1>
           <p className="text-sm text-[var(--color-ink-light)]">
-            Effective date: March 6, 2026
+            Effective date: April 13, 2026
           </p>
         </header>
 
@@ -62,14 +62,16 @@ export default function PrivacyPolicyPage() {
 
             <h3 className="text-base font-semibold text-[var(--color-ink)] mt-6 mb-2">Account information</h3>
             <p className="text-[var(--color-ink-mid)] leading-relaxed mb-3">
-              When you sign in with Apple or email, we receive:
+              When you create an account, we receive:
             </p>
             <ul className="list-disc pl-6 space-y-2 text-[var(--color-ink-mid)]">
               <li><strong className="text-[var(--color-ink)]">Display name</strong> (first and last name) &mdash; only if you choose to share it. Stored on our servers to personalize your experience.</li>
-              <li><strong className="text-[var(--color-ink)]">Email address</strong> &mdash; used for account identification only.</li>
+              <li><strong className="text-[var(--color-ink)]">Phone number</strong> &mdash; if you sign up with phone + password, we store your number to authenticate you and, with your opt-in, to send you SMS alerts when your watches trigger. See Section 4 (SMS / Text Messaging) below.</li>
+              <li><strong className="text-[var(--color-ink)]">Email address</strong> &mdash; if you sign in with Apple or Google, provided by the identity provider and used only for account identification.</li>
+              <li><strong className="text-[var(--color-ink)]">SMS consent record</strong> &mdash; the timestamp and disclosure text you agreed to when opting into SMS alerts. Kept as an audit trail for carrier compliance.</li>
             </ul>
             <p className="text-[var(--color-ink-mid)] leading-relaxed mt-3">
-              We do not store your passwords or credentials directly. Authentication is handled securely through Apple&apos;s Sign In with Apple service or Supabase Auth.
+              We do not store your passwords in the clear. Authentication is handled by Supabase Auth (phone + password), Sign In with Apple, or Google Sign-In.
             </p>
 
             <h3 className="text-base font-semibold text-[var(--color-ink)] mt-6 mb-2">Watch data</h3>
@@ -177,40 +179,118 @@ export default function PrivacyPolicyPage() {
               to find matching product listings. Only the product search query is sent &mdash; no personal information.
             </p>
 
-            <h3 className="text-base font-semibold text-[var(--color-ink)] mt-6 mb-2">Apple (authentication & payments)</h3>
+            <h3 className="text-base font-semibold text-[var(--color-ink)] mt-6 mb-2">Apple &amp; Google (authentication)</h3>
             <p className="text-[var(--color-ink-mid)] leading-relaxed">
-              Sign In with Apple handles authentication. All subscription payments are processed entirely by Apple through the App Store. We never receive or store your payment information.
+              Sign In with Apple and Google Sign-In handle authentication when you choose those options. Your Apple ID / Google credentials are never shared with us.
+            </p>
+
+            <h3 className="text-base font-semibold text-[var(--color-ink)] mt-6 mb-2">Payments (Apple In-App Purchase &amp; Stripe)</h3>
+            <p className="text-[var(--color-ink-mid)] leading-relaxed">
+              Subscriptions purchased from the iOS app are processed entirely by Apple through the App Store. Subscriptions purchased from the web app (joinsteward.app) are processed by{' '}
+              <a href="https://stripe.com" target="_blank" rel="noopener noreferrer" className="text-[var(--color-accent)] hover:underline">Stripe</a>. In both cases we never receive or store your full card details &mdash; we only receive a transaction identifier, subscription status, and the last four digits of the card (Stripe only) for billing support.
+            </p>
+
+            <h3 className="text-base font-semibold text-[var(--color-ink)] mt-6 mb-2">Twilio (SMS delivery)</h3>
+            <p className="text-[var(--color-ink-mid)] leading-relaxed">
+              If you opt in to SMS alerts, we transmit your phone number and the text of each message to{' '}
+              <a href="https://www.twilio.com" target="_blank" rel="noopener noreferrer" className="text-[var(--color-accent)] hover:underline">Twilio</a>{' '}
+              solely so they can deliver the message to your wireless carrier. Twilio is a processor; we do not use Twilio for marketing, profiling, or any purpose other than message delivery.
+            </p>
+
+            <h3 className="text-base font-semibold text-[var(--color-ink)] mt-6 mb-2">Product analytics (web)</h3>
+            <p className="text-[var(--color-ink-mid)] leading-relaxed">
+              The web app (joinsteward.app) uses{' '}
+              <a href="https://posthog.com" target="_blank" rel="noopener noreferrer" className="text-[var(--color-accent)] hover:underline">PostHog</a>{' '}and{' '}
+              <a href="https://vercel.com/analytics" target="_blank" rel="noopener noreferrer" className="text-[var(--color-accent)] hover:underline">Vercel Analytics</a>{' '}
+              to measure aggregate product usage &mdash; page views, clicks, and conversion funnels &mdash; so we can improve the app. These tools may record your user ID, coarse geolocation (country/region), and device type. We do not use them for advertising, cross-site tracking, or selling data to third parties. The iOS app does not use these tools.
             </p>
           </section>
 
           {/* Section 4 */}
           <section>
             <h2 className="text-xl font-bold font-[var(--font-serif)] text-[var(--color-ink)] mb-4">
-              4. Data We Do NOT Collect
+              4. SMS / Text Messaging
             </h2>
+            <p className="text-[var(--color-ink-mid)] leading-relaxed mb-3">
+              If you sign up with your phone number and affirmatively opt in at
+              the point of signup, Steward may send you recurring automated
+              text messages to the number you provided.
+            </p>
+
+            <h3 className="text-base font-semibold text-[var(--color-ink)] mt-6 mb-2">Types of messages you&apos;ll receive</h3>
             <ul className="list-disc pl-6 space-y-2 text-[var(--color-ink-mid)]">
-              <li>We do not collect payment or credit card information</li>
-              <li>We do not use analytics SDKs or third-party tracking tools</li>
-              <li>We do not serve advertisements</li>
-              <li>We do not sell, rent, or share your personal data with third parties for marketing</li>
-              <li>We do not track you across other apps or websites</li>
+              <li><strong className="text-[var(--color-ink)]">Transactional</strong> &mdash; one-time verification codes (OTP) and password-reset codes. These are required to use the service and cannot be opted out of.</li>
+              <li><strong className="text-[var(--color-ink)]">Alerts</strong> &mdash; price-drop, restock, and watch-triggered notifications based on the watches you create. These require your explicit opt-in and can be stopped at any time.</li>
             </ul>
+
+            <h3 className="text-base font-semibold text-[var(--color-ink)] mt-6 mb-2">Opt-in</h3>
+            <p className="text-[var(--color-ink-mid)] leading-relaxed">
+              You opt in to alert messages by checking the SMS consent box on
+              the signup screen. Consent is <strong className="text-[var(--color-ink)]">not a condition of purchase</strong> or of using Steward &mdash; you can use Apple or Google sign-in and the in-app / push notification channels instead.
+              We record the timestamp and the exact disclosure text you
+              agreed to as an audit trail.
+            </p>
+
+            <h3 className="text-base font-semibold text-[var(--color-ink)] mt-6 mb-2">Frequency &amp; cost</h3>
+            <p className="text-[var(--color-ink-mid)] leading-relaxed">
+              Message frequency varies based on how many watches you&apos;ve
+              created and how often their conditions are met. Message and
+              data rates may apply from your wireless carrier. Steward does
+              not charge you for SMS.
+            </p>
+
+            <h3 className="text-base font-semibold text-[var(--color-ink)] mt-6 mb-2">Opt-out and help</h3>
+            <p className="text-[var(--color-ink-mid)] leading-relaxed">
+              You can opt out of alert messages at any time by replying{' '}
+              <strong className="text-[var(--color-ink)]">STOP</strong> to any Steward text message, or by turning off SMS alerts in the app&apos;s Settings screen. For help, reply{' '}
+              <strong className="text-[var(--color-ink)]">HELP</strong> or email{' '}
+              <a href="mailto:hello@joinsteward.app" className="text-[var(--color-accent)] hover:underline">hello@joinsteward.app</a>.
+              After you reply STOP you will receive one confirmation message and no further alerts. You may re-opt-in at any time by re-enabling SMS alerts in Settings.
+            </p>
+
+            <h3 className="text-base font-semibold text-[var(--color-ink)] mt-6 mb-2">Sharing of SMS data</h3>
+            <p className="text-[var(--color-ink-mid)] leading-relaxed">
+              <strong className="text-[var(--color-ink)]">
+                No mobile information will be shared with third parties or
+                affiliates for marketing or promotional purposes. All
+                categories of personal information exclude text messaging
+                originator opt-in data and consent; this information will
+                not be shared with any third parties or affiliates.
+              </strong>{' '}
+              Phone numbers and the content of alert messages are transmitted
+              only to our SMS delivery provider (Twilio) solely to deliver
+              the message to your carrier.
+            </p>
           </section>
 
           {/* Section 5 */}
           <section>
             <h2 className="text-xl font-bold font-[var(--font-serif)] text-[var(--color-ink)] mb-4">
-              5. Data Retention
+              5. Data We Do NOT Collect
+            </h2>
+            <ul className="list-disc pl-6 space-y-2 text-[var(--color-ink-mid)]">
+              <li>We do not store full credit card numbers &mdash; payments are handled entirely by Apple or Stripe</li>
+              <li>We do not serve advertisements</li>
+              <li>We do not sell, rent, or share your personal data with third parties for marketing</li>
+              <li>We do not track you across other apps or websites</li>
+              <li>We do not use advertising SDKs, ad networks, or third-party ad trackers</li>
+            </ul>
+          </section>
+
+          {/* Section 6 */}
+          <section>
+            <h2 className="text-xl font-bold font-[var(--font-serif)] text-[var(--color-ink)] mb-4">
+              6. Data Retention
             </h2>
             <p className="text-[var(--color-ink-mid)] leading-relaxed">
               Your data is retained as long as your account is active. Watch check results are kept to power price history and insights. If you delete your account, all associated data (profile, watches, activities, and check results) will be permanently removed from our servers within 30 days.
             </p>
           </section>
 
-          {/* Section 6 */}
+          {/* Section 7 */}
           <section>
             <h2 className="text-xl font-bold font-[var(--font-serif)] text-[var(--color-ink)] mb-4">
-              6. Data Security
+              7. Data Security
             </h2>
             <p className="text-[var(--color-ink-mid)] leading-relaxed mb-3">
               We protect your data using:
@@ -223,10 +303,10 @@ export default function PrivacyPolicyPage() {
             </ul>
           </section>
 
-          {/* Section 7 */}
+          {/* Section 8 */}
           <section>
             <h2 className="text-xl font-bold font-[var(--font-serif)] text-[var(--color-ink)] mb-4">
-              7. Your Rights
+              8. Your Rights
             </h2>
             <p className="text-[var(--color-ink-mid)] leading-relaxed mb-3">
               You have the right to:
@@ -239,30 +319,30 @@ export default function PrivacyPolicyPage() {
             </ul>
           </section>
 
-          {/* Section 8 */}
+          {/* Section 9 */}
           <section>
             <h2 className="text-xl font-bold font-[var(--font-serif)] text-[var(--color-ink)] mb-4">
-              8. Children&apos;s Privacy
+              9. Children&apos;s Privacy
             </h2>
             <p className="text-[var(--color-ink-mid)] leading-relaxed">
               Steward is not intended for children under 13. We do not knowingly collect personal information from children. If you believe a child has provided us with personal data, please contact us and we will promptly delete it.
             </p>
           </section>
 
-          {/* Section 9 */}
+          {/* Section 10 */}
           <section>
             <h2 className="text-xl font-bold font-[var(--font-serif)] text-[var(--color-ink)] mb-4">
-              9. Changes to This Policy
+              10. Changes to This Policy
             </h2>
             <p className="text-[var(--color-ink-mid)] leading-relaxed">
               We may update this Privacy Policy from time to time. If we make material changes, we will notify you through the app or by updating the effective date at the top of this page. Your continued use of Steward after changes constitutes acceptance of the updated policy.
             </p>
           </section>
 
-          {/* Section 10 */}
+          {/* Section 11 */}
           <section>
             <h2 className="text-xl font-bold font-[var(--font-serif)] text-[var(--color-ink)] mb-4">
-              10. Contact Us
+              11. Contact Us
             </h2>
             <p className="text-[var(--color-ink-mid)] leading-relaxed mb-4">
               If you have questions about this Privacy Policy or want to request data deletion, contact us at:

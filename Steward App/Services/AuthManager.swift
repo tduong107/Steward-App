@@ -81,9 +81,19 @@ final class AuthManager {
         return digits.hasPrefix("+") && digits.count >= 11 && digits.count <= 16
     }
 
+    /// Exact disclosure text shown to users above the SMS consent toggle.
+    /// Kept in sync with the copy rendered in AuthScreen so we can record
+    /// exactly what the user agreed to as an audit trail for TCPA / A2P 10DLC.
+    static let smsConsentDisclosure =
+        "I agree to receive recurring automated price-drop and watch alerts from Steward at the phone number provided. Message frequency varies. Msg & data rates may apply. Reply STOP to cancel, HELP for help. Consent is not a condition of purchase."
+
     /// Creates a new account with phone number and password.
     /// After sign-up, an OTP code is sent to the phone for verification.
-    func signUp(phone: String, password: String, name: String) async throws {
+    ///
+    /// - Parameter smsConsent: User must have affirmatively checked the SMS
+    ///   consent disclosure shown at signup. This call refuses to proceed
+    ///   without it to keep us inside TCPA / A2P 10DLC compliance.
+    func signUp(phone: String, password: String, name: String, smsConsent: Bool) async throws {
         errorMessage = nil
 
         guard isValidPhone(phone) else {
@@ -96,9 +106,23 @@ final class AuthManager {
             return
         }
 
+        guard smsConsent else {
+            errorMessage = "Please agree to receive SMS alerts to continue"
+            return
+        }
+
+        let consentTimestamp = ISO8601DateFormatter().string(from: Date())
+
         let response = try await SupabaseConfig.client.auth.signUp(
             phone: phone,
-            password: password
+            password: password,
+            data: [
+                "display_name": .string(name),
+                "phone_number": .string(phone),
+                "sms_alerts": .bool(true),
+                "sms_consent_at": .string(consentTimestamp),
+                "sms_consent_text": .string(Self.smsConsentDisclosure),
+            ]
         )
 
         // If we got a session immediately (auto-confirm enabled), finalize
@@ -109,10 +133,11 @@ final class AuthManager {
             AnalyticsService.shared.identify(userId: session.user.id, properties: ["phone": phone, "name": name])
             AnalyticsService.shared.trackSignUp(method: "phone_password")
 
-            // Save profile data
-            await saveProfile(userId: session.user.id, name: name, phone: phone)
+            // Save profile data (including consent timestamp)
+            await saveProfile(userId: session.user.id, name: name, phone: phone, smsConsentAt: consentTimestamp)
         }
-        // Otherwise, user needs to verify OTP first
+        // Otherwise, user needs to verify OTP first — consent metadata is
+        // already attached to the auth user via the `data:` argument above.
     }
 
     // MARK: - Phone OTP Verification
@@ -137,8 +162,18 @@ final class AuthManager {
         AnalyticsService.shared.identify(userId: session.user.id, properties: ["phone": phone, "name": name])
         AnalyticsService.shared.trackSignUp(method: "phone_otp")
 
+        // Pull the SMS consent timestamp off the auth user metadata if the
+        // signUp call attached it (signUp path → verifyOTP path). This carries
+        // the audit trail from the checkbox click through to the profiles row.
+        let consentAt: String?
+        if case let .string(value) = session.user.userMetadata["sms_consent_at"] {
+            consentAt = value
+        } else {
+            consentAt = nil
+        }
+
         // Save profile data after verification
-        await saveProfile(userId: session.user.id, name: name, phone: phone)
+        await saveProfile(userId: session.user.id, name: name, phone: phone, smsConsentAt: consentAt)
     }
 
     // MARK: - Phone + Password Sign In
@@ -334,18 +369,42 @@ final class AuthManager {
     }
 
     /// Saves or updates the user's profile with name and phone number
-    private func saveProfile(userId: UUID, name: String, phone: String) async {
+    private func saveProfile(userId: UUID, name: String, phone: String, smsConsentAt: String? = nil) async {
         self.displayName = name
         self.phoneNumber = phone
 
-        _ = try? await SupabaseConfig.client
-            .from("profiles")
-            .upsert([
-                "id": userId.uuidString,
-                "display_name": name,
-                "phone_number": phone
-            ])
-            .execute()
+        // Build the upsert payload. `sms_consent_at` column may not yet exist
+        // in every environment, so we try the full payload first and fall back
+        // to the legacy shape on failure rather than blocking signup.
+        var payload: [String: String] = [
+            "id": userId.uuidString,
+            "display_name": name,
+            "phone_number": phone,
+        ]
+        if let smsConsentAt {
+            payload["sms_consent_at"] = smsConsentAt
+        }
+
+        do {
+            _ = try await SupabaseConfig.client
+                .from("profiles")
+                .upsert(payload)
+                .execute()
+        } catch {
+            // Fallback: retry without the consent column if the DB schema
+            // hasn't been migrated yet. The consent record is still safely
+            // attached to the Supabase auth user metadata in that case.
+            if smsConsentAt != nil {
+                _ = try? await SupabaseConfig.client
+                    .from("profiles")
+                    .upsert([
+                        "id": userId.uuidString,
+                        "display_name": name,
+                        "phone_number": phone,
+                    ])
+                    .execute()
+            }
+        }
     }
 
     // MARK: - Notification Contact Methods
@@ -376,6 +435,60 @@ final class AuthManager {
         _ = try? await SupabaseConfig.client
             .from("profiles")
             .update(["phone_number": phone])
+            .eq("id", value: userId.uuidString)
+            .execute()
+    }
+
+    /// Records an affirmative SMS opt-in and saves the phone number in a
+    /// single transaction. Use this whenever a user agrees to receive SMS
+    /// alerts from the app (e.g. the Settings "Agree & enable SMS alerts"
+    /// button, or an onboarding phone-entry sheet). The disclosure text
+    /// the user agreed to is also attached to the auth user metadata as an
+    /// audit trail for TCPA / A2P 10DLC compliance.
+    func enableSMSAlerts(phone: String) async {
+        guard let userId = currentUserId else { return }
+
+        let consentTimestamp = ISO8601DateFormatter().string(from: Date())
+        self.phoneNumber = phone
+
+        _ = try? await SupabaseConfig.client
+            .from("profiles")
+            .update([
+                "phone_number": phone,
+                "sms_consent_at": consentTimestamp,
+            ])
+            .eq("id", value: userId.uuidString)
+            .execute()
+
+        // Also persist the exact disclosure text the user agreed to on the
+        // auth user metadata so we have two independent audit trails.
+        _ = try? await SupabaseConfig.client.auth.update(
+            user: UserAttributes(
+                data: [
+                    "sms_consent_at": .string(consentTimestamp),
+                    "sms_consent_text": .string(Self.smsConsentDisclosure),
+                ]
+            )
+        )
+    }
+
+    /// Revokes SMS consent (app-side STOP). Clears `sms_consent_at` so the
+    /// notify-user edge function will stop sending SMS alerts to this user
+    /// on its next run. Does not delete the phone number itself — the user
+    /// can re-enable SMS alerts later.
+    func disableSMSAlerts() async {
+        guard let userId = currentUserId else { return }
+
+        // Use a dedicated Encodable so we can emit an explicit SQL NULL for
+        // sms_consent_at (PostgREST encodes `nil` in an optional property as
+        // a JSON null, which is then written as SQL NULL).
+        struct ConsentRevocation: Encodable {
+            let sms_consent_at: String?
+        }
+
+        _ = try? await SupabaseConfig.client
+            .from("profiles")
+            .update(ConsentRevocation(sms_consent_at: nil))
             .eq("id", value: userId.uuidString)
             .execute()
     }
