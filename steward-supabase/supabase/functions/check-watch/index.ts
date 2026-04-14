@@ -615,9 +615,16 @@ serve(async (req) => {
 
     // ─── Expired Date Detection ──────────────────────────────────
     // Auto-pause watches with dates that have already passed
-    // (e.g., restaurant reservation for April 6 when today is April 12)
+    // (e.g., restaurant reservation for April 6 when today is April 12).
+    //
+    // IMPORTANT: only scan the user-written `condition` text, NEVER the
+    // URL. URLs frequently contain dates in tracking/campaign params
+    // (e.g. `cm_mmc=or_-_-iOS_App_PDPShare-_-2026-04-13-_-Share_PDP` on
+    // REI share links) which would false-positive and pause brand-new
+    // watches. Camping/ticket/resy/travel modes carry their event dates
+    // in their dedicated *_meta JSON fields, not the URL.
     {
-      const text = `${watch.condition ?? ""} ${watch.url ?? ""}`;
+      const text = `${watch.condition ?? ""}`;
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
@@ -2152,7 +2159,9 @@ serve(async (req) => {
     }
 
     // ─── Engagement: Price Trending Down notification ─────────────
-    // When price drops but hasn't hit target yet — build excitement
+    // When price drops but hasn't hit target yet — build excitement.
+    // Reads the previously-persisted price directly off the watch row.
+    const lastPrice: number | null = watch.last_price ?? null;
     if (!changed && !stillFailing && currentPrice !== null && lastPrice !== null && currentPrice < lastPrice && watch.action_type === "price") {
       try {
         const today = new Date().toISOString().slice(0, 10);
