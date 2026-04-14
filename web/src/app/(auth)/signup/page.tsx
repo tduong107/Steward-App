@@ -34,7 +34,6 @@ export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [otpSent, setOtpSent] = useState(false)
   const [otp, setOtp] = useState('')
-  const [smsConsent, setSmsConsent] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [oauthLoading, setOauthLoading] = useState<'apple' | 'google' | null>(null)
@@ -51,7 +50,10 @@ export default function SignupPage() {
     const digits = phone.replace(/\D/g, '')
     if (digits.length < 10) { setError('Please enter a valid 10-digit US phone number'); return }
     if (password.length < 6) { setError('Password must be at least 6 characters'); return }
-    if (!smsConsent) { setError('Please agree to receive SMS alerts to continue'); return }
+
+    // The act of tapping Create Account IS the SMS consent (click-to-accept
+    // pattern — see the disclosure rendered directly above the button).
+    // Recording the timestamp + text here creates the audit trail.
 
     track('create_account_click')
     setLoading(true)
@@ -68,7 +70,7 @@ export default function SignupPage() {
             sms_alerts: true,
             sms_consent_at: new Date().toISOString(),
             sms_consent_text:
-              'I agree to receive recurring automated price-drop and watch alerts from Steward at the phone number provided. Message frequency varies. Message & data rates may apply. Reply STOP to cancel, HELP for help.',
+              'By tapping Create Account, you agree to receive recurring automated price-drop and watch alerts from Steward at the phone number provided. Msg frequency varies. Msg & data rates may apply. Reply STOP to cancel, HELP for help. Consent is not a condition of purchase.',
           },
         },
       })
@@ -258,32 +260,6 @@ export default function SignupPage() {
                 </button>
               </div>
 
-              {/* SMS consent (TCPA / A2P 10DLC) */}
-              <label className="flex items-start gap-3 cursor-pointer group">
-                <input
-                  type="checkbox"
-                  checked={smsConsent}
-                  onChange={e => setSmsConsent(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 shrink-0 rounded border-[#2A5C45] bg-[#0F2018] text-[#6EE7B7] focus:ring-1 focus:ring-[#6EE7B7]/40 focus:ring-offset-0 accent-[#6EE7B7] cursor-pointer"
-                />
-                <span className="text-xs leading-relaxed text-[#F7F6F3]/50 group-hover:text-[#F7F6F3]/70 transition-colors">
-                  I agree to receive recurring automated price-drop and watch
-                  alerts from Steward at the number above. Message frequency
-                  varies. Msg &amp; data rates may apply. Reply{' '}
-                  <span className="font-semibold text-[#F7F6F3]/70">STOP</span>{' '}
-                  to cancel,{' '}
-                  <span className="font-semibold text-[#F7F6F3]/70">HELP</span>{' '}
-                  for help. Consent is not a condition of purchase. See our{' '}
-                  <Link
-                    href="/privacy"
-                    className="text-[#6EE7B7]/60 hover:text-[#6EE7B7] underline"
-                  >
-                    Privacy Policy
-                  </Link>
-                  .
-                </span>
-              </label>
-
               {error && (
                 <p className="text-sm text-red-400 bg-red-400/10 rounded-xl px-3 py-2.5">{error}</p>
               )}
@@ -305,6 +281,23 @@ export default function SignupPage() {
                 )}
                 {loading ? 'Sending code...' : 'Create Account'}
               </button>
+
+              {/* SMS consent disclosure (TCPA / A2P 10DLC click-to-accept).
+                  Placed directly under the submit button so the action of
+                  tapping Create Account is unambiguously tied to the
+                  disclosure the user just read. */}
+              <p className="text-[11px] leading-relaxed text-[#F7F6F3]/35 text-center -mt-1">
+                By tapping Create Account, you agree to receive recurring
+                automated price-drop and watch alerts via SMS. Msg frequency
+                varies. Msg &amp; data rates may apply. Reply{' '}
+                <span className="text-[#F7F6F3]/55">STOP</span> to cancel,{' '}
+                <span className="text-[#F7F6F3]/55">HELP</span> for help.
+                Consent is not a condition of purchase. See our{' '}
+                <Link href="/privacy" className="text-[#6EE7B7]/60 hover:text-[#6EE7B7] underline">
+                  Privacy Policy
+                </Link>
+                .
+              </p>
             </form>
           </>
         ) : (

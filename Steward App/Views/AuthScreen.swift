@@ -26,7 +26,6 @@ struct AuthScreen: View {
     @State private var showForgotPassword = false
     @State private var forgotPasswordStep: ForgotStep = .enterPhone
     @State private var isSubmitting = false
-    @State private var smsConsent = false
 
     enum AuthMode: String {
         case signIn = "Sign In"
@@ -146,13 +145,6 @@ struct AuthScreen: View {
                 .frame(maxWidth: .infinity, alignment: .trailing).padding(.top, -8)
             }
 
-            // SMS consent (TCPA / A2P 10DLC) — required affirmative opt-in
-            // before we send any marketing / price-drop alerts to this number.
-            if authMode == .signUp {
-                smsConsentRow
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-            }
-
             // Error
             if let error = authManager.errorMessage {
                 Text(error).font(.system(size: 12)).foregroundStyle(.red.opacity(0.8))
@@ -169,6 +161,14 @@ struct AuthScreen: View {
                 .background(mint).clipShape(RoundedRectangle(cornerRadius: 14))
             }
             .disabled(isSubmitting || !isFormValid).opacity(isFormValid ? 1.0 : 0.5)
+
+            // SMS consent disclosure (TCPA / A2P 10DLC click-to-accept).
+            // Placed directly under the Create Account button so the act of
+            // tapping the button is unambiguously tied to this disclosure.
+            if authMode == .signUp {
+                smsConsentDisclosure
+                    .transition(.opacity)
+            }
         }
     }
 
@@ -328,32 +328,20 @@ struct AuthScreen: View {
         }
     }
 
-    private var smsConsentRow: some View {
-        Button {
-            withAnimation(.easeInOut(duration: 0.15)) { smsConsent.toggle() }
-        } label: {
-            HStack(alignment: .top, spacing: 10) {
-                Image(systemName: smsConsent ? "checkmark.square.fill" : "square")
-                    .font(.system(size: 16, weight: .regular))
-                    .foregroundStyle(smsConsent ? mint : mint.opacity(0.4))
-                    .frame(width: 18, height: 18)
-                    .padding(.top, 1)
-
-                (
-                    Text("I agree to receive recurring automated price-drop and watch alerts from Steward at the number above. Message frequency varies. Msg & data rates may apply. Reply ")
-                    + Text("STOP").fontWeight(.semibold).foregroundColor(.white.opacity(0.85))
-                    + Text(" to cancel, ")
-                    + Text("HELP").fontWeight(.semibold).foregroundColor(.white.opacity(0.85))
-                    + Text(" for help. Consent is not a condition of purchase.")
-                )
-                .font(.system(size: 11))
-                .foregroundStyle(mint.opacity(0.55))
-                .multilineTextAlignment(.leading)
-                .fixedSize(horizontal: false, vertical: true)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .buttonStyle(.plain)
+    private var smsConsentDisclosure: some View {
+        (
+            Text("By tapping Create Account, you agree to receive recurring automated price-drop and watch alerts via SMS. Msg frequency varies. Msg & data rates may apply. Reply ")
+            + Text("STOP").foregroundColor(mint.opacity(0.7))
+            + Text(" to cancel, ")
+            + Text("HELP").foregroundColor(mint.opacity(0.7))
+            + Text(" for help. Consent is not a condition of purchase.")
+        )
+        .font(.system(size: 10))
+        .foregroundStyle(mint.opacity(0.4))
+        .multilineTextAlignment(.center)
+        .lineSpacing(1)
+        .fixedSize(horizontal: false, vertical: true)
+        .padding(.top, 2)
     }
 
     private var termsView: some View {
@@ -400,7 +388,6 @@ struct AuthScreen: View {
             return phoneValid
                 && !fullName.trimmingCharacters(in: .whitespaces).isEmpty
                 && password.count >= 6
-                && smsConsent
         }
         return phoneValid && password.count >= 6
     }
@@ -425,7 +412,7 @@ struct AuthScreen: View {
         isSubmitting = true; authManager.errorMessage = nil
         do {
             if authMode == .signUp {
-                try await authManager.signUp(phone: normalizedPhone, password: password, name: fullName.trimmingCharacters(in: .whitespaces), smsConsent: smsConsent)
+                try await authManager.signUp(phone: normalizedPhone, password: password, name: fullName.trimmingCharacters(in: .whitespaces))
                 if !authManager.isAuthenticated { withAnimation(.spring(response: 0.3)) { showOTPStep = true } }
             } else {
                 try await authManager.signIn(phone: normalizedPhone, password: password)
@@ -443,7 +430,7 @@ struct AuthScreen: View {
 
     private func handleResendOTP() async {
         isSubmitting = true; authManager.errorMessage = nil
-        do { try await authManager.signUp(phone: normalizedPhone, password: password, name: fullName.trimmingCharacters(in: .whitespaces), smsConsent: smsConsent) }
+        do { try await authManager.signUp(phone: normalizedPhone, password: password, name: fullName.trimmingCharacters(in: .whitespaces)) }
         catch { authManager.errorMessage = friendlyError(error) }
         isSubmitting = false
     }

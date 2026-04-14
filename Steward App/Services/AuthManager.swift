@@ -81,19 +81,24 @@ final class AuthManager {
         return digits.hasPrefix("+") && digits.count >= 11 && digits.count <= 16
     }
 
-    /// Exact disclosure text shown to users above the SMS consent toggle.
-    /// Kept in sync with the copy rendered in AuthScreen so we can record
-    /// exactly what the user agreed to as an audit trail for TCPA / A2P 10DLC.
+    /// Exact disclosure text shown to users at the moment they tap the
+    /// Create Account button (click-to-accept pattern). Must stay in sync
+    /// with the copy rendered in `AuthScreen.smsConsentDisclosure` and in
+    /// `SettingsScreen.phoneEntrySheet`. Recorded on every signup as an
+    /// audit trail for TCPA / A2P 10DLC.
     static let smsConsentDisclosure =
-        "I agree to receive recurring automated price-drop and watch alerts from Steward at the phone number provided. Message frequency varies. Msg & data rates may apply. Reply STOP to cancel, HELP for help. Consent is not a condition of purchase."
+        "By tapping Create Account, you agree to receive recurring automated price-drop and watch alerts from Steward at the phone number provided. Msg frequency varies. Msg & data rates may apply. Reply STOP to cancel, HELP for help. Consent is not a condition of purchase."
 
     /// Creates a new account with phone number and password.
     /// After sign-up, an OTP code is sent to the phone for verification.
     ///
-    /// - Parameter smsConsent: User must have affirmatively checked the SMS
-    ///   consent disclosure shown at signup. This call refuses to proceed
-    ///   without it to keep us inside TCPA / A2P 10DLC compliance.
-    func signUp(phone: String, password: String, name: String, smsConsent: Bool) async throws {
+    /// CONTRACT: callers MUST only invoke this from a UI flow that displays
+    /// the `smsConsentDisclosure` text directly adjacent to the Create
+    /// Account button (click-to-accept pattern). The act of tapping the
+    /// Create Account button IS the user's affirmative SMS opt-in — this
+    /// function records the timestamp and disclosure as an audit trail for
+    /// TCPA / A2P 10DLC compliance.
+    func signUp(phone: String, password: String, name: String) async throws {
         errorMessage = nil
 
         guard isValidPhone(phone) else {
@@ -103,11 +108,6 @@ final class AuthManager {
 
         guard password.count >= 6 else {
             errorMessage = "Password must be at least 6 characters"
-            return
-        }
-
-        guard smsConsent else {
-            errorMessage = "Please agree to receive SMS alerts to continue"
             return
         }
 
