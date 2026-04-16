@@ -435,10 +435,12 @@ serve(async (req) => {
     const origin = req.headers.get("origin");
     const dynamicCors = getCorsHeaders(origin);
 
-    // Verify apikey header matches the real Supabase anon key (not just "present")
-    const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+    // Verify apikey header matches the real Supabase anon key (not just "present").
+    // Env var is ANON_KEY (not SUPABASE_ANON_KEY) because the Supabase CLI
+    // blocks secrets with the SUPABASE_ prefix.
+    const ANON_KEY = Deno.env.get("ANON_KEY") ?? "";
     const apikey = req.headers.get("apikey") ?? "";
-    if (!apikey || (SUPABASE_ANON_KEY && apikey !== SUPABASE_ANON_KEY)) {
+    if (!apikey || (ANON_KEY && apikey !== ANON_KEY)) {
       return new Response(
         JSON.stringify({ error: "Unauthorized" }),
         {
