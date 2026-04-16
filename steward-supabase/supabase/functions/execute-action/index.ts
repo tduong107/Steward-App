@@ -56,6 +56,35 @@ serve(async (req) => {
       );
     }
 
+    // ─── SSRF Protection ──────────────────────────────────────────
+    // CRITICAL: this function sends stored user cookies to the action URL.
+    // An attacker who modifies action_url to point at their own server
+    // could exfiltrate session cookies. Block internal/suspicious URLs
+    // and restrict to HTTPS-only for cookie safety.
+    try {
+      const u = new URL(actionUrl);
+      const h = u.hostname.toLowerCase();
+      const blocked =
+        h === "localhost" || h === "0.0.0.0" || h === "[::1]" ||
+        h.endsWith(".local") || h.endsWith(".internal") ||
+        /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.)/.test(h) ||
+        h.includes("metadata.google") || h.includes("metadata.aws") ||
+        u.protocol === "file:" || u.protocol === "ftp:" ||
+        u.protocol === "data:" || u.protocol === "javascript:";
+      if (blocked || (u.protocol !== "https:" && u.protocol !== "http:")) {
+        console.warn(`[execute-action] SSRF blocked: ${actionUrl} (watch ${watch_id})`);
+        return new Response(
+          JSON.stringify({ error: "Blocked URL", executed: false }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    } catch {
+      return new Response(
+        JSON.stringify({ error: "Invalid action URL", executed: false }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // ── Attempt server-side action execution ──
     let executed = false;
     let executionNote = "";

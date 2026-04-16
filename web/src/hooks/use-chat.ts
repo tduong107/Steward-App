@@ -119,6 +119,44 @@ function mapWatchJson(raw: Record<string, unknown>): Partial<Watch> {
   if (url && !url.match(/^https?:\/\//i)) {
     url = `https://${url}`
   }
+
+  // Security: validate URL scheme and block dangerous/internal URLs
+  try {
+    const parsed = new URL(url)
+    const scheme = parsed.protocol.toLowerCase()
+    if (scheme !== 'https:' && scheme !== 'http:') {
+      console.warn('[use-chat] Blocked non-HTTP URL from AI:', url)
+      return {} // Return empty — will fail gracefully downstream
+    }
+    const h = parsed.hostname.toLowerCase()
+    if (
+      h === 'localhost' || h === '0.0.0.0' || h === '[::1]' ||
+      h.endsWith('.local') || h.endsWith('.internal') ||
+      /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.)/.test(h) ||
+      h.includes('metadata.google')
+    ) {
+      console.warn('[use-chat] Blocked internal URL from AI:', url)
+      return {}
+    }
+  } catch {
+    console.warn('[use-chat] Invalid URL from AI:', url)
+    return {}
+  }
+
+  // Validate image URL if present
+  let imageUrl = (raw.imageURL || raw.image_url || null) as string | null
+  if (imageUrl) {
+    try {
+      const imgParsed = new URL(imageUrl)
+      const imgScheme = imgParsed.protocol.toLowerCase()
+      if (imgScheme !== 'https:' && imgScheme !== 'http:') {
+        imageUrl = null // Block javascript:, data:, file: etc.
+      }
+    } catch {
+      imageUrl = null
+    }
+  }
+
   return {
     emoji: raw.emoji as string,
     name: raw.name as string,
@@ -127,7 +165,7 @@ function mapWatchJson(raw: Record<string, unknown>): Partial<Watch> {
     action_label: (raw.actionLabel || raw.action_label) as string,
     action_type: (raw.actionType || raw.action_type || 'notify') as Watch['action_type'],
     check_frequency: (raw.checkFrequency || raw.check_frequency || 'Daily') as Watch['check_frequency'],
-    image_url: (raw.imageURL || raw.image_url || null) as string | null,
+    image_url: imageUrl,
   } as Partial<Watch>
 }
 

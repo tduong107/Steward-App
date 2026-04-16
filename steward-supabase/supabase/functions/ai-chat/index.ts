@@ -4,10 +4,31 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
+// CORS: restrict to our own domains + localhost for dev.
+// Wildcard (*) lets any website call this endpoint and burn API credits.
+const ALLOWED_ORIGINS = [
+  "https://www.joinsteward.app",
+  "https://joinsteward.app",
+  "http://localhost:3000",
+  "http://localhost:3001",
+];
+
+function getCorsHeaders(origin: string | null): Record<string, string> {
+  const allowed = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    "Access-Control-Allow-Origin": allowed,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Vary": "Origin",
+  };
+}
+
+// Legacy: keep a static version for preflight and iOS (no Origin header).
+// iOS doesn't send an Origin header so it won't match any allowed origin —
+// this is fine because iOS talks directly to the function URL, not via
+// browser CORS. The CORS headers are only security-relevant for browsers.
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Origin": ALLOWED_ORIGINS[0],
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
@@ -410,14 +431,19 @@ serve(async (req) => {
   }
 
   try {
-    // Verify apikey header is present (basic guard against unauthenticated abuse)
+    // Use dynamic CORS based on request Origin
+    const origin = req.headers.get("origin");
+    const dynamicCors = getCorsHeaders(origin);
+
+    // Verify apikey header matches the real Supabase anon key (not just "present")
+    const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
     const apikey = req.headers.get("apikey") ?? "";
-    if (!apikey) {
+    if (!apikey || (SUPABASE_ANON_KEY && apikey !== SUPABASE_ANON_KEY)) {
       return new Response(
-        JSON.stringify({ error: "Unauthorized — missing apikey" }),
+        JSON.stringify({ error: "Unauthorized" }),
         {
           status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: { ...dynamicCors, "Content-Type": "application/json" },
         }
       );
     }
@@ -432,7 +458,7 @@ serve(async (req) => {
         JSON.stringify({ error: "Too many requests. Please try again later." }),
         {
           status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: { ...dynamicCors, "Content-Type": "application/json" },
         }
       );
     }
@@ -444,7 +470,7 @@ serve(async (req) => {
         JSON.stringify({ error: "messages array is required" }),
         {
           status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: { ...dynamicCors, "Content-Type": "application/json" },
         }
       );
     }
@@ -454,12 +480,21 @@ serve(async (req) => {
     const MAX_MESSAGES = 30;
     const sanitizedMessages = messages.slice(-MAX_MESSAGES);
 
+    // 1b. Limit individual message size to prevent token-bombing
+    // (a single 100KB message could cost $0.10+ in API tokens)
+    const MAX_MESSAGE_CHARS = 8000;
+    for (const msg of sanitizedMessages) {
+      if (typeof msg.content === "string" && msg.content.length > MAX_MESSAGE_CHARS) {
+        msg.content = msg.content.slice(0, MAX_MESSAGE_CHARS) + "\n[...message truncated for safety]";
+      }
+    }
+
     // 2. Validate message roles (only "user" and "assistant" allowed)
     for (const msg of sanitizedMessages) {
       if (msg.role !== "user" && msg.role !== "assistant") {
         return new Response(
           JSON.stringify({ error: "Invalid message role" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          { status: 400, headers: { ...dynamicCors, "Content-Type": "application/json" } }
         );
       }
     }
@@ -484,7 +519,7 @@ serve(async (req) => {
         JSON.stringify({ error: "ANTHROPIC_API_KEY not configured" }),
         {
           status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: { ...dynamicCors, "Content-Type": "application/json" },
         }
       );
     }
@@ -540,7 +575,7 @@ serve(async (req) => {
         }),
         {
           status: 502,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: { ...dynamicCors, "Content-Type": "application/json" },
         }
       );
     }
@@ -564,7 +599,7 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({ text }), {
       status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...dynamicCors, "Content-Type": "application/json" },
     });
   } catch (err) {
     console.error(`[ai-chat] Error: ${err.message}`);

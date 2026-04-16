@@ -598,6 +598,37 @@ serve(async (req) => {
       );
     }
 
+    // ─── SSRF Protection ──────────────────────────────────────────
+    // Block watches pointing at internal/cloud-metadata URLs. An attacker
+    // could create a watch for http://169.254.169.254/latest/meta-data/
+    // and the edge function (running inside Supabase's network) would
+    // fetch it and store the response in check_results.
+    {
+      try {
+        const u = new URL(watch.url);
+        const h = u.hostname.toLowerCase();
+        const blocked =
+          h === "localhost" || h === "0.0.0.0" || h === "[::1]" ||
+          h.endsWith(".local") || h.endsWith(".internal") ||
+          /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.)/.test(h) ||
+          h.includes("metadata.google") || h.includes("metadata.aws") ||
+          h === "metadata.google.internal" ||
+          u.protocol === "file:" || u.protocol === "ftp:" ||
+          u.protocol === "data:" || u.protocol === "javascript:";
+        if (blocked) {
+          console.warn(`[check-watch] SSRF blocked: ${watch.url} (watch ${watch.id})`);
+          await supabase.from("watches").update({
+            status: "paused", needs_attention: true,
+            last_error: "This URL points to an internal or restricted address and cannot be monitored.",
+          }).eq("id", watch.id);
+          return new Response(
+            JSON.stringify({ error: "Blocked URL", watch_id: watch.id }),
+            { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      } catch { /* URL parse failure — will fail naturally downstream */ }
+    }
+
     // Cumulative timeout tracker — Supabase edge functions have 26s limit
     const funcStartTime = Date.now();
     const timeRemaining = () => 24000 - (Date.now() - funcStartTime); // 2s margin

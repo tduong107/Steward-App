@@ -660,8 +660,36 @@ final class ChatViewModel {
         return text + "\n\n[URL_CONTEXT: I resolved the URLs for you. Here's what I found:\n\(context)\nUse this info to understand what the user is referring to. Use the ORIGINAL URL the user provided for the watch, not the resolved one.]"
     }
 
+    /// Validates that a URL is safe to fetch (not internal/cloud-metadata/dangerous scheme)
+    private func isURLSafeToFetch(_ url: URL) -> Bool {
+        guard let scheme = url.scheme?.lowercased(),
+              scheme == "https" || scheme == "http" else {
+            return false // Block javascript:, data:, file:, ftp: etc.
+        }
+        guard let host = url.host?.lowercased() else { return false }
+        // Block internal/cloud-metadata addresses
+        let blocked = [
+            "localhost", "0.0.0.0", "[::1]",
+        ]
+        if blocked.contains(host) { return false }
+        if host.hasSuffix(".local") || host.hasSuffix(".internal") { return false }
+        let ipPatterns = ["127.", "10.", "192.168.", "169.254."]
+        if ipPatterns.contains(where: { host.hasPrefix($0) }) { return false }
+        if host.range(of: #"^172\.(1[6-9]|2\d|3[01])\."#, options: .regularExpression) != nil { return false }
+        if host.contains("metadata.google") || host.contains("metadata.aws") { return false }
+        return true
+    }
+
     /// Resolves a URL (follows redirects) and fetches the page title + price info
     private func resolveAndFetchMetadata(url: URL) async -> String? {
+        // SSRF protection: don't fetch internal/dangerous URLs
+        guard isURLSafeToFetch(url) else {
+            #if DEBUG
+            print("[ChatViewModel] SSRF blocked: \(url.absoluteString)")
+            #endif
+            return nil
+        }
+
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         // Mimic a real browser to avoid blocks
