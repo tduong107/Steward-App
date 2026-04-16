@@ -12,7 +12,16 @@ export async function POST(request: NextRequest) {
     }
 
     const stripe = getStripe()
-    const origin = request.headers.get('origin') || process.env.NEXT_PUBLIC_SITE_URL || ''
+    // Hardcoded origin allowlist to prevent open redirect attacks
+    const ALLOWED_ORIGINS = [
+      'https://www.joinsteward.app',
+      'https://joinsteward.app',
+      'http://localhost:3000',
+    ]
+    const requestOrigin = request.headers.get('origin') || ''
+    const origin = ALLOWED_ORIGINS.includes(requestOrigin)
+      ? requestOrigin
+      : (process.env.NEXT_PUBLIC_SITE_URL || 'https://www.joinsteward.app')
 
     // Get email from multiple sources (phone-only users may not have user.email)
     const { data: profile } = await supabase

@@ -27,7 +27,19 @@ export async function POST(request: NextRequest) {
     }
 
     const stripe = getStripe()
-    const origin = request.headers.get('origin') || process.env.NEXT_PUBLIC_SITE_URL || ''
+    // Use a hardcoded origin to prevent open redirect attacks.
+    // An attacker could spoof the Origin header to redirect users to
+    // a phishing page after checkout (e.g., Origin: https://evil.com →
+    // success_url becomes https://evil.com/home?upgraded=pro).
+    const ALLOWED_ORIGINS = [
+      'https://www.joinsteward.app',
+      'https://joinsteward.app',
+      'http://localhost:3000',
+    ]
+    const requestOrigin = request.headers.get('origin') || ''
+    const origin = ALLOWED_ORIGINS.includes(requestOrigin)
+      ? requestOrigin
+      : (process.env.NEXT_PUBLIC_SITE_URL || 'https://www.joinsteward.app')
 
     // Get user's email and profile
     const { data: profile } = await supabase
