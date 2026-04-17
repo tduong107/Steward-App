@@ -15,8 +15,11 @@ export default function BlogLayout({ children }: { children: React.ReactNode }) 
     >
       <BlogNav />
 
-      {/* Spacer for fixed nav */}
-      <div style={{ height: 64 }} />
+      {/* Spacer for the fixed nav. Height must match the nav's rendered
+          height — with the bumped sizing (22px vertical padding + 36px
+          logo + button ~44px) the nav is ~80px tall, so 96px gives a
+          comfortable 16px buffer for the content below. */}
+      <div style={{ height: 96 }} />
 
       {/* ── Main content ── */}
       <main>{children}</main>
