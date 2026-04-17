@@ -404,6 +404,26 @@ body {
   transform-origin: bottom left;
 }
 
+/* Reduced-motion safety: users with OS-level "Reduce Motion" on (common on
+ * iOS) would otherwise be stuck at the animation's opacity:0 starting
+ * state because `wordReveal` never runs. Also applies to the inline
+ * `opacity:0; animation: hiw-fadeUp ...forwards` pattern used throughout
+ * the hero. Force elements to their final, visible state. */
+@media (prefers-reduced-motion: reduce) {
+  .landing-word {
+    opacity: 1 !important;
+    transform: none !important;
+    animation: none !important;
+  }
+  /* Generic safety for any element animating via hiw-fadeUp — catches the
+   * inline `opacity: 0; animation: 'hiw-fadeUp ...forwards'` elements. */
+  [style*="hiw-fadeUp"] {
+    opacity: 1 !important;
+    transform: none !important;
+    animation: none !important;
+  }
+}
+
 /* Dot-grid parallax bg */
 .landing-dot-grid {
   position: absolute;

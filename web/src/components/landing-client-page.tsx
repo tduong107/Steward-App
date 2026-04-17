@@ -5,11 +5,30 @@ import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { track } from '@vercel/analytics'
 
-// Lazy-load below-fold sections — deferred until JS is idle
-const LandingHIW = dynamic(() => import('@/components/landing-hiw').then(m => ({ default: m.LandingHIW })), { ssr: false })
-const LandingUseCases = dynamic(() => import('@/components/landing-use-cases').then(m => ({ default: m.LandingUseCases })), { ssr: false })
+// Lazy-load below-fold sections — deferred until JS is idle.
+// IMPORTANT: include a `loading` fallback that preserves a minimum height.
+// Without this, when the LazySection below reveals these components, there
+// is a network round-trip to fetch their JS chunk — during which the
+// component renders as `null`, leaving a visibly blank section on slower
+// mobile connections. The placeholder below keeps layout stable until the
+// chunk lands.
+const LandingHIW = dynamic(
+  () => import('@/components/landing-hiw').then(m => ({ default: m.LandingHIW })),
+  { ssr: false, loading: () => <div style={{ minHeight: 600 }} /> }
+)
+const LandingUseCases = dynamic(
+  () => import('@/components/landing-use-cases').then(m => ({ default: m.LandingUseCases })),
+  { ssr: false, loading: () => <div style={{ minHeight: 500 }} /> }
+)
 
-/** Defers rendering of children until the placeholder enters the viewport (200px margin). */
+/**
+ * Defers rendering of children until the placeholder enters the viewport
+ * (200px margin). The outer wrapper carries `min-height` at ALL times so the
+ * section never collapses to 0 — even during the brief window between
+ * "observer fires" and "children finish rendering" (or dynamic chunk load).
+ * Without that floor, users on mobile hit visibly blank sections on fast
+ * scrolls.
+ */
 function LazySection({ children, minHeight = 400 }: { children: React.ReactNode; minHeight?: number }) {
   const ref = useRef<HTMLDivElement>(null)
   const [visible, setVisible] = useState(false)
@@ -17,6 +36,13 @@ function LazySection({ children, minHeight = 400 }: { children: React.ReactNode;
   useEffect(() => {
     const el = ref.current
     if (!el) return
+    // Safety net: if IntersectionObserver doesn't exist (very old browser)
+    // or for any reason the element is already past the viewport when
+    // hydration runs, flip visible immediately.
+    if (typeof IntersectionObserver === 'undefined') {
+      setVisible(true)
+      return
+    }
     const obs = new IntersectionObserver(
       ([entry]) => { if (entry.isIntersecting) { setVisible(true); obs.disconnect() } },
       { rootMargin: '200px' }
@@ -25,7 +51,7 @@ function LazySection({ children, minHeight = 400 }: { children: React.ReactNode;
     return () => obs.disconnect()
   }, [])
 
-  return <div ref={ref}>{visible ? children : <div style={{ minHeight }} />}</div>
+  return <div ref={ref} style={{ minHeight }}>{visible ? children : null}</div>
 }
 
 // ── Logo ─────────────────────────────────────────────────────────────────────
