@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
+import { useRef, type MouseEvent as ReactMouseEvent } from 'react'
 
 // Palette — matches the rest of the marketing site.
 const S = {
@@ -14,7 +14,10 @@ type Category = {
   title: string
   desc: string
   href: string
-  accent: string // hex without #, used for color-mix & gradients
+  accent: string
+  /** rgb tuple of the accent, so we can build glows with rgba() and not
+   *  depend on color-mix() (which older Safari/Edge don't support). */
+  accentRGB: string
 }
 
 const CATEGORIES: Category[] = [
@@ -22,52 +25,61 @@ const CATEGORIES: Category[] = [
     title: 'How We Compare',
     desc: 'See how Steward stacks up against Honey, CamelCamelCamel, and other price trackers.',
     href: '/blog/comparisons',
-    accent: '#F59E0B', // amber — for comparisons (warmer, analytical)
+    accent: '#F59E0B',
+    accentRGB: '245, 158, 11', // amber
   },
   {
     title: 'Guides',
     desc: 'Step-by-step guides on tracking campsites, restaurants, flights, and event tickets.',
     href: '/blog/guides',
-    accent: '#6EE7B7', // mint — on-brand primary
+    accent: '#6EE7B7',
+    accentRGB: '110, 231, 183', // mint
   },
   {
     title: 'Insights',
     desc: 'Tips on saving money, tracking strategies, product updates, and behind-the-scenes looks.',
     href: '/blog/insights',
-    accent: '#A882FF', // purple — for thought-leadership
+    accent: '#A882FF',
+    accentRGB: '168, 130, 255', // purple
   },
 ]
 
 function ResourceCard({ cat, index }: { cat: Category; index: number }) {
-  const ref = useRef<HTMLAnchorElement>(null)
-  // Spotlight coords (percent) — default 50/50 so the first hover doesn't pop
-  const [spot, setSpot] = useState({ x: 50, y: 50 })
-  // 3D tilt (deg). Small amplitude so it feels premium, not cartoony.
-  const [tilt, setTilt] = useState({ x: 0, y: 0 })
+  // Direct DOM updates via refs — avoids React re-renders on every
+  // mousemove frame, which keeps the tilt buttery-smooth.
+  const cardRef = useRef<HTMLAnchorElement>(null)
+  const innerRef = useRef<HTMLDivElement>(null)
 
   const handleMouseMove = (e: ReactMouseEvent<HTMLAnchorElement>) => {
-    const el = ref.current
-    if (!el) return
-    const rect = el.getBoundingClientRect()
+    const card = cardRef.current
+    const inner = innerRef.current
+    if (!card || !inner) return
+
+    const rect = card.getBoundingClientRect()
     const relX = (e.clientX - rect.left) / rect.width
     const relY = (e.clientY - rect.top) / rect.height
-    setSpot({ x: relX * 100, y: relY * 100 })
-    // Tilt: cursor on the left tilts right-side toward user, etc.
-    // Clamp to ±6deg for a subtle, not-nauseating effect.
-    setTilt({
-      x: (0.5 - relY) * 6,
-      y: (relX - 0.5) * 6,
-    })
+
+    // Update CSS vars for the spotlight position (percent).
+    card.style.setProperty('--mx', `${relX * 100}%`)
+    card.style.setProperty('--my', `${relY * 100}%`)
+
+    // Apply tilt on the INNER element so the wrapper's entrance animation
+    // doesn't fight with it. Tilt amplitude ±12° — visible but not dizzying.
+    const tiltX = (0.5 - relY) * 12
+    const tiltY = (relX - 0.5) * 12
+    inner.style.transform = `perspective(1000px) rotateX(${tiltX}deg) rotateY(${tiltY}deg) translateZ(0)`
   }
 
   const handleMouseLeave = () => {
-    setTilt({ x: 0, y: 0 })
-    // Don't reset spot — let it fade with the opacity transition.
+    const inner = innerRef.current
+    if (!inner) return
+    // Smoothly return to rest — the CSS transition on .card-inner handles easing.
+    inner.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg) translateZ(0)'
   }
 
   return (
     <Link
-      ref={ref}
+      ref={cardRef}
       href={cat.href}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
@@ -75,25 +87,28 @@ function ResourceCard({ cat, index }: { cat: Category; index: number }) {
       style={
         {
           '--accent': cat.accent,
-          '--mx': `${spot.x}%`,
-          '--my': `${spot.y}%`,
-          '--tiltX': `${tilt.x}deg`,
-          '--tiltY': `${tilt.y}deg`,
+          '--accent-rgb': cat.accentRGB,
           animationDelay: `${0.35 + index * 0.12}s`,
         } as React.CSSProperties
       }
     >
-      {/* Accent strip at top — draws from center on hover */}
-      <span className="accent-bar" aria-hidden />
+      <div ref={innerRef} className="card-inner">
+        {/* Accent strip — draws from center on hover */}
+        <span className="accent-bar" aria-hidden />
 
-      {/* Radial spotlight that follows the cursor */}
-      <span className="spotlight" aria-hidden />
+        {/* Spotlight that follows the cursor */}
+        <span className="spotlight" aria-hidden />
 
-      <h2 className="card-title">{cat.title}</h2>
-      <p className="card-desc">{cat.desc}</p>
-      <span className="explore">
-        Explore <span className="arrow">→</span>
-      </span>
+        {/* Shine sweep — animates across the card once on hover */}
+        <span className="shine" aria-hidden />
+
+        <h2 className="card-title">{cat.title}</h2>
+        <p className="card-desc">{cat.desc}</p>
+        <span className="explore">
+          <span className="explore-text">Explore</span>
+          <span className="arrow" aria-hidden>→</span>
+        </span>
+      </div>
     </Link>
   )
 }
@@ -101,19 +116,11 @@ function ResourceCard({ cat, index }: { cat: Category; index: number }) {
 export default function ResourcesClient() {
   return (
     <div className="resources-root">
-      {/* Ambient background orbs — slow drift, very subtle */}
+      {/* Ambient background orbs */}
       <div className="orb orb-a" aria-hidden />
       <div className="orb orb-b" aria-hidden />
 
-      <div
-        style={{
-          maxWidth: 900,
-          margin: '0 auto',
-          padding: '60px 24px 80px',
-          position: 'relative',
-          zIndex: 1,
-        }}
-      >
+      <div className="page-container">
         {/* Hero */}
         <div className="hero">
           <div className="pill">
@@ -132,8 +139,7 @@ export default function ResourcesClient() {
           </div>
 
           <h1 className="heading">
-            Comparisons, guides &amp;{' '}
-            <em>insights</em>
+            Comparisons, guides &amp; <em>insights</em>
           </h1>
 
           <p className="sub">
@@ -142,13 +148,7 @@ export default function ResourcesClient() {
         </div>
 
         {/* Category cards */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-            gap: 20,
-          }}
-        >
+        <div className="cards-grid">
           {CATEGORIES.map((cat, i) => (
             <ResourceCard key={cat.title} cat={cat} index={i} />
           ))}
@@ -160,6 +160,14 @@ export default function ResourcesClient() {
           position: relative;
           min-height: 100vh;
           overflow: hidden;
+        }
+
+        .page-container {
+          max-width: 1200px;
+          margin: 0 auto;
+          padding: 60px 24px 80px;
+          position: relative;
+          z-index: 1;
         }
 
         /* ─── Ambient drifting orbs ─── */
@@ -199,7 +207,7 @@ export default function ResourcesClient() {
         /* ─── Hero ─── */
         .hero {
           text-align: center;
-          margin-bottom: 60px;
+          margin-bottom: 72px;
         }
 
         .pill {
@@ -220,7 +228,7 @@ export default function ResourcesClient() {
 
         .heading {
           font-family: ${S.serif};
-          font-size: clamp(32px, 5vw, 48px);
+          font-size: clamp(32px, 5vw, 52px);
           font-weight: 700;
           line-height: 1.1;
           letter-spacing: -0.03em;
@@ -234,8 +242,6 @@ export default function ResourcesClient() {
           display: inline-block;
           position: relative;
         }
-        /* Gentle "breathing" glow on the italic word — subtle enough to feel
-           alive without being distracting. */
         .heading em::after {
           content: '';
           position: absolute;
@@ -260,9 +266,9 @@ export default function ResourcesClient() {
         .sub {
           font-size: 16px;
           line-height: 1.6;
-          color: rgba(247, 246, 243, 0.5);
+          color: rgba(247, 246, 243, 0.55);
           font-weight: 300;
-          max-width: 500px;
+          max-width: 540px;
           margin: 0 auto;
           animation: fadeIn 0.9s 0.35s ease-out backwards;
         }
@@ -271,45 +277,79 @@ export default function ResourcesClient() {
           to   { opacity: 1; transform: translateY(0); }
         }
 
+        /* ─── Cards grid ─── */
+        .cards-grid {
+          display: grid;
+          /* Default: as-many-as-fit with 320px minimum (mobile/tablet) */
+          grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+          gap: 24px;
+        }
+        /* On desktop, force a clean 3-column layout so the 3 cards each
+           get a generous ~370px width instead of being cramped at 320px. */
+        @media (min-width: 1100px) {
+          .cards-grid {
+            grid-template-columns: repeat(3, 1fr);
+            gap: 28px;
+          }
+        }
+
         /* ─── Cards ─── */
+        /* The outer wrapper carries the entrance animation + hover lift,
+           so the inner layer can freely control tilt without conflict. */
         .resource-card {
+          position: relative;
+          display: block;
+          text-decoration: none;
+          border-radius: 22px;
+          animation: cardEntry 0.75s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+          transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+          perspective: 1200px; /* enables 3D on the inner element */
+        }
+        @keyframes cardEntry {
+          from { opacity: 0; transform: translateY(32px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        .resource-card:hover {
+          transform: translateY(-6px);
+        }
+
+        .card-inner {
           position: relative;
           display: flex;
           flex-direction: column;
-          gap: 16px;
-          background: rgba(255, 255, 255, 0.02);
-          border: 1px solid rgba(255, 255, 255, 0.06);
-          border-radius: 20px;
-          padding: 32px 28px;
-          text-decoration: none;
+          gap: 18px;
+          min-height: 280px;
+          background:
+            linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+          border: 1px solid rgba(255, 255, 255, 0.07);
+          border-radius: 22px;
+          padding: 36px 32px;
           overflow: hidden;
-          isolation: isolate; /* keep the spotlight pseudo layering local */
-          /* 3D transform driven by the --tiltX / --tiltY vars. perspective on
-             parent would be more realistic but per-card is fine at this scale. */
-          transform: perspective(900px) rotateX(var(--tiltX, 0deg)) rotateY(var(--tiltY, 0deg)) translateZ(0);
+          isolation: isolate;
           transform-style: preserve-3d;
+          transform: perspective(1000px) rotateX(0deg) rotateY(0deg) translateZ(0);
+          /* Slightly longer transition so the settle feels smooth when the
+             cursor leaves the card. During active hover, the inline transform
+             overrides this, so there's no lag while tracking. */
           transition:
-            transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
-            border-color 0.3s ease,
-            background 0.3s ease,
-            box-shadow 0.3s ease;
-          animation: cardEntry 0.75s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+            transform 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+            border-color 0.35s ease,
+            background 0.35s ease,
+            box-shadow 0.35s ease;
           will-change: transform;
         }
-        @keyframes cardEntry {
-          from { opacity: 0; transform: translateY(28px) perspective(900px) rotateX(0) rotateY(0); }
-          to   { opacity: 1; transform: translateY(0)   perspective(900px) rotateX(0) rotateY(0); }
-        }
 
-        .resource-card:hover {
-          border-color: color-mix(in srgb, var(--accent) 38%, transparent);
-          background: rgba(255, 255, 255, 0.035);
+        .resource-card:hover .card-inner {
+          border-color: rgba(var(--accent-rgb), 0.45);
+          background:
+            linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.015));
           box-shadow:
-            0 20px 40px -20px rgba(0, 0, 0, 0.6),
-            0 0 40px -10px color-mix(in srgb, var(--accent) 25%, transparent);
+            0 24px 60px -24px rgba(0, 0, 0, 0.7),
+            0 0 0 1px rgba(var(--accent-rgb), 0.15) inset,
+            0 0 60px -10px rgba(var(--accent-rgb), 0.35);
         }
 
-        /* Accent strip at the top — draws from center on hover */
+        /* Accent strip at top */
         .accent-bar {
           position: absolute;
           top: 0;
@@ -330,19 +370,19 @@ export default function ResourcesClient() {
           transform: scaleX(1);
         }
 
-        /* Cursor spotlight — radial gradient at --mx/--my vars */
+        /* Cursor-follow spotlight — now much more visible */
         .spotlight {
           position: absolute;
           inset: 0;
           border-radius: inherit;
           background: radial-gradient(
-            420px circle at var(--mx, 50%) var(--my, 50%),
-            color-mix(in srgb, var(--accent) 14%, transparent) 0%,
-            color-mix(in srgb, var(--accent) 4%, transparent) 35%,
-            transparent 65%
+            500px circle at var(--mx, 50%) var(--my, 50%),
+            rgba(var(--accent-rgb), 0.28) 0%,
+            rgba(var(--accent-rgb), 0.1)  28%,
+            transparent 60%
           );
           opacity: 0;
-          transition: opacity 0.35s ease;
+          transition: opacity 0.4s ease;
           pointer-events: none;
           z-index: 0;
         }
@@ -350,47 +390,113 @@ export default function ResourcesClient() {
           opacity: 1;
         }
 
+        /* Shine sweep — diagonal highlight that sweeps across on hover */
+        .shine {
+          position: absolute;
+          inset: 0;
+          border-radius: inherit;
+          background: linear-gradient(
+            120deg,
+            transparent 30%,
+            rgba(var(--accent-rgb), 0.16) 50%,
+            transparent 70%
+          );
+          background-size: 250% 250%;
+          background-position: 200% 200%;
+          pointer-events: none;
+          z-index: 1;
+          opacity: 0;
+          transition: opacity 0.2s ease;
+        }
+        .resource-card:hover .shine {
+          opacity: 1;
+          animation: shineSweep 1.2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+        @keyframes shineSweep {
+          0%   { background-position: 200% 200%; }
+          100% { background-position: -100% -100%; }
+        }
+
         .card-title {
           font-family: ${S.serif};
-          font-size: 22px;
+          font-size: 24px;
           font-weight: 700;
           color: ${S.cream};
           line-height: 1.2;
           margin: 0;
           position: relative;
-          z-index: 1;
-          transition: color 0.3s ease;
+          z-index: 2;
+          transition: color 0.35s ease, transform 0.35s ease;
         }
         .resource-card:hover .card-title {
-          color: color-mix(in srgb, var(--accent) 20%, ${S.cream});
+          color: var(--accent);
+          transform: translateX(2px);
         }
 
         .card-desc {
-          font-size: 14px;
-          color: rgba(247, 246, 243, 0.45);
-          line-height: 1.5;
+          font-size: 14.5px;
+          color: rgba(247, 246, 243, 0.55);
+          line-height: 1.55;
           margin: 0;
           flex: 1;
           position: relative;
-          z-index: 1;
+          z-index: 2;
+          transition: color 0.35s ease;
+        }
+        .resource-card:hover .card-desc {
+          color: rgba(247, 246, 243, 0.7);
         }
 
         .explore {
-          font-size: 13px;
+          font-size: 13.5px;
           font-weight: 600;
           color: ${S.mint};
           position: relative;
-          z-index: 1;
+          z-index: 2;
           display: inline-flex;
           align-items: center;
-          gap: 4px;
+          gap: 6px;
+          transition: color 0.35s ease;
         }
-        .explore .arrow {
+        .resource-card:hover .explore {
+          color: var(--accent);
+        }
+        .explore-text {
+          position: relative;
+        }
+        /* Animated underline on the "Explore" text */
+        .explore-text::after {
+          content: '';
+          position: absolute;
+          left: 0;
+          right: 0;
+          bottom: -3px;
+          height: 1px;
+          background: currentColor;
+          transform: scaleX(0);
+          transform-origin: left;
+          transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        .resource-card:hover .explore-text::after {
+          transform: scaleX(1);
+        }
+        .arrow {
           display: inline-block;
-          transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+          transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
         }
-        .resource-card:hover .explore .arrow {
-          transform: translateX(6px);
+        .resource-card:hover .arrow {
+          transform: translateX(8px);
+        }
+
+        /* Touch-device / no-hover: show a simplified lift state on :active for
+           the brief tap feedback. */
+        @media (hover: none) {
+          .resource-card:active {
+            transform: translateY(-3px);
+          }
+          .resource-card:active .accent-bar {
+            transform: scaleX(1);
+          }
         }
 
         /* Respect OS-level "reduce motion" — strip all animations + transitions. */
@@ -401,10 +507,15 @@ export default function ResourcesClient() {
           .heading em::after,
           .sub,
           .resource-card,
+          .card-inner,
           .accent-bar,
           .spotlight,
-          .explore .arrow,
-          .card-title {
+          .shine,
+          .explore,
+          .explore-text::after,
+          .arrow,
+          .card-title,
+          .card-desc {
             animation: none !important;
             transition: none !important;
             transform: none !important;
