@@ -2,61 +2,9 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import Link from 'next/link'
-import dynamic from 'next/dynamic'
 import { track } from '@vercel/analytics'
-
-// Lazy-load below-fold sections — deferred until JS is idle.
-// IMPORTANT: include a `loading` fallback that preserves a minimum height.
-// Without this, when the LazySection below reveals these components, there
-// is a network round-trip to fetch their JS chunk — during which the
-// component renders as `null`, leaving a visibly blank section on slower
-// mobile connections. The placeholder below keeps layout stable until the
-// chunk lands.
-const LandingHIW = dynamic(
-  () => import('@/components/landing-hiw').then(m => ({ default: m.LandingHIW })),
-  { ssr: false, loading: () => <div style={{ minHeight: 600 }} /> }
-)
-const LandingUseCases = dynamic(
-  () => import('@/components/landing-use-cases').then(m => ({ default: m.LandingUseCases })),
-  { ssr: false, loading: () => <div style={{ minHeight: 500 }} /> }
-)
-
-/**
- * Defers rendering of children until the placeholder enters the viewport
- * (200px margin). While deferred, an inner placeholder holds the `minHeight`
- * footprint so the observer has a real box to observe. Once visible, that
- * placeholder is removed and children render at their natural height — so
- * there is never extra blank space below a section just because the
- * declared minHeight exceeded the actual content height on a mobile layout.
- *
- * Sections that lazy-load ADDITIONAL JS (dynamic imports below) pass their
- * own minHeight via `dynamic({ loading: ... })` so the chunk-load window
- * still has a stable placeholder even after LazySection has revealed them.
- */
-function LazySection({ children, minHeight = 400 }: { children: React.ReactNode; minHeight?: number }) {
-  const ref = useRef<HTMLDivElement>(null)
-  const [visible, setVisible] = useState(false)
-
-  useEffect(() => {
-    const el = ref.current
-    if (!el) return
-    // Safety net: if IntersectionObserver doesn't exist (very old browser)
-    // or for any reason the element is already past the viewport when
-    // hydration runs, flip visible immediately.
-    if (typeof IntersectionObserver === 'undefined') {
-      setVisible(true)
-      return
-    }
-    const obs = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) { setVisible(true); obs.disconnect() } },
-      { rootMargin: '200px' }
-    )
-    obs.observe(el)
-    return () => obs.disconnect()
-  }, [])
-
-  return <div ref={ref}>{visible ? children : <div style={{ minHeight }} />}</div>
-}
+import { LandingHIW } from '@/components/landing-hiw'
+import { LandingUseCases } from '@/components/landing-use-cases'
 
 // ── Logo ─────────────────────────────────────────────────────────────────────
 function Logo() {
@@ -1269,13 +1217,13 @@ export function LandingClientPage() {
       <Nav />
       <Hero />
       <Ticker />
-      <LazySection minHeight={500}><PriceFeature /></LazySection>
-      <LazySection minHeight={500}><AIFeature /></LazySection>
-      <LazySection minHeight={600}><LandingHIW /></LazySection>
-      <LazySection minHeight={500}><LandingUseCases /></LazySection>
-      <LazySection minHeight={600}><PlatformShowcase /></LazySection>
-      <LazySection minHeight={500}><Pricing /></LazySection>
-      <LazySection minHeight={300}><FAQ /></LazySection>
+      <PriceFeature />
+      <AIFeature />
+      <LandingHIW />
+      <LandingUseCases />
+      <PlatformShowcase />
+      <Pricing />
+      <FAQ />
       <FinalCTA />
       <Footer />
 
