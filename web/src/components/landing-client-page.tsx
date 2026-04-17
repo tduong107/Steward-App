@@ -23,11 +23,15 @@ const LandingUseCases = dynamic(
 
 /**
  * Defers rendering of children until the placeholder enters the viewport
- * (200px margin). The outer wrapper carries `min-height` at ALL times so the
- * section never collapses to 0 — even during the brief window between
- * "observer fires" and "children finish rendering" (or dynamic chunk load).
- * Without that floor, users on mobile hit visibly blank sections on fast
- * scrolls.
+ * (200px margin). While deferred, an inner placeholder holds the `minHeight`
+ * footprint so the observer has a real box to observe. Once visible, that
+ * placeholder is removed and children render at their natural height — so
+ * there is never extra blank space below a section just because the
+ * declared minHeight exceeded the actual content height on a mobile layout.
+ *
+ * Sections that lazy-load ADDITIONAL JS (dynamic imports below) pass their
+ * own minHeight via `dynamic({ loading: ... })` so the chunk-load window
+ * still has a stable placeholder even after LazySection has revealed them.
  */
 function LazySection({ children, minHeight = 400 }: { children: React.ReactNode; minHeight?: number }) {
   const ref = useRef<HTMLDivElement>(null)
@@ -51,7 +55,7 @@ function LazySection({ children, minHeight = 400 }: { children: React.ReactNode;
     return () => obs.disconnect()
   }, [])
 
-  return <div ref={ref} style={{ minHeight }}>{visible ? children : null}</div>
+  return <div ref={ref}>{visible ? children : <div style={{ minHeight }} />}</div>
 }
 
 // ── Logo ─────────────────────────────────────────────────────────────────────
