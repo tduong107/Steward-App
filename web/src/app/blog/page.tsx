@@ -15,7 +15,6 @@ export const metadata: Metadata = {
 
 const S = {
   mint: '#6EE7B7',
-  gold: '#F59E0B',
   cream: '#F7F6F3',
   serif: 'Georgia, "Times New Roman", serif',
 }
@@ -25,28 +24,16 @@ const CATEGORIES = [
     title: 'How We Compare',
     desc: 'See how Steward stacks up against Honey, CamelCamelCamel, and other price trackers.',
     href: '/blog/comparisons',
-    icon: '⚡',
-    accent: S.gold,
-    accentBg: 'rgba(245,158,11,0.08)',
-    accentBorder: 'rgba(245,158,11,0.2)',
   },
   {
     title: 'Guides',
     desc: 'Step-by-step guides on tracking campsites, restaurants, flights, and event tickets.',
     href: '/blog/guides',
-    icon: '📖',
-    accent: S.mint,
-    accentBg: 'rgba(110,231,183,0.08)',
-    accentBorder: 'rgba(110,231,183,0.18)',
   },
   {
     title: 'Insights',
     desc: 'Tips on saving money, tracking strategies, product updates, and behind-the-scenes looks.',
     href: '/blog/insights',
-    icon: '💡',
-    accent: 'rgba(168,130,255,0.9)',
-    accentBg: 'rgba(168,130,255,0.08)',
-    accentBorder: 'rgba(168,130,255,0.18)',
   },
 ]
 
@@ -80,12 +67,6 @@ export default function BlogIndexPage() {
               borderRadius: 20, padding: '32px 28px', textDecoration: 'none', transition: 'all 0.3s ease',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ fontSize: 24 }}>{cat.icon}</span>
-              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: cat.accent, background: cat.accentBg, border: `1px solid ${cat.accentBorder}`, borderRadius: 20, padding: '3px 10px' }}>
-                {cat.title}
-              </span>
-            </div>
             <h2 style={{ fontFamily: S.serif, fontSize: 22, fontWeight: 700, color: S.cream, lineHeight: 1.2, margin: 0 }}>
               {cat.title}
             </h2>
