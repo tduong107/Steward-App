@@ -1,4 +1,5 @@
 import SwiftUI
+import Supabase
 
 struct DetailScreen: View {
     let watch: Watch
@@ -1415,7 +1416,7 @@ struct DetailScreen: View {
             return (
                 "No session stored",
                 "Sign in via the share sheet on a supported retailer to enable auto-cart. Until then, triggers fall back to a Smart Cart Link notification.",
-                .none
+                .missing
             )
         }
 
@@ -1431,7 +1432,7 @@ struct DetailScreen: View {
         // Parse cookie array to find earliest non-expired expiry.
         guard let data = raw.data(using: .utf8),
               let cookies = try? JSONDecoder().decode([SerializedCookieRef].self, from: data) else {
-            return ("Session status unknown", "Steward couldn't parse the stored cookies. Re-sign in via the share sheet.", .none)
+            return ("Session status unknown", "Steward couldn't parse the stored cookies. Re-sign in via the share sheet.", .missing)
         }
 
         let now = Date().timeIntervalSince1970
@@ -1466,8 +1467,12 @@ struct DetailScreen: View {
         let expiresDate: Double?
     }
 
+    /// Three states we render for a watch's captured session. `.missing`
+    /// used to be named `.none` which clashed with `Optional.none` during
+    /// tuple-return type inference and broke the build under Xcode; keep
+    /// it as `.missing` to preserve that unambiguity.
     private enum SessionStatusKind {
-        case active, expired, none
+        case active, expired, missing
     }
 
     private var autoCartStatusSection: some View {
@@ -1565,7 +1570,7 @@ struct DetailScreen: View {
             // Test Session button — only when we have cookies AND the
             // retailer is on the supported list (otherwise probe-session
             // returns a trivial local-only result and wastes a round-trip).
-            if sessionStatus.kind != .none && autoActSupportedForURL(watch.url) {
+            if sessionStatus.kind != .missing && autoActSupportedForURL(watch.url) {
                 HStack(spacing: 10) {
                     Button {
                         Task { await probeSessionNow() }
