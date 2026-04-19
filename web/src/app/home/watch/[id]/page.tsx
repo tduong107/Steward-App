@@ -30,7 +30,9 @@ import {
 import posthog from 'posthog-js'
 import { createClient } from '@/lib/supabase/client'
 import { useSub } from '@/hooks/use-subscription'
-import type { Watch, CheckResult, CheckFrequency } from '@/lib/types'
+import { useAuth } from '@/hooks/use-auth'
+import { PaywallDialog } from '@/components/paywall-dialog'
+import type { Watch, CheckResult, CheckFrequency, ResponseMode } from '@/lib/types'
 import { timeAgo, nextCheckLabel, getDomain, cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -39,21 +41,20 @@ import { Dialog } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Dropdown } from '@/components/ui/dropdown'
 import { Skeleton } from '@/components/ui/skeleton'
+import Image from 'next/image'
 import { PriceHistoryChart } from '@/components/price-history-chart'
 
-const allFrequencyOptions = [
-  { label: 'Daily', value: 'Daily' },
-  { label: 'Every 12 hours', value: 'Every 12 hours' },
-  { label: 'Every 6 hours', value: 'Every 6 hours' },
-  { label: 'Every 4 hours', value: 'Every 4 hours' },
-  { label: 'Every 2 hours', value: 'Every 2 hours' },
-]
-
-const tierFrequencies: Record<string, string[]> = {
-  free: ['Daily'],
-  pro: ['Daily', 'Every 12 hours'],
-  premium: ['Daily', 'Every 12 hours', 'Every 6 hours', 'Every 4 hours', 'Every 2 hours'],
+/// Minimum subscription tier required for each response mode (matches iOS).
+const responseModeRequiredTier: Record<ResponseMode, 'free' | 'pro' | 'premium'> = {
+  notify: 'free',
+  quickLink: 'pro',
+  stewardActs: 'premium',
 }
+
+/// Sections the Edit dialog can scroll to / highlight on open. Matches the
+/// stat cards that are now tap-to-edit, so clicking a card deep-links into
+/// the relevant section.
+type EditScrollTarget = 'name' | 'frequency' | 'time' | 'notify' | 'triggered' | null
 
 export default function WatchDetailPage() {
   const params = useParams()
@@ -61,7 +62,14 @@ export default function WatchDetailPage() {
   const watchId = params.id as string
   const supabaseRef = useRef(createClient())
   const { tier } = useSub()
-  const frequencyOptions = allFrequencyOptions.filter(f => (tierFrequencies[tier] ?? ['Daily']).includes(f.value))
+  const { user, profile } = useAuth()
+
+  // Whether the user has email / phone configured anywhere (matches iOS
+  // `authManager.effectiveEmail` / `.effectivePhone` which falls back across
+  // auth user + profile overrides). If neither is present we hide that row
+  // from the Notify Channels picker.
+  const hasEmail = Boolean(user?.email || profile?.notification_email)
+  const hasPhone = Boolean(user?.phone || profile?.phone_number)
 
   const [watch, setWatch] = useState<Watch | null>(null)
   const [checkResults, setCheckResults] = useState<CheckResult[]>([])
@@ -74,11 +82,37 @@ export default function WatchDetailPage() {
   const [editName, setEditName] = useState('')
   const [editFrequency, setEditFrequency] = useState('')
   const [editPreferredTime, setEditPreferredTime] = useState('')
+  const [editNotifyChannels, setEditNotifyChannels] = useState<string[]>([])
+  const [editResponseMode, setEditResponseMode] = useState<ResponseMode>('notify')
+  const [editNotifyAnyDrop, setEditNotifyAnyDrop] = useState(false)
   const [editSaving, setEditSaving] = useState(false)
+  const [editScrollTarget, setEditScrollTarget] = useState<EditScrollTarget>(null)
+
+  // Secondary paywall opened when a user taps a locked response mode.
+  const [paywallOpen, setPaywallOpen] = useState(false)
 
   // Share state
   const [shareUrl, setShareUrl] = useState<string | null>(null)
   const [shareCopied, setShareCopied] = useState(false)
+
+  // When the edit dialog opens with a specific target section, scroll that
+  // section into view on the next frame (after the portal has mounted +
+  // animated in). We look it up by the data-edit-section attribute so each
+  // section stays self-describing.
+  useEffect(() => {
+    if (!editOpen || !editScrollTarget) return
+    const t = requestAnimationFrame(() => {
+      const el = document.querySelector(
+        `[data-edit-section="${editScrollTarget}"]`,
+      ) as HTMLElement | null
+      if (!el) return
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      // Brief highlight so the user can see what they tapped jumped them to.
+      el.classList.add('wd-edit-section-focus')
+      window.setTimeout(() => el.classList.remove('wd-edit-section-focus'), 1400)
+    })
+    return () => cancelAnimationFrame(t)
+  }, [editOpen, editScrollTarget])
 
   // Fetch watch and check results
   useEffect(() => {
@@ -206,24 +240,56 @@ export default function WatchDetailPage() {
     setTimeout(() => setShareCopied(false), 2000)
   }, [shareUrl])
 
-  const openEditDialog = useCallback(() => {
-    if (!watch) return
-    setEditName(watch.name)
-    setEditFrequency(watch.check_frequency)
-    setEditPreferredTime(watch.preferred_check_time || '')
-    setEditOpen(true)
-  }, [watch])
+  /// Parses the stored `notify_channels` value (may be JSON-encoded array,
+  /// comma-separated string, or blank) into a deduped array of channel keys.
+  const parseChannels = useCallback((raw: string | null | undefined): string[] => {
+    if (!raw) return []
+    try {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) return parsed.map(String)
+    } catch {
+      /* not JSON — fall through */
+    }
+    return raw.split(',').map((c) => c.trim()).filter(Boolean)
+  }, [])
+
+  const openEditDialog = useCallback(
+    (target: EditScrollTarget = null) => {
+      if (!watch) return
+      setEditName(watch.name)
+      setEditFrequency(watch.check_frequency)
+      setEditPreferredTime(watch.preferred_check_time || '')
+      setEditNotifyChannels(parseChannels(watch.notify_channels))
+      setEditResponseMode(watch.response_mode || 'notify')
+      setEditNotifyAnyDrop(Boolean(watch.notify_any_price_drop))
+      setEditScrollTarget(target)
+      setEditOpen(true)
+    },
+    [watch, parseChannels],
+  )
 
   const handleSaveEdit = useCallback(async () => {
     if (!watch) return
+
+    // Invariant: at least one notify channel must be selected. Fall back to
+    // "push" if we somehow end up empty rather than block saving.
+    const channels = editNotifyChannels.length > 0 ? editNotifyChannels : ['push']
+
     setEditSaving(true)
     try {
       const updates: Partial<Watch> = {
         name: editName,
         check_frequency: editFrequency as CheckFrequency,
+        // Persist channels as CSV — iOS already stores/parses this shape.
+        notify_channels: channels.join(','),
+        response_mode: editResponseMode,
       }
       if (editPreferredTime) {
         updates.preferred_check_time = editPreferredTime
+      }
+      // Only send notify_any_price_drop when it's meaningful for this watch.
+      if (watch.action_type === 'price') {
+        updates.notify_any_price_drop = editNotifyAnyDrop
       }
       await supabaseRef.current
         .from('watches')
@@ -236,7 +302,44 @@ export default function WatchDetailPage() {
     } finally {
       setEditSaving(false)
     }
-  }, [watch, editName, editFrequency, editPreferredTime])
+  }, [
+    watch,
+    editName,
+    editFrequency,
+    editPreferredTime,
+    editNotifyChannels,
+    editResponseMode,
+    editNotifyAnyDrop,
+  ])
+
+  /// Toggle a channel in the local edit state. Enforces the "at least one
+  /// selected" invariant on toggle (you can't remove the last channel).
+  const toggleChannel = useCallback((channel: string) => {
+    setEditNotifyChannels((prev) => {
+      if (prev.includes(channel)) {
+        // Refuse to remove the last remaining channel.
+        if (prev.length === 1) return prev
+        return prev.filter((c) => c !== channel)
+      }
+      return [...prev, channel].sort()
+    })
+  }, [])
+
+  /// Called when a user taps a locked response mode. Opens the paywall
+  /// dialog rather than silently selecting. Matches iOS behavior.
+  const selectResponseMode = useCallback(
+    (mode: ResponseMode) => {
+      const required = responseModeRequiredTier[mode]
+      const tierRank = { free: 0, pro: 1, premium: 2 } as const
+      const hasAccess = tierRank[tier] >= tierRank[required]
+      if (!hasAccess) {
+        setPaywallOpen(true)
+        return
+      }
+      setEditResponseMode(mode)
+    },
+    [tier],
+  )
 
   // Loading skeleton
   if (loading) {
@@ -304,9 +407,11 @@ export default function WatchDetailPage() {
             {/* Product image / emoji hero */}
             {watch.image_url ? (
               <div className="wd-hero-image relative shrink-0">
-                <img
+                <Image
                   src={watch.image_url}
                   alt={watch.name}
+                  width={96}
+                  height={96}
                   className="h-20 w-20 sm:h-24 sm:w-24 rounded-[var(--radius-lg)] object-cover shadow-[var(--shadow-md)] ring-1 ring-[var(--color-border)]"
                 />
                 <div className="absolute -bottom-1 -right-1 h-5 w-5 rounded-full border-2 border-[var(--color-bg-card)] flex items-center justify-center" style={{ background: watch.status === 'watching' && !watch.triggered ? 'var(--color-accent)' : watch.triggered ? 'var(--color-green)' : watch.status === 'paused' ? 'var(--color-ink-light)' : 'var(--color-gold)' }}>
@@ -578,13 +683,19 @@ export default function WatchDetailPage() {
           </div>
         </div>
 
-        {/* Frequency */}
-        <div className="wd-stat-card group rounded-[var(--radius-lg)] bg-[var(--color-bg-card)] border border-[var(--color-border)] p-4 transition-all hover:shadow-[var(--shadow-sm)] hover:border-[var(--color-border-mid)]" style={{ animationDelay: '0.2s' }}>
+        {/* Frequency — click to edit */}
+        <button
+          type="button"
+          onClick={() => openEditDialog('frequency')}
+          aria-label="Edit check frequency"
+          className="wd-stat-card wd-stat-card-editable group rounded-[var(--radius-lg)] bg-[var(--color-bg-card)] border border-[var(--color-border)] p-4 text-left transition-all hover:shadow-[var(--shadow-sm)] hover:border-[var(--color-accent-mid)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/40"
+          style={{ animationDelay: '0.2s' }}
+        >
           <div className="flex items-start gap-3">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--color-accent-light)] transition-transform group-hover:scale-105">
               <RefreshCw className="h-4 w-4 text-[var(--color-accent)]" />
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-light)]">
                 Frequency
               </p>
@@ -592,8 +703,9 @@ export default function WatchDetailPage() {
                 {watch.check_frequency}
               </p>
             </div>
+            <Pencil className="wd-stat-edit-icon h-3.5 w-3.5 text-[var(--color-ink-light)] opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
           </div>
-        </div>
+        </button>
 
         {/* Next check */}
         <div className="wd-stat-card group rounded-[var(--radius-lg)] bg-[var(--color-bg-card)] border border-[var(--color-border)] p-4 transition-all hover:shadow-[var(--shadow-sm)] hover:border-[var(--color-border-mid)]" style={{ animationDelay: '0.25s' }}>
@@ -631,13 +743,19 @@ export default function WatchDetailPage() {
           </div>
         </div>
 
-        {/* When triggered */}
-        <div className="wd-stat-card group rounded-[var(--radius-lg)] bg-[var(--color-bg-card)] border border-[var(--color-border)] p-4 transition-all hover:shadow-[var(--shadow-sm)] hover:border-[var(--color-border-mid)]" style={{ animationDelay: '0.35s' }}>
+        {/* When triggered — click to edit */}
+        <button
+          type="button"
+          onClick={() => openEditDialog('triggered')}
+          aria-label="Edit what happens when this watch is triggered"
+          className="wd-stat-card wd-stat-card-editable group rounded-[var(--radius-lg)] bg-[var(--color-bg-card)] border border-[var(--color-border)] p-4 text-left transition-all hover:shadow-[var(--shadow-sm)] hover:border-[var(--color-accent-mid)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/40"
+          style={{ animationDelay: '0.35s' }}
+        >
           <div className="flex items-start gap-3">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--color-pink-light)] transition-transform group-hover:scale-105">
               <Activity className="h-4 w-4 text-[var(--color-pink)]" />
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-light)]">
                 When Triggered
               </p>
@@ -645,11 +763,18 @@ export default function WatchDetailPage() {
                 {responseModeLabel[watch.response_mode] || watch.response_mode}
               </p>
             </div>
+            <Pencil className="wd-stat-edit-icon h-3.5 w-3.5 text-[var(--color-ink-light)] opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
           </div>
-        </div>
+        </button>
 
-        {/* Notify channels — spans full row on smallest screen */}
-        <div className="wd-stat-card group rounded-[var(--radius-lg)] bg-[var(--color-bg-card)] border border-[var(--color-border)] p-4 sm:col-span-2 lg:col-span-3 transition-all hover:shadow-[var(--shadow-sm)] hover:border-[var(--color-border-mid)]" style={{ animationDelay: '0.4s' }}>
+        {/* Notify channels — spans full row on smallest screen, click to edit */}
+        <button
+          type="button"
+          onClick={() => openEditDialog('notify')}
+          aria-label="Edit notify channels"
+          className="wd-stat-card wd-stat-card-editable group rounded-[var(--radius-lg)] bg-[var(--color-bg-card)] border border-[var(--color-border)] p-4 text-left sm:col-span-2 lg:col-span-3 transition-all hover:shadow-[var(--shadow-sm)] hover:border-[var(--color-accent-mid)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/40"
+          style={{ animationDelay: '0.4s' }}
+        >
           <div className="flex items-start gap-3">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--color-blue-light)] transition-transform group-hover:scale-105">
               <Bell className="h-4 w-4 text-[var(--color-blue)]" />
@@ -682,8 +807,9 @@ export default function WatchDetailPage() {
                 )}
               </div>
             </div>
+            <Pencil className="wd-stat-edit-icon h-3.5 w-3.5 text-[var(--color-ink-light)] opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
           </div>
-        </div>
+        </button>
       </div>
 
       {/* ===== PRICE CHART SECTION ===== */}
@@ -871,7 +997,7 @@ export default function WatchDetailPage() {
       <div className="wd-action-bar fixed bottom-0 left-0 right-0 z-50 pointer-events-none">
         <div className="mx-auto max-w-2xl px-4 pb-4 sm:pb-6">
           <div className="pointer-events-auto flex items-center justify-center gap-2 rounded-[var(--radius-xl)] bg-[var(--color-bg-card)]/80 backdrop-blur-xl border border-[var(--color-border)] p-2.5 shadow-[var(--shadow-xl)]">
-            <Button variant="secondary" size="sm" onClick={openEditDialog} disabled={actionLoading} className="wd-action-btn">
+            <Button variant="secondary" size="sm" onClick={() => openEditDialog()} disabled={actionLoading} className="wd-action-btn">
               <Pencil className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Edit</span>
             </Button>
@@ -903,14 +1029,16 @@ export default function WatchDetailPage() {
 
       {/* Edit dialog */}
       <Dialog open={editOpen} onClose={() => setEditOpen(false)} title="Edit Watch">
-        <div className="space-y-4">
-          <Input
-            label="Name"
-            value={editName}
-            onChange={(e) => setEditName(e.target.value)}
-          />
+        <div className="space-y-5">
+          <div data-edit-section="name">
+            <Input
+              label="Name"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+            />
+          </div>
           {/* Frequency picker with tier sections (matches iOS) */}
-          <div>
+          <div data-edit-section="frequency">
             <label className="block text-xs font-medium text-[var(--color-ink-mid)] mb-2">Check Frequency</label>
             {[
               { tier: 'FREE', price: '', frequencies: ['Daily'] },
@@ -939,16 +1067,21 @@ export default function WatchDetailPage() {
                       <button
                         key={freq}
                         type="button"
-                        onClick={() => isCurrentOrLower && setEditFrequency(freq)}
+                        onClick={() => {
+                          if (isCurrentOrLower) {
+                            setEditFrequency(freq)
+                          } else {
+                            setPaywallOpen(true)
+                          }
+                        }}
                         className={`w-full flex items-center justify-between px-4 py-3 text-sm transition-colors ${
                           i > 0 ? 'border-t border-[var(--color-border)]' : ''
                         } ${editFrequency === freq
                           ? 'bg-[var(--color-accent-light)] text-[var(--color-accent)] font-semibold'
                           : isCurrentOrLower
                             ? 'bg-[var(--color-bg-card)] text-[var(--color-ink)] hover:bg-[var(--color-bg-deep)] cursor-pointer'
-                            : 'bg-[var(--color-bg-deep)] text-[var(--color-ink-light)] cursor-not-allowed opacity-60'
+                            : 'bg-[var(--color-bg-deep)] text-[var(--color-ink-light)] cursor-pointer hover:opacity-80'
                         }`}
-                        disabled={!isCurrentOrLower}
                       >
                         <span>{freq}</span>
                         {editFrequency === freq && (
@@ -964,13 +1097,189 @@ export default function WatchDetailPage() {
               )
             })}
           </div>
-          <Input
-            label="Preferred Check Time"
-            type="time"
-            value={editPreferredTime}
-            onChange={(e) => setEditPreferredTime(e.target.value)}
-          />
-          <div className="flex justify-end gap-2 pt-2">
+
+          <div data-edit-section="time">
+            <Input
+              label="Preferred Check Time"
+              type="time"
+              value={editPreferredTime}
+              onChange={(e) => setEditPreferredTime(e.target.value)}
+            />
+          </div>
+
+          {/* Notify Channels — matches iOS NotificationPickerSheet */}
+          <div data-edit-section="notify">
+            <label className="block text-xs font-medium text-[var(--color-ink-mid)] mb-2">
+              Notify Channels
+            </label>
+            <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] overflow-hidden">
+              {[
+                { key: 'push', icon: Bell, title: 'Push Notification', subtitle: 'Get notified instantly on your device', available: true },
+                hasEmail && {
+                  key: 'email',
+                  icon: Mail,
+                  title: 'Email',
+                  subtitle: user?.email || profile?.notification_email || 'Receive a detailed email alert',
+                  available: true,
+                },
+                hasPhone && {
+                  key: 'sms',
+                  icon: Smartphone,
+                  title: 'SMS',
+                  subtitle: profile?.phone_number || user?.phone || 'Get a text when triggered',
+                  available: true,
+                },
+              ].filter(Boolean).map((row, i, arr) => {
+                const r = row as { key: string; icon: React.ComponentType<{ size?: number; className?: string }>; title: string; subtitle: string; available: boolean }
+                const Icon = r.icon
+                const isSelected = editNotifyChannels.includes(r.key)
+                const isOnlyOne = isSelected && editNotifyChannels.length === 1
+                return (
+                  <button
+                    key={r.key}
+                    type="button"
+                    onClick={() => toggleChannel(r.key)}
+                    className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-colors ${
+                      i > 0 ? 'border-t border-[var(--color-border)]' : ''
+                    } ${isSelected ? 'bg-[var(--color-accent-light)]' : 'bg-[var(--color-bg-card)] hover:bg-[var(--color-bg-deep)]'} ${
+                      isOnlyOne ? 'cursor-not-allowed' : 'cursor-pointer'
+                    }`}
+                    aria-disabled={isOnlyOne}
+                    title={isOnlyOne ? 'At least one channel must be selected' : undefined}
+                  >
+                    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-sm)] ${
+                      isSelected ? 'bg-[var(--color-accent)]/20' : 'bg-[var(--color-bg-deep)]'
+                    }`}>
+                      <Icon size={14} className={isSelected ? 'text-[var(--color-accent)]' : 'text-[var(--color-ink-light)]'} />
+                    </div>
+                    <div className="flex-1 min-w-0 text-left">
+                      <div className={`font-medium ${isSelected ? 'text-[var(--color-accent)]' : 'text-[var(--color-ink)]'}`}>
+                        {r.title}
+                      </div>
+                      <div className="text-[11px] text-[var(--color-ink-light)] truncate">
+                        {r.subtitle}
+                      </div>
+                    </div>
+                    {isSelected ? (
+                      <CheckCircle size={18} className="text-[var(--color-accent)] shrink-0" />
+                    ) : (
+                      <div className="h-[18px] w-[18px] rounded-full border border-[var(--color-border-mid)] shrink-0" />
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+            {(!hasEmail || !hasPhone) && (
+              <p className="mt-2 text-[11px] text-[var(--color-ink-light)]">
+                Add your {!hasEmail && !hasPhone ? 'email and phone number' : !hasEmail ? 'email' : 'phone number'} in Settings to unlock more channels.
+              </p>
+            )}
+            <p className="mt-1 text-[11px] text-[var(--color-ink-light)]">
+              At least one channel must be selected.
+            </p>
+          </div>
+
+          {/* When Triggered — matches iOS ResponseModePickerSheet */}
+          <div data-edit-section="triggered">
+            <label className="block text-xs font-medium text-[var(--color-ink-mid)] mb-2">
+              When Triggered
+            </label>
+            <p className="text-[12px] text-[var(--color-ink-light)] mb-2">
+              What should Steward do when your watch condition is met?
+            </p>
+            <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] overflow-hidden">
+              {([
+                { mode: 'notify' as const, title: 'Notify Me', description: 'Steward sends you a push notification. You decide what to do next.', badge: null },
+                { mode: 'quickLink' as const, title: 'Notify + Quick Link', description: 'Notification with a smart action link — one tap to add to cart, book, or open checkout.', badge: 'Pro' as const },
+                { mode: 'stewardActs' as const, title: 'Auto Add to Cart', description: 'Steward automatically adds to cart, books the reservation, or completes the purchase within your spending limit.', badge: 'Premium' as const },
+              ]).map((opt, i) => {
+                const required = responseModeRequiredTier[opt.mode]
+                const tierRank = { free: 0, pro: 1, premium: 2 } as const
+                const hasAccess = tierRank[tier] >= tierRank[required]
+                const isSelected = editResponseMode === opt.mode
+                return (
+                  <button
+                    key={opt.mode}
+                    type="button"
+                    onClick={() => selectResponseMode(opt.mode)}
+                    className={`w-full flex items-start gap-3 px-4 py-3 text-sm transition-colors text-left ${
+                      i > 0 ? 'border-t border-[var(--color-border)]' : ''
+                    } ${isSelected
+                      ? 'bg-[var(--color-accent-light)]'
+                      : hasAccess
+                        ? 'bg-[var(--color-bg-card)] hover:bg-[var(--color-bg-deep)] cursor-pointer'
+                        : 'bg-[var(--color-bg-deep)] cursor-pointer hover:opacity-90'
+                    }`}
+                  >
+                    <div className="pt-0.5 shrink-0">
+                      {isSelected ? (
+                        <CheckCircle size={18} className="text-[var(--color-accent)]" />
+                      ) : (
+                        <div className="h-[18px] w-[18px] rounded-full border border-[var(--color-border-mid)]" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className={`font-medium ${hasAccess ? 'text-[var(--color-ink)]' : 'text-[var(--color-ink-light)]'}`}>
+                          {opt.title}
+                        </span>
+                        {opt.badge === 'Pro' && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[var(--color-accent)]/12 text-[var(--color-accent)]">
+                            PRO
+                          </span>
+                        )}
+                        {opt.badge === 'Premium' && (
+                          <>
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[var(--color-accent)] text-white">
+                              BETA
+                            </span>
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[var(--color-gold)]/12 text-[var(--color-gold)]">
+                              PREMIUM
+                            </span>
+                          </>
+                        )}
+                      </div>
+                      <p className={`mt-1 text-[12px] leading-relaxed ${hasAccess ? 'text-[var(--color-ink-mid)]' : 'text-[var(--color-ink-light)]'}`}>
+                        {opt.description}
+                      </p>
+                    </div>
+                    {!hasAccess && (
+                      <Lock size={12} className="text-[var(--color-ink-light)] shrink-0 mt-1" />
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Notify on any price drop — only for price watches, matches iOS toggle */}
+          {watch.action_type === 'price' && (
+            <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] p-4 flex items-start gap-3">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-sm)] bg-[var(--color-accent)]/12">
+                <Zap size={14} className="text-[var(--color-accent)]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <label className="flex items-start justify-between gap-3 cursor-pointer">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-[var(--color-ink)]">
+                      Notify on any price drop
+                    </div>
+                    <div className="text-[11px] text-[var(--color-ink-light)] mt-0.5">
+                      Alert even for small decreases
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={editNotifyAnyDrop}
+                    onChange={(e) => setEditNotifyAnyDrop(e.target.checked)}
+                    className="mt-1 h-4 w-4 accent-[var(--color-accent)] cursor-pointer"
+                  />
+                </label>
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 pt-2 sticky bottom-0 bg-[var(--color-bg-card)] -mx-4 sm:-mx-5 px-4 sm:px-5 pb-1 border-t border-[var(--color-border)] pt-4">
             <Button variant="secondary" onClick={() => setEditOpen(false)}>
               Cancel
             </Button>
@@ -980,6 +1289,9 @@ export default function WatchDetailPage() {
           </div>
         </div>
       </Dialog>
+
+      {/* Paywall for locked frequency / response mode options */}
+      <PaywallDialog open={paywallOpen} onClose={() => setPaywallOpen(false)} />
 
       {/* ===== Custom styles for this page ===== */}
       <style>{`
@@ -1080,6 +1392,30 @@ export default function WatchDetailPage() {
         /* Back button arrow */
         .wd-back-btn:hover .h-4 {
           transform: translateX(-2px);
+        }
+
+        /* Editable stat cards — subtle lift on hover so users discover
+           they're interactive without making the layout noisy. */
+        .wd-stat-card-editable {
+          cursor: pointer;
+          width: 100%;
+        }
+        .wd-stat-card-editable:hover {
+          transform: translateY(-1px);
+        }
+        .wd-stat-card-editable:active {
+          transform: translateY(0);
+        }
+
+        /* Brief focus pulse on the edit dialog section that was tapped
+           into — nudges the eye to the right row after opening. */
+        .wd-edit-section-focus {
+          animation: wd-editFocusPulse 1.2s ease-out;
+        }
+        @keyframes wd-editFocusPulse {
+          0% { background: transparent; }
+          30% { background: rgba(74, 222, 128, 0.10); }
+          100% { background: transparent; }
         }
       `}</style>
     </div>
