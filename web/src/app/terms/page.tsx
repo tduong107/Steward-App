@@ -106,13 +106,13 @@ export default function TermsOfServicePage() {
                   <tr className="border-b border-[var(--color-border)]">
                     <td className="px-5 py-3 font-medium text-[var(--color-ink)]">Steward Pro</td>
                     <td className="px-5 py-3">$4.99/mo</td>
-                    <td className="px-5 py-3">$29.99/yr</td>
+                    <td className="px-5 py-3">$39.99/yr</td>
                     <td className="px-5 py-3">Up to 7 watches, checks every 12 hours, price insights</td>
                   </tr>
                   <tr>
                     <td className="px-5 py-3 font-medium text-[var(--color-ink)]">Steward Premium</td>
                     <td className="px-5 py-3">$9.99/mo</td>
-                    <td className="px-5 py-3">$59.99/yr</td>
+                    <td className="px-5 py-3">$79.99/yr</td>
                     <td className="px-5 py-3">Up to 15 watches, checks every 2 hours, auto-execute actions, everything in Pro</td>
                   </tr>
                 </tbody>
