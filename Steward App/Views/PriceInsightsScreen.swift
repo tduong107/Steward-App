@@ -292,7 +292,10 @@ struct PriceInsightsScreen: View {
                 }
             }
 
-            // Chart
+            // Chart — .stepEnd for CamelCamelCamel-style staircase lines:
+            // price holds flat until next recorded check, then jumps
+            // vertically at the moment of change. More honest than a
+            // diagonal for data we only observe discretely.
             Chart(points) { point in
                 AreaMark(
                     x: .value("Date", point.date),
@@ -306,6 +309,7 @@ struct PriceInsightsScreen: View {
                         endPoint: .bottom
                     )
                 )
+                .interpolationMethod(.stepEnd)
 
                 LineMark(
                     x: .value("Date", point.date),
@@ -313,6 +317,7 @@ struct PriceInsightsScreen: View {
                 )
                 .foregroundStyle(chartColor)
                 .lineStyle(StrokeStyle(lineWidth: 2))
+                .interpolationMethod(.stepEnd)
             }
             .chartYScale(domain: minPrice...maxPrice)
             .chartXAxis(.hidden)

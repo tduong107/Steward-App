@@ -107,7 +107,10 @@ struct PriceHistoryChart: View {
                 }
             }
 
-            // Chart
+            // Chart — `.stepEnd` renders CamelCamelCamel-style staircase
+            // lines: price holds flat until the next recorded check, then
+            // jumps vertically. Honest about the discrete sampling — we
+            // never observed a diagonal slope between checks.
             Chart(points) { point in
                 if points.count >= 2 {
                     AreaMark(
@@ -122,6 +125,7 @@ struct PriceHistoryChart: View {
                             endPoint: .bottom
                         )
                     )
+                    .interpolationMethod(.stepEnd)
 
                     LineMark(
                         x: .value("Date", point.date),
@@ -129,6 +133,7 @@ struct PriceHistoryChart: View {
                     )
                     .foregroundStyle(accentColor)
                     .lineStyle(StrokeStyle(lineWidth: 2))
+                    .interpolationMethod(.stepEnd)
                 }
 
                 // Show point mark for single data point or selected point

@@ -98,6 +98,9 @@ struct PriceWatchRow: View {
     // MARK: - Mini Sparkline
 
     private var miniSparkline: some View {
+        // `.stepEnd` matches the staircase style used elsewhere in the
+        // app for price charts — price holds flat until the next check,
+        // then jumps. See PriceHistoryChart.swift for the rationale.
         Chart(priceHistory) { point in
             LineMark(
                 x: .value("Date", point.date),
@@ -105,6 +108,7 @@ struct PriceWatchRow: View {
             )
             .foregroundStyle(sparklineColor)
             .lineStyle(StrokeStyle(lineWidth: 1.5))
+            .interpolationMethod(.stepEnd)
         }
         .chartXAxis(.hidden)
         .chartYAxis(.hidden)

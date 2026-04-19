@@ -288,6 +288,7 @@ struct SavingsScreen: View {
                         endPoint: .bottom
                     )
                 )
+                .interpolationMethod(.stepEnd)
 
                 LineMark(
                     x: .value("Date", point.date),
@@ -295,14 +296,15 @@ struct SavingsScreen: View {
                 )
                 .foregroundStyle(Theme.accent)
                 .lineStyle(StrokeStyle(lineWidth: 1.5))
+                .interpolationMethod(.stepEnd)
             }
         }
-        // Default linear interpolation — connect data points with straight
-        // segments rather than Catmull-Rom splines. Splines looked fine on
-        // smooth price histories but produced misleading curves (valleys
-        // below the minimum, peaks above the maximum) for watches with
-        // sudden price drops like REI or Vuori. Straight lines honestly
-        // represent what actually happened between checks.
+        // `.stepEnd` gives CamelCamelCamel-style staircase lines: the
+        // price holds flat from each recorded check until the next one,
+        // then jumps vertically at the moment of the change. This is
+        // more honest than linear interpolation for price data — we
+        // didn't observe a gradual slope between checks; the price was
+        // at the previous value right up until we saw it change.
         .chartYScale(domain: minPrice...maxPrice)
         .chartXAxis(.hidden)
         .chartYAxis(.hidden)

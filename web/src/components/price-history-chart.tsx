@@ -85,8 +85,13 @@ export function PriceHistoryChart({ data }: PriceHistoryChartProps) {
             width={55}
           />
           <Tooltip content={<CustomTooltip />} />
+          {/* `stepAfter` renders CamelCamelCamel-style staircase lines:
+              price holds flat from each check until the next one, then
+              jumps vertically at the moment of change. Matches the
+              .stepEnd interpolation used in the iOS price charts
+              (PriceHistoryChart.swift / SavingsScreen.swift / etc.). */}
           <Area
-            type="monotone"
+            type="stepAfter"
             dataKey="price"
             stroke="var(--color-accent)"
             strokeWidth={2}
