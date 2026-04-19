@@ -102,6 +102,15 @@ export default function WatchDetailPage() {
   // Secondary paywall opened when a user taps a locked response mode.
   const [paywallOpen, setPaywallOpen] = useState(false)
 
+  // Auto-cart session probe: result of clicking "Test session". Null =
+  // never run, object = result of latest probe. Kept out of watch state
+  // so it resets when the user leaves the page.
+  const [sessionProbeResult, setSessionProbeResult] = useState<
+    | { logged_in: boolean; detail: string }
+    | null
+  >(null)
+  const [sessionProbing, setSessionProbing] = useState(false)
+
   // Share state
   const [shareUrl, setShareUrl] = useState<string | null>(null)
   const [shareCopied, setShareCopied] = useState(false)
@@ -345,6 +354,45 @@ export default function WatchDetailPage() {
       return [...prev, channel].sort()
     })
   }, [])
+
+  /// Invokes the `probe-session` edge function to ask the retailer whether
+  /// our stored cookies are still valid — without performing a real cart-add.
+  /// Used by the "Test session" button on the Auto-Cart Status card.
+  const handleProbeSession = useCallback(async () => {
+    if (!watch) return
+    setSessionProbing(true)
+    setSessionProbeResult(null)
+    try {
+      const { data, error } = await supabaseRef.current.functions.invoke(
+        'probe-session',
+        { body: { watch_id: watch.id, user_id: watch.user_id } },
+      )
+      if (error) throw error
+      if (data && typeof data === 'object' && 'logged_in' in data) {
+        setSessionProbeResult({
+          logged_in: Boolean(data.logged_in),
+          detail: String(data.detail ?? ''),
+        })
+        posthog.capture('auto_cart_session_probed', {
+          watch_id: watch.id,
+          logged_in: Boolean(data.logged_in),
+        })
+      } else {
+        setSessionProbeResult({
+          logged_in: false,
+          detail: 'Probe returned an unexpected response — try again in a moment.',
+        })
+      }
+    } catch (err) {
+      console.error('probe-session failed:', err)
+      setSessionProbeResult({
+        logged_in: false,
+        detail: "Couldn't reach the probe service. Try again shortly.",
+      })
+    } finally {
+      setSessionProbing(false)
+    }
+  }, [watch])
 
   /// Called when a user taps a locked response mode. Opens the paywall
   /// dialog rather than silently selecting. Matches iOS behavior.
@@ -772,6 +820,40 @@ export default function WatchDetailPage() {
                 </div>
               </div>
             </div>
+
+            {/* Test-session action row. Only useful when we have cookies at
+                all — otherwise the probe would trivially return "no session".
+                Also only for retailers we have a probe for (mirrors the
+                supported-domains list on the backend). */}
+            {session.status !== 'none' && functional && (
+              <div className="mt-3 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleProbeSession}
+                  disabled={sessionProbing}
+                >
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  {sessionProbing ? 'Testing…' : 'Test session'}
+                </Button>
+                {sessionProbeResult && (
+                  <div
+                    className={`flex items-start gap-2 text-[12px] rounded-[var(--radius-md)] px-3 py-2 border ${
+                      sessionProbeResult.logged_in
+                        ? 'bg-[var(--color-green)]/8 border-[var(--color-green)]/30 text-[var(--color-ink)]'
+                        : 'bg-[var(--color-gold)]/10 border-[var(--color-gold)]/30 text-[var(--color-ink)]'
+                    }`}
+                  >
+                    {sessionProbeResult.logged_in ? (
+                      <CheckCircle className="h-3.5 w-3.5 text-[var(--color-green)] shrink-0 mt-0.5" />
+                    ) : (
+                      <AlertTriangle className="h-3.5 w-3.5 text-[var(--color-gold)] shrink-0 mt-0.5" />
+                    )}
+                    <span className="leading-relaxed">{sessionProbeResult.detail}</span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )
       })()}
