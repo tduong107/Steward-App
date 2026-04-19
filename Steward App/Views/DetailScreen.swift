@@ -25,6 +25,11 @@ struct DetailScreen: View {
     @State private var showRenameAlert = false
     @State private var editedName = ""
 
+    // Auto-cart session probe — result of tapping "Test Session" on the
+    // Auto-Cart Status section. Nil = never run in this view session.
+    @State private var sessionProbeResult: (loggedIn: Bool, detail: String)?
+    @State private var isProbingSession = false
+
     /// Show price chart for price-related watches
     private var showsPriceChart: Bool {
         watch.actionType == .price ||
@@ -477,6 +482,13 @@ struct DetailScreen: View {
 
             // Auto-Act preferences (Premium feature)
             autoActSection
+
+            // Auto-Cart Status — visible only when the user opted into
+            // Auto Add to Cart. Shows session validity + last attempt
+            // outcome + a "Test Session" button.
+            if watch.autoActEnabled {
+                autoCartStatusSection
+            }
 
             // Visit website button
             visitWebsiteCard
@@ -1094,12 +1106,14 @@ struct DetailScreen: View {
             // Action options specific to this watch type
             VStack(spacing: 0) {
                 // For Free users: show "Notify Me"
-                // For Pro+ users: show "Notify + Quick Link" (replaces basic notify since it's strictly better)
+                // For Pro+ users: show "Smart Cart Link" (replaces basic notify since it's strictly better)
+                // "Smart Cart Link" was previously called "Notify + Quick Link" — renamed
+                // across iOS + web for consistency with the Tier 6 honesty reframe.
                 if subscriptionManager.currentTier.hasQuickLink && watch.actionType != .notify {
                     autoActOption(
                         icon: "link",
-                        title: "Notify + Quick Link",
-                        subtitle: "Notification with a direct link to take action",
+                        title: "Smart Cart Link",
+                        subtitle: "One-tap notification that opens your cart pre-filled on the retailer's site or app.",
                         isSelected: !watch.autoActEnabled,
                         isAvailable: true
                     ) {
@@ -1110,7 +1124,7 @@ struct DetailScreen: View {
                     autoActOption(
                         icon: "bell.fill",
                         title: "Notify Me",
-                        subtitle: "Send a push notification",
+                        subtitle: "Push notification when your condition is met. You decide what to do next.",
                         isSelected: !watch.autoActEnabled,
                         isAvailable: true
                     ) {
@@ -1118,19 +1132,19 @@ struct DetailScreen: View {
                         try? viewModel.saveAndSync(watch)
                     }
 
-                    // Show Quick Link as locked option for Free users
+                    // Show Smart Cart Link as locked option for Free users
                     if watch.actionType != .notify {
                         Divider().foregroundStyle(Theme.border).padding(.leading, 44)
 
                         autoActOption(
                             icon: "link",
-                            title: "Notify + Quick Link",
-                            subtitle: "Notification with a direct link to take action",
+                            title: "Smart Cart Link",
+                            subtitle: "One-tap notification that opens your cart pre-filled on the retailer.",
                             isSelected: false,
                             isAvailable: false,
                             tierBadge: "Pro"
                         ) {
-                            subscriptionManager.presentPaywall(highlighting: .pro, reason: "Quick Link is a Pro feature")
+                            subscriptionManager.presentPaywall(highlighting: .pro, reason: "Smart Cart Link is a Pro feature")
                         }
                     }
                 }
@@ -1147,8 +1161,8 @@ struct DetailScreen: View {
                         icon: "cart.badge.plus",
                         title: "Auto Add to Cart",
                         subtitle: canAutoAct
-                            ? "Steward adds to cart automatically"
-                            : "Coming soon for this store",
+                            ? "Steward tries to add to cart automatically. If the retailer declines or your session expires, you'll get a Smart Cart Link instead."
+                            : "Not wired up for this retailer yet — you'll get a Smart Cart Link notification on trigger.",
                         isSelected: watch.autoActEnabled,
                         isAvailable: isPremium && canAutoAct,
                         tierBadge: "Premium"
@@ -1165,7 +1179,7 @@ struct DetailScreen: View {
                     autoActOption(
                         icon: "calendar.badge.plus",
                         title: "Auto Book",
-                        subtitle: "Coming soon for Premium",
+                        subtitle: "Coming soon for Premium. For now, triggers send a notification with a one-tap booking link.",
                         isSelected: false,
                         isAvailable: false,
                         tierBadge: "Premium"
@@ -1174,7 +1188,7 @@ struct DetailScreen: View {
                     autoActOption(
                         icon: "doc.badge.plus",
                         title: "Auto Fill & Submit",
-                        subtitle: "Coming soon",
+                        subtitle: "Coming soon. For now, triggers send a notification with a link to the form.",
                         isSelected: false,
                         isAvailable: false
                     ) { }
@@ -1366,14 +1380,254 @@ struct DetailScreen: View {
         }
     }
 
+    /// Retailer domains where `execute-action` has a working backend
+    /// handler today. Keep in sync with web `AUTO_ACT_SUPPORTED_DOMAINS`
+    /// in `web/src/lib/auto-act.ts`.
+    ///
+    /// `nike.com`, `adidas.com`, and `costco.com` were removed — modern
+    /// Nike/Adidas are custom storefronts with Queue-it anti-bot, and
+    /// Costco's cart-add needs a CSRF form-post we don't handle. All
+    /// three fell through to the "Unsupported retailer" branch and
+    /// silently failed. Leaving them off the list means the user sees
+    /// "Not wired up for this retailer yet" — which is honest.
     private func autoActSupportedForURL(_ url: String) -> Bool {
         let lower = url.lowercased()
         let supportedDomains = [
             "amazon.com", "target.com", "walmart.com", "bestbuy.com",
-            "nike.com", "adidas.com", "costco.com",
             "myshopify.com", "shopify.com",
         ]
         return supportedDomains.contains { lower.contains($0) }
+    }
+
+    // MARK: - Auto-Cart Status Section
+    //
+    // Mirrors the web watch detail's Auto-Cart Status card. Shown only when
+    // `watch.autoActEnabled` is true. Reports session validity (derived
+    // from stored cookies' expiry) and the outcome of the last auto-cart
+    // attempt. Includes a "Test Session" button that calls the
+    // `probe-session` edge fn to ping the retailer with stored cookies.
+
+    /// Inspects the watch's stored cookies and returns a simple status.
+    /// Mirrors `inspectSession` in web `auto-act.ts`.
+    private var sessionStatus: (label: String, hint: String, kind: SessionStatusKind) {
+        // No cookies stored at all.
+        guard let raw = watch.siteCookies, !raw.isEmpty else {
+            return (
+                "No session stored",
+                "Sign in via the share sheet on a supported retailer to enable auto-cart. Until then, triggers fall back to a Smart Cart Link notification.",
+                .none
+            )
+        }
+
+        // Explicitly marked inactive on a prior run.
+        if let status = watch.cookieStatus, status != "active" {
+            return (
+                "Session expired",
+                "Re-sign in via the share sheet. Until then, triggers fall back to a Smart Cart Link notification.",
+                .expired
+            )
+        }
+
+        // Parse cookie array to find earliest non-expired expiry.
+        guard let data = raw.data(using: .utf8),
+              let cookies = try? JSONDecoder().decode([SerializedCookieRef].self, from: data) else {
+            return ("Session status unknown", "Steward couldn't parse the stored cookies. Re-sign in via the share sheet.", .none)
+        }
+
+        let now = Date().timeIntervalSince1970
+        let datedCookies = cookies.compactMap { $0.expiresDate }.filter { $0 > 0 }
+        let validDated = datedCookies.filter { $0 > now }
+
+        if !datedCookies.isEmpty && validDated.isEmpty {
+            return ("Session expired", "All stored cookies have expired. Re-sign in via the share sheet.", .expired)
+        }
+
+        // Earliest upcoming expiry → human label.
+        if let earliest = validDated.min() {
+            let expiryDate = Date(timeIntervalSince1970: earliest)
+            let secondsRemaining = earliest - now
+            let days = Int(secondsRemaining / 86400)
+            let hours = Int(secondsRemaining / 3600)
+            let expiryText = days >= 1 ? "\(days) day\(days == 1 ? "" : "s")" : "\(hours) hour\(hours == 1 ? "" : "s")"
+            _ = expiryDate  // kept for future relative-date tweaks
+            return (
+                "Session active · expires in \(expiryText)",
+                watch.cookieDomain.map { "Signed into \($0)." } ?? "Auto-cart is armed for this watch.",
+                .active
+            )
+        }
+
+        return ("Session active", "Auto-cart is armed for this watch.", .active)
+    }
+
+    /// Shape for decoding the `site_cookies` JSON column. Only fields we
+    /// inspect locally are typed — everything else is ignored.
+    private struct SerializedCookieRef: Decodable {
+        let expiresDate: Double?
+    }
+
+    private enum SessionStatusKind {
+        case active, expired, none
+    }
+
+    private var autoCartStatusSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: "bolt.circle.fill")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.accent)
+                    .frame(width: 28, height: 28)
+                    .background(Theme.accentLight)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                Text("Auto-Cart Status")
+                    .font(Theme.body(14, weight: .semibold))
+                    .foregroundStyle(Theme.ink)
+
+                Spacer()
+
+                Text("PREMIUM")
+                    .font(Theme.body(10, weight: .bold))
+                    .foregroundStyle(Theme.gold)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Theme.gold.opacity(0.12))
+                    .clipShape(Capsule())
+            }
+
+            // Session row
+            let session = sessionStatus
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: session.kind == .active
+                      ? "checkmark.shield.fill"
+                      : session.kind == .expired
+                        ? "exclamationmark.shield.fill"
+                        : "circle.slash")
+                    .font(.system(size: 16))
+                    .foregroundStyle(session.kind == .active
+                                     ? Color.green
+                                     : session.kind == .expired
+                                       ? Color.orange
+                                       : Theme.inkLight)
+                    .frame(width: 24)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(session.label)
+                        .font(Theme.body(13, weight: .semibold))
+                        .foregroundStyle(Theme.ink)
+                    Text(session.hint)
+                        .font(Theme.body(11))
+                        .foregroundStyle(Theme.inkMid)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(10)
+            .background(
+                session.kind == .active ? Color.green.opacity(0.08)
+                : session.kind == .expired ? Color.orange.opacity(0.08)
+                : Theme.bgDeep
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+
+            // Last-attempt row
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: watch.actionExecuted ? "cart.fill" : "clock")
+                    .font(.system(size: 16))
+                    .foregroundStyle(watch.actionExecuted ? Color.green : Theme.inkLight)
+                    .frame(width: 24)
+                VStack(alignment: .leading, spacing: 2) {
+                    if watch.actionExecuted, let at = watch.actionExecutedAt {
+                        Text("Added to cart · \(at.formatted(.relative(presentation: .named)))")
+                            .font(Theme.body(13, weight: .semibold))
+                            .foregroundStyle(Theme.ink)
+                        Text(watch.changeNote ?? "Auto-cart fired successfully on the last trigger.")
+                            .font(Theme.body(11))
+                            .foregroundStyle(Theme.inkMid)
+                            .lineLimit(2)
+                    } else {
+                        Text("No auto-cart attempts yet")
+                            .font(Theme.body(13, weight: .semibold))
+                            .foregroundStyle(Theme.ink)
+                        Text(autoActSupportedForURL(watch.url)
+                             ? "This watch will attempt auto-cart the next time it triggers."
+                             : "Auto-cart isn't wired up for this retailer yet — triggers fall back to a Smart Cart Link.")
+                            .font(Theme.body(11))
+                            .foregroundStyle(Theme.inkMid)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(10)
+            .background(watch.actionExecuted ? Color.green.opacity(0.08) : Theme.bgDeep)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+
+            // Test Session button — only when we have cookies AND the
+            // retailer is on the supported list (otherwise probe-session
+            // returns a trivial local-only result and wastes a round-trip).
+            if sessionStatus.kind != .none && autoActSupportedForURL(watch.url) {
+                HStack(spacing: 10) {
+                    Button {
+                        Task { await probeSessionNow() }
+                    } label: {
+                        HStack(spacing: 6) {
+                            if isProbingSession {
+                                ProgressView().controlSize(.small)
+                            } else {
+                                Image(systemName: "antenna.radiowaves.left.and.right")
+                                    .font(.system(size: 11, weight: .semibold))
+                            }
+                            Text(isProbingSession ? "Testing…" : "Test Session")
+                                .font(Theme.body(12, weight: .semibold))
+                        }
+                        .foregroundStyle(Theme.accent)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(Theme.accentLight)
+                        .clipShape(Capsule())
+                    }
+                    .disabled(isProbingSession)
+
+                    if let result = sessionProbeResult {
+                        HStack(alignment: .top, spacing: 6) {
+                            Image(systemName: result.loggedIn ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                                .font(.system(size: 11))
+                                .foregroundStyle(result.loggedIn ? Color.green : Color.orange)
+                            Text(result.detail)
+                                .font(Theme.body(11))
+                                .foregroundStyle(Theme.inkMid)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+
+                    Spacer(minLength: 0)
+                }
+            }
+        }
+        .padding(16)
+        .background(Theme.bgCard)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Theme.border, lineWidth: 1)
+        )
+    }
+
+    /// Triggers a call to the probe-session edge function and updates
+    /// `sessionProbeResult` with the outcome. Called from the Test Session
+    /// button. Safe to call repeatedly — the button disables itself while
+    /// a probe is in flight.
+    @MainActor
+    private func probeSessionNow() async {
+        isProbingSession = true
+        defer { isProbingSession = false }
+        do {
+            let userId = try await SupabaseConfig.client.auth.session.user.id
+            let result = try await supabase.probeSession(watchId: watch.id, userId: userId)
+            sessionProbeResult = (loggedIn: result.logged_in, detail: result.detail)
+        } catch {
+            sessionProbeResult = (loggedIn: false, detail: "Couldn't reach the probe service. Try again shortly.")
+        }
     }
 
     // MARK: - Price Drop Notify Section

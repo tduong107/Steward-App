@@ -240,6 +240,15 @@ final class WatchViewModel {
                         existing.topOffersData = nil
                     }
                     existing.excludedSourcesCSV = dto.excludedSources?.joined(separator: ",")
+                    // Auto-cart runtime state + session cookies. Pure
+                    // read-down — we never write these from the client,
+                    // but the detail screen's Auto-Cart Status card needs
+                    // them fresh on every sync.
+                    existing.actionExecuted = dto.actionExecuted
+                    existing.actionExecutedAt = dto.actionExecutedAt
+                    existing.siteCookies = dto.siteCookies
+                    existing.cookieDomain = dto.cookieDomain
+                    existing.cookieStatus = dto.cookieStatus
                 } else {
                     // New remote watch — insert
                     context.insert(Watch(from: dto))

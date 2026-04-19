@@ -53,6 +53,16 @@ extension Watch {
             self.topOffersData = nil
         }
         self.excludedSourcesCSV = dto.excludedSources?.joined(separator: ",")
+
+        // Auto-cart result + session cookies — populated by execute-action
+        // and the Share Extension login flow respectively. Read-only from
+        // the client's perspective: we only hydrate them from the server
+        // so the detail screen's Auto-Cart Status card has live data.
+        self.actionExecuted = dto.actionExecuted
+        self.actionExecutedAt = dto.actionExecutedAt
+        self.siteCookies = dto.siteCookies
+        self.cookieDomain = dto.cookieDomain
+        self.cookieStatus = dto.cookieStatus
     }
 
     /// Convert to DTO for uploading to Supabase

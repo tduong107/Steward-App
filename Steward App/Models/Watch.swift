@@ -149,6 +149,19 @@ final class Watch {
     var autoActEnabled: Bool = false
     var spendingLimit: Double?
 
+    // Auto-cart status — populated by execute-action after each trigger
+    // so the detail screen can show "Added to cart · 3h ago" etc.
+    var actionExecuted: Bool = false
+    var actionExecutedAt: Date?
+
+    // Session cookies captured by the Share Extension login WebView.
+    // Used by execute-action + probe-session to authenticate at the
+    // retailer. Mirror of the watches.site_cookies / cookie_domain /
+    // cookie_status columns in Supabase.
+    var siteCookies: String?
+    var cookieDomain: String?
+    var cookieStatus: String?
+
     // Notify on any price decrease (not just when target/threshold met)
     var notifyAnyPriceDrop: Bool = false
 
