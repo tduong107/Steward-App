@@ -288,7 +288,6 @@ struct SavingsScreen: View {
                         endPoint: .bottom
                     )
                 )
-                .interpolationMethod(.catmullRom)
 
                 LineMark(
                     x: .value("Date", point.date),
@@ -296,9 +295,14 @@ struct SavingsScreen: View {
                 )
                 .foregroundStyle(Theme.accent)
                 .lineStyle(StrokeStyle(lineWidth: 1.5))
-                .interpolationMethod(.catmullRom)
             }
         }
+        // Default linear interpolation — connect data points with straight
+        // segments rather than Catmull-Rom splines. Splines looked fine on
+        // smooth price histories but produced misleading curves (valleys
+        // below the minimum, peaks above the maximum) for watches with
+        // sudden price drops like REI or Vuori. Straight lines honestly
+        // represent what actually happened between checks.
         .chartYScale(domain: minPrice...maxPrice)
         .chartXAxis(.hidden)
         .chartYAxis(.hidden)
