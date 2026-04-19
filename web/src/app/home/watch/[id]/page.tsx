@@ -32,6 +32,12 @@ import { createClient } from '@/lib/supabase/client'
 import { useSub } from '@/hooks/use-subscription'
 import { useAuth } from '@/hooks/use-auth'
 import { PaywallDialog } from '@/components/paywall-dialog'
+import {
+  effectiveResponseMode,
+  autoActLabelFor,
+  autoActSubtitleFor,
+  isAutoActFunctional,
+} from '@/lib/auto-act'
 import type { Watch, CheckResult, CheckFrequency, ResponseMode } from '@/lib/types'
 import { timeAgo, nextCheckLabel, getDomain, cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -260,7 +266,9 @@ export default function WatchDetailPage() {
       setEditFrequency(watch.check_frequency)
       setEditPreferredTime(watch.preferred_check_time || '')
       setEditNotifyChannels(parseChannels(watch.notify_channels))
-      setEditResponseMode(watch.response_mode || 'notify')
+      // Derive from auto_act first — iOS writes auto_act without touching
+      // response_mode, so the stored response_mode can lie for iOS watches.
+      setEditResponseMode(effectiveResponseMode(watch))
       setEditNotifyAnyDrop(Boolean(watch.notify_any_price_drop))
       setEditScrollTarget(target)
       setEditOpen(true)
@@ -283,6 +291,14 @@ export default function WatchDetailPage() {
         // Persist channels as CSV — iOS already stores/parses this shape.
         notify_channels: channels.join(','),
         response_mode: editResponseMode,
+        // Sync auto_act alongside response_mode. The check-watch edge
+        // function only reads auto_act, so without this write the
+        // "Auto Add to Cart" selection would be a no-op on the backend.
+        // For non-stewardActs modes we explicitly clear auto_act so the
+        // user doesn't end up with both flags contradicting each other
+        // (e.g. response_mode='notify' but auto_act=true from an earlier
+        // iOS-side toggle).
+        auto_act: editResponseMode === 'stewardActs',
       }
       if (editPreferredTime) {
         updates.preferred_check_time = editPreferredTime
@@ -377,10 +393,16 @@ export default function WatchDetailPage() {
     )
   }
 
+  // Use auto_act as source of truth when set — iOS writes it without
+  // syncing response_mode, so `response_mode` alone can lie about what
+  // the watch is actually going to do. The stewardActs label also varies
+  // by action_type (Auto Add to Cart / Auto Book / Auto Fill & Submit).
+  const displayResponseMode = effectiveResponseMode(watch)
+  const stewardActsLabel = autoActLabelFor(watch.action_type) ?? 'Auto Add to Cart'
   const responseModeLabel: Record<string, string> = {
     notify: 'Notify Me',
     quickLink: 'Notify + Quick Link',
-    stewardActs: 'Auto Add to Cart',
+    stewardActs: stewardActsLabel,
   }
 
   const visibleChecks = showAllChecks ? checkResults : checkResults.slice(0, 10)
@@ -760,7 +782,7 @@ export default function WatchDetailPage() {
                 When Triggered
               </p>
               <p className="mt-1 text-sm font-medium text-[var(--color-ink)]">
-                {responseModeLabel[watch.response_mode] || watch.response_mode}
+                {responseModeLabel[displayResponseMode] || displayResponseMode}
               </p>
             </div>
             <Pencil className="wd-stat-edit-icon h-3.5 w-3.5 text-[var(--color-ink-light)] opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
@@ -1179,7 +1201,9 @@ export default function WatchDetailPage() {
             </p>
           </div>
 
-          {/* When Triggered — matches iOS ResponseModePickerSheet */}
+          {/* When Triggered — matches iOS autoActSection in DetailScreen.swift.
+              The stewardActs row is dynamic: label + subtitle + availability
+              depend on watch.action_type + URL + subscription tier. */}
           <div data-edit-section="triggered">
             <label className="block text-xs font-medium text-[var(--color-ink-mid)] mb-2">
               When Triggered
@@ -1188,27 +1212,63 @@ export default function WatchDetailPage() {
               What should Steward do when your watch condition is met?
             </p>
             <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] overflow-hidden">
-              {([
-                { mode: 'notify' as const, title: 'Notify Me', description: 'Steward sends you a push notification. You decide what to do next.', badge: null },
-                { mode: 'quickLink' as const, title: 'Notify + Quick Link', description: 'Notification with a smart action link — one tap to add to cart, book, or open checkout.', badge: 'Pro' as const },
-                { mode: 'stewardActs' as const, title: 'Auto Add to Cart', description: 'Steward automatically adds to cart, books the reservation, or completes the purchase within your spending limit.', badge: 'Premium' as const },
-              ]).map((opt, i) => {
+              {(() => {
+                // Derive the stewardActs row state from the watch. For notify
+                // watches we omit it entirely; for others we show it with the
+                // iOS-matching label ("Auto Add to Cart" / "Auto Book" / etc.)
+                // and grey-out any combo the backend can't actually execute.
+                const stewardActsLabel = autoActLabelFor(watch.action_type)
+                const stewardActsAvailable = isAutoActFunctional(watch.action_type, watch.url)
+                const stewardActsSubtitle = autoActSubtitleFor(watch.action_type, watch.url)
+
+                const rows: Array<{
+                  mode: ResponseMode
+                  title: string
+                  description: string
+                  badge: 'Pro' | 'Premium' | null
+                  functionalityAvailable: boolean
+                }> = [
+                  { mode: 'notify', title: 'Notify Me', description: 'Steward sends you a push notification. You decide what to do next.', badge: null, functionalityAvailable: true },
+                  { mode: 'quickLink', title: 'Notify + Quick Link', description: 'Notification with a smart action link — one tap to add to cart, book, or open checkout.', badge: 'Pro', functionalityAvailable: true },
+                ]
+                if (stewardActsLabel) {
+                  rows.push({
+                    mode: 'stewardActs',
+                    title: stewardActsLabel,
+                    description: stewardActsSubtitle,
+                    badge: 'Premium',
+                    functionalityAvailable: stewardActsAvailable,
+                  })
+                }
+                return rows
+              })().map((opt, i, rows) => {
                 const required = responseModeRequiredTier[opt.mode]
                 const tierRank = { free: 0, pro: 1, premium: 2 } as const
-                const hasAccess = tierRank[tier] >= tierRank[required]
+                const hasTier = tierRank[tier] >= tierRank[required]
+                // Fully-selectable only when tier AND functionality checks both pass.
+                const isSelectable = hasTier && opt.functionalityAvailable
                 const isSelected = editResponseMode === opt.mode
                 return (
                   <button
                     key={opt.mode}
                     type="button"
-                    onClick={() => selectResponseMode(opt.mode)}
+                    onClick={() => {
+                      // Don't let the user pick an unavailable option. For
+                      // tier-locked rows we still open the paywall; for
+                      // store-unsupported rows we quietly no-op (matches iOS).
+                      if (!opt.functionalityAvailable) return
+                      selectResponseMode(opt.mode)
+                    }}
+                    aria-disabled={!opt.functionalityAvailable}
                     className={`w-full flex items-start gap-3 px-4 py-3 text-sm transition-colors text-left ${
-                      i > 0 ? 'border-t border-[var(--color-border)]' : ''
+                      i < rows.length - 1 ? 'border-b border-[var(--color-border)]' : ''
                     } ${isSelected
                       ? 'bg-[var(--color-accent-light)]'
-                      : hasAccess
+                      : isSelectable
                         ? 'bg-[var(--color-bg-card)] hover:bg-[var(--color-bg-deep)] cursor-pointer'
-                        : 'bg-[var(--color-bg-deep)] cursor-pointer hover:opacity-90'
+                        : !opt.functionalityAvailable
+                          ? 'bg-[var(--color-bg-deep)] cursor-not-allowed opacity-70'
+                          : 'bg-[var(--color-bg-deep)] cursor-pointer hover:opacity-90'
                     }`}
                   >
                     <div className="pt-0.5 shrink-0">
@@ -1220,7 +1280,7 @@ export default function WatchDetailPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className={`font-medium ${hasAccess ? 'text-[var(--color-ink)]' : 'text-[var(--color-ink-light)]'}`}>
+                        <span className={`font-medium ${isSelectable ? 'text-[var(--color-ink)]' : 'text-[var(--color-ink-light)]'}`}>
                           {opt.title}
                         </span>
                         {opt.badge === 'Pro' && (
@@ -1239,11 +1299,11 @@ export default function WatchDetailPage() {
                           </>
                         )}
                       </div>
-                      <p className={`mt-1 text-[12px] leading-relaxed ${hasAccess ? 'text-[var(--color-ink-mid)]' : 'text-[var(--color-ink-light)]'}`}>
+                      <p className={`mt-1 text-[12px] leading-relaxed ${isSelectable ? 'text-[var(--color-ink-mid)]' : 'text-[var(--color-ink-light)]'}`}>
                         {opt.description}
                       </p>
                     </div>
-                    {!hasAccess && (
+                    {!hasTier && opt.functionalityAvailable && (
                       <Lock size={12} className="text-[var(--color-ink-light)] shrink-0 mt-1" />
                     )}
                   </button>
