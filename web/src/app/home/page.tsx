@@ -589,8 +589,7 @@ export default function DashboardPage() {
               {/* Row: icon + name */}
               <div className="flex items-center gap-3 mb-3">
                 {watch.image_url ? (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img src={watch.image_url} alt="" className="w-11 h-11 rounded-[var(--radius-md)] object-cover shrink-0 bg-[var(--color-bg-deep)]" />
+                  <Image src={watch.image_url} alt="" width={44} height={44} className="w-11 h-11 rounded-[var(--radius-md)] object-cover shrink-0 bg-[var(--color-bg-deep)]" />
                 ) : (
                   <div className="w-11 h-11 rounded-[var(--radius-md)] bg-[var(--color-bg-deep)] flex items-center justify-center text-[22px] shrink-0">
                     {watch.emoji || '👀'}

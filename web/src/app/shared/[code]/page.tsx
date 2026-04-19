@@ -87,12 +87,13 @@ export default async function SharedWatchPage({
         <div className="bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-[var(--radius-lg)] overflow-hidden shadow-sm">
           {/* Product image */}
           {watch.image_url && (
-            <div className="w-full h-48 bg-[var(--color-bg-deep)] overflow-hidden">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+            <div className="relative w-full h-48 bg-[var(--color-bg-deep)] overflow-hidden">
+              <Image
                 src={watch.image_url}
                 alt={watch.name}
-                className="w-full h-full object-cover"
+                fill
+                sizes="(max-width: 448px) 100vw, 448px"
+                className="object-cover"
               />
             </div>
           )}
