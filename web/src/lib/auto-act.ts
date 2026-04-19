@@ -119,23 +119,26 @@ export function isAutoActReady(
  * attempt an automated cart-add. These are the hostnames the backend
  * pattern-matches against in `steward-supabase/supabase/functions/execute-action/index.ts`.
  *
- * This list intentionally matches iOS (`autoActSupportedForURL` in
- * `DetailScreen.swift`) so both platforms offer/grey-out the same stores.
- * Keep them in sync.
+ * This list is *strictly functional* — every domain here has a working
+ * handler on the backend. Aspirational retailers (things we'd like to
+ * support but don't have handlers for) stay off the list so we don't
+ * lie to the user with "Auto Add to Cart" on a watch that will silently
+ * fall through to the "Unsupported retailer" branch.
  *
- * Note: Nike / Adidas / Costco appear on the iOS supported list but the
- * backend doesn't have dedicated handlers for them yet — those fall into
- * the generic/Shopify path and may or may not work depending on the
- * specific cart-add URL shape. Kept here for parity with iOS.
+ * Previously nike.com / adidas.com / costco.com were on this list, but
+ * modern Nike and Adidas storefronts are custom (not Shopify) with
+ * aggressive anti-bot (Queue-it etc.), and Costco's cart-add requires a
+ * form-post with CSRF that we don't currently handle. Removed until a
+ * dedicated handler ships for each.
+ *
+ * Keep this in sync with `autoActSupportedForURL(_:)` in iOS
+ * `DetailScreen.swift`.
  */
 export const AUTO_ACT_SUPPORTED_DOMAINS = [
   'amazon.com',
   'target.com',
   'walmart.com',
   'bestbuy.com',
-  'nike.com',
-  'adidas.com',
-  'costco.com',
   'myshopify.com',
   'shopify.com',
 ] as const
