@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import type { User } from '@supabase/supabase-js'
+import type { User, AuthChangeEvent, Session } from '@supabase/supabase-js'
 import posthog from 'posthog-js'
 import { createClient } from '@/lib/supabase/client'
 import type { Profile } from '@/lib/types'
@@ -66,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const supabase = supabaseRef.current
 
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session } }: { data: { session: Session | null } }) => {
       if (!mountedRef.current) return
       const currentUser = session?.user ?? null
       setUser(currentUser)
@@ -75,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
 
     // Listen for auth state changes (login, logout, token refresh)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
       if (!mountedRef.current) return
       const currentUser = session?.user ?? null
       setUser(currentUser)

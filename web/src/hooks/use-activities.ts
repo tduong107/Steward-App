@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import type { RealtimePostgresInsertPayload } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
 import type { Activity } from '@/lib/types'
 import { useAuth } from '@/hooks/use-auth'
@@ -56,8 +57,8 @@ export function useActivities() {
           table: 'activities',
           filter: `user_id=eq.${user.id}`,
         },
-        (payload) => {
-          const newActivity = payload.new as Activity
+        (payload: RealtimePostgresInsertPayload<Activity>) => {
+          const newActivity = payload.new
           setActivities((prev) => [newActivity, ...prev].slice(0, 100))
         }
       )

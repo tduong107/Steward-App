@@ -1,6 +1,11 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type {
+  RealtimePostgresInsertPayload,
+  RealtimePostgresUpdatePayload,
+  RealtimePostgresDeletePayload,
+} from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
 import type { Watch } from '@/lib/types'
 import posthog from 'posthog-js'
@@ -60,8 +65,8 @@ export function useWatches() {
           table: 'watches',
           filter: `user_id=eq.${user.id}`,
         },
-        (payload) => {
-          const newWatch = payload.new as Watch
+        (payload: RealtimePostgresInsertPayload<Watch>) => {
+          const newWatch = payload.new
           if (newWatch.status !== 'deleted') {
             setWatches((prev) => [newWatch, ...prev])
           }
@@ -75,8 +80,8 @@ export function useWatches() {
           table: 'watches',
           filter: `user_id=eq.${user.id}`,
         },
-        (payload) => {
-          const updated = payload.new as Watch
+        (payload: RealtimePostgresUpdatePayload<Watch>) => {
+          const updated = payload.new
           if (updated.status === 'deleted') {
             setWatches((prev) => prev.filter((w) => w.id !== updated.id))
           } else {
@@ -94,9 +99,13 @@ export function useWatches() {
           table: 'watches',
           filter: `user_id=eq.${user.id}`,
         },
-        (payload) => {
-          const deleted = payload.old as { id: string }
-          setWatches((prev) => prev.filter((w) => w.id !== deleted.id))
+        (payload: RealtimePostgresDeletePayload<Watch>) => {
+          // `old` is a partial — Postgres DELETE events only include the
+          // primary key unless REPLICA IDENTITY FULL is configured.
+          const deleted = payload.old as { id?: string }
+          if (deleted.id) {
+            setWatches((prev) => prev.filter((w) => w.id !== deleted.id))
+          }
         }
       )
       .subscribe()
