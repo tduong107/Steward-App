@@ -18,7 +18,7 @@
                BlueprintIdentifier = "F0F3F8AA2F580D560016A83A"
                BuildableName = "Steward App.app"
                BlueprintName = "Steward App"
-               ReferencedContainer = "container:Steward App.xcodeproj">
+               ReferencedContainer = "container:Steward Concierge.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -38,7 +38,7 @@
                BlueprintIdentifier = "F0F3F8B92F580D570016A83A"
                BuildableName = "Steward AppTests.xctest"
                BlueprintName = "Steward AppTests"
-               ReferencedContainer = "container:Steward App.xcodeproj">
+               ReferencedContainer = "container:Steward Concierge.xcodeproj">
             </BuildableReference>
          </TestableReference>
          <TestableReference
@@ -49,7 +49,7 @@
                BlueprintIdentifier = "F0F3F8C32F580D570016A83A"
                BuildableName = "Steward AppUITests.xctest"
                BlueprintName = "Steward AppUITests"
-               ReferencedContainer = "container:Steward App.xcodeproj">
+               ReferencedContainer = "container:Steward Concierge.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -71,7 +71,7 @@
             BlueprintIdentifier = "F0F3F8AA2F580D560016A83A"
             BuildableName = "Steward App.app"
             BlueprintName = "Steward App"
-            ReferencedContainer = "container:Steward App.xcodeproj">
+            ReferencedContainer = "container:Steward Concierge.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
       <StoreKitConfigurationFileReference
@@ -91,7 +91,7 @@
             BlueprintIdentifier = "F0F3F8AA2F580D560016A83A"
             BuildableName = "Steward App.app"
             BlueprintName = "Steward App"
-            ReferencedContainer = "container:Steward App.xcodeproj">
+            ReferencedContainer = "container:Steward Concierge.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>
