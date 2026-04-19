@@ -26,6 +26,10 @@ import {
   Timer,
   Activity,
   ChevronDown,
+  ShieldCheck,
+  ShieldAlert,
+  ShoppingCart,
+  CircleOff,
 } from 'lucide-react'
 import posthog from 'posthog-js'
 import { createClient } from '@/lib/supabase/client'
@@ -37,6 +41,7 @@ import {
   autoActLabelFor,
   autoActSubtitleFor,
   isAutoActFunctional,
+  inspectSession,
 } from '@/lib/auto-act'
 import type { Watch, CheckResult, CheckFrequency, ResponseMode } from '@/lib/types'
 import { timeAgo, nextCheckLabel, getDomain, cn } from '@/lib/utils'
@@ -664,6 +669,110 @@ export default function WatchDetailPage() {
           </div>
         </div>
       )}
+
+      {/* ===== AUTO-CART STATUS (only when the user opted into Auto Add to Cart) ===== */}
+      {watch.auto_act && (() => {
+        const session = inspectSession(watch)
+        const functional = isAutoActFunctional(watch.action_type, watch.url)
+
+        // Build the session-row content based on state.
+        let sessionIcon = <CircleOff className="h-4 w-4 text-[var(--color-ink-light)]" />
+        let sessionLabel = 'No session stored'
+        let sessionHint = 'Sign in via the iOS share sheet to enable auto-cart. Until then, triggers fall back to a push notification with a one-tap cart link.'
+        let sessionBg = 'bg-[var(--color-bg-deep)]'
+        if (session.status === 'active') {
+          sessionIcon = <ShieldCheck className="h-4 w-4 text-[var(--color-green)]" />
+          // Pick the shortest human-readable expiry — days if >= 1, else hours.
+          if (session.earliestExpiry) {
+            const ms = new Date(session.earliestExpiry).getTime() - Date.now()
+            const days = Math.floor(ms / (1000 * 60 * 60 * 24))
+            const hours = Math.floor(ms / (1000 * 60 * 60))
+            const expiryText = days >= 1 ? `${days} day${days === 1 ? '' : 's'}` : `${hours} hour${hours === 1 ? '' : 's'}`
+            sessionLabel = `Session active · expires in ${expiryText}`
+          } else {
+            sessionLabel = 'Session active'
+          }
+          sessionHint = session.domain ? `Signed into ${session.domain}.` : 'Auto-cart is armed for this watch.'
+          sessionBg = 'bg-[var(--color-green)]/10'
+        } else if (session.status === 'expired') {
+          sessionIcon = <ShieldAlert className="h-4 w-4 text-[var(--color-gold)]" />
+          sessionLabel = 'Session expired'
+          sessionHint = 'Re-sign in via the iOS share sheet. Until then, triggers fall back to a push notification with a one-tap cart link.'
+          sessionBg = 'bg-[var(--color-gold)]/10'
+        }
+
+        // Last-attempt row.
+        let attemptIcon = <Clock className="h-4 w-4 text-[var(--color-ink-light)]" />
+        let attemptLabel = 'No auto-cart attempts yet'
+        let attemptHint = functional
+          ? 'This watch will attempt auto-cart the next time it triggers.'
+          : 'Auto-cart isn\'t wired up for this retailer yet — triggers fall back to a cart link.'
+        let attemptBg = 'bg-[var(--color-bg-deep)]'
+        if (watch.action_executed && watch.action_executed_at) {
+          attemptIcon = <ShoppingCart className="h-4 w-4 text-[var(--color-green)]" />
+          attemptLabel = `Added to cart · ${timeAgo(watch.action_executed_at)}`
+          attemptHint = watch.change_note || 'Auto-cart fired successfully on the last trigger.'
+          attemptBg = 'bg-[var(--color-green)]/10'
+        }
+
+        return (
+          <div className="wd-section rounded-[var(--radius-xl)] bg-[var(--color-bg-card)] border border-[var(--color-border)] p-5 sm:p-6 shadow-[var(--shadow-xs)]" style={{ animationDelay: '0.08s' }}>
+            <div className="flex items-center gap-2 mb-4">
+              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--color-accent-light)]">
+                <Zap className="h-3.5 w-3.5 text-[var(--color-accent)]" />
+              </div>
+              <h3 className="text-sm font-semibold text-[var(--color-ink)]">
+                Auto-Cart Status
+              </h3>
+              <span className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full bg-[var(--color-gold)]/12 text-[var(--color-gold)]">
+                PREMIUM
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {/* Session row */}
+              <div className={`rounded-[var(--radius-lg)] border border-[var(--color-border-subtle)] p-4 ${sessionBg}`}>
+                <div className="flex items-start gap-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--color-bg-card)]">
+                    {sessionIcon}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-light)]">
+                      Session
+                    </p>
+                    <p className="mt-1 text-sm font-medium text-[var(--color-ink)]">
+                      {sessionLabel}
+                    </p>
+                    <p className="mt-1 text-[11px] text-[var(--color-ink-mid)] leading-relaxed">
+                      {sessionHint}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Last-attempt row */}
+              <div className={`rounded-[var(--radius-lg)] border border-[var(--color-border-subtle)] p-4 ${attemptBg}`}>
+                <div className="flex items-start gap-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--color-bg-card)]">
+                    {attemptIcon}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-light)]">
+                      Last attempt
+                    </p>
+                    <p className="mt-1 text-sm font-medium text-[var(--color-ink)]">
+                      {attemptLabel}
+                    </p>
+                    <p className="mt-1 text-[11px] text-[var(--color-ink-mid)] leading-relaxed line-clamp-2">
+                      {attemptHint}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* ===== DETAILS GRID (Visual Stats Cards) ===== */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">

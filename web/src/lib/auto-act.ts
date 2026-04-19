@@ -1,5 +1,119 @@
 import type { ActionType, ResponseMode, Watch } from '@/lib/types'
 
+/** Shape of one entry in the `site_cookies` JSON column. Mirrors
+ * `SerializedCookie` in the iOS Share Extension. Fields besides name/value
+ * are all optional and vary by browser. */
+export interface SerializedCookie {
+  name: string
+  value: string
+  domain?: string
+  path?: string
+  expiresDate?: number // Unix seconds; omitted for session cookies
+  isSecure?: boolean
+  isHTTPOnly?: boolean
+}
+
+/** Result of inspecting a watch's captured session cookies. */
+export interface SessionState {
+  /** 'active' when cookies exist, status is active, and at least one
+   * non-expired cookie remains. 'expired' when cookies exist but all
+   * are past their expiry. 'none' when nothing was ever captured. */
+  status: 'active' | 'expired' | 'none'
+  /** Earliest upcoming cookie expiry, as ISO string. Undefined for 'none'
+   * and for cookie sets that contain no dated cookies (session-only). */
+  earliestExpiry?: string
+  /** Domain cookies are scoped to, if known. */
+  domain?: string
+  /** Number of cookies stored. Surfaced for debugging only. */
+  cookieCount: number
+}
+
+/**
+ * Inspects a watch's `site_cookies` column and reports whether the stored
+ * session is still valid. This is a *best-effort* check — we only parse
+ * the expiry dates locally. The cookies may still be rejected by the
+ * retailer (revoked, 2FA invalidated, etc.), but a positive result here
+ * is a necessary precondition for auto-cart to have any chance of working.
+ */
+export function inspectSession(
+  watch: Pick<Watch, 'site_cookies' | 'cookie_status' | 'cookie_domain'>,
+): SessionState {
+  if (!watch.site_cookies) {
+    return { status: 'none', cookieCount: 0 }
+  }
+
+  let cookies: SerializedCookie[] = []
+  try {
+    const parsed = JSON.parse(watch.site_cookies)
+    cookies = Array.isArray(parsed) ? parsed : []
+  } catch {
+    return { status: 'none', cookieCount: 0, domain: watch.cookie_domain || undefined }
+  }
+
+  if (cookies.length === 0) {
+    return { status: 'none', cookieCount: 0, domain: watch.cookie_domain || undefined }
+  }
+
+  const now = Date.now() / 1000
+  const datedCookies = cookies.filter(
+    (c): c is SerializedCookie & { expiresDate: number } =>
+      typeof c.expiresDate === 'number' && c.expiresDate > 0,
+  )
+  const validDated = datedCookies.filter((c) => c.expiresDate > now)
+
+  // If every dated cookie has expired, treat the session as expired —
+  // the retailer will reject the request. Session-only cookies (no expiry)
+  // are excluded from this check because they live only as long as the
+  // browser was open; we can't verify them from here.
+  if (datedCookies.length > 0 && validDated.length === 0) {
+    return {
+      status: 'expired',
+      cookieCount: cookies.length,
+      domain: watch.cookie_domain || undefined,
+    }
+  }
+
+  // Respect cookie_status set by iOS — if it was explicitly marked inactive
+  // (e.g. detected as revoked server-side), show expired.
+  if (watch.cookie_status && watch.cookie_status !== 'active') {
+    return {
+      status: 'expired',
+      cookieCount: cookies.length,
+      domain: watch.cookie_domain || undefined,
+    }
+  }
+
+  // Earliest upcoming expiry across all dated cookies.
+  const earliestExpirySecs = validDated.length > 0
+    ? validDated.reduce((min, c) => Math.min(min, c.expiresDate), validDated[0].expiresDate)
+    : undefined
+
+  return {
+    status: 'active',
+    earliestExpiry: earliestExpirySecs
+      ? new Date(earliestExpirySecs * 1000).toISOString()
+      : undefined,
+    domain: watch.cookie_domain || undefined,
+    cookieCount: cookies.length,
+  }
+}
+
+/**
+ * True when this watch's auto-cart path is end-to-end viable right now:
+ * functionality is wired (supported domain + price/cart type), the user
+ * has opted in (auto_act = true), and the stored session looks alive.
+ *
+ * False when any prerequisite is missing. Used to decide between showing
+ * "✓ Ready to auto-cart" vs "Will fall back to Quick Cart Link."
+ */
+export function isAutoActReady(
+  watch: Pick<Watch, 'action_type' | 'url' | 'auto_act' | 'site_cookies' | 'cookie_status' | 'cookie_domain'>,
+): boolean {
+  if (!watch.auto_act) return false
+  if (!isAutoActFunctional(watch.action_type, watch.url)) return false
+  return inspectSession(watch).status === 'active'
+}
+
 /**
  * Retailer domains where the `execute-action` edge function can actually
  * attempt an automated cart-add. These are the hostnames the backend

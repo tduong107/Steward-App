@@ -38,6 +38,12 @@ export interface Watch {
   coupon_code: string | null
   action_executed: boolean
   action_executed_at: string | null
+  // Session cookies captured via the iOS Share Extension's in-app browser
+  // login flow. Required for execute-action to succeed on auth-walled
+  // retailers (Amazon, Target, Walmart, Best Buy). See StewardShare/LoginWebView.swift.
+  site_cookies: string | null
+  cookie_domain: string | null
+  cookie_status: string | null
   price_confidence: string | null
   notify_any_price_drop: boolean
   last_price: number | null
