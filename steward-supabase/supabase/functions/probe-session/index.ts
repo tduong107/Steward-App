@@ -54,8 +54,31 @@ serve(async (req) => {
       } satisfies ProbeResult);
     }
 
+    // SECURITY: verify the JWT's user matches the claimed user_id in the
+    // body before we query anything. Without this, verify_jwt=true only
+    // proves the caller is *some* authenticated user — they could spoof
+    // the body's user_id to probe another user's cookies and learn their
+    // login state at Amazon/Target/etc. We use the service-role client for
+    // DB access (to read cookies across users), so the caller's identity
+    // MUST be verified explicitly.
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const jwt = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+    if (!jwt) {
+      return json(401, {
+        logged_in: false,
+        detail: "Missing authorization.",
+      } satisfies ProbeResult);
+    }
+    const { data: { user: authedUser }, error: authError } = await supabase.auth.getUser(jwt);
+    if (authError || !authedUser || authedUser.id !== user_id) {
+      return json(403, {
+        logged_in: false,
+        detail: "Forbidden.",
+      } satisfies ProbeResult);
+    }
+
     // Load the watch + verify ownership. Using service role for cookie
-    // access; ownership check gates it.
+    // access; JWT identity already verified above.
     const { data: watch, error: watchError } = await supabase
       .from("watches")
       .select("id, user_id, url, site_cookies, cookie_status, cookie_domain")

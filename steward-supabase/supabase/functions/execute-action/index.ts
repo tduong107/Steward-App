@@ -18,9 +18,10 @@ serve(async (req) => {
   }
 
   try {
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+      serviceRoleKey
     );
 
     const { watch_id, user_id, action_type } = await req.json();
@@ -32,12 +33,41 @@ serve(async (req) => {
       );
     }
 
+    // SECURITY: verify the caller is allowed to act on this user_id.
+    // Two valid callers:
+    //   1. check-watch (server-to-server): invokes us with the service-role
+    //      key as the Bearer token. We trust the body's user_id then.
+    //   2. A client (iOS/web) with a user JWT: we must confirm the JWT's
+    //      sub claim matches the body's user_id — otherwise anyone with
+    //      *any* valid user JWT could spoof user_id and take actions
+    //      (add to cart, etc.) against another user's watch with stored
+    //      cookies.
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const jwt = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+    const isServiceRole = jwt === serviceRoleKey;
+    if (!isServiceRole) {
+      if (!jwt) {
+        return new Response(
+          JSON.stringify({ error: "Missing authorization", executed: false }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      const { data: { user: authedUser }, error: authError } = await supabase.auth.getUser(jwt);
+      if (authError || !authedUser || authedUser.id !== user_id) {
+        console.warn(`[execute-action] JWT-identity mismatch: claimed=${user_id}, authed=${authedUser?.id ?? "none"}`);
+        return new Response(
+          JSON.stringify({ error: "Forbidden", executed: false }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
     // Fetch the watch with cookies and action URL
     const { data: watch, error: watchError } = await supabase
       .from("watches")
       .select("id, user_id, name, emoji, url, action_url, action_type, site_cookies, cookie_domain, cookie_status, spending_limit")
       .eq("id", watch_id)
-      .eq("user_id", user_id) // Security: verify ownership
+      .eq("user_id", user_id) // Defense in depth: ownership check on DB query
       .single();
 
     if (watchError || !watch) {
