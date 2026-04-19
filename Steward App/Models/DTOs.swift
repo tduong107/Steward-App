@@ -31,6 +31,9 @@ struct WatchDTO: Codable, Identifiable, Sendable {
     // Multi-source search watch fields
     var watchMode: String
     var searchQuery: String?
+    var bestSource: String?
+    var topOffers: [TopOffer]?       // Snapshot of the top N retailers from the last check
+    var excludedSources: [String]?   // Retailer names the user has excluded from best-price consideration
 
     // Error tracking fields
     var consecutiveFailures: Int
@@ -81,6 +84,9 @@ struct WatchDTO: Codable, Identifiable, Sendable {
         case cookieStatus = "cookie_status"
         case watchMode = "watch_mode"
         case searchQuery = "search_query"
+        case bestSource = "best_source"
+        case topOffers = "top_offers"
+        case excludedSources = "excluded_sources"
         case consecutiveFailures = "consecutive_failures"
         case lastError = "last_error"
         case needsAttention = "needs_attention"
@@ -108,7 +114,8 @@ struct WatchDTO: Codable, Identifiable, Sendable {
          lastChecked: Date? = nil, triggered: Bool, changeNote: String? = nil,
          imageURL: String? = nil, actionURL: String? = nil, createdAt: Date,
          siteCookies: String? = nil, cookieDomain: String? = nil, cookieStatus: String? = nil,
-         watchMode: String = "url", searchQuery: String? = nil,
+         watchMode: String = "url", searchQuery: String? = nil, bestSource: String? = nil,
+         topOffers: [TopOffer]? = nil, excludedSources: [String]? = nil,
          consecutiveFailures: Int = 0, lastError: String? = nil, needsAttention: Bool = false,
          altSourceUrl: String? = nil, altSourceDomain: String? = nil,
          altSourcePrice: Double? = nil, altSourceFoundAt: Date? = nil,
@@ -127,7 +134,9 @@ struct WatchDTO: Codable, Identifiable, Sendable {
         self.imageURL = imageURL; self.actionURL = actionURL; self.createdAt = createdAt
         self.siteCookies = siteCookies; self.cookieDomain = cookieDomain
         self.cookieStatus = cookieStatus; self.watchMode = watchMode
-        self.searchQuery = searchQuery; self.consecutiveFailures = consecutiveFailures
+        self.searchQuery = searchQuery; self.bestSource = bestSource
+        self.topOffers = topOffers; self.excludedSources = excludedSources
+        self.consecutiveFailures = consecutiveFailures
         self.lastError = lastError; self.needsAttention = needsAttention
         self.altSourceUrl = altSourceUrl; self.altSourceDomain = altSourceDomain
         self.altSourcePrice = altSourcePrice; self.altSourceFoundAt = altSourceFoundAt
@@ -167,6 +176,9 @@ struct WatchDTO: Codable, Identifiable, Sendable {
         cookieStatus = try c.decodeIfPresent(String.self, forKey: .cookieStatus)
         watchMode = try c.decodeIfPresent(String.self, forKey: .watchMode) ?? "url"
         searchQuery = try c.decodeIfPresent(String.self, forKey: .searchQuery)
+        bestSource = try c.decodeIfPresent(String.self, forKey: .bestSource)
+        topOffers = try c.decodeIfPresent([TopOffer].self, forKey: .topOffers)
+        excludedSources = try c.decodeIfPresent([String].self, forKey: .excludedSources)
         consecutiveFailures = try c.decodeIfPresent(Int.self, forKey: .consecutiveFailures) ?? 0
         lastError = try c.decodeIfPresent(String.self, forKey: .lastError)
         needsAttention = try c.decodeIfPresent(Bool.self, forKey: .needsAttention) ?? false
@@ -185,6 +197,25 @@ struct WatchDTO: Codable, Identifiable, Sendable {
         affiliateNetwork = try c.decodeIfPresent(String.self, forKey: .affiliateNetwork)
         affiliateUrl = try c.decodeIfPresent(String.self, forKey: .affiliateUrl)
         isAffiliated = try c.decodeIfPresent(Bool.self, forKey: .isAffiliated) ?? false
+    }
+}
+
+/// A single retailer offer within a search-mode watch's top-offers snapshot.
+/// Server writes these to `watches.top_offers` JSONB on every check.
+struct TopOffer: Codable, Hashable, Sendable, Identifiable {
+    var source: String        // Retailer name (e.g. "eBay", "Walmart")
+    var price: Double
+    var url: String?
+    var title: String?
+    var imageURL: String?
+
+    // Synthesize an ID from source + price so SwiftUI ForEach works. If the
+    // same retailer appears twice with different prices we want distinct rows.
+    var id: String { "\(source.lowercased())|\(price)" }
+
+    enum CodingKeys: String, CodingKey {
+        case source, price, url, title
+        case imageURL
     }
 }
 

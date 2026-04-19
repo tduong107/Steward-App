@@ -8,12 +8,13 @@ final class SupabaseService {
 
     // MARK: - Watches
 
-    func fetchWatches() async throws -> [WatchDTO] {
+    func fetchWatches(limit: Int = 200) async throws -> [WatchDTO] {
         try await SupabaseConfig.client
             .from("watches")
             .select()
             .neq("status", value: "deleted")
             .order("created_at", ascending: false)
+            .limit(limit)
             .execute()
             .value
     }
@@ -173,11 +174,12 @@ final class SupabaseService {
 
     // MARK: - Activities
 
-    func fetchActivities() async throws -> [ActivityDTO] {
+    func fetchActivities(limit: Int = 100) async throws -> [ActivityDTO] {
         try await SupabaseConfig.client
             .from("activities")
             .select()
             .order("created_at", ascending: false)
+            .limit(limit)
             .execute()
             .value
     }

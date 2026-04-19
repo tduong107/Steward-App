@@ -6,6 +6,7 @@ struct DetailScreen: View {
     @Environment(SupabaseService.self) private var supabase
     @Environment(SubscriptionManager.self) private var subscriptionManager
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
 
     // Price history (real data from Supabase only)
     @State private var priceHistory: [PricePoint] = []
@@ -165,10 +166,10 @@ struct DetailScreen: View {
         .task {
             // Force sync to get latest needs_attention state from Supabase
             await viewModel.syncFromCloud() // Don't force — uses 3-second throttle to avoid redundant API calls
-            await loadCheckResults()
-            if showsPriceChart {
-                await loadPriceHistory()
-            }
+            // Load check results and price history concurrently (they're independent)
+            async let checksTask: () = loadCheckResults()
+            async let pricesTask: () = showsPriceChart ? loadPriceHistory() : ()
+            _ = await (checksTask, pricesTask)
         }
     }
 
@@ -191,7 +192,12 @@ struct DetailScreen: View {
             priceHistory = realPoints
 
             if realPoints.count >= 2 {
-                dealInsight = DealAnalyzer.analyze(history: realPoints)
+                // Search-mode watches track the best-of-multiple-retailers price, so
+                // "fake deal" heuristics (which assume a single seller) don't apply.
+                dealInsight = DealAnalyzer.analyze(
+                    history: realPoints,
+                    isSearchMode: watch.watchMode == "search"
+                )
             }
         } catch {
             // On error, leave empty — chart will show empty state
@@ -207,19 +213,13 @@ struct DetailScreen: View {
             HStack(spacing: 14) {
                 Group {
                     if let imageURL = watch.imageURL, let url = URL(string: imageURL) {
-                        AsyncImage(url: url) { phase in
-                            switch phase {
-                            case .success(let image):
-                                image
-                                    .resizable()
-                                    .scaledToFill()
-                            case .failure:
-                                Text(watch.emoji)
-                                    .font(.system(size: 26))
-                            default:
-                                ProgressView()
-                                    .controlSize(.small)
-                            }
+                        CachedAsyncImage(url: url) { image in
+                            image
+                                .resizable()
+                                .scaledToFill()
+                        } placeholder: {
+                            Text(watch.emoji)
+                                .font(.system(size: 26))
                         }
                     } else {
                         Text(watch.emoji)
@@ -303,26 +303,61 @@ struct DetailScreen: View {
 
     private var detailContent: some View {
         VStack(spacing: 8) {
-            // Error / needs attention banner
-            if watch.needsAttention {
+            // Error / needs attention / paused banner.
+            // Show for any of:
+            //  - watch.needsAttention (existing behavior)
+            //  - watch.status == .paused (so the user knows checks have stopped)
+            // BUT skip if the expired-date banner will show instead (covers its own UX).
+            if (watch.needsAttention || watch.status == .paused) && watch.expiredDateString == nil {
                 warningBanner
             }
 
             // Expired date warning (uses shared Watch.expiredDateString)
             if let expiredDate = watch.expiredDateString {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 12) {
                     HStack(spacing: 6) {
-                        Image(systemName: "calendar.badge.exclamationmark")
+                        Image(systemName: watch.status == .paused ? "pause.circle.fill" : "calendar.badge.exclamationmark")
                             .font(.system(size: 14))
                             .foregroundStyle(.orange)
-                        Text("Date has passed")
+                        Text(watch.status == .paused ? "PAUSED • Date has passed" : "Date has passed")
                             .font(Theme.body(13, weight: .bold))
                             .foregroundStyle(.orange)
                     }
 
-                    Text("This watch was for \(expiredDate) which has already passed. Update the date or remove this watch to free up a slot.")
+                    Text(watch.status == .paused
+                        ? "This watch was for \(expiredDate) and has been paused because the date passed. Update the date to resume checking, or remove it to free up a slot."
+                        : "This watch was for \(expiredDate) which has already passed. Update the date or remove this watch to free up a slot.")
                         .font(Theme.body(13))
                         .foregroundStyle(Theme.inkMid)
+
+                    HStack(spacing: 10) {
+                        Button {
+                            viewModel.openChatWithContext("I need to update my \"\(watch.name)\" watch. The date has passed. Can you help me set a new date?")
+                        } label: {
+                            Text("Update")
+                                .font(Theme.body(13, weight: .semibold))
+                                .foregroundStyle(.orange)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 10)
+                                .background(Color.orange.opacity(0.12))
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                        }
+                        .buttonStyle(.plain)
+
+                        Button {
+                            viewModel.removeWatch(watch)
+                            dismiss()
+                        } label: {
+                            Text("Remove")
+                                .font(Theme.body(13, weight: .semibold))
+                                .foregroundStyle(.red)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 10)
+                                .background(Color.red.opacity(0.12))
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
                 .padding(16)
                 .background(Color.orange.opacity(0.08))
@@ -357,8 +392,23 @@ struct DetailScreen: View {
                 }
             }
 
-            // Price Source Indicator — computed from latest check result
-            if showsPriceChart, let latestResult = checkResults.first {
+            // Top Prices list (search-mode watches) — shown directly under the
+            // chart so the actionable comparison is the first thing the user
+            // sees, not buried below the details/settings rows.
+            if watch.watchMode == "search" && !watch.topOffers.isEmpty {
+                topPricesSection
+            }
+
+            // Excluded sources (search-mode watches only, shown only if user has excluded any)
+            if watch.watchMode == "search" && !watch.excludedSources.isEmpty {
+                excludedSourcesSection
+            }
+
+            // Price Source Indicator — computed from latest check result.
+            // Skipped for search-mode watches since the Top Prices section
+            // above already conveys "compared across multiple stores" with
+            // real data.
+            if showsPriceChart, watch.watchMode != "search", let latestResult = checkResults.first {
                 let sourceInfo = computePriceSource(from: latestResult)
                 HStack(spacing: 8) {
                     Image(systemName: sourceInfo.icon)
@@ -543,63 +593,103 @@ struct DetailScreen: View {
     }
 
     // MARK: - Warning Banner
+    //
+    // Shown when a watch is paused or flagged needs_attention. The server
+    // auto-fixes watches on a 24h cooldown by itself, so this banner only
+    // appears when Steward has genuinely run out of automatic options and
+    // needs the user to intervene. Actions are contextual to the specific
+    // problem (listing ended → replace URL, blocked domain → remove, etc.).
+
+    private enum WarningReason {
+        case endedListing       // eBay listing sold/ended, replace with a new listing
+        case unreachable        // Repeatedly can't fetch — URL may have moved
+        case blockedDomain      // Internal/restricted URL — can't be monitored
+        case other              // Generic failure
+
+        init(lastError: String?, changeNote: String?) {
+            let text = (changeNote ?? lastError ?? "").lowercased()
+            if text.contains("listing has ended") || text.contains("listing was ended") || text.contains("no longer available") {
+                self = .endedListing
+            } else if text.contains("restricted") || text.contains("blocked") || text.contains("internal") {
+                self = .blockedDomain
+            } else if text.contains("unable to reach") || text.contains("could not reach") || text.contains("after 2 days") {
+                self = .unreachable
+            } else {
+                self = .other
+            }
+        }
+    }
 
     private var warningBanner: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        let isPaused = watch.status == .paused
+        let reason = WarningReason(lastError: watch.lastError, changeNote: watch.changeNote)
+        // Prefer change_note (server-set explanation like "listing ended") over lastError;
+        // fall back to a generic message if neither is set.
+        let primaryText = watch.changeNote ?? watch.lastError
+            ?? (isPaused ? "This watch was paused and has stopped checking." : "This watch is having trouble checking the page.")
+
+        return VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 6) {
-                Image(systemName: "exclamationmark.triangle.fill")
+                Image(systemName: isPaused ? "pause.circle.fill" : "exclamationmark.triangle.fill")
                     .font(.system(size: 12))
                     .foregroundStyle(Theme.gold)
 
-                Text(L10n.t("detail.needs_attention"))
+                Text(isPaused ? "PAUSED • NEEDS YOUR HELP" : "NEEDS YOUR HELP")
                     .font(Theme.body(11, weight: .bold))
                     .foregroundStyle(Theme.gold)
                     .tracking(0.5)
             }
 
-            Text(watch.lastError ?? "This watch is having trouble checking the page.")
+            Text(primaryText)
                 .font(Theme.body(14, weight: .semibold))
                 .foregroundStyle(Theme.ink)
 
-            Text("Failed \(watch.consecutiveFailures) times in a row. The page may have changed or the URL may no longer work.")
+            // Explanatory subtitle — sets the right expectation that Steward
+            // already tried to auto-fix. No more "click Ask AI" busywork.
+            Text(subtitleText(for: reason))
                 .font(Theme.body(12))
                 .foregroundStyle(Theme.inkMid)
 
+            // Contextual actions. For every reason, the user can Remove.
+            // For recoverable cases, they can also update the URL.
             HStack(spacing: 8) {
-                Button {
-                    viewModel.askAIToFix(watch)
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 12))
-                        Text(L10n.t("detail.ask_ai_fix"))
-                            .font(Theme.body(13, weight: .semibold))
+                if reason != .blockedDomain {
+                    Button {
+                        viewModel.askAIToFix(watch)
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "pencil")
+                                .font(.system(size: 12))
+                            Text(reason == .endedListing ? "Replace URL" : "Update URL")
+                                .font(Theme.body(13, weight: .semibold))
+                        }
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(Theme.gold)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
                     }
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
-                    .background(Theme.gold)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
 
                 Button {
-                    showBrowser = true
+                    viewModel.removeWatch(watch)
+                    dismiss()
                 } label: {
                     HStack(spacing: 6) {
-                        Image(systemName: "safari")
+                        Image(systemName: "trash")
                             .font(.system(size: 12))
-                        Text(L10n.t("detail.find_link"))
+                        Text("Remove")
                             .font(Theme.body(13, weight: .semibold))
                     }
-                    .foregroundStyle(Theme.gold)
+                    .foregroundStyle(.red)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 10)
-                    .background(Theme.goldLight)
+                    .background(Color.red.opacity(0.12))
                     .clipShape(RoundedRectangle(cornerRadius: 10))
                     .overlay(
                         RoundedRectangle(cornerRadius: 10)
-                            .stroke(Theme.gold.opacity(0.4), lineWidth: 1)
+                            .stroke(Color.red.opacity(0.3), lineWidth: 1)
                     )
                 }
                 .buttonStyle(.plain)
@@ -615,6 +705,178 @@ struct DetailScreen: View {
                 .stroke(Theme.gold.opacity(0.3), lineWidth: 1)
         )
         .padding(.bottom, 6)
+    }
+
+    /// Explanatory subtitle that frames the issue in terms of what Steward
+    /// already tried — so the user knows they're being asked to help, not
+    /// to trigger something that's redundant with the auto-fix.
+    private func subtitleText(for reason: WarningReason) -> String {
+        switch reason {
+        case .endedListing:
+            return "Steward can't revive a sold listing — please point this watch at a new listing for the same item, or remove it."
+        case .blockedDomain:
+            return "This URL can't be monitored. Remove this watch to free up a slot."
+        case .unreachable:
+            return "Steward tried to auto-fix this watch but couldn't find a working URL. Please update it with a working product page or remove the watch."
+        case .other:
+            return "Steward tried to auto-recover this watch but needs your help. Update the URL or remove the watch."
+        }
+    }
+
+    // MARK: - Top Prices (search-mode watches)
+
+    private var topPricesSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                Image(systemName: "list.bullet.rectangle")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.accent)
+                Text("TOP PRICES ACROSS STORES")
+                    .font(Theme.body(11, weight: .bold))
+                    .foregroundStyle(Theme.accent)
+                    .tracking(0.5)
+                Spacer()
+                Text("\(watch.topOffers.count) stores")
+                    .font(Theme.body(11))
+                    .foregroundStyle(Theme.inkLight)
+            }
+
+            VStack(spacing: 0) {
+                ForEach(Array(watch.topOffers.enumerated()), id: \.element.id) { index, offer in
+                    topOfferRow(offer: offer, isBest: index == 0)
+                    if index < watch.topOffers.count - 1 {
+                        Divider()
+                            .background(Theme.border)
+                    }
+                }
+            }
+            .background(Theme.bgCard)
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(Theme.border, lineWidth: 1)
+            )
+
+            Text("Tap a store to visit. Swipe-exclude removes a store from best-price tracking.")
+                .font(Theme.body(11))
+                .foregroundStyle(Theme.inkLight)
+                .padding(.horizontal, 4)
+        }
+        .padding(.bottom, 4)
+    }
+
+    @ViewBuilder
+    private func topOfferRow(offer: TopOffer, isBest: Bool) -> some View {
+        HStack(spacing: 12) {
+            // Price pill
+            VStack(alignment: .leading, spacing: 2) {
+                Text(String(format: "$%.2f", offer.price))
+                    .font(Theme.body(15, weight: .bold))
+                    .foregroundStyle(isBest ? Theme.accent : Theme.ink)
+
+                HStack(spacing: 4) {
+                    if isBest {
+                        Image(systemName: "star.fill")
+                            .font(.system(size: 8))
+                            .foregroundStyle(Theme.accent)
+                    }
+                    Text(offer.source)
+                        .font(Theme.body(12, weight: .medium))
+                        .foregroundStyle(Theme.inkMid)
+                        .lineLimit(1)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            // Visit button
+            if let urlString = offer.url, let url = URL(string: urlString) {
+                Button {
+                    openURL(url)
+                } label: {
+                    Image(systemName: "arrow.up.right.square")
+                        .font(.system(size: 16))
+                        .foregroundStyle(Theme.accent)
+                        .frame(width: 36, height: 36)
+                        .background(Theme.accentLight)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+                .buttonStyle(.plain)
+            }
+
+            // Exclude button — confirms before removing so users don't drop a store by accident
+            Button {
+                viewModel.excludeSource(watch, source: offer.source)
+            } label: {
+                Image(systemName: "eye.slash")
+                    .font(.system(size: 14))
+                    .foregroundStyle(Theme.inkMid)
+                    .frame(width: 36, height: 36)
+                    .background(Theme.bgDeep)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Exclude \(offer.source) from best-price tracking")
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .contentShape(Rectangle())
+    }
+
+    // MARK: - Excluded Sources
+
+    private var excludedSourcesSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: "eye.slash.fill")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Theme.inkMid)
+                Text("EXCLUDED STORES")
+                    .font(Theme.body(11, weight: .bold))
+                    .foregroundStyle(Theme.inkMid)
+                    .tracking(0.5)
+            }
+            Text("These stores are hidden from best-price tracking. Tap any to re-include.")
+                .font(Theme.body(11))
+                .foregroundStyle(Theme.inkLight)
+                .fixedSize(horizontal: false, vertical: true)
+
+            // Simple vertical list of excluded-store chips. For most watches
+            // the list is short (1-3 items), so a grid isn't needed.
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(watch.excludedSources, id: \.self) { source in
+                    Button {
+                        viewModel.reincludeSource(watch, source: source)
+                    } label: {
+                        HStack(spacing: 6) {
+                            Text(source)
+                                .font(Theme.body(12, weight: .medium))
+                                .foregroundStyle(Theme.inkMid)
+                            Spacer()
+                            Text("Re-include")
+                                .font(Theme.body(11))
+                                .foregroundStyle(Theme.accent)
+                            Image(systemName: "arrow.uturn.backward.circle.fill")
+                                .font(.system(size: 12))
+                                .foregroundStyle(Theme.accent)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Theme.bgDeep)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.bgCard)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(Theme.border, lineWidth: 1)
+        )
     }
 
     // MARK: - Alternative Source Banner

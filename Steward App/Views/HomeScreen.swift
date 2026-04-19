@@ -573,7 +573,12 @@ struct HomeScreen: View {
 
     private var expiredWatches: [Watch] {
         viewModel.watches.filter { watch in
-            watch.status == .watching && !watch.triggered && watch.hasExpiredDate
+            // Include "watching" watches (pre-scheduler-detection) AND "paused" watches
+            // that were auto-paused by the scheduler for having an expired date.
+            // Both cases need the user to take action (update or remove).
+            (watch.status == .watching || watch.status == .paused) &&
+                !watch.triggered &&
+                watch.hasExpiredDate
         }
     }
 

@@ -188,13 +188,10 @@ struct SavingsScreen: View {
                 HStack(spacing: 12) {
                     // Watch image or emoji
                     if let imageURL = watch.imageURL, let url = URL(string: imageURL) {
-                        AsyncImage(url: url) { phase in
-                            switch phase {
-                            case .success(let image):
-                                image.resizable().scaledToFill()
-                            default:
-                                Text(watch.emoji).font(.system(size: 18))
-                            }
+                        CachedAsyncImage(url: url) { image in
+                            image.resizable().scaledToFill()
+                        } placeholder: {
+                            Text(watch.emoji).font(.system(size: 18))
                         }
                         .frame(width: 40, height: 40)
                         .clipShape(RoundedRectangle(cornerRadius: 8))

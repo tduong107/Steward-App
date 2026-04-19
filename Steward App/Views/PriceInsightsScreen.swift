@@ -387,7 +387,11 @@ struct PriceInsightsScreen: View {
                 // Always use real data only — no mock fallback
                 priceData[watch.id] = points
 
-                if points.count >= 2, let insight = DealAnalyzer.analyze(history: points) {
+                if points.count >= 2,
+                   let insight = DealAnalyzer.analyze(
+                        history: points,
+                        isSearchMode: watch.watchMode == "search"
+                   ) {
                     dealInsights[watch.id] = insight
                 }
             } catch {

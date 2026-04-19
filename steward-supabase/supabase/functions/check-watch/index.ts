@@ -39,18 +39,18 @@ async function applyAffiliateLink(url: string, network: string, watch: any, supa
     let urlDomain = "";
     try { urlDomain = new URL(url).hostname.replace("www.", ""); } catch { return null; }
 
-    const domainConfig = _cachedAffiliateConfigs.find((c: any) =>
+    // Match on domain. Skimlinks catch-all (domain="*") was removed after their
+    // program declined us — no catch-all fallback means unmapped domains just
+    // pass through unchanged, which is the right behavior.
+    const config = _cachedAffiliateConfigs.find((c: any) =>
       c.domain !== "*" && (urlDomain === c.domain || urlDomain.endsWith("." + c.domain))
     );
-    const skimlinksConfig = _cachedAffiliateConfigs.find((c: any) => c.domain === "*" && c.network === "skimlinks");
-    const config = domainConfig || skimlinksConfig;
 
     if (!config || JSON.stringify(config.affiliate_params).includes("PLACEHOLDER")) return null;
 
     // Check if URL is already affiliated (prevent double-tagging)
     if (url.includes("tag=steward") || url.includes("anrdoezrs.net") || url.includes("shareasale.com/r.cfm") ||
-        url.includes("sjv.io") || url.includes("linksynergy.com") || url.includes("skimresources.com") ||
-        url.includes("mkevt=1")) {
+        url.includes("linksynergy.com") || url.includes("mkevt=1")) {
       return url; // Already affiliated
     }
 
@@ -63,16 +63,12 @@ async function applyAffiliateLink(url: string, network: string, watch: any, supa
         return `https://www.anrdoezrs.net/click-${config.affiliate_params.pid}-${config.affiliate_params.sid}?url=${encodeURIComponent(url)}`;
       case "shareasale":
         return `https://www.shareasale.com/r.cfm?u=${config.affiliate_params.uid}&b=${config.affiliate_params.bid}&m=${config.affiliate_params.mid}&urllink=${encodeURIComponent(url)}`;
-      case "impact":
-        return `https://${config.affiliate_params.program}.sjv.io/c/${config.affiliate_params.pid}/${config.affiliate_params.sid}?u=${encodeURIComponent(url)}`;
       case "rakuten":
         return `https://click.linksynergy.com/deeplink?id=${config.affiliate_params.lid}&murl=${encodeURIComponent(url)}`;
       case "ebay": {
         const sep = url.includes("?") ? "&" : "?";
         return `${url}${sep}mkevt=1&mkcid=1&mkrid=711-53200-19255-0&campid=${config.affiliate_params.campaign_id || ""}&toolid=10001&customid=steward`;
       }
-      case "skimlinks":
-        return `https://go.skimresources.com?id=${config.affiliate_params.publisher_id}&url=${encodeURIComponent(url)}`;
       case "direct": {
         const sep = url.includes("?") ? "&" : "?";
         return `${url}${sep}${config.affiliate_params.param}=${config.affiliate_params.value}`;
@@ -434,9 +430,24 @@ async function checkSearchWatch(
     return { watch_id: watch.id, changed: false, result_text: "No results found" };
   }
 
-  // Sort by price ascending and pick best
-  priced.sort((a, b) => a.price - b.price);
-  const bestResult = priced[0];
+  // Apply user-configured source exclusions — retailers the user explicitly
+  // removed from "best price" consideration (e.g. unfamiliar grey-market
+  // sellers). Matched case-insensitively against offer.source.
+  const excludedSources: string[] = Array.isArray(watch.excluded_sources) ? watch.excluded_sources : [];
+  const excludedSet = new Set(excludedSources.map((s: string) => s.toLowerCase().trim()).filter(Boolean));
+  let filteredPriced = priced;
+  if (excludedSet.size > 0) {
+    filteredPriced = priced.filter((p) => !excludedSet.has((p.source ?? "").toLowerCase().trim()));
+    if (filteredPriced.length === 0) {
+      // All results were excluded — nothing to compare, treat as no results
+      console.log(`[check-watch] Search watch ${watch.id}: all ${priced.length} results excluded by user`);
+      return { watch_id: watch.id, changed: false, result_text: "All results excluded by your filters. Remove a filter to see offers." };
+    }
+  }
+
+  // Sort by price ascending and pick best (after exclusion filter)
+  filteredPriced.sort((a, b) => a.price - b.price);
+  const bestResult = filteredPriced[0];
   const currentBestPrice = bestResult.price;
 
   // Get last known best price from previous check
@@ -487,24 +498,43 @@ async function checkSearchWatch(
 
   const now = new Date().toISOString();
 
+  // Build the top-offers snapshot. We store the TOP-N offers (post-exclusion)
+  // on the watch row itself so iOS can render the list without joining to
+  // check_results, and we also store in check_results for full history.
+  // De-duplicate by store (keep the cheapest per retailer) so the list
+  // shows distinct retailers rather than multiple near-identical eBay rows.
+  const dedupedByStore = new Map<string, typeof filteredPriced[number]>();
+  for (const offer of filteredPriced) {
+    const key = (offer.source || "Store").toLowerCase().trim();
+    const existing = dedupedByStore.get(key);
+    if (!existing || offer.price < existing.price) {
+      dedupedByStore.set(key, offer);
+    }
+  }
+  const topOffers = Array.from(dedupedByStore.values())
+    .sort((a, b) => a.price - b.price)
+    .slice(0, 8)
+    .map((r) => ({
+      title: r.title,
+      url: r.url,
+      source: r.source,
+      price: r.price,
+      imageURL: r.imageURL,
+    }));
+
   // Store check result with multi-source data
   await supabase.from("check_results").insert({
     id: crypto.randomUUID(),
     watch_id: watch.id,
     result_data: {
       text: resultText,
-      sources: priced.slice(0, 5).map((r) => ({
-        title: r.title,
-        url: r.url,
-        source: r.source,
-        price: r.price,
-        imageURL: r.imageURL,
-      })),
-      cross_store_offers: priced.slice(0, 8).map((r) => ({
+      sources: topOffers.slice(0, 5),
+      cross_store_offers: topOffers.map((r) => ({
         store: r.source,
         price: r.price,
         url: r.url,
       })),
+      excluded_sources: excludedSources, // Record what was excluded for this check
     },
     changed,
     price: currentBestPrice,
@@ -513,23 +543,43 @@ async function checkSearchWatch(
 
   // Update the watch
   const updateData: Record<string, unknown> = { last_checked: now };
-  if (changed) {
-    updateData.triggered = true;
-    updateData.status = "triggered";
-    updateData.change_note = resultText;
-    // Apply affiliate link to search-mode action URL
-    let searchActionUrl = bestResult.url;
-    if (watch.is_affiliated && watch.affiliate_network) {
+
+  // Persist the top-offers snapshot on the watch row for fast UI reads.
+  updateData.top_offers = topOffers;
+
+  // ALWAYS keep the best-source tracking fields fresh, not just on triggers.
+  // Otherwise the action_url stays pointing at the original reference URL
+  // (e.g. Amazon) while the best price is at a different retailer (e.g. eBay),
+  // so tapping the watch sends the user to the wrong store.
+  updateData.best_source = bestResult.source;
+
+  // Compute the best-source action URL (with affiliate if available) so
+  // "Visit Website" / action buttons route to the actual cheapest listing.
+  let searchActionUrl = bestResult.url;
+  // Re-apply affiliate network to the NEW best-source URL — a previously
+  // cached affiliate_url may point to a different retailer than this check's
+  // winner. Use the watch's stored affiliate_network when present, or fall
+  // through to the default mapping via applyAffiliateLink.
+  if (watch.is_affiliated && watch.affiliate_network && bestResult.url) {
+    try {
       const affiliated = await applyAffiliateLink(bestResult.url, watch.affiliate_network, watch, supabase);
       if (affiliated) {
         searchActionUrl = affiliated;
         updateData.affiliate_url = affiliated;
       }
-    }
+    } catch { /* non-critical; keep raw URL */ }
+  }
+  if (bestResult.url) {
     updateData.action_url = searchActionUrl;
-    if (bestResult.imageURL) {
-      updateData.image_url = bestResult.imageURL;
-    }
+  }
+  if (bestResult.imageURL) {
+    updateData.image_url = bestResult.imageURL;
+  }
+
+  if (changed) {
+    updateData.triggered = true;
+    updateData.status = "triggered";
+    updateData.change_note = resultText;
   }
 
   await supabase.from("watches").update(updateData).eq("id", watch.id);
@@ -629,9 +679,9 @@ serve(async (req) => {
       } catch { /* URL parse failure — will fail naturally downstream */ }
     }
 
-    // Cumulative timeout tracker — Supabase edge functions have 26s limit
+    // Cumulative timeout tracker — Supabase Pro edge functions have 60s wall clock
     const funcStartTime = Date.now();
-    const timeRemaining = () => 24000 - (Date.now() - funcStartTime); // 2s margin
+    const timeRemaining = () => 55000 - (Date.now() - funcStartTime); // 5s margin
 
     // Skip if watch is paused (triggered watches are allowed through for re-checking)
     if (watch.status === "paused") {
@@ -730,44 +780,75 @@ serve(async (req) => {
       let urlDomain = "";
       try { urlDomain = new URL(watch.url.match(/^https?:\/\//i) ? watch.url : `https://${watch.url}`).hostname.replace("www.", ""); } catch {}
 
-      // Article/news URLs that aren't product pages
-      const ARTICLE_PATTERNS = ["/article", "/ar-", "/news/", "/blog/", "/story/", "/lifestyle/"];
+      // Article/news URLs that aren't product pages.
+      // These are almost always a user mistake — they meant to share the product page
+      // from within the article, but shared the article URL instead. Articles don't
+      // have reliable prices (article mentions sale price, but that price changes or
+      // the article itself is stale), so the watch will never work correctly.
+      // Auto-pause and prompt the user to update the URL.
+      const ARTICLE_PATTERNS = ["/article", "/articles/", "/ar-", "/news/", "/blog/", "/story/", "/lifestyle/", "/reviews/", "/deals/", "/buying-guide"];
       const isArticleUrl = ARTICLE_PATTERNS.some(p => watch.url.includes(p));
-      const NEWS_DOMAINS = ["msn.com", "yahoo.com", "cnn.com", "bbc.com", "nytimes.com", "forbes.com", "businessinsider.com"];
+      const NEWS_DOMAINS = [
+        "msn.com", "yahoo.com", "cnn.com", "bbc.com", "nytimes.com", "forbes.com",
+        "businessinsider.com", "cnet.com", "theverge.com", "techcrunch.com",
+        "engadget.com", "wired.com", "tomsguide.com", "gizmodo.com", "mashable.com",
+      ];
       const isNewsDomain = NEWS_DOMAINS.some(d => urlDomain === d || urlDomain.endsWith("." + d));
 
-      if ((isArticleUrl || isNewsDomain) && !watch.needs_attention && watch.action_type === "price") {
-        // Flag once — don't repeatedly flag
-        const flagKey = `article_url_${watch.id}`;
-        const { data: alreadyFlagged } = await supabase
-          .from("engagement_notifications_sent")
-          .select("id")
-          .eq("user_id", watch.user_id)
-          .eq("notification_key", flagKey)
-          .maybeSingle();
+      if ((isArticleUrl || isNewsDomain) && watch.action_type === "price") {
+        // Pause the watch immediately — no point burning API budget on a URL
+        // that can't reliably produce a price. The iOS app's "Needs Attention"
+        // card will show the reason and offer Update/Remove actions.
+        const pauseNote = `This watch points to ${isNewsDomain ? "a news article" : "an article page"}, not a product page. Please update the URL to the actual retailer's product page so we can track the price accurately.`;
+        const alreadyPaused = watch.status === "paused";
 
-        if (!alreadyFlagged) {
-          await supabase.from("watches").update({
-            needs_attention: true,
-            last_error: "This watch points to a news article, not a product page. Price tracking may be inaccurate. Please update the URL to the actual retailer.",
-          }).eq("id", watch.id);
+        await supabase.from("watches").update({
+          status: "paused",
+          needs_attention: true,
+          change_note: pauseNote,
+          last_error: pauseNote,
+          last_checked: new Date().toISOString(),
+        }).eq("id", watch.id);
 
-          try {
-            await supabase.functions.invoke("notify-user", {
-              body: {
-                user_id: watch.user_id,
-                watch_id: watch.id,
-                notification_type: "engagement_article",
-                engagement_title: "⚠️ Watch URL needs update",
-                engagement_body: `"${watch.name}" points to a news article. Update the URL to the actual retailer for accurate price tracking.`,
-              },
-            });
-            await supabase.from("engagement_notifications_sent").upsert(
-              { user_id: watch.user_id, notification_key: flagKey },
-              { onConflict: "user_id,notification_key" }
-            );
-          } catch { /* non-critical */ }
+        // Notify once (idempotent via engagement_notifications_sent)
+        if (!alreadyPaused) {
+          const flagKey = `article_url_${watch.id}`;
+          const { data: alreadyFlagged } = await supabase
+            .from("engagement_notifications_sent")
+            .select("id")
+            .eq("user_id", watch.user_id)
+            .eq("notification_key", flagKey)
+            .maybeSingle();
+
+          if (!alreadyFlagged) {
+            try {
+              await supabase.functions.invoke("notify-user", {
+                body: {
+                  user_id: watch.user_id,
+                  watch_id: watch.id,
+                  notification_type: "engagement_article",
+                  engagement_title: "⚠️ Watch URL needs update",
+                  engagement_body: `"${watch.name}" points to an article, not a product page. Update the URL to the retailer's product page to start tracking.`,
+                },
+              });
+              await supabase.from("engagement_notifications_sent").upsert(
+                { user_id: watch.user_id, notification_key: flagKey },
+                { onConflict: "user_id,notification_key" }
+              );
+            } catch { /* non-critical */ }
+          }
         }
+
+        console.log(`[check-watch] Paused ${watch.id}: article URL detected (domain=${urlDomain})`);
+        return new Response(
+          JSON.stringify({
+            watch_id: watch.id,
+            paused: true,
+            reason: "article_url",
+            result_text: pauseNote,
+          }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
 
       // Unsupported/highly-problematic domains — warn but don't block
@@ -833,11 +914,11 @@ serve(async (req) => {
             .eq("enabled", true);
 
           if (affiliateConfigs?.length) {
-            const domainConfig = affiliateConfigs.find((c: any) =>
+            // Match exact domain only; the Skimlinks catch-all was removed
+            // when that program declined us. Unmapped domains stay unaffiliated.
+            const config = affiliateConfigs.find((c: any) =>
               c.domain !== "*" && (watchDomain === c.domain || watchDomain.endsWith("." + c.domain))
             );
-            const skimlinksConfig = affiliateConfigs.find((c: any) => c.domain === "*" && c.network === "skimlinks");
-            const config = domainConfig || skimlinksConfig;
 
             if (config && !JSON.stringify(config.affiliate_params).includes("PLACEHOLDER")) {
               const originalUrl = watch.url.match(/^https?:\/\//i) ? watch.url : `https://${watch.url}`;
@@ -893,6 +974,11 @@ serve(async (req) => {
     }
 
     // ─── Recreation.gov: use native availability API (free, no key needed) ────────────
+    // IMPORTANT: For camping URLs, do NOT fall through to standard AI check if the API fails.
+    // Recreation.gov camping pages always contain availability-related words (calendar,
+    // dates, "available") which cause the AI evaluator to false-positive every check.
+    const isRecGovCamping = watch.url?.includes("recreation.gov") &&
+      (/camping\/camp(?:grounds|sites)\/\d+/.test(watch.url));
     if (watch.url?.includes("recreation.gov")) {
       const campResult = await checkCampgroundWatch(watch, supabase);
       if (campResult) {
@@ -901,7 +987,26 @@ serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      // Fall through to standard check if API fails
+      // Only block fallthrough for camping URLs — permits/tickets can use AI evaluation
+      if (isRecGovCamping) {
+        const checkedAt = new Date().toISOString();
+        await supabase.from("check_results").insert({
+          id: crypto.randomUUID(),
+          watch_id: watch.id,
+          result_data: { text: "Recreation.gov API temporarily unavailable — will retry next check", source: "recreation-gov-api" },
+          changed: false,
+          checked_at: checkedAt,
+        });
+        await supabase.from("watches").update({
+          last_checked: checkedAt,
+          last_result_text: "Recreation.gov API temporarily unavailable — will retry next check",
+        }).eq("id", watch.id);
+        return new Response(
+          JSON.stringify({ watch_id: watch.id, changed: false, result_text: "Recreation.gov API temporarily unavailable" }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      // Non-camping recreation.gov URLs (permits, tickets) fall through to standard check
     }
 
     // ─── Resy: use native availability API ────────────
@@ -1147,31 +1252,100 @@ serve(async (req) => {
       );
     }
 
-    // ─── eBay API shortcut: extract item ID from URL, get price via API ────────────
-    let ebayPrice: number | null = null;
-    if (fetchUrl.includes("ebay.com/itm/")) {
+    // ─── Amazon Serper shortcut: extract ASIN from URL, get price via Google Shopping ────
+    // Amazon renders buy-box prices via JS only — static HTML has wrong prices from
+    // warranties, "similar items", etc. Use Serper Shopping for reliable pricing.
+    let amazonPrice: number | null = null;
+    if (fetchUrl.includes("amazon.com/") && watch.action_type === "price") {
       try {
-        const itemMatch = fetchUrl.match(/\/itm\/(\d+)/);
-        if (itemMatch) {
-          const itemId = itemMatch[1];
-          // Use eBay Browse API (free, no auth needed for basic item lookup via Serper)
+        // Extract ASIN from URL patterns: /dp/ASIN, /gp/product/ASIN, or /product/ASIN
+        const asinMatch = fetchUrl.match(/\/(?:dp|gp\/product|product)\/(B[A-Z0-9]{9})/);
+        if (asinMatch) {
+          const asin = asinMatch[1];
           const SERPER_KEY = Deno.env.get("SERPER_API_KEY") ?? "";
           if (SERPER_KEY) {
             const serperRes = await fetch("https://google.serper.dev/shopping", {
               method: "POST",
               headers: { "X-API-KEY": SERPER_KEY, "Content-Type": "application/json" },
-              body: JSON.stringify({ q: `site:ebay.com/itm/${itemId}`, num: 3 }),
+              body: JSON.stringify({ q: `site:amazon.com/dp/${asin}`, num: 5 }),
+              signal: AbortSignal.timeout(5000),
+            });
+            if (serperRes.ok) {
+              const data = await serperRes.json();
+              const items = data.shopping ?? [];
+              // Two-pass: first try exact ASIN match, then fall back to first Amazon result
+              let bestItem: any = null;
+              for (const item of items) {
+                if (item.link?.includes(asin)) {
+                  const p = parseShoppingPrice(item.price);
+                  if (p !== null) { amazonPrice = p; bestItem = item; break; }
+                }
+              }
+              // Fallback: query was scoped to this ASIN, so first Amazon result is likely correct
+              if (amazonPrice === null) {
+                for (const item of items) {
+                  if (item.link?.includes("amazon.com")) {
+                    const p = parseShoppingPrice(item.price);
+                    if (p !== null) { amazonPrice = p; bestItem = item; break; }
+                  }
+                }
+              }
+              if (amazonPrice !== null && bestItem) {
+                console.log(`[check-watch] Amazon Serper: $${amazonPrice} for ASIN ${asin}`);
+                // Fix hostname-only watch names from share extension
+                const watchNameRaw = (watch.name ?? "").trim().toLowerCase();
+                const nameIsHostname = !watchNameRaw.includes(" ") && /^(www\.)?[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(watchNameRaw);
+                if (nameIsHostname && bestItem.title) {
+                  const cleanTitle = bestItem.title.replace(/\s*[-|].*$/, "").trim();
+                  if (cleanTitle.length > 3 && cleanTitle.length < 200) {
+                    watch.name = cleanTitle;
+                    try {
+                      await supabase.from("watches").update({ name: cleanTitle }).eq("id", watch.id);
+                      console.log(`[check-watch] Fixed Amazon hostname-only name for ${watch.id}: "${cleanTitle}"`);
+                    } catch { /* non-critical */ }
+                  }
+                }
+              }
+            }
+          }
+        }
+      } catch { /* fall through to direct fetch */ }
+    }
+
+    // ─── eBay API shortcut: extract item/product ID from URL, get price via Serper ────
+    let ebayPrice: number | null = null;
+    if (fetchUrl.includes("ebay.com/itm/") || fetchUrl.includes("ebay.com/p/")) {
+      try {
+        // Match both /itm/{id} (auction/BIN listings) and /p/{id} (product catalog pages)
+        const itemMatch = fetchUrl.match(/\/itm\/(\d+)/) || fetchUrl.match(/\/p\/(\d+)/);
+        const isProductPage = fetchUrl.includes("ebay.com/p/");
+        if (itemMatch) {
+          const itemId = itemMatch[1];
+          const SERPER_KEY = Deno.env.get("SERPER_API_KEY") ?? "";
+          if (SERPER_KEY) {
+            // For /itm/ pages: search by item ID. For /p/ pages: use watch name or product ID
+            const searchQuery = isProductPage
+              ? (watch.name ? `${watch.name} site:ebay.com` : `site:ebay.com/p/${itemId}`)
+              : `site:ebay.com/itm/${itemId}`;
+            const serperRes = await fetch("https://google.serper.dev/shopping", {
+              method: "POST",
+              headers: { "X-API-KEY": SERPER_KEY, "Content-Type": "application/json" },
+              body: JSON.stringify({ q: searchQuery, num: 5 }),
               signal: AbortSignal.timeout(5000),
             });
             if (serperRes.ok) {
               const data = await serperRes.json();
               const items = data.shopping ?? [];
               for (const item of items) {
-                if (item.link?.includes(itemId)) {
+                // For /itm/: exact item ID match. For /p/: any eBay link with a price
+                const linkMatchesId = isProductPage
+                  ? item.link?.includes("ebay.com")
+                  : item.link?.includes(itemId);
+                if (linkMatchesId) {
                   const p = parseShoppingPrice(item.price);
                   if (p !== null) {
                     ebayPrice = p;
-                    console.log(`[check-watch] eBay Serper: $${p} for item ${itemId}`);
+                    console.log(`[check-watch] eBay Serper: $${p} for ${isProductPage ? "product" : "item"} ${itemId}`);
                     break;
                   }
                 }
@@ -1180,6 +1354,37 @@ serve(async (req) => {
           }
         }
       } catch { /* fall through */ }
+    }
+
+    // ─── Steam Store API shortcut: extract appid from URL, get price via Steam API ────
+    let steamPrice: number | null = null;
+    const steamAppMatch = fetchUrl.match(/store\.steampowered\.com\/app\/(\d+)/);
+    if (steamAppMatch && watch.action_type === "price") {
+      try {
+        const appId = steamAppMatch[1];
+        const steamRes = await fetch(
+          `https://store.steampowered.com/api/appdetails?appids=${appId}&filters=price_overview`,
+          { signal: AbortSignal.timeout(5000) }
+        );
+        if (steamRes.ok) {
+          const steamData = await steamRes.json();
+          const appData = steamData[appId];
+          if (appData?.success && appData.data?.price_overview) {
+            const po = appData.data.price_overview;
+            // final_formatted is like "$29.99", final is price in cents (2999)
+            steamPrice = po.final / 100;
+            console.log(`[check-watch] Steam API: $${steamPrice} for app ${appId}`);
+          }
+        }
+      } catch { /* fall through */ }
+    }
+
+    // ─── Deku Deals shortcut: extract current price from their structured page ────
+    let dekuDealsPrice: number | null = null;
+    if (fetchUrl.includes("dekudeals.com") && watch.action_type === "price") {
+      // Deku Deals will be fetched via normal path; we'll extract the price
+      // from the rendered HTML using a domain-specific extractor after fetch.
+      // Mark this so we can apply special extraction logic below.
     }
 
     // ─── Shopify API shortcut: try products.json before HTML fetch ────────────
@@ -1239,12 +1444,14 @@ serve(async (req) => {
       isKnownBlockedDomain &&
       ANTHROPIC_API_KEY &&
       watch.action_type === "price" &&
-      timeRemaining() > 21000
+      timeRemaining() > 16000
     ) {
       const wsStart = Date.now();
       try {
         console.log(`[check-watch] Blocked-domain fast-path: Claude Web Search for ${watch.id} (${fetchDomain})`);
-        const wsResult = await claudeWebSearchPrice(watch, watch.last_price ?? null);
+        // Use tighter 15s timeout (vs default 20s) to preserve budget for
+        // scrape_do and other fallbacks if this fails.
+        const wsResult = await claudeWebSearchPrice(watch, watch.last_price ?? null, 15000);
         if (wsResult !== null) {
           claudeEarlyPrice = wsResult.price;
           claudeEarlyConfidence = wsResult.confidence === "high" ? "high"
@@ -1252,11 +1459,72 @@ serve(async (req) => {
                                 : "low";
           claudeEarlyResultText = wsResult.resultText;
           console.log(`[check-watch] Blocked-domain fast-path success: $${wsResult.price} (${wsResult.confidence}) in ${Date.now() - wsStart}ms`);
+
+          // Fix hostname-only watch names: when the share extension couldn't
+          // extract a real name (e.g. "www.rei.com"), use the product name
+          // Claude discovered during web search to fix the watch name.
+          const watchNameRaw = (watch.name ?? "").trim().toLowerCase();
+          const looksLikeHostname = !watchNameRaw.includes(" ") && /^(www\.)?[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(watchNameRaw);
+          const newNameLooksLikeHostname = /^(www\.)?[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(wsResult.productName?.trim() ?? "");
+          if (looksLikeHostname && wsResult.productName && wsResult.productName.length > 2 && wsResult.productName.length < 200 && !newNameLooksLikeHostname) {
+            watch.name = wsResult.productName;
+            try {
+              await supabase.from("watches").update({ name: wsResult.productName }).eq("id", watch.id);
+              console.log(`[check-watch] Fixed hostname-only name for ${watch.id}: "${wsResult.productName}"`);
+            } catch { /* non-critical */ }
+          }
         } else {
           console.log(`[check-watch] Blocked-domain fast-path returned no price for ${watch.id} after ${Date.now() - wsStart}ms — falling through to normal chain`);
         }
       } catch (e: any) {
         console.log(`[check-watch] Blocked-domain fast-path error after ${Date.now() - wsStart}ms: ${e.message}`);
+      }
+    }
+
+    // ─── Serper Shopping fallback for blocked domains when Claude Web Search failed ─────
+    // Claude Web Search is flaky (API errors, timeouts, occasional null results).
+    // When it fails on a known-blocked domain, direct fetch won't work either (bot-protected)
+    // — so we'd get "Could not reach page". Use Serper Shopping as a safety net: it queries
+    // Google Shopping which typically has cached prices for major retailers.
+    let blockedDomainFallbackPrice: number | null = null;
+    if (
+      claudeEarlyPrice === null &&
+      serperFallbackDomains.some(d => fetchDomain.includes(d)) &&
+      watch.name &&
+      timeRemaining() > 7000
+    ) {
+      const SERPER_KEY = Deno.env.get("SERPER_API_KEY") ?? "";
+      if (SERPER_KEY) {
+        try {
+          console.log(`[check-watch] Claude Web Search failed for ${watch.id} on ${fetchDomain} — trying Serper Shopping fallback`);
+          const searchQuery = `${watch.name} site:${fetchDomain}`;
+          const serperRes = await fetch("https://google.serper.dev/shopping", {
+            method: "POST",
+            headers: { "X-API-KEY": SERPER_KEY, "Content-Type": "application/json" },
+            body: JSON.stringify({ q: searchQuery, num: 5 }),
+            signal: AbortSignal.timeout(6000),
+          });
+          if (serperRes.ok) {
+            const serperData = await serperRes.json();
+            const items = serperData.shopping ?? [];
+            for (const item of items) {
+              try {
+                const itemHost = new URL(item.link ?? "").hostname.replace("www.", "");
+                // Require exact host match — don't accept a result from a different retailer
+                if (itemHost === fetchDomain || itemHost.endsWith("." + fetchDomain) || fetchDomain.endsWith("." + itemHost)) {
+                  const sp = parseShoppingPrice(item.price);
+                  if (sp !== null) {
+                    blockedDomainFallbackPrice = sp;
+                    console.log(`[check-watch] Serper fallback: $${sp} for ${watch.id} from ${itemHost}`);
+                    break;
+                  }
+                }
+              } catch { /* skip */ }
+            }
+          }
+        } catch (e: any) {
+          console.log(`[check-watch] Serper fallback failed: ${e.message}`);
+        }
       }
     }
 
@@ -1268,7 +1536,20 @@ serve(async (req) => {
       if (SERPER_KEY) {
         try {
           console.log(`[check-watch] Serper-primary domain ${fetchDomain}, skipping direct fetch for ${watch.id}`);
-          const searchQuery = `${watch.name} site:${fetchDomain}`;
+
+          // Extract Temu goods_id from URL — its product names are often generic
+          // (e.g. "Temu Product") but the goods_id is a unique 10-15 digit number
+          // that Google Shopping indexes. Searching for the goods_id directly
+          // gives much better match rates than a generic product name.
+          let searchQuery = `${watch.name} site:${fetchDomain}`;
+          if (fetchDomain.includes("temu.com")) {
+            const goodsMatch = fetchUrl.match(/goods_id=(\d+)/);
+            if (goodsMatch) {
+              searchQuery = `"${goodsMatch[1]}" site:temu.com`;
+              console.log(`[check-watch] Temu goods_id-based search for ${watch.id}`);
+            }
+          }
+
           const serperRes = await fetch("https://google.serper.dev/shopping", {
             method: "POST",
             headers: { "X-API-KEY": SERPER_KEY, "Content-Type": "application/json" },
@@ -1313,11 +1594,21 @@ serve(async (req) => {
     const methodLog: Array<{ method: string; status: string; error?: string; duration_ms: number; price_found?: number }> = [];
 
     // Method memory: if a non-direct method worked last time, skip direct fetch to save time.
-    // Also skip if the blocked-domain fast path above already found a price — no point
-    // wasting the budget on a fetch we expect to fail.
-    const preferredMethod = watch.preferred_fetch_method;
+    // Also skip if we already have a reliable price from an API shortcut — no point
+    // wasting the budget on a fetch we expect to fail or return less accurate data.
+    //
+    // IMPORTANT: If the watch has 2+ consecutive failures, ignore the stale preferred
+    // method. A method that worked previously may have become unreliable (e.g. Claude
+    // Web Search API flakiness) — letting other methods try again recovers the watch.
+    const preferredMethod = (watch.consecutive_failures ?? 0) >= 2 ? null : watch.preferred_fetch_method;
+    if (preferredMethod === null && watch.preferred_fetch_method) {
+      console.log(`[check-watch] Ignoring stale preferred method "${watch.preferred_fetch_method}" for ${watch.id} (${watch.consecutive_failures} consecutive failures)`);
+    }
     const skipDirectFetch = serperPrimaryDomains.some(d => fetchDomain.includes(d)) ||
       claudeEarlyPrice !== null ||
+      amazonPrice !== null ||  // Amazon Serper Shopping already found price
+      steamPrice !== null ||   // Steam API already found price
+      blockedDomainFallbackPrice !== null ||  // Serper fallback for blocked domain found price
       (preferredMethod && preferredMethod !== "direct" && preferredMethod !== "direct_desktop_ua");
 
     if (skipDirectFetch) {
@@ -1327,6 +1618,12 @@ serve(async (req) => {
         // so evaluateConditionAsync runs the condition against the price
         // rather than returning "Could not reach page".
         console.log(`[check-watch] Skipping direct fetch for ${watch.id} — blocked-domain fast path returned $${claudeEarlyPrice}`);
+        fetchSuccess = true;
+        pageText = "";
+      } else if (amazonPrice !== null || steamPrice !== null || blockedDomainFallbackPrice !== null) {
+        // API shortcut or Serper fallback already found a price — treat as successful
+        const apiPrice = amazonPrice ?? steamPrice ?? blockedDomainFallbackPrice;
+        console.log(`[check-watch] Skipping direct fetch for ${watch.id} — API/fallback returned $${apiPrice}`);
         fetchSuccess = true;
         pageText = "";
       } else {
@@ -1455,7 +1752,25 @@ serve(async (req) => {
     // Extract current price from raw HTML (structured selectors work best on raw HTML)
     // Use blocked-domain fast-path price first (Claude Web Search ran before fetch),
     // then Shopify API price, then HTML extraction.
-    let currentPrice = claudeEarlyPrice ?? ebayPrice ?? shopifyPrice ?? (fetchSuccess ? extractPrice(pageText) : null);
+    let currentPrice = claudeEarlyPrice ?? amazonPrice ?? ebayPrice ?? steamPrice ?? shopifyPrice ?? blockedDomainFallbackPrice ?? (fetchSuccess ? extractPrice(pageText) : null);
+
+    // Log when frequency fallback was used — these prices are often wrong
+    if (currentPrice !== null && claudeEarlyPrice === null && amazonPrice === null && ebayPrice === null && steamPrice === null && shopifyPrice === null && _lastExtractMethod === "frequency") {
+      console.log(`[check-watch] ⚠️ Price $${currentPrice} from frequency fallback (low confidence) for ${watch.id}`);
+    }
+
+    // ─── Deku Deals domain-specific price extraction ─────────────────────
+    // Deku Deals shows prices for multiple retailers/platforms. The generic
+    // extractPrice frequency fallback often picks the wrong one. Override
+    // with targeted extraction of the "current best price" element.
+    if (fetchSuccess && fetchUrl.includes("dekudeals.com") && pageText.length > 0) {
+      const dekuPrice = extractDekuDealsPrice(pageText);
+      if (dekuPrice !== null) {
+        currentPrice = dekuPrice;
+        dekuDealsPrice = dekuPrice;
+        console.log(`[check-watch] Deku Deals extraction: $${dekuPrice} for ${watch.id}`);
+      }
+    }
 
     // ─── Scrape.do retry for JS-heavy sites where price extraction failed ────────────
     // If we got HTML but couldn't find a price, the page likely renders prices via JavaScript.
@@ -1503,16 +1818,62 @@ serve(async (req) => {
     // Strip HTML for condition evaluation (AI and regex work better on plain text)
     const plainText = fetchSuccess ? stripHtml(pageText) : pageText;
 
+    // ─── eBay ended-listing detection ────────────────────────────────
+    // eBay listings that have ended/sold still return 200 but show "This listing
+    // has ended" or "This listing was ended by the seller". Detect this and give
+    // the user a clear, actionable message instead of a generic failure.
+    let ebayListingEnded = false;
+    if (fetchSuccess && fetchUrl.includes("ebay.com") && plainText.length > 0) {
+      const ptLower = plainText.toLowerCase();
+      if (
+        ptLower.includes("this listing has ended") ||
+        ptLower.includes("this listing was ended") ||
+        ptLower.includes("bidding has ended") ||
+        ptLower.includes("this item is no longer available") ||
+        ptLower.includes("the listing you're looking for has ended")
+      ) {
+        ebayListingEnded = true;
+        console.log(`[check-watch] eBay listing ended for ${watch.id}`);
+      }
+    }
+
     // ─── Price Confidence Assessment ──────────────────────────────────
     let priceConfidence: "high" | "medium" | "low" | "none" = "none";
     if (claudeEarlyPrice !== null && currentPrice === claudeEarlyPrice) {
       // Blocked-domain fast path: trust Claude Web Search's own confidence,
       // since it navigated to the actual URL via its web_search tool.
       priceConfidence = claudeEarlyConfidence;
+    } else if (amazonPrice !== null && currentPrice === amazonPrice) {
+      // Amazon Serper Shopping: structured Google Shopping data matched to ASIN
+      priceConfidence = "high";
+    } else if (ebayPrice !== null && currentPrice === ebayPrice) {
+      // eBay Serper Shopping: structured Google Shopping data for eBay item
+      priceConfidence = "high";
+    } else if (steamPrice !== null && currentPrice === steamPrice) {
+      // Steam Store API: official price from Valve's API
+      priceConfidence = "high";
+    } else if (dekuDealsPrice !== null && currentPrice === dekuDealsPrice) {
+      // Deku Deals domain-specific extraction
+      priceConfidence = "medium";
+    } else if (shopifyPrice !== null && currentPrice === shopifyPrice) {
+      // Shopify API: structured JSON from Shopify's products.json endpoint
+      priceConfidence = "high";
+    } else if (blockedDomainFallbackPrice !== null && currentPrice === blockedDomainFallbackPrice) {
+      // Serper Shopping fallback for blocked domains — Google Shopping cache,
+      // slightly less fresh than a direct fetch but reliable for major retailers.
+      priceConfidence = "medium";
     } else if (currentPrice !== null) {
       const hasJsonLd = /<script[^>]*type="application\/ld\+json"/i.test(pageText);
       const hasOgPrice = /property="(?:og|product):price:amount"/i.test(pageText);
-      priceConfidence = (hasJsonLd || hasOgPrice) ? "high" : "medium";
+      if (hasJsonLd || hasOgPrice) {
+        priceConfidence = "high";
+      } else if (_lastExtractMethod === "frequency") {
+        // Frequency fallback: most-common $X.XX on page — often wrong on
+        // complex pages (Amazon accessories, multi-product pages, etc.)
+        priceConfidence = "low";
+      } else {
+        priceConfidence = "medium";
+      }
     } else if (fetchSuccess) {
       // Use already-stripped plainText length instead of calling stripHtml again
       const hasJsFramework = /__NEXT_DATA__|window\.__INITIAL_STATE__|__NUXT__|window\.__APP/i.test(pageText);
@@ -1894,6 +2255,44 @@ serve(async (req) => {
       priceForAI
     );
 
+    // ─── eBay ended-listing: override result and pause watch ────────
+    if (ebayListingEnded) {
+      changed = false;
+      currentPrice = null;
+      resultText = "This eBay listing has ended or the item was sold.";
+
+      // Record check result, pause watch, and notify user
+      const now = new Date().toISOString();
+      await supabase.from("check_results").insert({
+        id: crypto.randomUUID(),
+        watch_id: watch.id,
+        result_data: { text: resultText, content_hash: null, price_confidence: "none", ebay_listing_ended: true },
+        changed: false,
+        price: null,
+        checked_at: now,
+      });
+
+      await supabase.from("watches").update({
+        last_checked: now,
+        status: "paused",
+        needs_attention: true,
+        consecutive_failures: 0,
+        last_error: "This eBay listing has ended. Update the URL to a new listing or remove the watch.",
+      }).eq("id", watch.id);
+
+      try {
+        await supabase.functions.invoke("notify-user", {
+          body: { watch_id: watch.id, user_id: watch.user_id, notification_type: "needs_attention" },
+        });
+      } catch { /* non-critical */ }
+
+      console.log(`[check-watch] eBay listing ended — paused watch ${watch.id}`);
+      return new Response(
+        JSON.stringify({ watch_id: watch.id, changed: false, result_text: resultText, ebay_listing_ended: true }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // If the blocked-domain fast path provided the price, override the
     // result text with Claude's own "verified via web search" copy (the
     // evaluator otherwise produces a generic "$X — price unchanged" line
@@ -2168,7 +2567,9 @@ serve(async (req) => {
     }
 
     // ─── Notify on any price decrease if user opted in ────────────
-    if (!changed && watch.notify_any_price_drop && currentPrice !== null && lastKnownPrice !== null && currentPrice < lastKnownPrice) {
+    // Skip notification if price confidence is "low" (frequency fallback) — these
+    // are often wrong and would trigger spurious "price dropped!" alerts.
+    if (!changed && watch.notify_any_price_drop && currentPrice !== null && lastKnownPrice !== null && currentPrice < lastKnownPrice && priceConfidence !== "low") {
       changed = true;
       resultText = `Price dropped to $${currentPrice.toFixed(2)} (was $${lastKnownPrice.toFixed(2)})`;
     }
@@ -2425,20 +2826,36 @@ serve(async (req) => {
         });
       } catch { /* non-critical logging */ }
 
-      // Auto-resolve: when failures cross threshold, try to find a working URL automatically
-      // Skip if already needs_attention (avoid expensive re-resolve on every check)
-      if (newFailures >= FAILURE_THRESHOLD && newFailures < pauseAt && !watch.needs_attention && timeRemaining() > 8000) {
-        console.log(`[check-watch] Auto-resolve: attempting to fix ${watch.id} (${watch.name}) after ${newFailures} failures`);
+      // Auto-resolve: try to find a working URL automatically.
+      // Runs whenever a watch is failing OR already flagged needs_attention —
+      // we don't want the user to have to click "Ask AI to fix" when Steward
+      // can keep trying on its own. Rate-limited to once per 24h per watch so
+      // we don't burn API credits on watches that genuinely can't be fixed
+      // automatically (ended listings, expired promos, etc.).
+      const AUTO_FIX_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours
+      const lastAutoFixAt = watch.last_auto_fix_at ? new Date(watch.last_auto_fix_at).getTime() : 0;
+      const autoFixCooldownPassed = (Date.now() - lastAutoFixAt) >= AUTO_FIX_COOLDOWN_MS;
+      const eligibleForAutoFix = newFailures >= FAILURE_THRESHOLD && newFailures < pauseAt && timeRemaining() > 8000;
+
+      if (eligibleForAutoFix && autoFixCooldownPassed) {
+        console.log(`[check-watch] Auto-resolve: attempting to fix ${watch.id} (${watch.name}) after ${newFailures} failures (needs_attention=${watch.needs_attention})`);
+        updateData.last_auto_fix_at = new Date().toISOString();
 
         const autoFixResult = await attemptAutoResolve(watch, supabase);
 
         if (autoFixResult.resolved) {
-          // Auto-fix succeeded! Update the URL and reset failures
+          // Auto-fix succeeded! Restore a fully-working watch state.
           console.log(`[check-watch] Auto-resolve succeeded for ${watch.id}: new URL = ${autoFixResult.newUrl}`);
           updateData.url = autoFixResult.newUrl;
           updateData.consecutive_failures = 0;
           updateData.last_error = null;
           updateData.needs_attention = false;
+          // If the watch was paused (e.g. by an earlier auto-pause threshold),
+          // resume it now that we have a working URL.
+          if (watch.status === "paused") {
+            updateData.status = "watching";
+            updateData.change_note = null;
+          }
 
           // Log the auto-fix as an activity
           try {
@@ -2459,21 +2876,29 @@ serve(async (req) => {
             await supabase.functions.invoke("check-watch", { body: { watch_id: watch.id } });
           } catch { /* non-critical */ }
         } else {
-          // Auto-fix failed — flag for user attention
-          updateData.needs_attention = true;
-          console.log(`[check-watch] Auto-resolve failed for ${watch.id}, flagging needs_attention`);
-          try {
-            await supabase.functions.invoke("notify-user", {
-              body: {
-                watch_id: watch.id,
-                user_id: watch.user_id,
-                notification_type: "needs_attention",
-              },
-            });
-          } catch {
-            console.error("[check-watch] Failed to send needs_attention notification");
+          // Auto-fix failed — flag for user attention only if not already flagged
+          // (avoid re-notifying the user every 24h for the same problem).
+          if (!watch.needs_attention) {
+            updateData.needs_attention = true;
+            console.log(`[check-watch] Auto-resolve failed for ${watch.id}, flagging needs_attention`);
+            try {
+              await supabase.functions.invoke("notify-user", {
+                body: {
+                  watch_id: watch.id,
+                  user_id: watch.user_id,
+                  notification_type: "needs_attention",
+                },
+              });
+            } catch {
+              console.error("[check-watch] Failed to send needs_attention notification");
+            }
+          } else {
+            console.log(`[check-watch] Auto-resolve still failing for ${watch.id}, already flagged (no re-notify)`);
           }
         }
+      } else if (eligibleForAutoFix && !autoFixCooldownPassed) {
+        const hoursLeft = Math.ceil((AUTO_FIX_COOLDOWN_MS - (Date.now() - lastAutoFixAt)) / (60 * 60 * 1000));
+        console.log(`[check-watch] Auto-resolve in cooldown for ${watch.id} (${hoursLeft}h remaining)`);
       }
     } else if (prevFailures > 0 || watch.needs_attention) {
       // Success (or auto-fixed) — reset error tracking
@@ -3182,19 +3607,41 @@ function detectFareHold(url: string, pageText: string): FareHoldInfo {
 
 // ─── Price Extraction ─────────────────────────────────────────────
 
+// Tracks which extraction method was used by the last `extractPrice` call.
+// "structured" = meta/JSON-LD/domain-specific/CSS-class selectors (reliable)
+// "context" = price near keywords like "price", "sale" (moderate)
+// "frequency" = most-common $X.XX on page (unreliable, often wrong)
+let _lastExtractMethod: "structured" | "context" | "frequency" | "none" = "none";
+
 function extractPrice(text: string): number | null {
+  _lastExtractMethod = "none";
   // Strategy: meta tags → JSON-LD → Amazon-specific → structured HTML → context → frequency fallback
 
   // 0a) og:price:amount or product:price:amount meta tags (most reliable)
+  // First, check if the page declares a non-USD currency — if so, skip og:price
+  // to avoid storing ¥37,950 as $37,950 (e.g., Japanese watch sites)
+  const currencyPatterns = [
+    /property="(?:og|product):price:currency"\s+content="([^"]+)"/i,
+    /content="([^"]+)"\s+property="(?:og|product):price:currency"/i,
+  ];
+  let pageCurrency: string | null = null;
+  for (const cp of currencyPatterns) {
+    const cm = text.match(cp);
+    if (cm) { pageCurrency = cm[1].toUpperCase().trim(); break; }
+  }
+  const isUsdPage = !pageCurrency || pageCurrency === "USD" || pageCurrency === "US";
+
   const ogPricePatterns = [
     /property="(?:og|product):price:amount"\s+content="([^"]+)"/i,
     /content="([^"]+)"\s+property="(?:og|product):price:amount"/i,
   ];
-  for (const pattern of ogPricePatterns) {
-    const match = text.match(pattern);
-    if (match) {
-      const price = parseFloat(match[1].replace(/,/g, ""));
-      if (price > 0.50 && price < 100_000) return price;
+  if (isUsdPage) {
+    for (const pattern of ogPricePatterns) {
+      const match = text.match(pattern);
+      if (match) {
+        const price = parseFloat(match[1].replace(/,/g, ""));
+        if (price > 0.50 && price < 100_000) { _lastExtractMethod = "structured"; return price; }
+      }
     }
   }
 
@@ -3205,7 +3652,7 @@ function extractPrice(text: string): number | null {
     try {
       const jsonData = JSON.parse(jsonLdMatch[1]);
       const price = findPriceInJsonLd(jsonData);
-      if (price !== null && price > 0.50 && price < 100_000) return price;
+      if (price !== null && price > 0.50 && price < 100_000) { _lastExtractMethod = "structured"; return price; }
     } catch {
       // Invalid JSON, skip
     }
@@ -3236,7 +3683,7 @@ function extractPrice(text: string): number | null {
       const match = text.match(pattern);
       if (match) {
         const price = parseFloat(match[1].replace(/,/g, ""));
-        if (price > 0.50 && price < 100_000) return price;
+        if (price > 0.50 && price < 100_000) { _lastExtractMethod = "structured"; return price; }
       }
     }
   }
@@ -3259,7 +3706,7 @@ function extractPrice(text: string): number | null {
       const match = text.match(pattern);
       if (match) {
         const price = parseFloat(match[1].replace(/,/g, ""));
-        if (price > 0.50 && price < 100_000) return price;
+        if (price > 0.50 && price < 100_000) { _lastExtractMethod = "structured"; return price; }
       }
     }
   }
@@ -3279,7 +3726,7 @@ function extractPrice(text: string): number | null {
     const match = text.match(pattern);
     if (match) {
       const price = parseFloat(match[1].replace(/,/g, ""));
-      if (price > 0.50 && price < 100_000) return price;
+      if (price > 0.50 && price < 100_000) { _lastExtractMethod = "structured"; return price; }
     }
   }
 
@@ -3292,7 +3739,7 @@ function extractPrice(text: string): number | null {
   const contextMatches = [...text.matchAll(contextPattern)];
   for (const match of contextMatches) {
     const price = parseFloat(match[1].replace(/,/g, ""));
-    if (price > 0.50 && price < 100_000 && !wasPrices.has(price)) return price;
+    if (price > 0.50 && price < 100_000 && !wasPrices.has(price)) { _lastExtractMethod = "context"; return price; }
   }
   // If all context matches were "was" prices, fall through to frequency
 
@@ -3325,7 +3772,53 @@ function extractPrice(text: string): number | null {
     }
   }
 
+  _lastExtractMethod = "frequency";
   return bestPrice;
+}
+
+/**
+ * Deku Deals-specific price extraction.
+ * Deku Deals pages show prices across multiple retailers/platforms (eShop, Amazon, Walmart, etc.).
+ * The generic extractor's frequency fallback picks whichever price appears most often, which is
+ * often NOT the current best price. This function targets the primary "current price" element.
+ */
+function extractDekuDealsPrice(html: string): number | null {
+  // Deku Deals shows the current best price in a prominent element, typically:
+  // - JSON-LD Product schema with offers.price
+  // - <meta property="product:price:amount">
+  // - A "Current Price" or "Best Price" section with a price
+  // The generic extractPrice already handles JSON-LD and og:price, so if those
+  // matched, they're correct. The problem is when they DON'T match and we fall
+  // through to frequency. Target Deku-specific HTML patterns instead.
+
+  // Pattern 1: "Current Price" / "Best Price" heading followed by a price
+  const bestPricePatterns = [
+    /(?:current|best|lowest)\s*price[^$]{0,80}\$([\d,]+\.\d{2})/i,
+    /class="[^"]*price[^"]*current[^"]*"[^>]*>\s*\$?([\d,]+\.\d{2})/i,
+    /class="[^"]*current[^"]*price[^"]*"[^>]*>\s*\$?([\d,]+\.\d{2})/i,
+    // Deku Deals uses "main-price" or similar classes for the hero price
+    /class="[^"]*main[_-]?price[^"]*"[^>]*>\s*\$?([\d,]+\.\d{2})/i,
+    // Price in the hero/header section (first large price on page)
+    /class="[^"]*price[^"]*"[^>]*>\s*\$\s*([\d,]+\.\d{2})/i,
+  ];
+
+  for (const pattern of bestPricePatterns) {
+    const match = html.match(pattern);
+    if (match) {
+      const price = parseFloat(match[1].replace(/,/g, ""));
+      if (price > 0.50 && price < 100_000) return price;
+    }
+  }
+
+  // Pattern 2: Look for the FIRST standalone $X.XX in the page body (above the fold)
+  // Deku Deals puts the current price prominently at the top
+  const firstPriceInBody = html.match(/<body[\s\S]{0,5000}?\$([\d,]+\.\d{2})/i);
+  if (firstPriceInBody) {
+    const price = parseFloat(firstPriceInBody[1].replace(/,/g, ""));
+    if (price > 0.50 && price < 100_000) return price;
+  }
+
+  return null;
 }
 
 /**
@@ -3408,17 +3901,26 @@ function findPriceInJsonLd(obj: any): number | null {
     return null;
   }
   if (obj && typeof obj === "object") {
-    // Direct price field
-    if (obj.price !== undefined) {
-      const p = typeof obj.price === "number" ? obj.price : parseFloat(String(obj.price).replace(/,/g, ""));
-      if (!isNaN(p) && p > 0) return p;
+    // Skip non-USD currencies in JSON-LD (e.g., JPY ¥37,950 ≠ $37,950)
+    const currency = (obj.priceCurrency ?? "").toUpperCase();
+    if (currency && currency !== "USD" && currency !== "US") {
+      return null;
     }
-    // Check lowPrice
+
+    // PREFER lowPrice when present — on multi-variant products (AggregateOffer),
+    // `lowPrice` is the "starting at" price. This is what users want to track
+    // for price-drop alerts (e.g., REI Sahara shirt ranges $16.83–$69.95 by
+    // color/size; tracking the $16.83 clearance variant is what matters).
     if (obj.lowPrice !== undefined) {
       const p = typeof obj.lowPrice === "number" ? obj.lowPrice : parseFloat(String(obj.lowPrice).replace(/,/g, ""));
       if (!isNaN(p) && p > 0) return p;
     }
-    // Recurse into offers
+    // Direct price field (single-variant products, or when no range is given)
+    if (obj.price !== undefined) {
+      const p = typeof obj.price === "number" ? obj.price : parseFloat(String(obj.price).replace(/,/g, ""));
+      if (!isNaN(p) && p > 0) return p;
+    }
+    // Recurse into offers — for AggregateOffer, the lowPrice is typically here
     if (obj.offers) {
       const result = findPriceInJsonLd(obj.offers);
       if (result !== null) return result;
@@ -3434,8 +3936,9 @@ function findPriceInJsonLd(obj: any): number | null {
 
 async function claudeWebSearchPrice(
   watch: any,
-  lastKnownPrice: number | null
-): Promise<{ price: number; resultText: string; confidence: string } | null> {
+  lastKnownPrice: number | null,
+  timeoutMs = 20000
+): Promise<{ price: number; resultText: string; confidence: string; productName?: string } | null> {
   if (!ANTHROPIC_API_KEY) return null;
 
   let watchDomain = "";
@@ -3458,13 +3961,19 @@ async function claudeWebSearchPrice(
           name: "web_search",
           max_uses: 3,
         }],
-        system: `You are a price verification assistant. Your job is to find the CURRENT retail price of a specific product on a specific retailer's website. Use web search to find the actual current price — not the MSRP or list price, but what the product is actually selling for RIGHT NOW including any sales or discounts. Respond with ONLY a JSON object: {"price": NUMBER, "confidence": "high"|"medium"|"low", "source": "brief description of where you found the price"}. If you truly cannot find the current price, respond {"price": null, "confidence": "none"}.`,
+        system: `You are a price verification assistant. Your job is to find the CURRENT retail price of a specific product on a specific retailer's website.
+
+Use web search to find the actual current price — not the MSRP or list price, but what the product is actually selling for RIGHT NOW including any sales or discounts.
+
+CRITICAL: Many product pages have MULTIPLE VARIANTS (different colors, sizes, styles) each with its own price. When variants exist, return the LOWEST currently-available price — this is what shoppers care about for a "price drop" alert. If the page shows a price range like "$16.83 – $69.95", return the LOWER number ($16.83). If the page shows "From $X" or "Starting at $X", return that starting price.
+
+Respond with ONLY a JSON object: {"price": NUMBER, "confidence": "high"|"medium"|"low", "source": "brief description of where you found the price", "product_name": "the actual product name as shown on the retailer's website", "is_range": true if the product has multiple variants with different prices, false otherwise, "price_high": optional upper bound of the range if is_range is true}. If you truly cannot find the current price, respond {"price": null, "confidence": "none"}.`,
         messages: [{
           role: "user",
-          content: `Find the current price of this product:\n\nProduct: ${watch.name}\nRetailer: ${watchDomain || "unknown"}\nURL: ${watch.url}\n${lastKnownPrice ? `Last known price: $${lastKnownPrice.toFixed(2)}` : ""}\n\nSearch for the actual current selling price on ${watchDomain || "the retailer's website"}. Look for sale prices, not just MSRP.`,
+          content: `Find the current price of this product:\n\nProduct: ${watch.name}\nRetailer: ${watchDomain || "unknown"}\nURL: ${watch.url}\n${lastKnownPrice ? `Last known price: $${lastKnownPrice.toFixed(2)}` : ""}\n\nSearch for the actual current selling price on ${watchDomain || "the retailer's website"}. Look for sale prices, not just MSRP. If the product has variants with different prices, return the LOWEST available variant's price.`,
         }],
       }),
-      signal: AbortSignal.timeout(20000),
+      signal: AbortSignal.timeout(timeoutMs),
     });
 
     if (!response.ok) {
@@ -3496,13 +4005,16 @@ async function claudeWebSearchPrice(
     const confidence = confMatch?.[1] || "medium";
     const sourceMatch = resultText.match(/"source"\s*:\s*"([^"]+)"/);
     const source = sourceMatch?.[1] || "web search";
+    const nameMatch = resultText.match(/"product_name"\s*:\s*"([^"]+)"/);
+    const productName = nameMatch?.[1] || undefined;
 
-    console.log(`[claudeWebSearch] Found $${price} (${confidence}) for ${watch.id}: ${source}`);
+    console.log(`[claudeWebSearch] Found $${price} (${confidence}) for ${watch.id}: ${source}${productName ? ` — "${productName}"` : ""}`);
 
     return {
       price,
       resultText: `$${price.toFixed(2)} (verified via web search)`,
       confidence,
+      productName,
     };
   } catch (err: any) {
     console.log(`[claudeWebSearch] Error: ${err.message}`);

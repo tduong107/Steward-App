@@ -61,7 +61,13 @@ struct DealAnalyzer {
     /// Analyze a price history and return a deal insight.
     /// Requires at least 2 data points; returns nil otherwise.
     /// - Parameter sellerWasPrice: The seller's claimed "was"/"original" price (from page HTML)
-    static func analyze(history: [PricePoint], sellerWasPrice: Double? = nil) -> DealInsight? {
+    /// - Parameter isSearchMode: Pass true for "best price across the web" watches — the
+    ///   price history tracks whichever retailer was cheapest each day, so a dip/spike
+    ///   often reflects retailer churn (a flash clearance that sold out, a seller
+    ///   changing listings) rather than genuine seller-manipulated pricing. In that
+    ///   case we skip the "fake deal" detection paths because they assume a single
+    ///   seller's pricing behavior.
+    static func analyze(history: [PricePoint], sellerWasPrice: Double? = nil, isSearchMode: Bool = false) -> DealInsight? {
         guard history.count >= 2,
               let currentPrice = history.last?.price else { return nil }
 
@@ -87,21 +93,31 @@ struct DealAnalyzer {
         let historySpanDays = calendar.dateComponents([.day], from: oldestDate, to: Date()).day ?? 0
         let hasEnoughHistory = historySpanDays >= 3 && history.count >= 3
 
-        // Fake deal detection (two methods):
-        // Method 1: Check if price was inflated in the last 14 days then "dropped" back to average
-        let historyFakeDeal = detectFakeDeal(
-            history: history,
-            currentPrice: currentPrice,
-            avg30d: avg30d
-        )
-        // Method 2: Compare seller's "was" price to our historical data
-        // If our 30d avg is close to the "sale" price, the "was" price is likely inflated
-        let sellerFakeDeal = detectSellerInflatedPrice(
-            sellerWasPrice: sellerWasPrice,
-            currentPrice: currentPrice,
-            avg30d: avg30d,
-            allTimeHigh: allTimeHigh
-        )
+        // Fake deal detection (two methods). Both methods assume a single
+        // retailer manipulating their own pricing — NOT applicable to
+        // search-mode watches where each data point may be from a different
+        // store, so skip both when isSearchMode.
+        let historyFakeDeal: Bool
+        let sellerFakeDeal: Bool
+        if isSearchMode {
+            historyFakeDeal = false
+            sellerFakeDeal = false
+        } else {
+            // Method 1: Check if price was inflated in the last 14 days then "dropped" back to average
+            historyFakeDeal = detectFakeDeal(
+                history: history,
+                currentPrice: currentPrice,
+                avg30d: avg30d
+            )
+            // Method 2: Compare seller's "was" price to our historical data
+            // If our 30d avg is close to the "sale" price, the "was" price is likely inflated
+            sellerFakeDeal = detectSellerInflatedPrice(
+                sellerWasPrice: sellerWasPrice,
+                currentPrice: currentPrice,
+                avg30d: avg30d,
+                allTimeHigh: allTimeHigh
+            )
+        }
         let fakeDealDetected = historyFakeDeal || sellerFakeDeal
 
         // Determine rating

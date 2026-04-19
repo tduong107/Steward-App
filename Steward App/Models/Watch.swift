@@ -116,6 +116,12 @@ final class Watch {
     var createdAt: Date
     var watchMode: String = "url"          // "url" (single-URL) or "search" (multi-source)
     var searchQuery: String?               // Product search query for search-mode watches
+    var bestSource: String?                // For search-mode watches: retailer where the current best price was found (e.g. "eBay", "Walmart")
+    /// JSON-encoded [TopOffer] — top N retailer offers from the most recent check.
+    /// Stored as String because SwiftData doesn't natively handle arrays of Codable structs.
+    var topOffersData: String?
+    /// Retailer names the user has excluded from best-price consideration, comma-separated.
+    var excludedSourcesCSV: String?
 
     // Error tracking — populated by check-watch when checks fail
     var consecutiveFailures: Int = 0
@@ -154,6 +160,35 @@ final class Watch {
     var status: WatchStatus {
         get { WatchStatus(rawValue: statusRaw) ?? .watching }
         set { statusRaw = newValue.rawValue }
+    }
+
+    /// Decoded top-offers list from the most recent search-mode check.
+    /// Empty array if none available (never checked, URL-mode watch, etc.)
+    var topOffers: [TopOffer] {
+        get {
+            guard let data = topOffersData?.data(using: .utf8),
+                  let decoded = try? JSONDecoder().decode([TopOffer].self, from: data)
+            else { return [] }
+            return decoded
+        }
+        set {
+            guard let encoded = try? JSONEncoder().encode(newValue),
+                  let s = String(data: encoded, encoding: .utf8)
+            else { topOffersData = nil; return }
+            topOffersData = s
+        }
+    }
+
+    /// Retailer names the user has excluded from best-price consideration.
+    /// Case-insensitive matching is done server-side.
+    var excludedSources: [String] {
+        get {
+            guard let csv = excludedSourcesCSV, !csv.isEmpty else { return [] }
+            return csv.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        }
+        set {
+            excludedSourcesCSV = newValue.isEmpty ? nil : newValue.joined(separator: ",")
+        }
     }
 
     init(
@@ -350,6 +385,11 @@ extension Watch {
 
     /// Formatted countdown string to next watch (e.g. "in 4h 23m", "in 12m")
     var nextCheckCountdown: String {
+        // Paused watches are not checking — don't show a countdown that implies otherwise.
+        if status == .paused {
+            return "Paused"
+        }
+
         guard let nextDate = nextCheckDate else { return checkFrequency }
 
         let now = Date()

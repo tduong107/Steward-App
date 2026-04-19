@@ -43,6 +43,16 @@ extension Watch {
         self.affiliateNetwork = dto.affiliateNetwork
         self.affiliateUrl = dto.affiliateUrl
         self.isAffiliated = dto.isAffiliated
+        self.bestSource = dto.bestSource
+        // Encode topOffers to JSON string for SwiftData storage
+        if let offers = dto.topOffers,
+           let encoded = try? JSONEncoder().encode(offers),
+           let s = String(data: encoded, encoding: .utf8) {
+            self.topOffersData = s
+        } else {
+            self.topOffersData = nil
+        }
+        self.excludedSourcesCSV = dto.excludedSources?.joined(separator: ",")
     }
 
     /// Convert to DTO for uploading to Supabase
@@ -68,6 +78,16 @@ extension Watch {
             createdAt: self.createdAt,
             watchMode: self.watchMode,
             searchQuery: self.searchQuery,
+            bestSource: self.bestSource,
+            // topOffers is server-computed — never overwrite from the client.
+            // Sending nil omits the field from the PATCH body (Swift encoder
+            // skips nil optionals), so the server's value stays intact.
+            topOffers: nil,
+            // excludedSources is CLIENT-driven (user toggles exclusions). We
+            // must ALWAYS send the current state, even empty — otherwise
+            // Swift omits the field and the server keeps the stale value,
+            // causing a re-included store to flicker back on next sync.
+            excludedSources: self.excludedSources,
             consecutiveFailures: self.consecutiveFailures,
             lastError: self.lastError,
             needsAttention: self.needsAttention,

@@ -179,9 +179,10 @@ final class WatchViewModel {
         syncError = nil
 
         do {
-            // Fetch remote data (async — frees main thread while waiting)
-            let remoteDTOs = try await supabase?.fetchWatches() ?? []
-            let remoteActivities = try await supabase?.fetchActivities() ?? []
+            // Fetch remote data concurrently (both are independent network calls)
+            async let watchesTask = supabase?.fetchWatches() ?? []
+            async let activitiesTask = supabase?.fetchActivities() ?? []
+            let (remoteDTOs, remoteActivities) = try await (watchesTask, activitiesTask)
 
             // Merge watches: update existing, insert new, delete removed
             // (preserves SwiftData object identity so live references in DetailScreen stay valid)
@@ -191,7 +192,8 @@ final class WatchViewModel {
 
             for dto in remoteDTOs {
                 if let existing = existingById[dto.id] {
-                    // Update in-place — preserves object identity
+                    // Update in-place — preserves object identity so live
+                    // references (DetailScreen, cards) stay valid.
                     existing.emoji = dto.emoji
                     existing.name = dto.name
                     existing.url = dto.url
@@ -217,6 +219,27 @@ final class WatchViewModel {
                     existing.altSourceDomain = dto.altSourceDomain
                     existing.altSourcePrice = dto.altSourcePrice
                     existing.altSourceFoundAt = dto.altSourceFoundAt
+                    // Newer fields — were missing from this in-place update
+                    // path, meaning existing local watches never picked them
+                    // up. Now kept in sync with the server on every refresh.
+                    existing.couponCode = dto.couponCode
+                    existing.autoActEnabled = dto.autoAct
+                    existing.spendingLimit = dto.spendingLimit
+                    existing.notifyAnyPriceDrop = dto.notifyAnyPriceDrop
+                    existing.priceConfidence = dto.priceConfidence
+                    existing.affiliateNetwork = dto.affiliateNetwork
+                    existing.affiliateUrl = dto.affiliateUrl
+                    existing.isAffiliated = dto.isAffiliated
+                    existing.bestSource = dto.bestSource
+                    // Encode topOffers array as JSON string for SwiftData
+                    if let offers = dto.topOffers,
+                       let encoded = try? JSONEncoder().encode(offers),
+                       let s = String(data: encoded, encoding: .utf8) {
+                        existing.topOffersData = s
+                    } else {
+                        existing.topOffersData = nil
+                    }
+                    existing.excludedSourcesCSV = dto.excludedSources?.joined(separator: ",")
                 } else {
                     // New remote watch — insert
                     context.insert(Watch(from: dto))
@@ -377,11 +400,17 @@ final class WatchViewModel {
             priceHistories: priceHistories
         )
 
-        // Compute deal insights for each watch (reused by savings tab)
+        // Compute deal insights for each watch (reused by savings tab).
+        // Search-mode watches skip the "fake deal" heuristics (different
+        // retailer each day ≠ price manipulation).
+        let searchModeByWatchId = Dictionary(uniqueKeysWithValues: priceWatches.map { ($0.id, $0.watchMode == "search") })
         var insights: [UUID: DealInsight] = [:]
         for (watchId, history) in priceHistories {
             if history.count >= 2 {
-                insights[watchId] = DealAnalyzer.analyze(history: history)
+                insights[watchId] = DealAnalyzer.analyze(
+                    history: history,
+                    isSearchMode: searchModeByWatchId[watchId] ?? false
+                )
             }
         }
         dealInsights = insights
@@ -415,20 +444,43 @@ final class WatchViewModel {
         guard !watchesMissingImages.isEmpty else { return }
 
         let task = Task {
-            for watch in watchesMissingImages {
-                guard !Task.isCancelled else { return }
-                if let ogImage = await fetchOGImageURL(for: watch.url) {
-                    watch.imageURL = ogImage
-                    try? modelContext?.save()
+            // Fetch OG images concurrently (max 3 at a time to avoid flooding)
+            await withTaskGroup(of: (Watch, String?).self) { group in
+                var iterator = watchesMissingImages.makeIterator()
 
-                    // Push update to Supabase
-                    if let userId = auth?.currentUserId {
-                        let dto = watch.toDTO(userId: userId)
-                        try? await supabase?.updateWatch(dto)
+                // Seed initial batch (max 3 concurrent)
+                for _ in 0..<min(3, watchesMissingImages.count) {
+                    if let watch = iterator.next() {
+                        group.addTask { [weak self] in
+                            guard !Task.isCancelled else { return (watch, nil) }
+                            let url = await self?.fetchOGImageURL(for: watch.url)
+                            return (watch, url)
+                        }
+                    }
+                }
+
+                for await (watch, ogImage) in group {
+                    guard !Task.isCancelled else { return }
+                    if let ogImage {
+                        watch.imageURL = ogImage
+                        if let userId = auth?.currentUserId {
+                            let dto = watch.toDTO(userId: userId)
+                            try? await supabase?.updateWatch(dto)
+                        }
+                    }
+                    // Enqueue next watch
+                    if let nextWatch = iterator.next() {
+                        group.addTask { [weak self] in
+                            guard !Task.isCancelled else { return (nextWatch, nil) }
+                            let url = await self?.fetchOGImageURL(for: nextWatch.url)
+                            return (nextWatch, url)
+                        }
                     }
                 }
             }
-            // Refresh UI once after all backfills complete
+
+            // Save once after all backfills complete
+            try? modelContext?.save()
             fetchLocalWatches()
         }
         backgroundTasks.append(task)
@@ -752,6 +804,14 @@ final class WatchViewModel {
         watch.consecutiveFailures = 0
         watch.lastError = nil
         watch.needsAttention = false
+        // Resume checking: if the watch was auto-paused (expired date, ended
+        // listing, article URL, repeated failures), the AI fix restores a
+        // working URL so we can resume active checking. Also clear change_note
+        // so the stale "paused reason" banner disappears from Detail/Home.
+        if watch.status == .paused {
+            watch.status = .watching
+        }
+        watch.changeNote = nil
         try? context.save()
         fetchLocalWatches()
 
@@ -791,6 +851,12 @@ final class WatchViewModel {
         watch.consecutiveFailures = 0
         watch.lastError = nil
         watch.needsAttention = false
+        // Resume checking: switching to an alt source restores a working URL,
+        // so un-pause the watch and clear any stale paused-reason banner.
+        if watch.status == .paused {
+            watch.status = .watching
+        }
+        watch.changeNote = nil
         watch.altSourceUrl = nil
         watch.altSourceDomain = nil
         watch.altSourcePrice = nil
@@ -829,6 +895,53 @@ final class WatchViewModel {
             guard let supabase = self.supabase, let auth = self.auth, let userId = auth.currentUserId else { return }
             let dto = watch.toDTO(userId: userId)
             try? await supabase.updateWatch(dto)
+        }
+    }
+
+    // MARK: - Search-mode source exclusions
+
+    /// Exclude a retailer from a search-mode watch's best-price consideration.
+    /// Updates local state immediately, syncs to server, then triggers a re-check
+    /// so the watch's best_source/price/top_offers reflect the new filter.
+    func excludeSource(_ watch: Watch, source: String) {
+        guard let context = modelContext else { return }
+        let trimmed = source.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        var excluded = watch.excludedSources
+        // Case-insensitive de-dup
+        if !excluded.contains(where: { $0.caseInsensitiveCompare(trimmed) == .orderedSame }) {
+            excluded.append(trimmed)
+            watch.excludedSources = excluded
+        }
+        // Optimistically strip this retailer from the cached top offers list so
+        // the UI updates instantly while we wait for the server to re-check.
+        watch.topOffers = watch.topOffers.filter { $0.source.caseInsensitiveCompare(trimmed) != .orderedSame }
+        try? context.save()
+        fetchLocalWatches()
+
+        Task {
+            guard let supabase = self.supabase, let auth = self.auth, let userId = auth.currentUserId else { return }
+            let dto = watch.toDTO(userId: userId)
+            try? await supabase.updateWatch(dto)
+            // Re-check so best_source/price update against the new exclusion
+            try? await supabase.triggerCheck(watchId: watch.id)
+            await syncFromCloud(force: true)
+        }
+    }
+
+    /// Re-include a previously-excluded retailer so it can compete for best price again.
+    func reincludeSource(_ watch: Watch, source: String) {
+        guard let context = modelContext else { return }
+        watch.excludedSources = watch.excludedSources.filter { $0.caseInsensitiveCompare(source) != .orderedSame }
+        try? context.save()
+        fetchLocalWatches()
+
+        Task {
+            guard let supabase = self.supabase, let auth = self.auth, let userId = auth.currentUserId else { return }
+            let dto = watch.toDTO(userId: userId)
+            try? await supabase.updateWatch(dto)
+            try? await supabase.triggerCheck(watchId: watch.id)
+            await syncFromCloud(force: true)
         }
     }
 

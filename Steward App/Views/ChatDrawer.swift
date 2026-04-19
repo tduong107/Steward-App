@@ -924,19 +924,12 @@ struct ProductLinkCard: View {
             HStack(spacing: 10) {
                 // Product image or source icon fallback
                 if let imageURLString = link.imageURL, let imgURL = URL(string: imageURLString) {
-                    AsyncImage(url: imgURL) { phase in
-                        switch phase {
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .scaledToFill()
-                        case .failure:
-                            sourceIconView
-                        default:
-                            ProgressView()
-                                .controlSize(.small)
-                                .frame(width: 40, height: 40)
-                        }
+                    CachedAsyncImage(url: imgURL) { image in
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    } placeholder: {
+                        sourceIconView
                     }
                     .frame(width: 40, height: 40)
                     .clipShape(RoundedRectangle(cornerRadius: 8))

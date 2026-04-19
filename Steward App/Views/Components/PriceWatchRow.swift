@@ -22,19 +22,13 @@ struct PriceWatchRow: View {
                 // Product image or emoji
                 Group {
                     if let imageURL = watch.imageURL, let url = URL(string: imageURL) {
-                        AsyncImage(url: url) { phase in
-                            switch phase {
-                            case .success(let image):
-                                image
-                                    .resizable()
-                                    .scaledToFill()
-                            case .failure:
-                                Text(watch.emoji)
-                                    .font(.system(size: 18))
-                            default:
-                                ProgressView()
-                                    .controlSize(.small)
-                            }
+                        CachedAsyncImage(url: url) { image in
+                            image
+                                .resizable()
+                                .scaledToFill()
+                        } placeholder: {
+                            Text(watch.emoji)
+                                .font(.system(size: 18))
                         }
                     } else {
                         Text(watch.emoji)

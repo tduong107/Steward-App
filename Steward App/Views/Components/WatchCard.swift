@@ -10,19 +10,13 @@ struct WatchCard: View {
                 // Product image or emoji fallback
                 ZStack(alignment: .topTrailing) {
                     if let imageURL = watch.imageURL, let url = URL(string: imageURL) {
-                        AsyncImage(url: url) { phase in
-                            switch phase {
-                            case .success(let image):
-                                image
-                                    .resizable()
-                                    .scaledToFill()
-                            case .failure:
-                                Text(watch.emoji)
-                                    .font(.system(size: 20))
-                            default:
-                                ProgressView()
-                                    .controlSize(.small)
-                            }
+                        CachedAsyncImage(url: url) { image in
+                            image
+                                .resizable()
+                                .scaledToFill()
+                        } placeholder: {
+                            Text(watch.emoji)
+                                .font(.system(size: 20))
                         }
                         .frame(width: 44, height: 44)
                         .background(Theme.bgDeep)
@@ -44,17 +38,27 @@ struct WatchCard: View {
                             )
                             .offset(x: 3, y: -3)
                             .modifier(PulseModifier(enabled: true))
-                    } else if watch.needsAttention {
+                    } else if watch.hasExpiredDate {
+                        // Expired-date takes priority over generic paused/needs-attention
+                        // since it has a specific UX (Update/Remove actions).
                         Circle()
-                            .fill(Theme.gold)
+                            .fill(.orange)
                             .frame(width: 10, height: 10)
                             .overlay(
                                 Circle().stroke(Theme.bgCard, lineWidth: 2)
                             )
                             .offset(x: 3, y: -3)
-                    } else if watch.hasExpiredDate {
+                    } else if watch.status == .paused {
                         Circle()
-                            .fill(.orange)
+                            .fill(Theme.inkMid)
+                            .frame(width: 10, height: 10)
+                            .overlay(
+                                Circle().stroke(Theme.bgCard, lineWidth: 2)
+                            )
+                            .offset(x: 3, y: -3)
+                    } else if watch.needsAttention {
+                        Circle()
+                            .fill(Theme.gold)
                             .frame(width: 10, height: 10)
                             .overlay(
                                 Circle().stroke(Theme.bgCard, lineWidth: 2)
@@ -87,8 +91,17 @@ struct WatchCard: View {
                         HStack(spacing: 4) {
                             Image(systemName: "magnifyingglass")
                                 .font(.system(size: 9))
-                            Text(L10n.t("watch.tracking_stores"))
-                                .lineLimit(1)
+                            // Show the specific retailer when we know where the
+                            // current best price lives (e.g. "Best at eBay").
+                            // Falls back to a generic "tracking stores" label
+                            // for search watches that haven't been checked yet.
+                            if let source = watch.bestSource, !source.isEmpty {
+                                Text("Best at \(source)")
+                                    .lineLimit(1)
+                            } else {
+                                Text(L10n.t("watch.tracking_stores"))
+                                    .lineLimit(1)
+                            }
                         }
                         .font(Theme.body(11))
                         .foregroundStyle(Theme.accentMid)
@@ -101,8 +114,15 @@ struct WatchCard: View {
                     }
 
                     HStack(spacing: 5) {
+                        let isPaused = watch.status == .paused
                         Circle()
-                            .fill(watch.triggered ? Theme.accent : watch.needsAttention ? Theme.gold : Theme.borderMid)
+                            .fill(watch.triggered
+                                ? Theme.accent
+                                : watch.needsAttention
+                                    ? Theme.gold
+                                    : isPaused
+                                        ? Theme.inkMid
+                                        : Theme.borderMid)
                             .frame(width: 5, height: 5)
                             .modifier(PulseModifier(enabled: watch.triggered))
 
@@ -114,6 +134,17 @@ struct WatchCard: View {
                             Text(watch.changeNote ?? "Change detected!")
                                 .font(Theme.body(11, weight: .semibold))
                                 .foregroundStyle(Theme.accent)
+                                .lineLimit(1)
+                        } else if isPaused {
+                            // Paused state — dominant signal. Prefer changeNote (specific
+                            // reason like "listing ended") over lastError, fall back to generic.
+                            Image(systemName: "pause.circle.fill")
+                                .font(.system(size: 9))
+                                .foregroundStyle(watch.needsAttention ? Theme.gold : Theme.inkMid)
+
+                            Text("Paused · \(watch.changeNote ?? watch.lastError ?? "Needs attention")")
+                                .font(Theme.body(11, weight: .medium))
+                                .foregroundStyle(watch.needsAttention ? Theme.gold : Theme.inkMid)
                                 .lineLimit(1)
                         } else if watch.needsAttention {
                             Image(systemName: "exclamationmark.triangle.fill")
