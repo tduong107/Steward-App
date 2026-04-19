@@ -39,7 +39,11 @@ export function inspectSession(
   watch: Pick<Watch, 'site_cookies' | 'cookie_status' | 'cookie_domain'>,
 ): SessionState {
   if (!watch.site_cookies) {
-    return { status: 'none', cookieCount: 0 }
+    return {
+      status: 'none',
+      cookieCount: 0,
+      domain: watch.cookie_domain || undefined,
+    }
   }
 
   let cookies: SerializedCookie[] = []
@@ -98,21 +102,6 @@ export function inspectSession(
   }
 }
 
-/**
- * True when this watch's auto-cart path is end-to-end viable right now:
- * functionality is wired (supported domain + price/cart type), the user
- * has opted in (auto_act = true), and the stored session looks alive.
- *
- * False when any prerequisite is missing. Used to decide between showing
- * "✓ Ready to auto-cart" vs "Will fall back to Quick Cart Link."
- */
-export function isAutoActReady(
-  watch: Pick<Watch, 'action_type' | 'url' | 'auto_act' | 'site_cookies' | 'cookie_status' | 'cookie_domain'>,
-): boolean {
-  if (!watch.auto_act) return false
-  if (!isAutoActFunctional(watch.action_type, watch.url)) return false
-  return inspectSession(watch).status === 'active'
-}
 
 /**
  * Retailer domains where the `execute-action` edge function can actually

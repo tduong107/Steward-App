@@ -1445,12 +1445,10 @@ struct DetailScreen: View {
 
         // Earliest upcoming expiry → human label.
         if let earliest = validDated.min() {
-            let expiryDate = Date(timeIntervalSince1970: earliest)
             let secondsRemaining = earliest - now
             let days = Int(secondsRemaining / 86400)
             let hours = Int(secondsRemaining / 3600)
             let expiryText = days >= 1 ? "\(days) day\(days == 1 ? "" : "s")" : "\(hours) hour\(hours == 1 ? "" : "s")"
-            _ = expiryDate  // kept for future relative-date tweaks
             return (
                 "Session active · expires in \(expiryText)",
                 watch.cookieDomain.map { "Signed into \($0)." } ?? "Auto-cart is armed for this watch.",
@@ -1570,7 +1568,7 @@ struct DetailScreen: View {
             // Test Session button — only when we have cookies AND the
             // retailer is on the supported list (otherwise probe-session
             // returns a trivial local-only result and wastes a round-trip).
-            if sessionStatus.kind != .missing && autoActSupportedForURL(watch.url) {
+            if session.kind != .missing && autoActSupportedForURL(watch.url) {
                 HStack(spacing: 10) {
                     Button {
                         Task { await probeSessionNow() }

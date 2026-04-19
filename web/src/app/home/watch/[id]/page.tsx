@@ -282,7 +282,16 @@ export default function WatchDetailPage() {
       setEditNotifyChannels(parseChannels(watch.notify_channels))
       // Derive from auto_act first — iOS writes auto_act without touching
       // response_mode, so the stored response_mode can lie for iOS watches.
-      setEditResponseMode(effectiveResponseMode(watch))
+      // Then clamp: if the current watch can't legitimately show the
+      // stewardActs row (e.g. action_type === 'notify' has no Auto row),
+      // fall back to 'notify'. Otherwise opening the dialog selects an
+      // invisible radio the user can't uncheck, and saving would preserve
+      // the stale auto_act=true on notify watches forever.
+      const derived = effectiveResponseMode(watch)
+      const hasAutoActRow = autoActLabelFor(watch.action_type) !== null
+      setEditResponseMode(
+        derived === 'stewardActs' && !hasAutoActRow ? 'notify' : derived,
+      )
       setEditNotifyAnyDrop(Boolean(watch.notify_any_price_drop))
       setEditScrollTarget(target)
       setEditOpen(true)
