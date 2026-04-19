@@ -406,7 +406,9 @@ export default function WatchDetailPage() {
   const stewardActsLabel = autoActLabelFor(watch.action_type) ?? 'Auto Add to Cart'
   const responseModeLabel: Record<string, string> = {
     notify: 'Notify Me',
-    quickLink: 'Notify + Quick Link',
+    // Renamed from "Notify + Quick Link" — see Tier 6 reframe. The
+    // behaviour is unchanged: push notification with a one-tap cart URL.
+    quickLink: 'Smart Cart Link',
     stewardActs: stewardActsLabel,
   }
 
@@ -1337,8 +1339,8 @@ export default function WatchDetailPage() {
                   badge: 'Pro' | 'Premium' | null
                   functionalityAvailable: boolean
                 }> = [
-                  { mode: 'notify', title: 'Notify Me', description: 'Steward sends you a push notification. You decide what to do next.', badge: null, functionalityAvailable: true },
-                  { mode: 'quickLink', title: 'Notify + Quick Link', description: 'Notification with a smart action link — one tap to add to cart, book, or open checkout.', badge: 'Pro', functionalityAvailable: true },
+                  { mode: 'notify', title: 'Notify Me', description: 'Push notification when your condition is met. You decide what to do next.', badge: null, functionalityAvailable: true },
+                  { mode: 'quickLink', title: 'Smart Cart Link', description: 'Push notification with a one-tap link that opens your cart pre-filled on the retailer\'s site or app.', badge: 'Pro', functionalityAvailable: true },
                 ]
                 if (stewardActsLabel) {
                   rows.push({

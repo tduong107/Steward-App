@@ -956,7 +956,7 @@ const PLANS: Plan[] = [
   },
   {
     name: 'Steward Pro', monthly: '$4.99', yearly: '$39.99', periodMonthly: '/ month', periodYearly: '/ year', featured: false,
-    features: ['Up to 7 trackers', 'Check every 12 hours', 'Notify + Quick Link', 'Price insights & deal alerts', 'Email & SMS alerts'],
+    features: ['Up to 7 trackers', 'Check every 12 hours', 'Smart Cart Links', 'Price insights & deal alerts', 'Email & SMS alerts'],
     btnMonthly: 'Subscribe for $4.99/mo', btnYearly: 'Subscribe for $39.99/yr',
   },
   {

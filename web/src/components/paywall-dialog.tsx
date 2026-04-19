@@ -41,7 +41,7 @@ const tiers: TierConfig[] = [
     key: 'pro',
     monthlyPrice: '$4.99',
     yearlyPrice: '$39.99',
-    features: ['7 watches', 'Every 12h checks', 'Quick Links', 'Price insights'],
+    features: ['7 watches', 'Every 12h checks', 'Smart Cart Links', 'Price insights'],
   },
   {
     name: 'Premium',

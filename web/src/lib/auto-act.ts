@@ -195,9 +195,10 @@ export function isAutoActFunctional(actionType: ActionType, url: string): boolea
 }
 
 /**
- * Subtitle shown under the "Steward Acts" row. Mirrors iOS messaging —
- * "Coming soon for this store" for price/cart watches on unsupported
- * retailers, generic "Coming soon" for book/form which aren't wired yet.
+ * Subtitle shown under the "Steward Acts" row. For every path we make
+ * the Smart Cart Link fallback explicit — users always know they'll get
+ * *something* when their watch triggers, even if the auto-action half
+ * doesn't fire. This is the core of the Tier 6 honesty reframe.
  */
 export function autoActSubtitleFor(actionType: ActionType, url: string): string {
   const supported = isAutoActSupportedForURL(url)
@@ -205,12 +206,12 @@ export function autoActSubtitleFor(actionType: ActionType, url: string): string 
     case 'price':
     case 'cart':
       return supported
-        ? 'Steward automatically adds to cart within your spending limit.'
-        : 'Coming soon for this store.'
+        ? 'Steward tries to add to cart automatically within your spending limit. If the retailer declines or your session has expired, you\'ll get a Smart Cart Link notification instead.'
+        : 'Auto-cart isn\'t wired up for this retailer yet — you\'ll get a Smart Cart Link notification on trigger.'
     case 'book':
-      return 'Coming soon for Premium users.'
+      return 'Auto-book is coming soon for Premium users. For now, triggers send a notification with a one-tap booking link.'
     case 'form':
-      return 'Coming soon.'
+      return 'Coming soon. For now, triggers send a notification with a link to the form.'
     case 'notify':
       return ''
   }
