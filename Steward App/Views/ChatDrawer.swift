@@ -16,6 +16,18 @@ struct ChatDrawer: View {
     @State private var dragOffset: CGFloat = 0
     @State private var speechRecognizer = SpeechRecognizer()
 
+    /// Staged single watch awaiting confirmation — set when the AI proposes a
+    /// watch whose URL is on the tracking-unreliable list (Temu, Shein, etc.).
+    /// When non-nil, a confirmation alert is presented; resolving it clears the value.
+    @State private var pendingUnreliableWatch: UnreliableWatchAlert?
+
+    /// Payload for the unreliable-URL confirmation alert.
+    private struct UnreliableWatchAlert: Identifiable {
+        let id = UUID()
+        let watch: Watch
+        let initialPrice: Double?
+    }
+
     var body: some View {
         GeometryReader { geo in
             ZStack(alignment: .bottom) {
@@ -72,7 +84,20 @@ struct ChatDrawer: View {
         .onChange(of: chatVM.watchReadySignal) {
             // Bridge single watch creation (with optional initial price)
             if let watch = chatVM.pendingWatch {
-                if let price = chatVM.pendingWatchInitialPrice {
+                let price = chatVM.pendingWatchInitialPrice
+
+                // Intercept tracking-unreliable domains (Temu, Shein, etc.) and
+                // ask the user to confirm before creating. Search-mode watches
+                // don't hit the blocked retailer directly, so let them through.
+                if watch.watchMode != "search",
+                   TrackingReliability.isUnreliable(url: watch.url) {
+                    pendingUnreliableWatch = UnreliableWatchAlert(watch: watch, initialPrice: price)
+                    chatVM.pendingWatch = nil
+                    chatVM.pendingWatchInitialPrice = nil
+                    return
+                }
+
+                if let price {
                     watchVM.addWatchWithPrice(watch, initialPrice: price)
                 } else {
                     watchVM.addWatch(watch)
@@ -89,6 +114,28 @@ struct ChatDrawer: View {
                     }
                 }
             }
+        }
+        .alert(
+            "Tracking may be unreliable",
+            isPresented: Binding(
+                get: { pendingUnreliableWatch != nil },
+                set: { if !$0 { pendingUnreliableWatch = nil } }
+            ),
+            presenting: pendingUnreliableWatch
+        ) { entry in
+            Button("Create anyway") {
+                if let price = entry.initialPrice {
+                    watchVM.addWatchWithPrice(entry.watch, initialPrice: price)
+                } else {
+                    watchVM.addWatch(entry.watch)
+                }
+                pendingUnreliableWatch = nil
+            }
+            Button("Cancel", role: .cancel) {
+                pendingUnreliableWatch = nil
+            }
+        } message: { entry in
+            Text(TrackingReliability.warningMessage(for: entry.watch.url))
         }
         .onChange(of: chatVM.pendingWishlistWatches.count) {
             // Bridge wishlist bulk import

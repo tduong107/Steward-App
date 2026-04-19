@@ -271,6 +271,58 @@ struct ShareExtensionView: View {
         .padding(.horizontal, 20)
     }
 
+    // MARK: - Unreliable-Site Warning Banner
+
+    /// Amber warning card shown for retailers known to block price tracking.
+    /// Taps "Track Best Price Anywhere" to fast-path to a search-mode watch
+    /// using the product name extracted from the page title.
+    private var unreliableSiteBanner: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.orange)
+                    .frame(width: 24, height: 24)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Tracking may be unreliable")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white)
+
+                    Text(TrackingReliability.warningMessage(for: sharedURL))
+                        .font(.system(size: 12))
+                        .foregroundStyle(.white.opacity(0.75))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            Button {
+                Task { await analyzeAndCreateWatch(watchType: "search") }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "storefront.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                    Text("Track Best Price Anywhere")
+                        .font(.system(size: 13, weight: .semibold))
+                }
+                .foregroundStyle(.black)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 9)
+                .background(mintGreen)
+                .clipShape(Capsule())
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(14)
+        .background(Color.orange.opacity(0.12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(Color.orange.opacity(0.35), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .padding(.horizontal, 20)
+    }
+
     // MARK: - Ready Content (pick watch type)
 
     private var readyContent: some View {
@@ -278,6 +330,13 @@ struct ShareExtensionView: View {
             VStack(spacing: 14) {
                 urlCard
                     .padding(.top, 14)
+
+                // Warn for retailers known to block price tracking (Temu, Shein, etc.).
+                // The user can still proceed, but we surface "Best Price Anywhere"
+                // as the recommended alternative before they pick a watch type.
+                if TrackingReliability.isUnreliable(url: sharedURL) {
+                    unreliableSiteBanner
+                }
 
                 Text("What should I watch for?")
                     .font(.system(size: 14, weight: .medium))
