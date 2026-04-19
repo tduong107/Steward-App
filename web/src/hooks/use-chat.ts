@@ -254,6 +254,7 @@ export function useChat(tier: string = 'free') {
   const [isLoading, setIsLoading] = useState(false)
   const isFirstMessageRef = useRef(true)
   const conversationHistoryRef = useRef<HistoryEntry[]>([])
+  const supabaseRef = useRef(createClient())
 
   const addMessage = useCallback((msg: ChatMessage) => {
     setMessages((prev) => [...prev, msg])
@@ -363,7 +364,7 @@ export function useChat(tier: string = 'free') {
       setIsLoading(true)
 
       try {
-        const supabase = createClient()
+        const supabase = supabaseRef.current
         const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
         const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
