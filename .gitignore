@@ -30,3 +30,7 @@ Pods/
 
 # Supabase
 steward-supabase/.env
+
+# Claude Code agent working state — worktrees, plans, launch config,
+# cached model outputs. Ephemeral; should never be committed.
+.claude/
