@@ -1,68 +1,113 @@
 'use client'
 
-import { Calendar, Code, FileText, User, Clock } from 'lucide-react'
+import {
+  Package,
+  Plane,
+  Share2,
+  Sparkles,
+  Tent,
+  Ticket,
+  TrendingDown,
+  UtensilsCrossed,
+} from 'lucide-react'
 import RadialOrbitalTimeline from '@/components/ui/radial-orbital-timeline'
 
-// Demo data — intentionally generic so this page only showcases the
-// component itself, not any Steward-specific flow. If we later decide
-// to adopt the orbital layout for something real (e.g. a "how Steward
-// works" animated diagram on the landing page), we'd swap the nodes
-// out for the actual story.
+// Eight Steward use cases, mirroring the "One app, endless ways to save"
+// section on the landing page. Orbital layout here is an alternate
+// visual take — click any node to see its description + which related
+// use cases light up.
+//
+// `relatedIds` creates the hover-glow graph — we connect use cases
+// that share a user intent (e.g. Price Drops ↔ Restocks both monitor
+// products; Restaurant Tables ↔ Event Tickets both snag cancellations).
 const timelineData = [
   {
     id: 1,
-    title: 'Planning',
-    date: 'Jan 2024',
-    content: 'Project planning and requirements gathering phase.',
-    category: 'Planning',
-    icon: Calendar,
-    relatedIds: [2],
+    title: 'Price Drops',
+    date: 'SHOPPING',
+    content: 'Set a target price across thousands of retailers. Get pinged the instant it hits. Nike, Amazon, Best Buy and more.',
+    category: 'Shopping',
+    icon: TrendingDown,
+    relatedIds: [3, 6, 7],
     status: 'completed' as const,
     energy: 100,
   },
   {
     id: 2,
-    title: 'Design',
-    date: 'Feb 2024',
-    content: 'UI/UX design and system architecture.',
-    category: 'Design',
-    icon: FileText,
-    relatedIds: [1, 3],
+    title: 'Restaurant Tables',
+    date: 'DINING',
+    content: 'Impossible reservation? Steward monitors Resy for cancellations and new openings so you snag the table.',
+    category: 'Dining',
+    icon: UtensilsCrossed,
+    relatedIds: [4, 5],
+    status: 'completed' as const,
+    energy: 92,
+  },
+  {
+    id: 3,
+    title: 'Flight Deals',
+    date: 'TRAVEL',
+    content: 'Track fares across airlines and routes. Get pinged when prices drop on the trips you actually want to take.',
+    category: 'Travel',
+    icon: Plane,
+    relatedIds: [1, 4],
+    status: 'completed' as const,
+    energy: 95,
+  },
+  {
+    id: 4,
+    title: 'Campsites',
+    date: 'TRAVEL',
+    content: 'Yosemite, Yellowstone, Big Sur. Snag that cancellation before anyone else via Recreation.gov monitoring.',
+    category: 'Travel',
+    icon: Tent,
+    relatedIds: [2, 3],
+    status: 'completed' as const,
+    energy: 88,
+  },
+  {
+    id: 5,
+    title: 'Event Tickets',
+    date: 'ENTERTAINMENT',
+    content: 'Sold-out concert? Steward monitors Ticketmaster for face-value drops and new inventory releases.',
+    category: 'Entertainment',
+    icon: Ticket,
+    relatedIds: [2, 6],
+    status: 'completed' as const,
+    energy: 85,
+  },
+  {
+    id: 6,
+    title: 'Restocks',
+    date: 'SHOPPING',
+    content: 'Limited releases, sold-out sneakers, viral products. Be first in line when they come back. Works on most URLs.',
+    category: 'Shopping',
+    icon: Package,
+    relatedIds: [1, 5, 7],
     status: 'completed' as const,
     energy: 90,
   },
   {
-    id: 3,
-    title: 'Development',
-    date: 'Mar 2024',
-    content: 'Core features implementation and testing.',
-    category: 'Development',
-    icon: Code,
-    relatedIds: [2, 4],
-    status: 'in-progress' as const,
-    energy: 60,
+    id: 7,
+    title: 'AI Chat Setup',
+    date: 'HOW IT WORKS',
+    content: 'Just say what you want. Your AI concierge figures out what to track, picks the right retailer, and starts watching.',
+    category: 'AI',
+    icon: Sparkles,
+    relatedIds: [1, 6, 8],
+    status: 'completed' as const,
+    energy: 100,
   },
   {
-    id: 4,
-    title: 'Testing',
-    date: 'Apr 2024',
-    content: 'User testing and bug fixes.',
-    category: 'Testing',
-    icon: User,
-    relatedIds: [3, 5],
-    status: 'pending' as const,
-    energy: 30,
-  },
-  {
-    id: 5,
-    title: 'Release',
-    date: 'May 2024',
-    content: 'Final deployment and release.',
-    category: 'Release',
-    icon: Clock,
-    relatedIds: [4],
-    status: 'pending' as const,
-    energy: 10,
+    id: 8,
+    title: 'Share Extension',
+    date: 'HOW IT WORKS',
+    content: 'See something in Safari or Chrome you want to track? Tap Share → Steward. Done. Works in most apps.',
+    category: 'iOS',
+    icon: Share2,
+    relatedIds: [7],
+    status: 'completed' as const,
+    energy: 80,
   },
 ]
 

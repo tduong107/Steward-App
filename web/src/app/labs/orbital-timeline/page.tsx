@@ -5,7 +5,7 @@ import { OrbitalTimelineLabDemo } from './demo'
 // page. Keep it out of Google and our sitemap (sitemap.ts only emits
 // explicit routes, but the meta is defense in depth).
 export const metadata: Metadata = {
-  title: 'Orbital Timeline — Lab',
+  title: 'Endless Ways to Save — Orbital View',
   robots: { index: false, follow: false },
 }
 
