@@ -1,8 +1,13 @@
 import { clsx, type ClassValue } from "clsx"
-import { twMerge } from "tailwind-merge"
 
+// Plain clsx — we don't use tailwind-merge here because it's not in the
+// committed package.json. The shadcn CLI added it to local WIP but
+// we'd need to commit the package.json changes first before relying on
+// the `twMerge` layer. If we want Tailwind class-conflict resolution
+// later, add `tailwind-merge` as an explicit dependency first, then
+// switch to `twMerge(clsx(inputs))` here.
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
+  return clsx(inputs)
 }
 
 // Get domain from URL
