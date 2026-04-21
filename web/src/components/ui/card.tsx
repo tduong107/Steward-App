@@ -33,6 +33,29 @@ const CardContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDi
 )
 CardContent.displayName = 'CardContent'
 
+// Small h3-level title, matching shadcn's default CardTitle shape so
+// orbital-timeline and other shadcn-style consumers work. The specific
+// typography here is intentionally minimal — the real Steward cards
+// compose their own titles via Theme.serif(...); this is just enough
+// to unblock third-party components that expect shadcn's CardTitle.
+const CardTitle = React.forwardRef<HTMLHeadingElement, React.HTMLAttributes<HTMLHeadingElement>>(
+  ({ className, ...props }, ref) => (
+    <h3
+      ref={ref}
+      className={cn('text-base font-semibold leading-none tracking-tight', className)}
+      {...props}
+    />
+  ),
+)
+CardTitle.displayName = 'CardTitle'
+
+const CardDescription = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLParagraphElement>>(
+  ({ className, ...props }, ref) => (
+    <p ref={ref} className={cn('text-sm text-[var(--color-ink-mid)]', className)} {...props} />
+  ),
+)
+CardDescription.displayName = 'CardDescription'
+
 const CardFooter = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
     <div
@@ -47,4 +70,4 @@ const CardFooter = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDiv
 )
 CardFooter.displayName = 'CardFooter'
 
-export { Card, CardHeader, CardContent, CardFooter }
+export { Card, CardHeader, CardContent, CardFooter, CardTitle, CardDescription }
