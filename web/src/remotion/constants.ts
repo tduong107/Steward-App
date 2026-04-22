@@ -1,120 +1,148 @@
-// Shared data for the Steward hero video. Mirrors the 8 "ways to save"
-// use cases from web/src/app/labs/orbital-timeline/demo.tsx, but with
-// tighter narration-friendly copy.
+// Steward explainer video — shared tokens + real data.
+//
+// Brand tokens mirror web/src/app/globals.css so the video reads like
+// an extension of the landing page. Real watches are a snapshot from
+// our production Supabase (anonymized — no user_ids, no URLs, just
+// product/domain/status) pulled 2026-04-22.
 
-export type UseCase = {
-  id: number
-  title: string
-  category: string
-  narration: string // short, spoken-style caption (~1 sentence)
-  color: string // hex accent for this category
-  relatedIds: number[]
-}
+// ---------- Brand tokens (from globals.css) ----------
 
-export const USE_CASES: UseCase[] = [
-  {
-    id: 1,
-    title: 'Price Drops',
-    category: 'SHOPPING',
-    narration: 'Set a target price. Get pinged the instant it hits.',
-    color: '#06b6d4',
-    relatedIds: [3, 6, 7],
-  },
-  {
-    id: 2,
-    title: 'Restaurant Tables',
-    category: 'DINING',
-    narration: 'Monitor Resy for cancellations and snag the table.',
-    color: '#f59e0b',
-    relatedIds: [4, 5],
-  },
-  {
-    id: 3,
-    title: 'Flight Deals',
-    category: 'TRAVEL',
-    narration: 'Track fares on the trips you actually want to take.',
-    color: '#8b5cf6',
-    relatedIds: [1, 4],
-  },
-  {
-    id: 4,
-    title: 'Campsites',
-    category: 'TRAVEL',
-    narration: 'Yosemite. Yellowstone. The second a cancellation drops.',
-    color: '#8b5cf6',
-    relatedIds: [2, 3],
-  },
-  {
-    id: 5,
-    title: 'Event Tickets',
-    category: 'ENTERTAINMENT',
-    narration: 'Sold-out concert? Wait for face-value inventory to reopen.',
-    color: '#ec4899',
-    relatedIds: [2, 6],
-  },
-  {
-    id: 6,
-    title: 'Restocks',
-    category: 'SHOPPING',
-    narration: 'Limited drops. Sold-out sneakers. Be first in line.',
-    color: '#06b6d4',
-    relatedIds: [1, 5, 7],
-  },
-  {
-    id: 7,
-    title: 'AI Chat',
-    category: 'HOW IT WORKS',
-    narration: 'Just say what you want. Your concierge handles the rest.',
-    color: '#10b981',
-    relatedIds: [1, 6, 8],
-  },
-  {
-    id: 8,
-    title: 'Share Extension',
-    category: 'HOW IT WORKS',
-    narration: 'See something in Safari? Tap Share. Done.',
-    color: '#10b981',
-    relatedIds: [7],
-  },
-]
+export const COLORS = {
+  bgDeep: '#080A08',
+  bgCard: '#0F1211',
+  bgElev: '#141816',
+  forest: '#0F2018',
+  mint: '#6EE7B7',
+  mintDim: '#3DB88A',
+  cream: '#F7F6F3',
+  creamDim: 'rgba(247, 246, 243, 0.5)',
+  creamFaint: 'rgba(247, 246, 243, 0.3)',
+  border: 'rgba(255, 255, 255, 0.1)',
+  borderBright: 'rgba(255, 255, 255, 0.22)',
+  gold: '#F59E0B',
+  goldLight: '#FEF3C7',
+  red: '#EF4444',
+  green: '#22C55E',
+} as const
+
+export const FONTS = {
+  serif: '"Georgia", "Times New Roman", serif',
+  body: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
+} as const
+
+// ---------- Video config ----------
 
 export const FPS = 30
 export const WIDTH = 1920
 export const HEIGHT = 1080
 
-// Scene timing (in seconds), converted to frames at runtime
-export const TIMING = {
-  INTRO_END: 2.5, // brand mark
-  ORBIT_IN_END: 5, // orbit rings drawn, nodes placed
-  NODES_PER_CYCLE: 8,
-  SECONDS_PER_NODE: 2.5, // 8 × 2.5s = 20s of node highlights
-  ALL_ACTIVE_END: 27, // 5 + 20 + 2s all-lit
-  TOTAL: 28,
+// Six-scene explainer. Seconds → frames at render.
+export const SCENES = {
+  HOOK: { start: 0, dur: 3 }, // "Scalpers have bots. Now you have a concierge."
+  SHARE: { start: 3, dur: 5 }, // Spot something → tap Share → pick Steward
+  CHAT: { start: 8, dur: 5 }, // AI concierge creates the watch
+  WATCHES: { start: 13, dur: 7 }, // Real watches from DB animate in as a grid
+  NOTIFY: { start: 20, dur: 5 }, // Phone + push notification → tap to buy
+  CTA: { start: 25, dur: 5 }, // "Get started for free"
 } as const
 
-export const TOTAL_FRAMES = Math.round(TIMING.TOTAL * FPS)
+export const TOTAL_SECONDS = 30
+export const TOTAL_FRAMES = TOTAL_SECONDS * FPS
 
-// Orbit geometry (1920x1080 canvas)
-export const ORBIT = {
-  CX: 960,
-  CY: 540,
-  R: 340, // outer orbit radius
-  NODE_SIZE: 96, // base node diameter
-  CENTER_SIZE: 140,
-} as const
+// ---------- Real watches (Supabase snapshot) ----------
 
-// Node angular positions — 45° apart, starting at top (−90°), going clockwise
-export function angleForNode(index: number): number {
-  return -Math.PI / 2 + (index * 2 * Math.PI) / 8
+export type WatchStatus = 'drop' | 'available' | 'watching'
+
+export type RealWatch = {
+  emoji: string
+  name: string
+  retailer: string // domain-ish
+  status: WatchStatus
+  wasPrice?: number
+  nowPrice?: number
+  targetPrice?: number
+  note?: string
+  accent?: string // override card accent color
 }
 
-export function nodePosition(
-  index: number,
-  rotation: number = 0,
-): { x: number; y: number } {
-  const a = angleForNode(index) + rotation
-  return {
-    x: ORBIT.CX + ORBIT.R * Math.cos(a),
-    y: ORBIT.CY + ORBIT.R * Math.sin(a),
-  }
-}
+// Hand-picked from `status IN ('watching','triggered')` for a diverse
+// mix across verticals. Prices are real; retailer names are the actual
+// source domain Steward monitored.
+export const REAL_WATCHES: RealWatch[] = [
+  {
+    emoji: '🏷️',
+    name: 'Nike Air Force 1',
+    retailer: 'Best Price · eBay',
+    status: 'drop',
+    wasPrice: 100,
+    nowPrice: 56,
+    note: 'Price dropped across retailers',
+    accent: COLORS.mint,
+  },
+  {
+    emoji: '✈️',
+    name: 'LAX → JFK · May 2',
+    retailer: 'JetBlue',
+    status: 'drop',
+    wasPrice: 301.8,
+    nowPrice: 276.8,
+    note: 'Flight price dropped',
+    accent: COLORS.mint,
+  },
+  {
+    emoji: '📅',
+    name: 'Silver Tip Campground',
+    retailer: 'recreation.gov',
+    status: 'available',
+    note: 'Site 01 · Lake Alpine opened up',
+    accent: COLORS.gold,
+  },
+  {
+    emoji: '🍽️',
+    name: 'Carbone NYC',
+    retailer: 'resy.com',
+    status: 'watching',
+    note: '2 guests · May 3 · 8:30pm',
+  },
+  {
+    emoji: '🧥',
+    name: "Arc'teryx Beta SL Jacket",
+    retailer: 'rei.com',
+    status: 'watching',
+    nowPrice: 299.83,
+    note: 'Waiting for a drop',
+  },
+  {
+    emoji: '👡',
+    name: 'Birkenstock Franca',
+    retailer: 'birkenstock.com',
+    status: 'watching',
+    nowPrice: 149.95,
+    targetPrice: 120,
+    note: 'Target: below $120',
+  },
+  {
+    emoji: '💰',
+    name: 'Vuori Halo Hoodie',
+    retailer: 'rei.com',
+    status: 'watching',
+    nowPrice: 98,
+    note: 'Any drop',
+  },
+  {
+    emoji: '👜',
+    name: 'Coach Tabby Shoulder Bag',
+    retailer: 'coach.com',
+    status: 'watching',
+    nowPrice: 395,
+    note: 'Any drop',
+  },
+  {
+    emoji: '🧊',
+    name: 'Coleman 35Qt Cooler',
+    retailer: "dicks sporting goods",
+    status: 'watching',
+    nowPrice: 199.99,
+    note: 'Any drop',
+  },
+]

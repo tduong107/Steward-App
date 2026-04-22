@@ -4,7 +4,7 @@ import { HeroVideoPlayer } from './player'
 // Noindex — private preview for internal use, not a real page.
 // /labs/* is already in the middleware auth allowlist.
 export const metadata: Metadata = {
-  title: 'Hero Video — Orbital Loop',
+  title: 'Hero Video — 30s Explainer',
   robots: { index: false, follow: false },
 }
 

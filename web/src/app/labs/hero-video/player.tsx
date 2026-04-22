@@ -12,7 +12,7 @@ export function HeroVideoPlayer() {
           width: '100%',
           maxWidth: 1280,
           aspectRatio: `${WIDTH} / ${HEIGHT}`,
-          boxShadow: '0 40px 120px rgba(139, 92, 246, 0.15)',
+          boxShadow: '0 40px 120px rgba(110, 231, 183, 0.18)',
           borderRadius: 16,
           overflow: 'hidden',
           border: '1px solid rgba(255,255,255,0.08)',
@@ -32,12 +32,12 @@ export function HeroVideoPlayer() {
         />
       </div>
 
-      <div className="text-sm text-white/50 max-w-xl text-center leading-relaxed">
-        Private preview · {Math.round(TOTAL_FRAMES / FPS)}s loop at {FPS}fps ·
-        {' '}{WIDTH}×{HEIGHT}. Captions serve as the visual narration; drop an
-        MP3 into <code className="text-white/70">public/voiceover/</code> and wire
-        it into <code className="text-white/70">StewardHeroVideo.tsx</code> to
-        add voice.
+      <div className="text-sm text-white/50 max-w-2xl text-center leading-relaxed">
+        Private preview · 30-second interactive explainer at {FPS}fps · {WIDTH}×{HEIGHT}. Brand tokens
+        and copy mirror the live landing page. The 8 watches shown in the "Right now" scene are real,
+        pulled from production Supabase on 2026-04-22. Captions narrate the story; drop an MP3 into{' '}
+        <code className="text-white/70">public/voiceover/</code> and wire it in{' '}
+        <code className="text-white/70">StewardHeroVideo.tsx</code> to add voiceover.
       </div>
     </div>
   )
