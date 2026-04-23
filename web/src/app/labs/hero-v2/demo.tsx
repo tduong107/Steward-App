@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { SplineScene } from '@/components/ui/splite'
 import { Spotlight } from '@/components/ui/spotlight'
 
@@ -30,243 +30,101 @@ const SANS =
 // generic humanoid. Runtime URL via my.spline.design publish.
 const SPLINE_URL = 'https://prod.spline.design/PMjj5iAHXFgvcUSQ/scene.splinecode'
 
-// ───── Floating cards (copy matches landing FLOAT_CARDS exactly) ─────
+// ───── Use cases (match the 8 cards on the landing's "One app, endless
+// ways to save" grid, but rendered here as clickable floating chips
+// distributed around the concierge robot) ─────
 
-type FloatCard = {
+type UseCase = {
+  id: string
+  icon: string
+  title: string
+  tag: string
+  style: {
+    left?: string
+    right?: string
+    top?: string
+    bottom?: string
+    width: number
+  }
   depth: number
-  style: React.CSSProperties
   delay: number // ms
-  isNotif?: boolean
-  children: React.ReactNode
 }
 
-const FLOAT_CARDS: FloatCard[] = [
+const USE_CASES: UseCase[] = [
   {
-    depth: 0.04,
-    delay: 800,
-    style: { right: '3%', top: '6%', width: 220 },
-    children: (
-      <>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontSize: 26 }}>👟</span>
-          <div>
-            <div style={{ fontSize: 12, fontWeight: 500, color: C.cream, marginBottom: 2 }}>
-              Nike Dunk Low Panda
-            </div>
-            <div style={{ fontSize: 10, color: C.textFaint }}>nike.com</div>
-          </div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 10 }}>
-          <span style={{ fontSize: 11, color: 'rgba(247,246,243,0.3)', textDecoration: 'line-through' }}>
-            $120
-          </span>
-          <span style={{ fontFamily: SERIF, fontSize: 22, fontWeight: 700, color: C.mint }}>
-            $89
-          </span>
-          <span
-            style={{
-              fontSize: 9,
-              fontWeight: 800,
-              color: C.gold,
-              background: 'rgba(245,158,11,0.12)',
-              padding: '2px 6px',
-              borderRadius: 10,
-            }}
-          >
-            -26%
-          </span>
-        </div>
-        <div
-          style={{
-            fontSize: 9,
-            fontWeight: 700,
-            padding: '3px 8px',
-            borderRadius: 20,
-            background: 'rgba(245,158,11,0.14)',
-            border: '1px solid rgba(245,158,11,0.28)',
-            color: C.gold,
-            display: 'inline-block',
-            marginTop: 10,
-          }}
-        >
-          ↓ Target price hit!
-        </div>
-      </>
-    ),
-  },
-  {
-    depth: 0.025,
-    delay: 1000,
-    style: { left: '44%', top: '5%', width: 200 },
-    children: (
-      <>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontSize: 26 }}>✈️</span>
-          <div>
-            <div style={{ fontSize: 12, fontWeight: 500, color: C.cream, marginBottom: 2 }}>
-              SFO → Tokyo Narita
-            </div>
-            <div style={{ fontSize: 10, color: C.textFaint }}>Round trip · 2 adults</div>
-          </div>
-        </div>
-        <div
-          style={{
-            fontSize: 9,
-            fontWeight: 700,
-            padding: '3px 8px',
-            borderRadius: 20,
-            background: 'rgba(110,231,183,0.08)',
-            border: '1px solid rgba(110,231,183,0.15)',
-            color: C.mint,
-            display: 'inline-block',
-            marginTop: 10,
-          }}
-        >
-          📡 Monitoring fares
-        </div>
-      </>
-    ),
-  },
-  {
-    depth: 0.035,
-    delay: 1200,
-    // Moved from `right: 1%, top: 54%` — it was sitting on the robot's
-    // torso. Now parked in the gap column between hero text and robot.
-    style: { left: '40%', top: '44%', width: 205 },
-    children: (
-      <>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontSize: 26 }}>🏕</span>
-          <div>
-            <div style={{ fontSize: 12, fontWeight: 500, color: C.cream, marginBottom: 2 }}>
-              Yosemite · Upper Pines
-            </div>
-            <div style={{ fontSize: 10, color: C.textFaint }}>recreation.gov</div>
-          </div>
-        </div>
-        <div
-          style={{
-            fontSize: 9,
-            fontWeight: 700,
-            padding: '3px 8px',
-            borderRadius: 20,
-            background: 'rgba(52,211,153,0.1)',
-            border: '1px solid rgba(52,211,153,0.22)',
-            color: '#34d399',
-            display: 'inline-block',
-            marginTop: 10,
-          }}
-        >
-          🎉 Site available!
-        </div>
-      </>
-    ),
-  },
-  {
-    depth: 0.02,
-    delay: 1400,
-    style: { left: '44%', bottom: '5%', width: 190 },
-    children: (
-      <>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontSize: 26 }}>🎫</span>
-          <div>
-            <div style={{ fontSize: 12, fontWeight: 500, color: C.cream, marginBottom: 2 }}>
-              Kendrick Lamar · LA
-            </div>
-            <div style={{ fontSize: 10, color: C.textFaint }}>ticketmaster.com</div>
-          </div>
-        </div>
-        <div
-          style={{
-            fontSize: 9,
-            fontWeight: 700,
-            padding: '3px 8px',
-            borderRadius: 20,
-            background: 'rgba(239,68,68,0.1)',
-            border: '1px solid rgba(239,68,68,0.22)',
-            color: '#f87171',
-            display: 'inline-block',
-            marginTop: 10,
-          }}
-        >
-          Sold out · Monitoring
-        </div>
-      </>
-    ),
-  },
-  {
+    id: 'price-drops',
+    icon: '📉',
+    title: 'Price Drops',
+    tag: 'Nike, Amazon, Best Buy & more',
+    style: { left: '37%', top: '4%', width: 185 },
     depth: 0.03,
-    delay: 1600,
-    style: { right: '5%', bottom: '2%', width: 190 },
-    children: (
-      <>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontSize: 26 }}>📦</span>
-          <div>
-            <div style={{ fontSize: 12, fontWeight: 500, color: C.cream, marginBottom: 2 }}>
-              PS5 Pro · Target
-            </div>
-            <div style={{ fontSize: 10, color: C.textFaint }}>target.com</div>
-          </div>
-        </div>
-        <div
-          style={{
-            fontSize: 9,
-            fontWeight: 700,
-            padding: '3px 8px',
-            borderRadius: 20,
-            background: 'rgba(52,211,153,0.1)',
-            border: '1px solid rgba(52,211,153,0.22)',
-            color: '#34d399',
-            display: 'inline-block',
-            marginTop: 10,
-          }}
-        >
-          Back in stock!
-        </div>
-      </>
-    ),
+    delay: 800,
   },
   {
-    depth: 0.05,
-    delay: 1800,
-    isNotif: true,
-    // Moved from `left: 48%, top: 36%` — it was covering the robot's
-    // face/chest. Now sits higher and further left, between the hero
-    // eyebrow and the SFO card.
-    style: { left: '37%', top: '22%', width: 240 },
-    children: (
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-        <span
-          style={{
-            width: 10,
-            height: 10,
-            borderRadius: '50%',
-            background: C.mint,
-            marginTop: 4,
-            flexShrink: 0,
-            boxShadow: `0 0 0 4px rgba(110,231,183,0.2)`,
-          }}
-        />
-        <div style={{ fontSize: 12, color: 'rgba(247,246,243,0.8)', lineHeight: 1.4 }}>
-          <strong style={{ color: C.mint }}>Table found!</strong> Carbone NY just opened a Friday
-          8pm slot for 2 guests.
-          <span
-            style={{
-              display: 'block',
-              fontSize: 10,
-              color: 'rgba(247,246,243,0.35)',
-              marginTop: 2,
-            }}
-          >
-            Just now
-          </span>
-        </div>
-      </div>
-    ),
+    id: 'restaurants',
+    icon: '🍽',
+    title: 'Restaurant Tables',
+    tag: 'Resy & more',
+    style: { left: '52%', top: '6%', width: 185 },
+    depth: 0.025,
+    delay: 900,
+  },
+  {
+    id: 'flights',
+    icon: '✈️',
+    title: 'Flight Deals',
+    tag: 'Major airlines & routes',
+    style: { left: '37%', top: '20%', width: 185 },
+    depth: 0.04,
+    delay: 1000,
+  },
+  {
+    id: 'campsites',
+    icon: '🏕',
+    title: 'Campsites',
+    tag: 'Recreation.gov sites',
+    style: { left: '53%', top: '22%', width: 185 },
+    depth: 0.035,
+    delay: 1100,
+  },
+  {
+    id: 'tickets',
+    icon: '🎫',
+    title: 'Event Tickets',
+    tag: 'Ticketmaster & more',
+    style: { left: '37%', top: '52%', width: 185 },
+    depth: 0.03,
+    delay: 1200,
+  },
+  {
+    id: 'restocks',
+    icon: '📦',
+    title: 'Restocks',
+    tag: 'Works on most URLs',
+    style: { left: '53%', top: '54%', width: 185 },
+    depth: 0.04,
+    delay: 1300,
+  },
+  {
+    id: 'ai-chat',
+    icon: '✦',
+    title: 'AI Chat Setup',
+    tag: 'Just describe it',
+    style: { left: '37%', bottom: '6%', width: 185 },
+    depth: 0.025,
+    delay: 1400,
+  },
+  {
+    id: 'share-ext',
+    icon: '↗',
+    title: 'Share Extension',
+    tag: 'Works in most apps',
+    style: { left: '53%', bottom: '8%', width: 185 },
+    depth: 0.035,
+    delay: 1500,
   },
 ]
+
 
 const DEMO_CHIPS = [
   { q: 'Nike Dunk Low Panda', emoji: '👟' },
@@ -279,6 +137,8 @@ const DEMO_CHIPS = [
 
 export function HeroV2Demo() {
   const [cardsReady, setCardsReady] = useState(false)
+  const [activeCardId, setActiveCardId] = useState<string | null>(null)
+  const [clickCount, setClickCount] = useState(0) // bumps each tap so ring can re-fire
   const mouseRef = useRef({ x: 0, y: 0 })
   const curRef = useRef({ x: 0, y: 0 })
   const cardEls = useRef<Array<HTMLDivElement | null>>([])
@@ -289,6 +149,11 @@ export function HeroV2Demo() {
     return () => clearTimeout(t)
   }, [])
 
+  const handleCardClick = (id: string) => {
+    setActiveCardId(id)
+    setClickCount((n) => n + 1)
+  }
+
   // Parallax loop — identical easing to landing-client-page.tsx
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
@@ -298,7 +163,7 @@ export function HeroV2Demo() {
       }
     }
     document.addEventListener('mousemove', onMove)
-    const depths = FLOAT_CARDS.map((c) => c.depth)
+    const depths = USE_CASES.map((c) => c.depth)
     const loop = () => {
       curRef.current.x += (mouseRef.current.x - curRef.current.x) * 0.06
       curRef.current.y += (mouseRef.current.y - curRef.current.y) * 0.06
@@ -599,19 +464,23 @@ export function HeroV2Demo() {
         </div>
 
         {/* ── RIGHT: concierge stage ──
-            Canvas starts past the hero-text column (~46% on 1400px wide)
-            and extends off-screen right so the robot's natural center
-            lands around 78% of viewport — clear of the text column and
-            away from the card clusters. */}
+            The GENKUB scene renders its robot left-of-canvas-center in
+            its own scene coordinates, so we (a) start the canvas
+            further right and (b) apply a translateX on the container to
+            physically shift the rendered canvas further right. Together
+            these put the robot's visual center around 78-82% of the
+            viewport — clear of the hero-text column AND the 8 use case
+            cards that now sit in the left-center gap. */}
         <div
           style={{
             position: 'absolute',
-            left: '44%',
-            right: '-8%',
+            left: '50%',
+            right: '-20%',
             top: 0,
             bottom: 0,
             zIndex: 1,
             pointerEvents: 'none',
+            transform: 'translateX(25%)',
           }}
         >
           {/* Stage light — mint cone from above the robot */}
@@ -705,7 +574,7 @@ export function HeroV2Demo() {
           </motion.div>
         </div>
 
-        {/* ── Floating deal cards layer ── */}
+        {/* ── Clickable use case cards layer ── */}
         <div
           style={{
             position: 'absolute',
@@ -714,42 +583,25 @@ export function HeroV2Demo() {
             pointerEvents: 'none',
           }}
         >
-          {FLOAT_CARDS.map((card, i) => (
+          {USE_CASES.map((uc, i) => (
             <div
-              key={i}
+              key={uc.id}
               ref={(el) => {
                 cardEls.current[i] = el
               }}
               style={{
                 position: 'absolute',
-                ...card.style,
-                background: card.isNotif
-                  ? 'linear-gradient(135deg, rgba(42,92,69,0.8), rgba(28,61,46,0.6))'
-                  : 'rgba(15,32,24,0.7)',
-                border: card.isNotif
-                  ? '1px solid rgba(110,231,183,0.25)'
-                  : '1px solid rgba(255,255,255,0.08)',
-                borderRadius: 18,
-                padding: 16,
-                backdropFilter: 'blur(16px)',
-                boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-                opacity: cardsReady ? 1 : 0,
-                transition: `opacity .8s ${card.delay}ms ease`,
-                pointerEvents: 'auto',
-                fontFamily: SANS,
+                ...uc.style,
+                pointerEvents: 'none',
               }}
             >
-              <motion.div
-                initial={{ opacity: 0, y: 12, scale: 0.95 }}
-                animate={cardsReady ? { opacity: 1, y: 0, scale: 1 } : undefined}
-                transition={{
-                  duration: 0.6,
-                  delay: card.delay / 1000,
-                  ease: [0.22, 1, 0.36, 1],
-                }}
-              >
-                {card.children}
-              </motion.div>
+              <UseCaseCard
+                useCase={uc}
+                ready={cardsReady}
+                activeId={activeCardId}
+                clickCount={clickCount}
+                onClick={() => handleCardClick(uc.id)}
+              />
             </div>
           ))}
         </div>
@@ -811,3 +663,138 @@ function RevealWord({
   )
 }
 
+
+// ───── Use case card ─────
+//
+// Clickable chip rendered at an absolute position (set by the parent
+// wrapper). Handles:
+//  - Staggered entrance (spring-in via framer-motion delay from props)
+//  - Hover lift (scale + translateY)
+//  - Tap press (scale down briefly)
+//  - Click selection: mint ring ripples outward + border brightens,
+//    controlled via `activeId + clickCount` from the parent so tapping
+//    the same card re-fires the animation.
+
+function UseCaseCard({
+  useCase,
+  ready,
+  activeId,
+  clickCount,
+  onClick,
+}: {
+  useCase: UseCase
+  ready: boolean
+  activeId: string | null
+  clickCount: number
+  onClick: () => void
+}) {
+  const isActive = activeId === useCase.id
+  return (
+    <motion.button
+      type="button"
+      onClick={onClick}
+      initial={{ opacity: 0, y: 14, scale: 0.94 }}
+      animate={
+        ready ? { opacity: 1, y: 0, scale: 1 } : { opacity: 0, y: 14, scale: 0.94 }
+      }
+      transition={{
+        duration: 0.55,
+        delay: useCase.delay / 1000,
+        ease: [0.22, 1, 0.36, 1],
+      }}
+      whileHover={{ scale: 1.05, y: -3 }}
+      whileTap={{ scale: 0.96 }}
+      style={{
+        position: 'relative',
+        width: '100%',
+        padding: '12px 14px',
+        background: isActive
+          ? 'linear-gradient(135deg, rgba(42,92,69,0.8), rgba(28,61,46,0.5))'
+          : 'rgba(15,32,24,0.72)',
+        border: isActive
+          ? '1px solid rgba(110,231,183,0.55)'
+          : '1px solid rgba(255,255,255,0.08)',
+        borderRadius: 16,
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        boxShadow: isActive
+          ? '0 0 0 4px rgba(110,231,183,0.18), 0 12px 32px rgba(0,0,0,0.4)'
+          : '0 8px 28px rgba(0,0,0,0.3)',
+        cursor: 'pointer',
+        textAlign: 'left',
+        fontFamily: SANS,
+        color: 'inherit',
+        pointerEvents: 'auto',
+        transition: 'border-color 0.25s, background 0.25s, box-shadow 0.25s',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div
+          style={{
+            width: 34,
+            height: 34,
+            borderRadius: 10,
+            background: isActive ? 'rgba(110,231,183,0.18)' : 'rgba(110,231,183,0.08)',
+            border: '1px solid rgba(110,231,183,0.18)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 18,
+            flexShrink: 0,
+          }}
+        >
+          {useCase.icon}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div
+            style={{
+              fontFamily: SERIF,
+              fontSize: 14,
+              fontWeight: 700,
+              color: C.cream,
+              letterSpacing: '-0.01em',
+              lineHeight: 1.15,
+            }}
+          >
+            {useCase.title}
+          </div>
+          <div
+            style={{
+              marginTop: 3,
+              fontSize: 10,
+              color: C.mint,
+              fontWeight: 600,
+              letterSpacing: '0.01em',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+          >
+            ✓ {useCase.tag}
+          </div>
+        </div>
+      </div>
+
+      {/* Ripple ring — re-keyed on clickCount so the same card can be
+          tapped repeatedly and still animate. */}
+      <AnimatePresence>
+        {isActive && (
+          <motion.span
+            key={`ring-${clickCount}`}
+            initial={{ opacity: 0.9, scale: 0.6 }}
+            animate={{ opacity: 0, scale: 1.35 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.75, ease: [0.22, 1, 0.36, 1] }}
+            style={{
+              position: 'absolute',
+              inset: -2,
+              borderRadius: 18,
+              border: '2px solid rgba(110,231,183,0.85)',
+              pointerEvents: 'none',
+            }}
+          />
+        )}
+      </AnimatePresence>
+    </motion.button>
+  )
+}
