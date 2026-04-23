@@ -516,19 +516,22 @@ export function HeroV2Demo() {
         <div
           style={{
             position: 'absolute',
-            left: '55%',
-            right: '-20%',
+            // Canvas widened from 65% → 85% (left:45 + right:-30) so the
+            // robot's raised waving arm no longer clips at the left edge
+            // during the GENKUB greeting animation's peak frames. The
+            // wider canvas means the Spline camera captures more of the
+            // scene horizontally.
+            left: '45%',
+            right: '-30%',
             top: 0,
             bottom: 0,
             zIndex: 1,
             pointerEvents: 'none',
-            // Tuned to match the 6-card grid's geometric center. The
-            // GENKUB robot has an outstretched left arm that extends his
-            // visual center ~2% right of his face, so translateX(10%)
-            // puts the face around 67% and the full visual mass
-            // (head + arm span) around 69% — matching the cards' center
-            // of mass at ~68% horizontal.
-            transform: 'translateX(10%)',
+            // Retuned shift to keep robot face landing around 64% of
+            // viewport (cards' geometric center of mass). Formula:
+            //   face% = left + translateX*width + 0.09*width
+            //   64   = 45 + 0.13*85 + 0.09*85 = 45 + 11 + 7.65 = 63.65%
+            transform: 'translateX(13%)',
           }}
         >
           {/* Stage light — mint cone from above the robot. Positioned at
