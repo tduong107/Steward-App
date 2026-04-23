@@ -130,7 +130,9 @@ const FLOAT_CARDS: FloatCard[] = [
   {
     depth: 0.035,
     delay: 1200,
-    style: { right: '1%', top: '54%', width: 205 },
+    // Moved from `right: 1%, top: 54%` — it was sitting on the robot's
+    // torso. Now parked in the gap column between hero text and robot.
+    style: { left: '40%', top: '44%', width: 205 },
     children: (
       <>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -230,7 +232,10 @@ const FLOAT_CARDS: FloatCard[] = [
     depth: 0.05,
     delay: 1800,
     isNotif: true,
-    style: { left: '48%', top: '36%', width: 240 },
+    // Moved from `left: 48%, top: 36%` — it was covering the robot's
+    // face/chest. Now sits higher and further left, between the hero
+    // eyebrow and the SFO card.
+    style: { left: '37%', top: '22%', width: 240 },
     children: (
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
         <span
@@ -593,14 +598,18 @@ export function HeroV2Demo() {
           </motion.div>
         </div>
 
-        {/* ── RIGHT: concierge stage ── */}
+        {/* ── RIGHT: concierge stage ──
+            Canvas starts past the hero-text column (~46% on 1400px wide)
+            and extends off-screen right so the robot's natural center
+            lands around 78% of viewport — clear of the text column and
+            away from the card clusters. */}
         <div
           style={{
             position: 'absolute',
-            right: '-10%',
+            left: '44%',
+            right: '-8%',
             top: 0,
             bottom: 0,
-            width: '75%',
             zIndex: 1,
             pointerEvents: 'none',
           }}
