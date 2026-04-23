@@ -25,9 +25,10 @@ const SERIF = 'Georgia, "Times New Roman", serif'
 const SANS =
   '-apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", "Helvetica Neue", Arial, sans-serif'
 
-// Public demo robot scene from spline.design/community. Swap to a butler
-// or tuxedo-wearing model when one is picked — same drop-in URL.
-const SPLINE_URL = 'https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode'
+// "GENKUB - Greeting robot" from spline.design/community — picked
+// because it waves hello (concierge-y) and has cleaner lines than the
+// generic humanoid. Runtime URL via my.spline.design publish.
+const SPLINE_URL = 'https://prod.spline.design/PMjj5iAHXFgvcUSQ/scene.splinecode'
 
 // ───── Floating cards (copy matches landing FLOAT_CARDS exactly) ─────
 
@@ -864,25 +865,6 @@ function ConciergeOutfit({ mouse }: { mouse: { x: number; y: number } }) {
         {/* Center knot */}
         <rect x="30" y="10" width="12" height="16" rx="2" fill="#0F2018" />
         <rect x="32" y="12" width="8" height="12" rx="1" fill="url(#bowtieGrad)" opacity="0.6" />
-      </svg>
-
-      {/* White collar/shirt V under the bowtie */}
-      <svg
-        width="120"
-        height="140"
-        viewBox="0 0 120 140"
-        style={{
-          position: 'absolute',
-          left: '50%',
-          top: 48,
-          marginLeft: -60,
-          opacity: 0.28,
-        }}
-      >
-        <path
-          d="M 60 0 L 20 60 L 40 140 L 80 140 L 100 60 Z"
-          fill="rgba(255,255,255,0.9)"
-        />
       </svg>
 
       {/* Subtle mint glow under the bowtie area (fakes a stage light hit) */}
