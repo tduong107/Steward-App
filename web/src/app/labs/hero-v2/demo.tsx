@@ -39,6 +39,9 @@ type UseCase = {
   icon: string
   title: string
   tag: string
+  desc: string // long-form, shown in modal
+  simBold: string // "Price dropped!" header in simulation card
+  simBody: string // narrative simulation body
   style: {
     left?: string
     right?: string
@@ -50,14 +53,22 @@ type UseCase = {
   delay: number // ms
 }
 
+// Positions are an organic scatter around the robot — all 8 cards sit
+// in the top strip, left gap column, or bottom strip so none overlap
+// the robot's body (robot lands around 75-80% viewport after the
+// canvas+transform push below). Detail copy is lifted verbatim from
+// LandingUseCases so the modal matches the site's own cards.
 const USE_CASES: UseCase[] = [
   {
     id: 'price-drops',
     icon: '📉',
     title: 'Price Drops',
     tag: 'Nike, Amazon, Best Buy & more',
-    style: { left: '37%', top: '4%', width: 185 },
-    depth: 0.03,
+    desc: 'Set a target price across thousands of retailers. Steward monitors 24/7 and pings you the second it hits your number, with fake deal detection so you never get played by inflated "sale" prices.',
+    simBold: 'Price dropped!',
+    simBody: "Nike Dunk Low Panda is now $89 at nike.com. That's 26% below your target.",
+    style: { left: '30%', top: '3%', width: 185 },
+    depth: 0.04,
     delay: 800,
   },
   {
@@ -65,7 +76,10 @@ const USE_CASES: UseCase[] = [
     icon: '🍽',
     title: 'Restaurant Tables',
     tag: 'Resy & more',
-    style: { left: '52%', top: '6%', width: 185 },
+    desc: "That impossible Resy reservation? Steward watches it around the clock and pings you the moment a table frees up so you can book before anyone else even knows it's available.",
+    simBold: 'Table found!',
+    simBody: 'Carbone NY just opened a Friday 8pm slot for 2 guests.',
+    style: { left: '47%', top: '1%', width: 195 },
     depth: 0.025,
     delay: 900,
   },
@@ -74,8 +88,11 @@ const USE_CASES: UseCase[] = [
     icon: '✈️',
     title: 'Flight Deals',
     tag: 'Major airlines & routes',
-    style: { left: '37%', top: '20%', width: 185 },
-    depth: 0.04,
+    desc: 'Set a fare threshold for any route and Steward monitors prices across airlines. The moment it drops below your target, you get an instant alert with a direct link to book.',
+    simBold: 'Fare dropped!',
+    simBody: "SFO → Tokyo round trip is now $1,120. That's $127 less than yesterday.",
+    style: { left: '36%', top: '34%', width: 185 },
+    depth: 0.035,
     delay: 1000,
   },
   {
@@ -83,8 +100,11 @@ const USE_CASES: UseCase[] = [
     icon: '🏕',
     title: 'Campsites',
     tag: 'Recreation.gov sites',
-    style: { left: '53%', top: '22%', width: 185 },
-    depth: 0.035,
+    desc: 'The best campsites book up in seconds. Steward watches Recreation.gov for cancellations on specific dates and pings you the moment one opens up so you can grab it first.',
+    simBold: 'Site available!',
+    simBody: "Yosemite Upper Pines has an opening Jun 14–16. Book it before it's gone.",
+    style: { left: '38%', top: '58%', width: 185 },
+    depth: 0.03,
     delay: 1100,
   },
   {
@@ -92,8 +112,11 @@ const USE_CASES: UseCase[] = [
     icon: '🎫',
     title: 'Event Tickets',
     tag: 'Ticketmaster & more',
-    style: { left: '37%', top: '52%', width: 185 },
-    depth: 0.03,
+    desc: 'Sold out before you could buy? Steward monitors Ticketmaster and other platforms for face-value drops and new inventory so you get tickets at a fair price, not scalper markup.',
+    simBold: 'Tickets available!',
+    simBody: '2 floor seats for Kendrick Lamar at The Forum just dropped at face value.',
+    style: { left: '34%', bottom: '4%', width: 185 },
+    depth: 0.04,
     delay: 1200,
   },
   {
@@ -101,8 +124,11 @@ const USE_CASES: UseCase[] = [
     icon: '📦',
     title: 'Restocks',
     tag: 'Works on most URLs',
-    style: { left: '53%', top: '54%', width: 185 },
-    depth: 0.04,
+    desc: "Limited drops, sold-out sneakers, viral products that vanish in minutes. Steward monitors stock status and alerts you the moment something is back so you're always first in line.",
+    simBold: 'Back in stock!',
+    simBody: 'PS5 Pro is available at Target right now. Grab it before it sells out again.',
+    style: { left: '51%', bottom: '3%', width: 185 },
+    depth: 0.03,
     delay: 1300,
   },
   {
@@ -110,7 +136,10 @@ const USE_CASES: UseCase[] = [
     icon: '✦',
     title: 'AI Chat Setup',
     tag: 'Just describe it',
-    style: { left: '37%', bottom: '6%', width: 185 },
+    desc: 'Skip the forms and dropdowns. Just describe what you want. "Dyson V15 under $500" or "Carbone table next Friday" and Steward\'s AI finds it and sets up the tracker in seconds.',
+    simBold: 'Found it.',
+    simBody: "Dyson V15 Detect is $549 at dyson.com. I'll ping you the moment it dips below $500.",
+    style: { left: '1%', bottom: '38%', width: 185 },
     depth: 0.025,
     delay: 1400,
   },
@@ -119,7 +148,10 @@ const USE_CASES: UseCase[] = [
     icon: '↗',
     title: 'Share Extension',
     tag: 'Works in most apps',
-    style: { left: '53%', bottom: '8%', width: 185 },
+    desc: 'See something while browsing? Tap the share button in Safari, Chrome, or any app, then tap Steward. The AI reads the page, identifies the product, and sets up tracking in under 10 seconds.',
+    simBold: 'Link received!',
+    simBody: 'Nike Dunk Low Panda detected from nike.com. What should I track?',
+    style: { right: '1%', bottom: '6%', width: 195 },
     depth: 0.035,
     delay: 1500,
   },
@@ -137,9 +169,10 @@ const DEMO_CHIPS = [
 
 export function HeroV2Demo() {
   const [cardsReady, setCardsReady] = useState(false)
-  const [activeCardId, setActiveCardId] = useState<string | null>(null)
-  const [clickCount, setClickCount] = useState(0) // bumps each tap so ring can re-fire
+  const [modal, setModal] = useState<UseCase | null>(null)
   const mouseRef = useRef({ x: 0, y: 0 })
+  const closeBtnRef = useRef<HTMLButtonElement>(null)
+  const triggerRef = useRef<HTMLElement | null>(null)
   const curRef = useRef({ x: 0, y: 0 })
   const cardEls = useRef<Array<HTMLDivElement | null>>([])
   const rafRef = useRef<number | null>(null)
@@ -149,10 +182,29 @@ export function HeroV2Demo() {
     return () => clearTimeout(t)
   }, [])
 
-  const handleCardClick = (id: string) => {
-    setActiveCardId(id)
-    setClickCount((n) => n + 1)
+  const openModal = (uc: UseCase, trigger: EventTarget | null) => {
+    triggerRef.current = trigger as HTMLElement | null
+    setModal(uc)
   }
+
+  // Focus management — mirrors LandingUseCases modal
+  useEffect(() => {
+    if (modal) {
+      closeBtnRef.current?.focus()
+    } else {
+      triggerRef.current?.focus()
+    }
+  }, [modal])
+
+  // ESC to close
+  useEffect(() => {
+    if (!modal) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setModal(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [modal])
 
   // Parallax loop — identical easing to landing-client-page.tsx
   useEffect(() => {
@@ -474,23 +526,26 @@ export function HeroV2Demo() {
         <div
           style={{
             position: 'absolute',
-            left: '50%',
+            left: '55%',
             right: '-20%',
             top: 0,
             bottom: 0,
             zIndex: 1,
             pointerEvents: 'none',
-            transform: 'translateX(25%)',
+            transform: 'translateX(35%)',
           }}
         >
-          {/* Stage light — mint cone from above the robot */}
+          {/* Stage light — mint cone from above the robot. Positioned at
+              container-left 9% to align with the robot's actual render
+              position inside the Spline canvas (GENKUB renders ~9% from
+              the left edge of its scene, not at canvas center). */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 1.6, delay: 0.6, ease: 'easeOut' }}
             style={{
               position: 'absolute',
-              left: '50%',
+              left: '9%',
               top: '-5%',
               width: 600,
               height: 600,
@@ -501,14 +556,14 @@ export function HeroV2Demo() {
             }}
           />
 
-          {/* Robot halo — faint pulsing mint ring behind the robot */}
+          {/* Robot halo — aligned with robot render position */}
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 1.4, delay: 0.9, ease: [0.22, 1, 0.36, 1] }}
             style={{
               position: 'absolute',
-              left: '50%',
+              left: '9%',
               top: '42%',
               width: 480,
               height: 480,
@@ -533,14 +588,14 @@ export function HeroV2Demo() {
             <SplineScene scene={SPLINE_URL} className="w-full h-full" />
           </div>
 
-          {/* Floating "Your concierge" badge */}
+          {/* Floating "Your concierge" badge — aligned with robot */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 1.5, ease: [0.22, 1, 0.36, 1] }}
             style={{
               position: 'absolute',
-              left: '50%',
+              left: '9%',
               bottom: '10%',
               transform: 'translateX(-50%)',
               display: 'inline-flex',
@@ -598,9 +653,8 @@ export function HeroV2Demo() {
               <UseCaseCard
                 useCase={uc}
                 ready={cardsReady}
-                activeId={activeCardId}
-                clickCount={clickCount}
-                onClick={() => handleCardClick(uc.id)}
+                isOpen={modal?.id === uc.id}
+                onClick={(e) => openModal(uc, e.currentTarget)}
               />
             </div>
           ))}
@@ -627,6 +681,18 @@ export function HeroV2Demo() {
       >
         Labs · Hero v2 preview
       </div>
+
+      {/* Use-case detail modal — opened when a floating card is clicked */}
+      <AnimatePresence>
+        {modal && (
+          <UseCaseModal
+            key={modal.id}
+            useCase={modal}
+            onClose={() => setModal(null)}
+            closeRef={closeBtnRef}
+          />
+        )}
+      </AnimatePresence>
     </section>
   )
 }
@@ -678,21 +744,19 @@ function RevealWord({
 function UseCaseCard({
   useCase,
   ready,
-  activeId,
-  clickCount,
+  isOpen,
   onClick,
 }: {
   useCase: UseCase
   ready: boolean
-  activeId: string | null
-  clickCount: number
-  onClick: () => void
+  isOpen: boolean
+  onClick: (e: React.MouseEvent<HTMLButtonElement>) => void
 }) {
-  const isActive = activeId === useCase.id
   return (
     <motion.button
       type="button"
       onClick={onClick}
+      aria-label={`Learn more about ${useCase.title}`}
       initial={{ opacity: 0, y: 14, scale: 0.94 }}
       animate={
         ready ? { opacity: 1, y: 0, scale: 1 } : { opacity: 0, y: 14, scale: 0.94 }
@@ -702,22 +766,22 @@ function UseCaseCard({
         delay: useCase.delay / 1000,
         ease: [0.22, 1, 0.36, 1],
       }}
-      whileHover={{ scale: 1.05, y: -3 }}
+      whileHover={{ scale: 1.05, y: -4 }}
       whileTap={{ scale: 0.96 }}
       style={{
         position: 'relative',
         width: '100%',
         padding: '12px 14px',
-        background: isActive
-          ? 'linear-gradient(135deg, rgba(42,92,69,0.8), rgba(28,61,46,0.5))'
+        background: isOpen
+          ? 'linear-gradient(135deg, rgba(42,92,69,0.85), rgba(28,61,46,0.55))'
           : 'rgba(15,32,24,0.72)',
-        border: isActive
+        border: isOpen
           ? '1px solid rgba(110,231,183,0.55)'
           : '1px solid rgba(255,255,255,0.08)',
         borderRadius: 16,
         backdropFilter: 'blur(16px)',
         WebkitBackdropFilter: 'blur(16px)',
-        boxShadow: isActive
+        boxShadow: isOpen
           ? '0 0 0 4px rgba(110,231,183,0.18), 0 12px 32px rgba(0,0,0,0.4)'
           : '0 8px 28px rgba(0,0,0,0.3)',
         cursor: 'pointer',
@@ -725,7 +789,7 @@ function UseCaseCard({
         fontFamily: SANS,
         color: 'inherit',
         pointerEvents: 'auto',
-        transition: 'border-color 0.25s, background 0.25s, box-shadow 0.25s',
+        transition: 'border-color 0.3s, background 0.3s, box-shadow 0.3s',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -734,7 +798,7 @@ function UseCaseCard({
             width: 34,
             height: 34,
             borderRadius: 10,
-            background: isActive ? 'rgba(110,231,183,0.18)' : 'rgba(110,231,183,0.08)',
+            background: 'rgba(110,231,183,0.08)',
             border: '1px solid rgba(110,231,183,0.18)',
             display: 'flex',
             alignItems: 'center',
@@ -774,27 +838,164 @@ function UseCaseCard({
           </div>
         </div>
       </div>
+    </motion.button>
+  )
+}
 
-      {/* Ripple ring — re-keyed on clickCount so the same card can be
-          tapped repeatedly and still animate. */}
-      <AnimatePresence>
-        {isActive && (
-          <motion.span
-            key={`ring-${clickCount}`}
-            initial={{ opacity: 0.9, scale: 0.6 }}
-            animate={{ opacity: 0, scale: 1.35 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.75, ease: [0.22, 1, 0.36, 1] }}
+// ───── Modal (mirrors LandingUseCases.modal — same copy shape & look) ─────
+
+function UseCaseModal({
+  useCase,
+  onClose,
+  closeRef,
+}: {
+  useCase: UseCase
+  onClose: () => void
+  closeRef: React.RefObject<HTMLButtonElement | null>
+}) {
+  return (
+    <motion.div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`${useCase.title} details`}
+      onClick={onClose}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.25 }}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 200,
+        background: 'rgba(0,0,0,0.7)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 20,
+      }}
+    >
+      <motion.div
+        onClick={(e) => e.stopPropagation()}
+        initial={{ opacity: 0, y: 24, scale: 0.96 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 12, scale: 0.97 }}
+        transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+        style={{
+          background: C.forest,
+          border: '1px solid rgba(110,231,183,0.2)',
+          borderRadius: 24,
+          padding: 'clamp(24px,5vw,36px)',
+          maxWidth: 480,
+          width: '100%',
+          position: 'relative',
+          maxHeight: '90dvh',
+          overflowY: 'auto',
+          fontFamily: SANS,
+        }}
+      >
+        <button
+          ref={closeRef}
+          onClick={onClose}
+          aria-label="Close dialog"
+          style={{
+            position: 'absolute',
+            top: 16,
+            right: 16,
+            width: 32,
+            height: 32,
+            borderRadius: '50%',
+            background: 'rgba(255,255,255,0.06)',
+            border: '1px solid rgba(255,255,255,0.1)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 14,
+            color: 'rgba(247,246,243,0.55)',
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+          }}
+        >
+          ✕
+        </button>
+        <div style={{ fontSize: 40, marginBottom: 16 }}>{useCase.icon}</div>
+        <div
+          style={{
+            fontFamily: SERIF,
+            fontSize: 28,
+            fontWeight: 700,
+            color: C.cream,
+            marginBottom: 8,
+            letterSpacing: '-0.02em',
+          }}
+        >
+          {useCase.title}
+        </div>
+        <div
+          style={{
+            fontSize: 14,
+            lineHeight: 1.6,
+            color: 'rgba(247,246,243,0.6)',
+            marginBottom: 20,
+            fontWeight: 300,
+          }}
+        >
+          {useCase.desc}
+        </div>
+        <div
+          style={{
+            background: 'rgba(110,231,183,0.06)',
+            border: '1px solid rgba(110,231,183,0.15)',
+            borderRadius: 16,
+            padding: 16,
+            marginBottom: 20,
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: 10,
+          }}
+        >
+          <span
             style={{
-              position: 'absolute',
-              inset: -2,
-              borderRadius: 18,
-              border: '2px solid rgba(110,231,183,0.85)',
-              pointerEvents: 'none',
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              background: C.mint,
+              boxShadow: '0 0 10px rgba(110,231,183,0.6)',
+              marginTop: 5,
+              flexShrink: 0,
+              display: 'block',
             }}
           />
-        )}
-      </AnimatePresence>
-    </motion.button>
+          <div
+            style={{
+              fontSize: 13,
+              color: 'rgba(247,246,243,0.7)',
+              lineHeight: 1.45,
+            }}
+          >
+            <strong style={{ color: C.cream }}>{useCase.simBold}</strong>{' '}
+            {useCase.simBody}
+          </div>
+        </div>
+        <a
+          href="/signup"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
+            background: C.mint,
+            color: C.forest,
+            fontSize: 14,
+            fontWeight: 700,
+            padding: '12px 24px',
+            borderRadius: 12,
+            textDecoration: 'none',
+          }}
+        >
+          Try it free →
+        </a>
+      </motion.div>
+    </motion.div>
   )
 }
