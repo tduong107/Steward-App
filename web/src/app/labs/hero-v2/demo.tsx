@@ -53,12 +53,23 @@ type UseCase = {
   delay: number // ms
 }
 
-// Positions are an organic scatter around the robot — all 8 cards sit
-// in the top strip, left gap column, or bottom strip so none overlap
-// the robot's body (robot lands around 75-80% viewport after the
-// canvas+transform push below). Detail copy is lifted verbatim from
-// LandingUseCases so the modal matches the site's own cards.
+// Cards form a ring AROUND the robot. Robot lands at ~70% viewport
+// (see Spline container config below), body ~57.5-82.5% horizontal ×
+// 15-85% vertical. The 8 cards sit in an 8-point compass around him:
+//
+//       NW   N   NE
+//         \  |  /
+//       W --robot-- E
+//         /  |  \
+//       SW   S   SE
+//
+// NW / SW / W live in the 44-59% gap between hero-text (ends ~45%)
+// and robot. N / S sit above/below the robot in the top/bottom strips.
+// NE / E / SE live at the right edge (85-100%) to the right of the
+// robot's body. None overlap the robot or the hero-text column.
+// Detail copy is lifted verbatim from components/landing-use-cases.tsx.
 const USE_CASES: UseCase[] = [
+  // NW — gap column, upper
   {
     id: 'price-drops',
     icon: '📉',
@@ -67,10 +78,11 @@ const USE_CASES: UseCase[] = [
     desc: 'Set a target price across thousands of retailers. Steward monitors 24/7 and pings you the second it hits your number, with fake deal detection so you never get played by inflated "sale" prices.',
     simBold: 'Price dropped!',
     simBody: "Nike Dunk Low Panda is now $89 at nike.com. That's 26% below your target.",
-    style: { left: '30%', top: '3%', width: 185 },
+    style: { top: '3%', left: '44%', width: 170 },
     depth: 0.04,
     delay: 800,
   },
+  // N — above robot head
   {
     id: 'restaurants',
     icon: '🍽',
@@ -79,10 +91,11 @@ const USE_CASES: UseCase[] = [
     desc: "That impossible Resy reservation? Steward watches it around the clock and pings you the moment a table frees up so you can book before anyone else even knows it's available.",
     simBold: 'Table found!',
     simBody: 'Carbone NY just opened a Friday 8pm slot for 2 guests.',
-    style: { left: '47%', top: '1%', width: 195 },
+    style: { top: '0%', left: '58%', width: 175 },
     depth: 0.025,
     delay: 900,
   },
+  // NE — top-right corner
   {
     id: 'flights',
     icon: '✈️',
@@ -91,10 +104,11 @@ const USE_CASES: UseCase[] = [
     desc: 'Set a fare threshold for any route and Steward monitors prices across airlines. The moment it drops below your target, you get an instant alert with a direct link to book.',
     simBold: 'Fare dropped!',
     simBody: "SFO → Tokyo round trip is now $1,120. That's $127 less than yesterday.",
-    style: { left: '36%', top: '34%', width: 185 },
+    style: { top: '3%', right: '3%', width: 170 },
     depth: 0.035,
     delay: 1000,
   },
+  // E — right of robot, mid-height
   {
     id: 'campsites',
     icon: '🏕',
@@ -103,10 +117,11 @@ const USE_CASES: UseCase[] = [
     desc: 'The best campsites book up in seconds. Steward watches Recreation.gov for cancellations on specific dates and pings you the moment one opens up so you can grab it first.',
     simBold: 'Site available!',
     simBody: "Yosemite Upper Pines has an opening Jun 14–16. Book it before it's gone.",
-    style: { left: '38%', top: '58%', width: 185 },
+    style: { top: '43%', right: '1%', width: 165 },
     depth: 0.03,
     delay: 1100,
   },
+  // SE — bottom-right corner
   {
     id: 'tickets',
     icon: '🎫',
@@ -115,10 +130,11 @@ const USE_CASES: UseCase[] = [
     desc: 'Sold out before you could buy? Steward monitors Ticketmaster and other platforms for face-value drops and new inventory so you get tickets at a fair price, not scalper markup.',
     simBold: 'Tickets available!',
     simBody: '2 floor seats for Kendrick Lamar at The Forum just dropped at face value.',
-    style: { left: '34%', bottom: '4%', width: 185 },
+    style: { bottom: '3%', right: '3%', width: 170 },
     depth: 0.04,
     delay: 1200,
   },
+  // S — below robot feet
   {
     id: 'restocks',
     icon: '📦',
@@ -127,10 +143,11 @@ const USE_CASES: UseCase[] = [
     desc: "Limited drops, sold-out sneakers, viral products that vanish in minutes. Steward monitors stock status and alerts you the moment something is back so you're always first in line.",
     simBold: 'Back in stock!',
     simBody: 'PS5 Pro is available at Target right now. Grab it before it sells out again.',
-    style: { left: '51%', bottom: '3%', width: 185 },
+    style: { bottom: '0%', left: '58%', width: 175 },
     depth: 0.03,
     delay: 1300,
   },
+  // SW — gap column, lower
   {
     id: 'ai-chat',
     icon: '✦',
@@ -139,10 +156,11 @@ const USE_CASES: UseCase[] = [
     desc: 'Skip the forms and dropdowns. Just describe what you want. "Dyson V15 under $500" or "Carbone table next Friday" and Steward\'s AI finds it and sets up the tracker in seconds.',
     simBold: 'Found it.',
     simBody: "Dyson V15 Detect is $549 at dyson.com. I'll ping you the moment it dips below $500.",
-    style: { left: '1%', bottom: '38%', width: 185 },
+    style: { bottom: '3%', left: '44%', width: 170 },
     depth: 0.025,
     delay: 1400,
   },
+  // W — gap column, mid-height
   {
     id: 'share-ext',
     icon: '↗',
@@ -151,7 +169,7 @@ const USE_CASES: UseCase[] = [
     desc: 'See something while browsing? Tap the share button in Safari, Chrome, or any app, then tap Steward. The AI reads the page, identifies the product, and sets up tracking in under 10 seconds.',
     simBold: 'Link received!',
     simBody: 'Nike Dunk Low Panda detected from nike.com. What should I track?',
-    style: { right: '1%', bottom: '6%', width: 195 },
+    style: { top: '43%', left: '44%', width: 165 },
     depth: 0.035,
     delay: 1500,
   },
@@ -532,7 +550,10 @@ export function HeroV2Demo() {
             bottom: 0,
             zIndex: 1,
             pointerEvents: 'none',
-            transform: 'translateX(35%)',
+            // Pulled back from translateX(35%) — robot now sits around
+            // 71% of viewport (center of the 8-card ring) instead of
+            // being buried in the right edge.
+            transform: 'translateX(15%)',
           }}
         >
           {/* Stage light — mint cone from above the robot. Positioned at
