@@ -274,7 +274,6 @@ const DEMO_CHIPS = [
 
 export function HeroV2Demo() {
   const [cardsReady, setCardsReady] = useState(false)
-  const [mouse, setMouse] = useState({ x: 0, y: 0 })
   const mouseRef = useRef({ x: 0, y: 0 })
   const curRef = useRef({ x: 0, y: 0 })
   const cardEls = useRef<Array<HTMLDivElement | null>>([])
@@ -298,7 +297,6 @@ export function HeroV2Demo() {
     const loop = () => {
       curRef.current.x += (mouseRef.current.x - curRef.current.x) * 0.06
       curRef.current.y += (mouseRef.current.y - curRef.current.y) * 0.06
-      setMouse({ x: curRef.current.x, y: curRef.current.y })
       cardEls.current.forEach((el, i) => {
         if (!el) return
         const d = depths[i] ?? 0.03
@@ -599,10 +597,10 @@ export function HeroV2Demo() {
         <div
           style={{
             position: 'absolute',
-            right: '-4%',
-            top: '5%',
-            bottom: '5%',
-            width: '58%',
+            right: '-10%',
+            top: 0,
+            bottom: 0,
+            width: '75%',
             zIndex: 1,
             pointerEvents: 'none',
           }}
@@ -656,9 +654,6 @@ export function HeroV2Demo() {
           >
             <SplineScene scene={SPLINE_URL} className="w-full h-full" />
           </div>
-
-          {/* Concierge-outfit overlay: bowtie + under-collar vest accent */}
-          <ConciergeOutfit mouse={mouse} />
 
           {/* Floating "Your concierge" badge */}
           <motion.div
@@ -807,79 +802,3 @@ function RevealWord({
   )
 }
 
-/**
- * Concierge-outfit overlay.
- *
- * The Spline scene is an external 3D model we can't edit from here, so
- * this adds a small mint bowtie + vest V-line anchored roughly to the
- * robot's neck area. It tracks mouse position with the same small
- * amplitude the robot does in the scene so the accessory drifts along
- * instead of feeling stuck to the viewport.
- *
- * Not pixel-perfect — the "proper fix" is to swap SPLINE_URL to a
- * tuxedo/butler scene from spline.design/community. This is a stylish
- * placeholder until that happens.
- */
-function ConciergeOutfit({ mouse }: { mouse: { x: number; y: number } }) {
-  const tx = mouse.x * -12
-  const ty = mouse.y * -8
-
-  return (
-    <div
-      style={{
-        position: 'absolute',
-        left: '50%',
-        top: '30%',
-        width: 160,
-        height: 220,
-        marginLeft: -80,
-        marginTop: -40,
-        pointerEvents: 'none',
-        transform: `translate(${tx}px, ${ty}px)`,
-        transition: 'transform 0.12s linear',
-      }}
-    >
-      {/* Bowtie */}
-      <svg
-        width="72"
-        height="36"
-        viewBox="0 0 72 36"
-        style={{
-          position: 'absolute',
-          left: '50%',
-          top: 18,
-          marginLeft: -36,
-          filter: 'drop-shadow(0 2px 8px rgba(110,231,183,0.45))',
-        }}
-      >
-        <defs>
-          <linearGradient id="bowtieGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#8FF0C5" />
-            <stop offset="100%" stopColor="#4BCB9A" />
-          </linearGradient>
-        </defs>
-        {/* Left triangle */}
-        <path d="M 4 2 L 32 18 L 4 34 Z" fill="url(#bowtieGrad)" />
-        {/* Right triangle */}
-        <path d="M 68 2 L 40 18 L 68 34 Z" fill="url(#bowtieGrad)" />
-        {/* Center knot */}
-        <rect x="30" y="10" width="12" height="16" rx="2" fill="#0F2018" />
-        <rect x="32" y="12" width="8" height="12" rx="1" fill="url(#bowtieGrad)" opacity="0.6" />
-      </svg>
-
-      {/* Subtle mint glow under the bowtie area (fakes a stage light hit) */}
-      <div
-        style={{
-          position: 'absolute',
-          left: '50%',
-          top: 8,
-          width: 140,
-          height: 80,
-          marginLeft: -70,
-          background: 'radial-gradient(ellipse at center, rgba(110,231,183,0.35), transparent 70%)',
-          filter: 'blur(14px)',
-        }}
-      />
-    </div>
-  )
-}
