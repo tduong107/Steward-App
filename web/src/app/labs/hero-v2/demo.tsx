@@ -53,21 +53,28 @@ type UseCase = {
   delay: number // ms
 }
 
-// Six cards in a balanced 3-top × 3-bottom grid around the robot.
-// (Share Extension + AI Chat Setup were removed.)
+// Six cards clustered in the gap between hero text and robot.
+// Previously spread NW/N/NE across 44%–97% horizontal, which read as
+// "scattered." Now packed into a 2-column × 3-row grid at left:44% /
+// left:58% so they fill the empty middle space. The right column and
+// middle row will slightly overlap the robot's body — that's by design
+// per the user's direction ("that is fine if the cards are clipping
+// the robot a little bit").
 //
-//      NW      N      NE       ← Price Drops · Restaurants · Flight Deals
-//          \  |  /
-//             robot (~71% viewport)
-//          /  |  \
-//      SW      S      SE       ← Event Tickets · Restocks · Campsites
+//   col 44%            col 58%
+//   ┌──────────────┐   ┌──────────────┐
+//   │ Price Drops  │   │ Restaurants  │   ← top row (top: 3%)
+//   └──────────────┘   └──────────────┘
+//   ┌──────────────┐   ┌──────────────┐
+//   │ Flight Deals │   │ Event Tickets│   ← middle row (top: 38%)
+//   └──────────────┘   └──────────────┘
+//   ┌──────────────┐   ┌──────────────┐
+//   │ Restocks     │   │ Campsites    │   ← bottom row (bottom: 3%)
+//   └──────────────┘   └──────────────┘
 //
-// Horizontal columns at left 44% / left 58% / right 3% put the 6 cards'
-// geometric center at ~(68%, 50%) viewport — essentially where the
-// robot lands, so he reads as the centerpiece of the ring.
 // Detail copy is lifted verbatim from components/landing-use-cases.tsx.
 const USE_CASES: UseCase[] = [
-  // NW — top row, left
+  // Row 1 — left
   {
     id: 'price-drops',
     icon: '📉',
@@ -76,11 +83,11 @@ const USE_CASES: UseCase[] = [
     desc: 'Set a target price across thousands of retailers. Steward monitors 24/7 and pings you the second it hits your number, with fake deal detection so you never get played by inflated "sale" prices.',
     simBold: 'Price dropped!',
     simBody: "Nike Dunk Low Panda is now $89 at nike.com. That's 26% below your target.",
-    style: { top: '3%', left: '44%', width: 170 },
+    style: { top: '3%', left: '44%', width: 175 },
     depth: 0.04,
     delay: 800,
   },
-  // N — top row, center (above robot head)
+  // Row 1 — right (may brush robot's head)
   {
     id: 'restaurants',
     icon: '🍽',
@@ -89,11 +96,11 @@ const USE_CASES: UseCase[] = [
     desc: "That impossible Resy reservation? Steward watches it around the clock and pings you the moment a table frees up so you can book before anyone else even knows it's available.",
     simBold: 'Table found!',
     simBody: 'Carbone NY just opened a Friday 8pm slot for 2 guests.',
-    style: { top: '0%', left: '58%', width: 175 },
+    style: { top: '3%', left: '58%', width: 175 },
     depth: 0.025,
     delay: 900,
   },
-  // NE — top row, right
+  // Row 2 — left (next to hero headline)
   {
     id: 'flights',
     icon: '✈️',
@@ -102,37 +109,11 @@ const USE_CASES: UseCase[] = [
     desc: 'Set a fare threshold for any route and Steward monitors prices across airlines. The moment it drops below your target, you get an instant alert with a direct link to book.',
     simBold: 'Fare dropped!',
     simBody: "SFO → Tokyo round trip is now $1,120. That's $127 less than yesterday.",
-    style: { top: '3%', right: '3%', width: 170 },
+    style: { top: '38%', left: '44%', width: 175 },
     depth: 0.035,
     delay: 1000,
   },
-  // SW — bottom row, left
-  {
-    id: 'tickets',
-    icon: '🎫',
-    title: 'Event Tickets',
-    tag: 'Ticketmaster & more',
-    desc: 'Sold out before you could buy? Steward monitors Ticketmaster and other platforms for face-value drops and new inventory so you get tickets at a fair price, not scalper markup.',
-    simBold: 'Tickets available!',
-    simBody: '2 floor seats for Kendrick Lamar at The Forum just dropped at face value.',
-    style: { bottom: '3%', left: '44%', width: 170 },
-    depth: 0.04,
-    delay: 1100,
-  },
-  // S — bottom row, center (below robot feet)
-  {
-    id: 'restocks',
-    icon: '📦',
-    title: 'Restocks',
-    tag: 'Works on most URLs',
-    desc: "Limited drops, sold-out sneakers, viral products that vanish in minutes. Steward monitors stock status and alerts you the moment something is back so you're always first in line.",
-    simBold: 'Back in stock!',
-    simBody: 'PS5 Pro is available at Target right now. Grab it before it sells out again.',
-    style: { bottom: '0%', left: '58%', width: 175 },
-    depth: 0.03,
-    delay: 1200,
-  },
-  // SE — bottom row, right
+  // Row 2 — right (overlaps robot torso — intentional)
   {
     id: 'campsites',
     icon: '🏕',
@@ -141,7 +122,33 @@ const USE_CASES: UseCase[] = [
     desc: 'The best campsites book up in seconds. Steward watches Recreation.gov for cancellations on specific dates and pings you the moment one opens up so you can grab it first.',
     simBold: 'Site available!',
     simBody: "Yosemite Upper Pines has an opening Jun 14–16. Book it before it's gone.",
-    style: { bottom: '3%', right: '3%', width: 170 },
+    style: { top: '38%', left: '58%', width: 175 },
+    depth: 0.03,
+    delay: 1100,
+  },
+  // Row 3 — left (next to hero demo bar)
+  {
+    id: 'tickets',
+    icon: '🎫',
+    title: 'Event Tickets',
+    tag: 'Ticketmaster & more',
+    desc: 'Sold out before you could buy? Steward monitors Ticketmaster and other platforms for face-value drops and new inventory so you get tickets at a fair price, not scalper markup.',
+    simBold: 'Tickets available!',
+    simBody: '2 floor seats for Kendrick Lamar at The Forum just dropped at face value.',
+    style: { bottom: '3%', left: '44%', width: 175 },
+    depth: 0.04,
+    delay: 1200,
+  },
+  // Row 3 — right (may brush robot's feet)
+  {
+    id: 'restocks',
+    icon: '📦',
+    title: 'Restocks',
+    tag: 'Works on most URLs',
+    desc: "Limited drops, sold-out sneakers, viral products that vanish in minutes. Steward monitors stock status and alerts you the moment something is back so you're always first in line.",
+    simBold: 'Back in stock!',
+    simBody: 'PS5 Pro is available at Target right now. Grab it before it sells out again.',
+    style: { bottom: '3%', left: '58%', width: 175 },
     depth: 0.035,
     delay: 1300,
   },
