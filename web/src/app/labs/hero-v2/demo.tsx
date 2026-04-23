@@ -522,10 +522,13 @@ export function HeroV2Demo() {
             bottom: 0,
             zIndex: 1,
             pointerEvents: 'none',
-            // Pulled back from translateX(35%) — robot now sits around
-            // 71% of viewport (center of the 8-card ring) instead of
-            // being buried in the right edge.
-            transform: 'translateX(15%)',
+            // Tuned to match the 6-card grid's geometric center. The
+            // GENKUB robot has an outstretched left arm that extends his
+            // visual center ~2% right of his face, so translateX(10%)
+            // puts the face around 67% and the full visual mass
+            // (head + arm span) around 69% — matching the cards' center
+            // of mass at ~68% horizontal.
+            transform: 'translateX(10%)',
           }}
         >
           {/* Stage light — mint cone from above the robot. Positioned at
