@@ -53,23 +53,21 @@ type UseCase = {
   delay: number // ms
 }
 
-// Cards form a ring AROUND the robot. Robot lands at ~70% viewport
-// (see Spline container config below), body ~57.5-82.5% horizontal ×
-// 15-85% vertical. The 8 cards sit in an 8-point compass around him:
+// Six cards in a balanced 3-top × 3-bottom grid around the robot.
+// (Share Extension + AI Chat Setup were removed.)
 //
-//       NW   N   NE
-//         \  |  /
-//       W --robot-- E
-//         /  |  \
-//       SW   S   SE
+//      NW      N      NE       ← Price Drops · Restaurants · Flight Deals
+//          \  |  /
+//             robot (~71% viewport)
+//          /  |  \
+//      SW      S      SE       ← Event Tickets · Restocks · Campsites
 //
-// NW / SW / W live in the 44-59% gap between hero-text (ends ~45%)
-// and robot. N / S sit above/below the robot in the top/bottom strips.
-// NE / E / SE live at the right edge (85-100%) to the right of the
-// robot's body. None overlap the robot or the hero-text column.
+// Horizontal columns at left 44% / left 58% / right 3% put the 6 cards'
+// geometric center at ~(68%, 50%) viewport — essentially where the
+// robot lands, so he reads as the centerpiece of the ring.
 // Detail copy is lifted verbatim from components/landing-use-cases.tsx.
 const USE_CASES: UseCase[] = [
-  // NW — gap column, upper
+  // NW — top row, left
   {
     id: 'price-drops',
     icon: '📉',
@@ -82,7 +80,7 @@ const USE_CASES: UseCase[] = [
     depth: 0.04,
     delay: 800,
   },
-  // N — above robot head
+  // N — top row, center (above robot head)
   {
     id: 'restaurants',
     icon: '🍽',
@@ -95,7 +93,7 @@ const USE_CASES: UseCase[] = [
     depth: 0.025,
     delay: 900,
   },
-  // NE — top-right corner
+  // NE — top row, right
   {
     id: 'flights',
     icon: '✈️',
@@ -108,20 +106,7 @@ const USE_CASES: UseCase[] = [
     depth: 0.035,
     delay: 1000,
   },
-  // E — right of robot, mid-height
-  {
-    id: 'campsites',
-    icon: '🏕',
-    title: 'Campsites',
-    tag: 'Recreation.gov sites',
-    desc: 'The best campsites book up in seconds. Steward watches Recreation.gov for cancellations on specific dates and pings you the moment one opens up so you can grab it first.',
-    simBold: 'Site available!',
-    simBody: "Yosemite Upper Pines has an opening Jun 14–16. Book it before it's gone.",
-    style: { top: '43%', right: '1%', width: 165 },
-    depth: 0.03,
-    delay: 1100,
-  },
-  // SE — bottom-right corner
+  // SW — bottom row, left
   {
     id: 'tickets',
     icon: '🎫',
@@ -130,11 +115,11 @@ const USE_CASES: UseCase[] = [
     desc: 'Sold out before you could buy? Steward monitors Ticketmaster and other platforms for face-value drops and new inventory so you get tickets at a fair price, not scalper markup.',
     simBold: 'Tickets available!',
     simBody: '2 floor seats for Kendrick Lamar at The Forum just dropped at face value.',
-    style: { bottom: '3%', right: '3%', width: 170 },
+    style: { bottom: '3%', left: '44%', width: 170 },
     depth: 0.04,
-    delay: 1200,
+    delay: 1100,
   },
-  // S — below robot feet
+  // S — bottom row, center (below robot feet)
   {
     id: 'restocks',
     icon: '📦',
@@ -145,33 +130,20 @@ const USE_CASES: UseCase[] = [
     simBody: 'PS5 Pro is available at Target right now. Grab it before it sells out again.',
     style: { bottom: '0%', left: '58%', width: 175 },
     depth: 0.03,
-    delay: 1300,
+    delay: 1200,
   },
-  // SW — gap column, lower
+  // SE — bottom row, right
   {
-    id: 'ai-chat',
-    icon: '✦',
-    title: 'AI Chat Setup',
-    tag: 'Just describe it',
-    desc: 'Skip the forms and dropdowns. Just describe what you want. "Dyson V15 under $500" or "Carbone table next Friday" and Steward\'s AI finds it and sets up the tracker in seconds.',
-    simBold: 'Found it.',
-    simBody: "Dyson V15 Detect is $549 at dyson.com. I'll ping you the moment it dips below $500.",
-    style: { bottom: '3%', left: '44%', width: 170 },
-    depth: 0.025,
-    delay: 1400,
-  },
-  // W — gap column, mid-height
-  {
-    id: 'share-ext',
-    icon: '↗',
-    title: 'Share Extension',
-    tag: 'Works in most apps',
-    desc: 'See something while browsing? Tap the share button in Safari, Chrome, or any app, then tap Steward. The AI reads the page, identifies the product, and sets up tracking in under 10 seconds.',
-    simBold: 'Link received!',
-    simBody: 'Nike Dunk Low Panda detected from nike.com. What should I track?',
-    style: { top: '43%', left: '44%', width: 165 },
+    id: 'campsites',
+    icon: '🏕',
+    title: 'Campsites',
+    tag: 'Recreation.gov sites',
+    desc: 'The best campsites book up in seconds. Steward watches Recreation.gov for cancellations on specific dates and pings you the moment one opens up so you can grab it first.',
+    simBold: 'Site available!',
+    simBody: "Yosemite Upper Pines has an opening Jun 14–16. Book it before it's gone.",
+    style: { bottom: '3%', right: '3%', width: 170 },
     depth: 0.035,
-    delay: 1500,
+    delay: 1300,
   },
 ]
 
