@@ -759,7 +759,7 @@ function UseCaseCard({
       style={{
         position: 'relative',
         width: '100%',
-        padding: '14px 36px 14px 14px', // extra right pad for chevron
+        padding: '14px',
         background: isOpen
           ? 'linear-gradient(135deg, rgba(42,92,69,0.9), rgba(28,61,46,0.55))'
           : 'linear-gradient(135deg, rgba(18,38,28,0.82), rgba(10,18,14,0.82))',
@@ -837,9 +837,7 @@ function UseCaseCard({
               color: C.mint,
               fontWeight: 600,
               letterSpacing: '0.02em',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
+              lineHeight: 1.35,
             }}
           >
             ✓ {useCase.tag}
@@ -847,23 +845,6 @@ function UseCaseCard({
         </div>
       </div>
 
-      {/* Subtle chevron on the right — hints at clickability without
-          eating a full line */}
-      <span
-        aria-hidden="true"
-        style={{
-          position: 'absolute',
-          right: 14,
-          top: '50%',
-          transform: 'translateY(-50%)',
-          fontSize: 16,
-          fontWeight: 500,
-          color: C.mint,
-          opacity: 0.55,
-        }}
-      >
-        →
-      </span>
     </motion.button>
   )
 }
