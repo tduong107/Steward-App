@@ -593,45 +593,6 @@ export function HeroV2Demo() {
             <SplineScene scene={SPLINE_URL} className="w-full h-full" />
           </div>
 
-          {/* Floating "Your concierge" badge — aligned with robot */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 1.5, ease: [0.22, 1, 0.36, 1] }}
-            style={{
-              position: 'absolute',
-              left: '9%',
-              bottom: '10%',
-              transform: 'translateX(-50%)',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 8,
-              padding: '8px 16px',
-              background: 'rgba(15,32,24,0.85)',
-              border: '1px solid rgba(110,231,183,0.3)',
-              borderRadius: 999,
-              backdropFilter: 'blur(12px)',
-              fontFamily: SANS,
-              fontSize: 12,
-              fontWeight: 600,
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase',
-              color: C.mint,
-              whiteSpace: 'nowrap',
-              pointerEvents: 'none',
-            }}
-          >
-            <span
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: '50%',
-                background: C.mint,
-                boxShadow: '0 0 0 4px rgba(110,231,183,0.2)',
-              }}
-            />
-            Your concierge · On duty
-          </motion.div>
         </div>
 
         {/* ── Clickable use case cards layer ── */}
@@ -757,6 +718,13 @@ function UseCaseCard({
   isOpen: boolean
   onClick: (e: React.MouseEvent<HTMLButtonElement>) => void
 }) {
+  // Each card floats on its own phase — deterministic per id so hot
+  // reloads keep the rhythm, but varied enough to look organic.
+  const hash = hashCode(useCase.id)
+  const floatDur = 3.2 + (hash % 200) / 100 // 3.2-5.2s
+  const floatAmp = 3 + (hash % 30) / 10 // 3-6px
+  const floatDelay = (hash % 1200) / 1000 // 0-1.2s
+
   return (
     <motion.button
       type="button"
@@ -764,52 +732,87 @@ function UseCaseCard({
       aria-label={`Learn more about ${useCase.title}`}
       initial={{ opacity: 0, y: 14, scale: 0.94 }}
       animate={
-        ready ? { opacity: 1, y: 0, scale: 1 } : { opacity: 0, y: 14, scale: 0.94 }
+        ready
+          ? {
+              opacity: 1,
+              y: [0, -floatAmp, 0],
+              scale: 1,
+            }
+          : { opacity: 0, y: 14, scale: 0.94 }
       }
-      transition={{
-        duration: 0.55,
-        delay: useCase.delay / 1000,
-        ease: [0.22, 1, 0.36, 1],
-      }}
-      whileHover={{ scale: 1.05, y: -4 }}
-      whileTap={{ scale: 0.96 }}
+      transition={
+        ready
+          ? {
+              opacity: { duration: 0.55, delay: useCase.delay / 1000 },
+              scale: { duration: 0.55, delay: useCase.delay / 1000 },
+              y: {
+                duration: floatDur,
+                delay: useCase.delay / 1000 + floatDelay,
+                repeat: Infinity,
+                ease: 'easeInOut',
+              },
+            }
+          : { duration: 0.4 }
+      }
+      whileHover={{ scale: 1.08, y: -8, transition: { duration: 0.25 } }}
+      whileTap={{ scale: 0.97 }}
       style={{
         position: 'relative',
         width: '100%',
-        padding: '12px 14px',
+        padding: '14px 36px 14px 14px', // extra right pad for chevron
         background: isOpen
-          ? 'linear-gradient(135deg, rgba(42,92,69,0.85), rgba(28,61,46,0.55))'
-          : 'rgba(15,32,24,0.72)',
+          ? 'linear-gradient(135deg, rgba(42,92,69,0.9), rgba(28,61,46,0.55))'
+          : 'linear-gradient(135deg, rgba(18,38,28,0.82), rgba(10,18,14,0.82))',
         border: isOpen
           ? '1px solid rgba(110,231,183,0.55)'
-          : '1px solid rgba(255,255,255,0.08)',
+          : '1px solid rgba(110,231,183,0.18)',
         borderRadius: 16,
-        backdropFilter: 'blur(16px)',
-        WebkitBackdropFilter: 'blur(16px)',
+        backdropFilter: 'blur(18px)',
+        WebkitBackdropFilter: 'blur(18px)',
         boxShadow: isOpen
-          ? '0 0 0 4px rgba(110,231,183,0.18), 0 12px 32px rgba(0,0,0,0.4)'
-          : '0 8px 28px rgba(0,0,0,0.3)',
+          ? '0 0 0 4px rgba(110,231,183,0.18), 0 14px 36px rgba(0,0,0,0.45)'
+          : '0 10px 30px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04)',
         cursor: 'pointer',
         textAlign: 'left',
         fontFamily: SANS,
         color: 'inherit',
         pointerEvents: 'auto',
+        overflow: 'hidden',
         transition: 'border-color 0.3s, background 0.3s, box-shadow 0.3s',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      {/* Live mint dot top-right */}
+      <motion.span
+        aria-hidden="true"
+        animate={{ opacity: [0.45, 1, 0.45], scale: [1, 1.15, 1] }}
+        transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+        style={{
+          position: 'absolute',
+          top: 10,
+          right: 14,
+          width: 7,
+          height: 7,
+          borderRadius: '50%',
+          background: C.mint,
+          boxShadow: '0 0 8px rgba(110,231,183,0.8)',
+        }}
+      />
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <div
           style={{
-            width: 34,
-            height: 34,
-            borderRadius: 10,
-            background: 'rgba(110,231,183,0.08)',
-            border: '1px solid rgba(110,231,183,0.18)',
+            width: 42,
+            height: 42,
+            borderRadius: 12,
+            background:
+              'linear-gradient(135deg, rgba(110,231,183,0.22), rgba(110,231,183,0.04))',
+            border: '1px solid rgba(110,231,183,0.3)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: 18,
+            fontSize: 22,
             flexShrink: 0,
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)',
           }}
         >
           {useCase.icon}
@@ -818,7 +821,7 @@ function UseCaseCard({
           <div
             style={{
               fontFamily: SERIF,
-              fontSize: 14,
+              fontSize: 15,
               fontWeight: 700,
               color: C.cream,
               letterSpacing: '-0.01em',
@@ -829,11 +832,11 @@ function UseCaseCard({
           </div>
           <div
             style={{
-              marginTop: 3,
-              fontSize: 10,
+              marginTop: 4,
+              fontSize: 10.5,
               color: C.mint,
               fontWeight: 600,
-              letterSpacing: '0.01em',
+              letterSpacing: '0.02em',
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
@@ -843,8 +846,35 @@ function UseCaseCard({
           </div>
         </div>
       </div>
+
+      {/* Subtle chevron on the right — hints at clickability without
+          eating a full line */}
+      <span
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          right: 14,
+          top: '50%',
+          transform: 'translateY(-50%)',
+          fontSize: 16,
+          fontWeight: 500,
+          color: C.mint,
+          opacity: 0.55,
+        }}
+      >
+        →
+      </span>
     </motion.button>
   )
+}
+
+// Simple deterministic hash for seeding per-card animation params.
+function hashCode(str: string): number {
+  let h = 0
+  for (let i = 0; i < str.length; i++) {
+    h = (h * 31 + str.charCodeAt(i)) | 0
+  }
+  return Math.abs(h)
 }
 
 // ───── Modal (mirrors LandingUseCases.modal — same copy shape & look) ─────
