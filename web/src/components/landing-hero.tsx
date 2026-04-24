@@ -155,11 +155,16 @@ const USE_CASES: UseCase[] = [
 ]
 
 
-const DEMO_CHIPS = [
-  { q: 'Nike Dunk Low Panda', emoji: '👟' },
-  { q: 'Carbone NY · Friday 8pm', emoji: '🍽' },
-  { q: 'Yosemite Upper Pines', emoji: '🏕' },
-  { q: 'SFO → Tokyo round trip', emoji: '✈️' },
+// Four example prompts that demo what the AI concierge can parse. Each
+// chip carries the full shape of a DemoResult so tapping it fills the
+// input + shows the simulated "Found by AI concierge" result card.
+type DemoResult = { emoji: string; q: string; price: string; site: string; action: string }
+
+const DEMO_CHIPS: DemoResult[] = [
+  { q: 'Nike Dunk Low Panda',     emoji: '👟', site: 'nike.com',           price: '$120',      action: '📉 Alert below $90' },
+  { q: 'Carbone NY · Friday 8pm', emoji: '🍽', site: 'resy.com',           price: '2 guests',  action: '🍽 Alert on openings' },
+  { q: 'Yosemite Upper Pines',    emoji: '🏕', site: 'recreation.gov',     price: 'Jun 14-16', action: '🏕 Alert on cancellation' },
+  { q: 'SFO → Tokyo round trip',  emoji: '✈️', site: 'google.com/flights', price: '$1,247',    action: '✈️ Alert on fare drop' },
 ]
 
 // ───── Main hero ─────
@@ -167,6 +172,9 @@ const DEMO_CHIPS = [
 export function LandingHero() {
   const [cardsReady, setCardsReady] = useState(false)
   const [modal, setModal] = useState<UseCase | null>(null)
+  const [demoInput, setDemoInput] = useState('')
+  const [demoLoading, setDemoLoading] = useState(false)
+  const [demoResult, setDemoResult] = useState<DemoResult | null>(null)
   const mouseRef = useRef({ x: 0, y: 0 })
   const closeBtnRef = useRef<HTMLButtonElement>(null)
   const triggerRef = useRef<HTMLElement | null>(null)
@@ -182,6 +190,28 @@ export function LandingHero() {
   const openModal = (uc: UseCase, trigger: EventTarget | null) => {
     triggerRef.current = trigger as HTMLElement | null
     setModal(uc)
+  }
+
+  // Demo bar — fills the input + shows a fake "AI found it" result
+  // card after a short spinner. Same behaviour as the original
+  // landing-client-page.tsx Hero().
+  const runDemo = (data: DemoResult) => {
+    setDemoResult(null)
+    setDemoLoading(true)
+    setDemoInput(data.q)
+    setTimeout(() => {
+      setDemoLoading(false)
+      setDemoResult(data)
+    }, 1400)
+  }
+
+  // Sensible fallback for a free-form input — grab the first matching
+  // chip or build a generic result if nothing matches.
+  const runFreeformDemo = () => {
+    const q = demoInput.trim()
+    if (!q) return
+    const match = DEMO_CHIPS.find((c) => c.q.toLowerCase().includes(q.toLowerCase()))
+    runDemo(match ?? { emoji: '✦', q, site: 'steward', price: 'AI detected', action: '📡 Start monitoring' })
   }
 
   // Focus management — mirrors LandingUseCases modal
@@ -415,38 +445,11 @@ export function LandingHero() {
             </a>
           </motion.div>
 
-          {/* Social proof */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.7, delay: 1.8 }}
-            style={{ marginTop: 28, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}
-          >
-            {['Free forever', 'No credit card', 'iOS & Web'].map((t, i) => (
-              <span key={t} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                {i > 0 && (
-                  <span
-                    style={{
-                      width: 3,
-                      height: 3,
-                      borderRadius: '50%',
-                      background: 'rgba(247,246,243,0.2)',
-                      display: 'inline-block',
-                    }}
-                  />
-                )}
-                <span style={{ fontSize: 12.5, color: 'rgba(247,246,243,0.35)', fontWeight: 300 }}>
-                  {t}
-                </span>
-              </span>
-            ))}
-          </motion.div>
-
-          {/* Demo bar */}
+          {/* Demo bar — functional AI-search simulation */}
           <motion.div
             initial={{ opacity: 0, y: 25 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 2, ease: [0.22, 1, 0.36, 1] }}
+            transition={{ duration: 0.8, delay: 1.9, ease: [0.22, 1, 0.36, 1] }}
             style={{ marginTop: 32, maxWidth: 460 }}
           >
             <div
@@ -461,6 +464,14 @@ export function LandingHero() {
               }}
             >
               <input
+                value={demoInput}
+                onChange={(e) => setDemoInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    runFreeformDemo()
+                  }
+                }}
                 placeholder="What do you want to track?"
                 aria-label="What do you want Steward to track?"
                 style={{
@@ -475,6 +486,7 @@ export function LandingHero() {
                 }}
               />
               <button
+                onClick={runFreeformDemo}
                 style={{
                   background: C.mint,
                   color: C.forest,
@@ -495,6 +507,7 @@ export function LandingHero() {
               {DEMO_CHIPS.map((chip) => (
                 <button
                   key={chip.q}
+                  onClick={() => runDemo(chip)}
                   style={{
                     background: 'rgba(110,231,183,0.06)',
                     border: '1px solid rgba(110,231,183,0.14)',
@@ -511,6 +524,133 @@ export function LandingHero() {
                 </button>
               ))}
             </div>
+
+            {/* Loading spinner */}
+            {demoLoading && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  marginTop: 14,
+                  fontSize: 12,
+                  color: 'rgba(110,231,183,0.7)',
+                }}
+              >
+                <span
+                  style={{
+                    width: 16,
+                    height: 16,
+                    borderRadius: '50%',
+                    border: '2px solid rgba(110,231,183,0.2)',
+                    borderTopColor: C.mint,
+                    animation: 'hiw-spin .8s linear infinite',
+                    display: 'inline-block',
+                  }}
+                />
+                Steward is searching...
+              </div>
+            )}
+
+            {/* Result card (appears after 1.4s "search") */}
+            {!demoLoading && demoResult && (
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+                style={{
+                  marginTop: 14,
+                  background:
+                    'linear-gradient(135deg, rgba(42,92,69,0.5), rgba(15,32,24,0.3))',
+                  border: '1px solid rgba(110,231,183,0.2)',
+                  borderRadius: 16,
+                  padding: 16,
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    marginBottom: 10,
+                  }}
+                >
+                  <span style={{ color: C.mint }}>✦</span>
+                  <span
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 600,
+                      letterSpacing: '0.08em',
+                      textTransform: 'uppercase',
+                      color: C.mint,
+                    }}
+                  >
+                    Found by AI concierge
+                  </span>
+                </div>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    marginBottom: 12,
+                  }}
+                >
+                  <span style={{ fontSize: 28 }}>{demoResult.emoji}</span>
+                  <div>
+                    <div
+                      style={{ fontSize: 14, fontWeight: 600, color: C.cream }}
+                    >
+                      {demoResult.q}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 11,
+                        color: 'rgba(247,246,243,0.4)',
+                      }}
+                    >
+                      {demoResult.price} · {demoResult.site}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  <a
+                    href="/signup"
+                    onClick={() =>
+                      track('signup_button_click', {
+                        location: `hero_demo_${demoResult.q}`,
+                      })
+                    }
+                    style={{
+                      fontSize: 11,
+                      padding: '6px 14px',
+                      borderRadius: 10,
+                      background: C.mint,
+                      color: C.forest,
+                      fontWeight: 700,
+                      textDecoration: 'none',
+                    }}
+                  >
+                    {demoResult.action}
+                  </a>
+                  <button
+                    onClick={() => setDemoResult(null)}
+                    style={{
+                      fontSize: 11,
+                      padding: '6px 14px',
+                      borderRadius: 10,
+                      background: 'rgba(255,255,255,0.04)',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      color: 'rgba(247,246,243,0.6)',
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    Change condition
+                  </button>
+                </div>
+              </motion.div>
+            )}
           </motion.div>
         </div>
 
