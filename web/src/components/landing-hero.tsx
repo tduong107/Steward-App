@@ -296,6 +296,34 @@ export function LandingHero() {
           .hero-float-card,
           .hero-dot-pulse { animation: none; }
         }
+
+        /* Desktop (>= 768px): show the absolute-positioned Spline +
+           floating cards, hide the mobile grid. */
+        .hero-stage-desktop { display: block; }
+        .hero-stage-mobile  { display: none; }
+
+        @media (max-width: 767px) {
+          /* Mobile: hide the Spline canvas and the absolute-positioned
+             cards layer entirely (both use .hero-stage-desktop). The
+             floating layout depends on a wide viewport; on phones the
+             cards would overlap the hero text and the Spline canvas
+             is a 380 KB download for a visual that doesn't fit. */
+          .hero-stage-desktop { display: none !important; }
+
+          /* Mobile: 2-column use-case grid below the demo bar. */
+          .hero-stage-mobile {
+            display: grid !important;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+          }
+
+          /* Cards are positioned absolute on desktop; reset for mobile. */
+          .hero-stage-mobile > * {
+            width: 100% !important;
+            position: static !important;
+            animation: none;
+          }
+        }
       `}</style>
 
       {/* Ambient gradient washes (mirror landing) */}
@@ -674,6 +702,25 @@ export function LandingHero() {
               </motion.div>
             )}
           </motion.div>
+
+          {/* ── Mobile card grid — 2×3 use cases below the demo bar.
+              Only visible < 768px; desktop hides this via CSS. The
+              Spline robot + absolute-positioned floating cards layer
+              above are display:none'd on the same breakpoint, since
+              the absolute-positioned layout can't fit on narrow
+              viewports and the robot is a 380 KB download that's a
+              rough trade on mobile networks anyway. */}
+          <div className="hero-stage-mobile" style={{ marginTop: 40 }}>
+            {USE_CASES.map((uc) => (
+              <UseCaseCard
+                key={uc.id}
+                useCase={uc}
+                ready={cardsReady}
+                isOpen={modal?.id === uc.id}
+                onClick={(e) => openModal(uc, e.currentTarget)}
+              />
+            ))}
+          </div>
         </div>
 
         {/* ── RIGHT: concierge stage ──
@@ -685,6 +732,7 @@ export function LandingHero() {
             viewport — clear of the hero-text column AND the 8 use case
             cards that now sit in the left-center gap. */}
         <div
+          className="hero-stage-desktop"
           style={{
             position: 'absolute',
             // Canvas widened from 65% → 85% (left:45 + right:-30) so the
@@ -760,8 +808,9 @@ export function LandingHero() {
 
         </div>
 
-        {/* ── Clickable use case cards layer ── */}
+        {/* ── Clickable use case cards layer (desktop) ── */}
         <div
+          className="hero-stage-desktop"
           style={{
             position: 'absolute',
             inset: 0,
