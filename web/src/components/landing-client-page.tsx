@@ -78,7 +78,7 @@ function Nav() {
       padding: scrolled ? '14px 48px' : '22px 48px',
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       background: scrolled ? 'rgba(8,10,8,0.92)' : 'rgba(8,10,8,0.7)',
-      backdropFilter: 'blur(24px) saturate(1.4)',
+      backdropFilter: 'blur(12px)',
       borderBottom: '1px solid rgba(110,231,183,0.06)',
       transition: 'all 0.4s',
       flexWrap: 'wrap' as const,

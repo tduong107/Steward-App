@@ -175,12 +175,8 @@ export function LandingHero() {
   const [demoInput, setDemoInput] = useState('')
   const [demoLoading, setDemoLoading] = useState(false)
   const [demoResult, setDemoResult] = useState<DemoResult | null>(null)
-  const mouseRef = useRef({ x: 0, y: 0 })
   const closeBtnRef = useRef<HTMLButtonElement>(null)
   const triggerRef = useRef<HTMLElement | null>(null)
-  const curRef = useRef({ x: 0, y: 0 })
-  const cardEls = useRef<Array<HTMLDivElement | null>>([])
-  const rafRef = useRef<number | null>(null)
 
   useEffect(() => {
     const t = setTimeout(() => setCardsReady(true), 250)
@@ -233,34 +229,12 @@ export function LandingHero() {
     return () => window.removeEventListener('keydown', onKey)
   }, [modal])
 
-  // Parallax loop — identical easing to landing-client-page.tsx
-  useEffect(() => {
-    const onMove = (e: MouseEvent) => {
-      mouseRef.current = {
-        x: (e.clientX / window.innerWidth - 0.5) * 2,
-        y: (e.clientY / window.innerHeight - 0.5) * 2,
-      }
-    }
-    document.addEventListener('mousemove', onMove)
-    const depths = USE_CASES.map((c) => c.depth)
-    const loop = () => {
-      curRef.current.x += (mouseRef.current.x - curRef.current.x) * 0.06
-      curRef.current.y += (mouseRef.current.y - curRef.current.y) * 0.06
-      cardEls.current.forEach((el, i) => {
-        if (!el) return
-        const d = depths[i] ?? 0.03
-        const tx = curRef.current.x * d * 600
-        const ty = curRef.current.y * d * 400
-        el.style.transform = `translate(${tx}px, ${ty}px)`
-      })
-      rafRef.current = requestAnimationFrame(loop)
-    }
-    loop()
-    return () => {
-      document.removeEventListener('mousemove', onMove)
-      if (rafRef.current) cancelAnimationFrame(rafRef.current)
-    }
-  }, [])
+  // Note: the mouse-parallax RAF loop that used to run here was
+  // removed for performance. It was mutating 6 DOM elements'
+  // `style.transform` every frame, competing with the Spline WebGL
+  // canvas for GPU/compositor time. The idle-float feeling is now
+  // handled by a pure CSS keyframe on each card (see <style> below),
+  // which runs on the compositor thread and doesn't touch JS.
 
   return (
     <section
@@ -276,6 +250,54 @@ export function LandingHero() {
         fontFamily: SANS,
       }}
     >
+      {/* Resource hints — React 19 hoists these to <head>. Preconnect
+          lets the browser open the TLS handshake to Spline's CDN in
+          parallel with the page render, and preload pre-fetches the
+          ~380 KB .splinecode binary so the robot pops in ~1-2s faster
+          on a cold load. */}
+      <link rel="preconnect" href="https://prod.spline.design" crossOrigin="anonymous" />
+      <link rel="dns-prefetch" href="https://prod.spline.design" />
+      <link
+        rel="preload"
+        as="fetch"
+        href={SPLINE_URL}
+        crossOrigin="anonymous"
+      />
+
+      {/* CSS animations for card float + dot pulse. Used to be
+          framer-motion infinite loops — see UseCaseCard comments for
+          the perf context. Using <style> inline so the keyframes ship
+          only when this component mounts. */}
+      <style>{`
+        @keyframes hero-card-float {
+          0%, 100% { transform: translateY(0); }
+          50%      { transform: translateY(-5px); }
+        }
+        .hero-float-card {
+          animation-name: hero-card-float;
+          animation-duration: var(--hero-float-dur, 4s);
+          animation-delay: var(--hero-float-delay, 0s);
+          animation-iteration-count: infinite;
+          animation-timing-function: ease-in-out;
+          will-change: transform;
+        }
+        @keyframes hero-dot-pulse {
+          0%, 100% { opacity: 0.45; transform: scale(1); }
+          50%      { opacity: 1;    transform: scale(1.15); }
+        }
+        .hero-dot-pulse {
+          animation-name: hero-dot-pulse;
+          animation-duration: 2s;
+          animation-delay: var(--hero-dot-delay, 0s);
+          animation-iteration-count: infinite;
+          animation-timing-function: ease-in-out;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .hero-float-card,
+          .hero-dot-pulse { animation: none; }
+        }
+      `}</style>
+
       {/* Ambient gradient washes (mirror landing) */}
       <div
         style={{
@@ -747,26 +769,37 @@ export function LandingHero() {
             pointerEvents: 'none',
           }}
         >
-          {USE_CASES.map((uc, i) => (
-            <div
-              key={uc.id}
-              ref={(el) => {
-                cardEls.current[i] = el
-              }}
-              style={{
-                position: 'absolute',
-                ...uc.style,
-                pointerEvents: 'none',
-              }}
-            >
-              <UseCaseCard
-                useCase={uc}
-                ready={cardsReady}
-                isOpen={modal?.id === uc.id}
-                onClick={(e) => openModal(uc, e.currentTarget)}
-              />
-            </div>
-          ))}
+          {USE_CASES.map((uc) => {
+            // Per-card CSS-animation timing, seeded from the id so
+            // hot-reloads keep rhythm but cards don't pulse in lockstep.
+            const hash = hashCode(uc.id)
+            const floatDur = 3.2 + (hash % 200) / 100 // 3.2–5.2s
+            const floatDelay = (hash % 1200) / 1000 // 0–1.2s
+            const dotDelay = (hash % 800) / 1000 // 0–0.8s
+            return (
+              <div
+                key={uc.id}
+                className="hero-float-card"
+                style={
+                  {
+                    position: 'absolute',
+                    ...uc.style,
+                    pointerEvents: 'none',
+                    '--hero-float-dur': `${floatDur}s`,
+                    '--hero-float-delay': `${floatDelay}s`,
+                    '--hero-dot-delay': `${dotDelay}s`,
+                  } as React.CSSProperties
+                }
+              >
+                <UseCaseCard
+                  useCase={uc}
+                  ready={cardsReady}
+                  isOpen={modal?.id === uc.id}
+                  onClick={(e) => openModal(uc, e.currentTarget)}
+                />
+              </div>
+            )
+          })}
         </div>
       </div>
 
@@ -840,57 +873,40 @@ function UseCaseCard({
   isOpen: boolean
   onClick: (e: React.MouseEvent<HTMLButtonElement>) => void
 }) {
-  // Each card floats on its own phase — deterministic per id so hot
-  // reloads keep the rhythm, but varied enough to look organic.
-  const hash = hashCode(useCase.id)
-  const floatDur = 3.2 + (hash % 200) / 100 // 3.2-5.2s
-  const floatAmp = 3 + (hash % 30) / 10 // 3-6px
-  const floatDelay = (hash % 1200) / 1000 // 0-1.2s
-
+  // Idle floating is handled by the `.hero-float-card` CSS animation on
+  // the parent wrapper. This component only drives entrance (one-shot),
+  // hover, and tap — so framer-motion's frame-scheduler is only busy
+  // during explicit user interaction, not on every tick.
   return (
     <motion.button
       type="button"
       onClick={onClick}
       aria-label={`Learn more about ${useCase.title}`}
       initial={{ opacity: 0, y: 14, scale: 0.94 }}
-      animate={
-        ready
-          ? {
-              opacity: 1,
-              y: [0, -floatAmp, 0],
-              scale: 1,
-            }
-          : { opacity: 0, y: 14, scale: 0.94 }
-      }
-      transition={
-        ready
-          ? {
-              opacity: { duration: 0.55, delay: useCase.delay / 1000 },
-              scale: { duration: 0.55, delay: useCase.delay / 1000 },
-              y: {
-                duration: floatDur,
-                delay: useCase.delay / 1000 + floatDelay,
-                repeat: Infinity,
-                ease: 'easeInOut',
-              },
-            }
-          : { duration: 0.4 }
-      }
-      whileHover={{ scale: 1.08, y: -8, transition: { duration: 0.25 } }}
+      animate={ready ? { opacity: 1, y: 0, scale: 1 } : { opacity: 0, y: 14, scale: 0.94 }}
+      transition={{
+        duration: 0.55,
+        delay: ready ? useCase.delay / 1000 : 0,
+        ease: [0.22, 1, 0.36, 1],
+      }}
+      whileHover={{ scale: 1.06, y: -6, transition: { duration: 0.2 } }}
       whileTap={{ scale: 0.97 }}
       style={{
         position: 'relative',
         width: '100%',
         padding: '14px',
+        // Fully opaque gradient replaces the previous 82%-alpha + 18px
+        // backdrop-filter blur — blurring a moving element was forcing
+        // the compositor to re-paint behind each card every frame, the
+        // single biggest GPU hit in the hero. Solid bg preserves the
+        // same look without GPU tax.
         background: isOpen
-          ? 'linear-gradient(135deg, rgba(42,92,69,0.9), rgba(28,61,46,0.55))'
-          : 'linear-gradient(135deg, rgba(18,38,28,0.82), rgba(10,18,14,0.82))',
+          ? 'linear-gradient(135deg, #1F3A2B, #132219)'
+          : 'linear-gradient(135deg, #142A1F, #0A120E)',
         border: isOpen
           ? '1px solid rgba(110,231,183,0.55)'
           : '1px solid rgba(110,231,183,0.18)',
         borderRadius: 16,
-        backdropFilter: 'blur(18px)',
-        WebkitBackdropFilter: 'blur(18px)',
         boxShadow: isOpen
           ? '0 0 0 4px rgba(110,231,183,0.18), 0 14px 36px rgba(0,0,0,0.45)'
           : '0 10px 30px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04)',
@@ -901,13 +917,15 @@ function UseCaseCard({
         pointerEvents: 'auto',
         overflow: 'hidden',
         transition: 'border-color 0.3s, background 0.3s, box-shadow 0.3s',
+        willChange: 'transform',
       }}
     >
-      {/* Live mint dot top-right */}
-      <motion.span
+      {/* Live mint dot top-right — CSS @keyframes (see <style> above);
+          framer-motion was running 6 parallel infinite opacity/scale
+          animations here, one per card, which was pure overhead. */}
+      <span
         aria-hidden="true"
-        animate={{ opacity: [0.45, 1, 0.45], scale: [1, 1.15, 1] }}
-        transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+        className="hero-dot-pulse"
         style={{
           position: 'absolute',
           top: 10,
