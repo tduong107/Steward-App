@@ -297,31 +297,29 @@ export function LandingHero() {
           .hero-dot-pulse { animation: none; }
         }
 
-        /* Desktop (>= 768px): show the absolute-positioned Spline +
-           floating cards, hide the mobile grid. */
+        /* Desktop (>= 768px): show the Spline canvas + absolute
+           floating cards. */
         .hero-stage-desktop { display: block; }
-        .hero-stage-mobile  { display: none; }
 
         @media (max-width: 767px) {
           /* Mobile: hide the Spline canvas and the absolute-positioned
-             cards layer entirely (both use .hero-stage-desktop). The
-             floating layout depends on a wide viewport; on phones the
-             cards would overlap the hero text and the Spline canvas
-             is a 380 KB download for a visual that doesn't fit. */
+             cards layer entirely. Desktop had hero-text column + robot
+             + cards in a wide flex row; mobile collapses to just the
+             hero copy column. */
           .hero-stage-desktop { display: none !important; }
 
-          /* Mobile: 2-column use-case grid below the demo bar. */
-          .hero-stage-mobile {
-            display: grid !important;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
+          /* Scene container: tighten padding so the 560-max column
+             isn't fighting 40px gutters on a 375px screen. */
+          .hero-scene-container {
+            padding: 40px 20px !important;
+            min-height: auto !important;
           }
 
-          /* Cards are positioned absolute on desktop; reset for mobile. */
-          .hero-stage-mobile > * {
-            width: 100% !important;
-            position: static !important;
-            animation: none;
+          /* Hero text column: let it shrink to fit the viewport. The
+             desktop flexShrink:0 was clipping the headline off the
+             right edge on narrow widths. */
+          .hero-text-column {
+            max-width: 100% !important;
           }
         }
       `}</style>
@@ -353,6 +351,7 @@ export function LandingHero() {
 
       {/* Scene container */}
       <div
+        className="hero-scene-container"
         style={{
           position: 'relative',
           zIndex: 2,
@@ -365,7 +364,15 @@ export function LandingHero() {
         }}
       >
         {/* ── LEFT: hero copy ── */}
-        <div style={{ position: 'relative', zIndex: 10, maxWidth: 560, flexShrink: 0 }}>
+        <div
+          className="hero-text-column"
+          style={{
+            position: 'relative',
+            zIndex: 10,
+            width: '100%',
+            maxWidth: 560,
+          }}
+        >
           {/* Eyebrow */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -702,25 +709,6 @@ export function LandingHero() {
               </motion.div>
             )}
           </motion.div>
-
-          {/* ── Mobile card grid — 2×3 use cases below the demo bar.
-              Only visible < 768px; desktop hides this via CSS. The
-              Spline robot + absolute-positioned floating cards layer
-              above are display:none'd on the same breakpoint, since
-              the absolute-positioned layout can't fit on narrow
-              viewports and the robot is a 380 KB download that's a
-              rough trade on mobile networks anyway. */}
-          <div className="hero-stage-mobile" style={{ marginTop: 40 }}>
-            {USE_CASES.map((uc) => (
-              <UseCaseCard
-                key={uc.id}
-                useCase={uc}
-                ready={cardsReady}
-                isOpen={modal?.id === uc.id}
-                onClick={(e) => openModal(uc, e.currentTarget)}
-              />
-            ))}
-          </div>
         </div>
 
         {/* ── RIGHT: concierge stage ──
