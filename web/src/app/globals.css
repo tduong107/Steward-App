@@ -1,7 +1,15 @@
 @import "tailwindcss";
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
-@import "tw-animate-css";
-@import "shadcn/tailwind.css";
+
+/* NOTE: `@import "tw-animate-css"` and `@import "shadcn/tailwind.css"` were
+   previously here but were never paired with their npm packages in the
+   committed package.json — they came from a stray shadcn-CLI run that
+   landed in the uncommitted WIP. Vercel's clean install couldn't resolve
+   either package, which broke 5 deploys in a row (commits b86c83d → c5e7bd0).
+   Both imports are dead weight: the `fade-in-up` and `slide-in-right`
+   keyframes that page code actually uses are defined inline below, and
+   the shadcn token mappings live in the `@theme inline` block at the end
+   of this file. Removed permanently. */
 
 @custom-variant dark (&:is(.dark *));
 
