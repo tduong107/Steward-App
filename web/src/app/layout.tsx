@@ -6,6 +6,10 @@ import { AuthProvider } from '@/providers/auth-provider'
 import { SubscriptionProvider } from '@/providers/subscription-provider'
 import { ThemeProvider } from '@/providers/theme-provider'
 import { PostHogProvider } from '@/providers/posthog-provider'
+import { Geist } from "next/font/google";
+import { cn } from "@/lib/utils";
+
+const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 export const viewport = {
   width: 'device-width',
@@ -129,7 +133,7 @@ const jsonLd = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className={cn("font-sans", geist.variable)}>
       <head>
         <script
           type="application/ld+json"

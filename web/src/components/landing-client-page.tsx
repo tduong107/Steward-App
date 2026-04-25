@@ -9,7 +9,6 @@ import { LandingUseCases } from '@/components/landing-use-cases'
 import { CursorSpotlight } from '@/components/landing-fx/cursor-spotlight'
 import { GlobalBg } from '@/components/landing-fx/global-bg'
 import { EyebrowPill } from '@/components/landing-fx/eyebrow-pill'
-import { SectionMarks } from '@/components/landing-fx/section-marks'
 import { Magnetic } from '@/components/landing-fx/magnetic'
 import { Bento } from '@/components/landing-fx/bento'
 import { LivePrice } from '@/components/landing-fx/live-price'
@@ -229,7 +228,6 @@ function PriceFeature() {
         overflow: 'hidden',
       }}
     >
-      <SectionMarks index={2} topic="Feature" right="Price drops" />
 
       {/* Local aurora blobs scoped to this section — sit beneath the
           grid in <GlobalBg /> for extra depth in the dark band. */}
@@ -727,7 +725,6 @@ function AIFeature() {
         overflow: 'hidden',
       }}
     >
-      <SectionMarks index={3} topic="AI Concierge" right="Chat · screenshot · share" />
 
       {/* Soft vertical band so this section reads distinct from S/02
           while staying in the same dark palette. The aurora blob below
@@ -1181,7 +1178,6 @@ function PlatformShowcase() {
 
   return (
     <section id="platforms" ref={sectionRef} style={{ padding: 'clamp(80px,12vh,140px) clamp(24px,8vw,60px)', background: S.bg, position: 'relative', overflow: 'hidden' }}>
-      <SectionMarks index={6} topic="Platform" right="iOS · web · synced" />
       {/* Bg glow */}
       <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 900px 700px at 50% 45%,rgba(42,92,69,0.35) 0%,transparent 60%)' }} />
 
@@ -1478,7 +1474,6 @@ function Pricing() {
 
   return (
     <section id="pricing" style={{ padding: 'clamp(60px,10vh,120px) clamp(24px,8vw,60px)', background: S.bg, position: 'relative' }}>
-      <SectionMarks index={7} topic="Pricing" right="3 tiers · pay yearly" />
       <div className="landing-reveal" style={{ textAlign: 'center', maxWidth: 600, margin: '0 auto 40px' }}>
         <div style={{ marginBottom: 16 }}><EyebrowPill>Pricing</EyebrowPill></div>
         <h2 style={{ fontFamily: S.serif, fontSize: 'clamp(44px,6vw,88px)', fontWeight: 700, lineHeight: 0.96, letterSpacing: '-0.035em', color: S.cream, margin: 0, marginBottom: 16 }}>
@@ -1614,7 +1609,6 @@ function FAQ() {
 
   return (
     <section id="faq" style={{ padding: 'clamp(60px,10vh,120px) clamp(24px,8vw,60px)', background: S.bg, position: 'relative' }}>
-      <SectionMarks index={8} topic="FAQ" right="7 answers" />
       <div className="landing-reveal" style={{ maxWidth: 720, margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: 48 }}>
           <div style={{ marginBottom: 16 }}><EyebrowPill>FAQ</EyebrowPill></div>
@@ -1664,7 +1658,6 @@ function FAQ() {
 function FinalCTA() {
   return (
     <section className="landing-reveal" style={{ padding: 'clamp(60px,10vh,120px) clamp(24px,8vw,60px)', textAlign: 'center', position: 'relative', overflow: 'hidden', background: S.bg }}>
-      <SectionMarks index={9} topic="Final CTA" right="free · 30 seconds" />
       <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 600px 400px at 50% 50%,rgba(42,92,69,0.35) 0%,transparent 70%)' }} />
       <div style={{ position: 'relative', zIndex: 1 }}>
         <div style={{ marginBottom: 16 }}><EyebrowPill>Your concierge is ready</EyebrowPill></div>

@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { EyebrowPill } from '@/components/landing-fx/eyebrow-pill'
-import { SectionMarks } from '@/components/landing-fx/section-marks'
 
 type Detail = {
   emoji: string
@@ -113,7 +112,6 @@ export function LandingUseCases() {
 
   return (
     <section id="why-steward" style={{ padding: 'clamp(60px,10vh,120px) clamp(24px,8vw,60px)', background: '#080A08', position: 'relative' }}>
-      <SectionMarks index={5} topic="Why Steward" right="6 verticals · 2 rails" />
       {/* Header */}
       <div className="landing-reveal" style={{ textAlign: 'center', maxWidth: 600, margin: '0 auto clamp(40px,7vh,72px)' }}>
         <div style={{ marginBottom: 16 }}><EyebrowPill>Why Steward</EyebrowPill></div>

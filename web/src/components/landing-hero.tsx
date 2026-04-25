@@ -7,7 +7,6 @@ import { SplineScene } from '@/components/ui/splite'
 import { Spotlight } from '@/components/ui/spotlight'
 import { EyebrowPill } from '@/components/landing-fx/eyebrow-pill'
 import { Magnetic } from '@/components/landing-fx/magnetic'
-import { SectionMarks } from '@/components/landing-fx/section-marks'
 
 // Brand tokens — mirror the S object in landing-client-page.tsx so the
 // hero reads as a true extension of the rest of the landing.
@@ -256,9 +255,6 @@ export function LandingHero() {
         fontFamily: SANS,
       }}
     >
-      {/* Huly-style corner marks. Numbered as section 01. */}
-      <SectionMarks index={1} topic="Hero" right="3 steps · ≈ 12 seconds" />
-
       {/* Resource hints — React 19 hoists these to <head>. Preconnect
           lets the browser open the TLS handshake to Spline's CDN in
           parallel with the page render, and preload pre-fetches the
@@ -393,17 +389,19 @@ export function LandingHero() {
             <EyebrowPill icon="✦">Now on the App Store &amp; Web</EyebrowPill>
           </motion.div>
 
-          {/* Headline — word reveal. Scale + spacing match the spec
-              (clamp 52→128, line-height 0.96, letter-spacing -0.035em). */}
+          {/* Headline — word reveal. The 8.5vw / 128px max from the
+              first concierge spec was wrapping each word onto its own
+              line on common viewports and pushing the eyebrow off the
+              top. Dialed back to a saner 92px max with 6vw scaling. */}
           <h1
             style={{
               fontFamily: SERIF,
-              lineHeight: 0.96,
-              letterSpacing: '-0.035em',
+              lineHeight: 0.98,
+              letterSpacing: '-0.03em',
               color: 'var(--ink, #fff)',
               margin: 0,
               marginBottom: 24,
-              fontSize: 'clamp(52px, 8.5vw, 128px)',
+              fontSize: 'clamp(40px, 6vw, 88px)',
               fontWeight: 700,
             }}
           >

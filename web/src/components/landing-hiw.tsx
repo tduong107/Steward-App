@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { EyebrowPill } from '@/components/landing-fx/eyebrow-pill'
-import { SectionMarks } from '@/components/landing-fx/section-marks'
 
 // ── data ─────────────────────────────────────────────────────────────────────
 const STEPS = [
@@ -335,7 +334,6 @@ export function LandingHIW() {
 
   return (
     <section ref={sectionRef} id="how-it-works" style={{ position: 'relative', background: 'linear-gradient(180deg,#080A08 0%,rgba(15,32,24,0.15) 30%,rgba(15,32,24,0.15) 70%,#080A08 100%)' }}>
-      <SectionMarks index={4} topic="How it works" right="3 steps · ≈ 30 seconds" />
       {/* Header */}
       <div className="hiw-header landing-reveal">
         <div style={{ marginBottom: 16 }}><EyebrowPill>How it works</EyebrowPill></div>
