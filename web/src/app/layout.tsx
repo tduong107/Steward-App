@@ -9,7 +9,14 @@ import { PostHogProvider } from '@/providers/posthog-provider'
 import { Geist } from "next/font/google";
 import { cn } from "@/lib/utils";
 
-const geist = Geist({subsets:['latin'],variable:'--font-sans'});
+// PERF: `preload: false` so the Geist font binary isn't fetched eagerly
+// on every page. The landing page renders body copy in Inter (system
+// fallback chain) and headings in Georgia — Geist is only used by
+// shadcn-themed app pages (/home/*). When a user hits those pages the
+// font fetches on demand; the small flash of system-ui is acceptable.
+// `display: 'swap'` (next/font default) also ensures the font swap
+// doesn't block first paint anywhere it IS loaded.
+const geist = Geist({ subsets: ['latin'], variable: '--font-sans', preload: false });
 
 export const viewport = {
   width: 'device-width',

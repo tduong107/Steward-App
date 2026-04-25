@@ -1,7 +1,10 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+// framer-motion fully removed from this file (Phase 8). All entrance
+// animations now run as CSS keyframes (.hero-rise, .use-case-card,
+// .modal-fade-in, .modal-pop-in) — no JS scheduler involvement on the
+// hero, ~50KB drop from the bundle.
 import { track } from '@vercel/analytics'
 import { SplineScene } from '@/components/ui/splite'
 import { Spotlight } from '@/components/ui/spotlight'
@@ -254,18 +257,15 @@ export function LandingHero() {
       }}
     >
       {/* Resource hints — React 19 hoists these to <head>. Preconnect
-          lets the browser open the TLS handshake to Spline's CDN in
-          parallel with the page render, and preload pre-fetches the
-          ~380 KB .splinecode binary so the robot pops in ~1-2s faster
-          on a cold load. */}
+          opens the TLS handshake to Spline's CDN in parallel with the
+          rest of the page render so when SplineScene actually fetches
+          the binary later, the connection is warm. PERF: dropped the
+          `<link rel="preload" as="fetch">` for the .splinecode binary
+          itself — it was forcing the 380 KB blob into the critical-
+          path waterfall, competing with the main JS bundle. The
+          deferred SplineScene mount fetches it post-idle instead. */}
       <link rel="preconnect" href="https://prod.spline.design" crossOrigin="anonymous" />
       <link rel="dns-prefetch" href="https://prod.spline.design" />
-      <link
-        rel="preload"
-        as="fetch"
-        href={SPLINE_URL}
-        crossOrigin="anonymous"
-      />
 
       {/* CSS animations for card float + dot pulse. Used to be
           framer-motion infinite loops — see UseCaseCard comments for
@@ -817,17 +817,22 @@ export function LandingHero() {
         </div>
       </div>
 
-      {/* Use-case detail modal — opened when a floating card is clicked */}
-      <AnimatePresence>
-        {modal && (
-          <UseCaseModal
-            key={modal.id}
-            useCase={modal}
-            onClose={() => setModal(null)}
-            closeRef={closeBtnRef}
-          />
-        )}
-      </AnimatePresence>
+      {/* Use-case detail modal — opened when a floating card is clicked.
+          PERF: was wrapped in <AnimatePresence> with `motion.div` for
+          backdrop + content (Phase 7). Now plain conditional render +
+          CSS keyframes for entrance. AnimatePresence is the only
+          remaining framer-motion consumer in this file, so removing
+          it lets us drop the dep entirely from the hero bundle.
+          Trade-off: no exit animation (modal disappears instantly when
+          user closes), which is fine for a click-dismiss interaction. */}
+      {modal && (
+        <UseCaseModal
+          key={modal.id}
+          useCase={modal}
+          onClose={() => setModal(null)}
+          closeRef={closeBtnRef}
+        />
+      )}
     </section>
   )
 }
@@ -1022,24 +1027,22 @@ function UseCaseModal({
   onClose: () => void
   closeRef: React.RefObject<HTMLButtonElement | null>
 }) {
+  // PERF: was framer-motion `motion.div` with `initial`/`animate`/
+  // `exit` for both backdrop and content. Now plain divs with the
+  // shared `.modal-fade-in` and `.modal-pop-in` CSS keyframes
+  // (see globals.css). Removing this lets the hero drop framer-motion
+  // entirely from its bundle (~50KB minified gz).
   return (
-    <motion.div
+    <div
+      className="modal-fade-in"
       role="dialog"
       aria-modal="true"
       aria-label={`${useCase.title} details`}
       onClick={onClose}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.25 }}
       style={{
         position: 'fixed',
         inset: 0,
         zIndex: 200,
-        // PERF: dropped backdrop-filter blur(8px) — full-viewport
-        // backdrop blur on a fixed overlay forces the compositor
-        // to re-blur every frame the modal is open. Bumped overlay
-        // opacity 0.7 → 0.82 to keep the same depth feel.
         background: 'rgba(0,0,0,0.82)',
         display: 'flex',
         alignItems: 'center',
@@ -1047,12 +1050,9 @@ function UseCaseModal({
         padding: 20,
       }}
     >
-      <motion.div
+      <div
+        className="modal-pop-in"
         onClick={(e) => e.stopPropagation()}
-        initial={{ opacity: 0, y: 24, scale: 0.96 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: 12, scale: 0.97 }}
-        transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
         style={{
           background: C.forest,
           border: '1px solid rgba(110,231,183,0.2)',
@@ -1167,7 +1167,7 @@ function UseCaseModal({
         >
           Try it free →
         </a>
-      </motion.div>
-    </motion.div>
+      </div>
+    </div>
   )
 }

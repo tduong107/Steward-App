@@ -1,23 +1,29 @@
 'use client'
 
 /**
- * SplineScene — wraps @splinetool/react-spline with two perf wins:
+ * SplineScene — wraps @splinetool/react-spline with three perf wins:
  *
- * 1. Lazy-loaded via dynamic import + Suspense fallback (so the
- *    ~600 KB Spline runtime never lands in the initial bundle).
+ * 1. **Deferred mount** (Phase 8): the Spline runtime + the ~380 KB
+ *    .splinecode binary are NOT fetched on initial render. We wait
+ *    until the browser reports idle time (or 1500ms post-mount,
+ *    whichever fires first) before flipping `shouldMount` to true.
+ *    During the wait, a CSS-only mint glow placeholder fills the
+ *    canvas region so the layout doesn't shift when Spline arrives.
+ *    This means hero TTI is no longer competing with Spline init.
  *
- * 2. IntersectionObserver pauses the 3D render loop when the canvas
- *    scrolls out of view. Spline normally drives a continuous 60fps
- *    rAF loop even when the canvas is below the fold, which on the
- *    landing page meant the GPU was busy painting an off-screen
- *    robot while the user was reading the pricing table further
- *    down. We capture the Spline `Application` instance from
- *    onLoad and call `.stop()` / `.play()` based on visibility.
+ * 2. Lazy-loaded via dynamic `import('@splinetool/react-spline')`
+ *    (so the runtime never lands in the initial JS bundle even
+ *    after `shouldMount` flips).
  *
- * Reduced-motion preference fully halts playback after the initial
- * load (the scene still renders one frame, then freezes).
+ * 3. IntersectionObserver pauses the 3D render loop when the canvas
+ *    scrolls out of view — capturing the Spline `Application` instance
+ *    via onLoad and calling `.stop()` / `.play()` based on visibility.
+ *
+ * Reduced-motion: skips deferred mount entirely (Spline never loads;
+ * the placeholder remains as the final visual). Saves the runtime
+ * cost completely for users who opted out of motion.
  */
-import { Suspense, lazy, useEffect, useRef } from 'react'
+import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 const Spline = lazy(() => import('@splinetool/react-spline'))
 
 // Minimal type for the bits of the Spline Application we touch — the
@@ -33,21 +39,65 @@ interface SplineSceneProps {
   className?: string
 }
 
+// Idle-time fallback in milliseconds. If `requestIdleCallback` isn't
+// available (Safari ≤ 17.5 doesn't ship it natively), or if the
+// browser never reports idle time within this budget, we mount
+// anyway so the user eventually sees the scene.
+const IDLE_FALLBACK_MS = 1500
+
 export function SplineScene({ scene, className }: SplineSceneProps) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const appRef = useRef<SplineApp | null>(null)
   const visibleRef = useRef<boolean>(true)
+  const [shouldMount, setShouldMount] = useState(false)
 
-  // Hook up IntersectionObserver once the wrapper mounts. We can't
-  // know when Spline has loaded ahead of time, so the observer
-  // tracks visibility immediately and onLoad consults `visibleRef`
-  // before deciding whether to play or stop.
+  // PERF: schedule the Spline mount for the first idle slot the
+  // browser hands us, with a 1.5s ceiling. This means hero animations
+  // and content can paint + become interactive before we start the
+  // GPU/network work to load the 3D scene.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    // Honor reduced-motion: skip Spline entirely. The placeholder
+    // remains as the visual.
+    const reduced = window.matchMedia(
+      '(prefers-reduced-motion: reduce)',
+    ).matches
+    if (reduced) return
+
+    let timeoutId = 0
+    let idleId = 0
+
+    const fire = () => setShouldMount(true)
+
+    type IdleWindow = Window & {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number
+      cancelIdleCallback?: (id: number) => void
+    }
+    const w = window as IdleWindow
+
+    if (typeof w.requestIdleCallback === 'function') {
+      idleId = w.requestIdleCallback(fire, { timeout: IDLE_FALLBACK_MS })
+    } else {
+      timeoutId = window.setTimeout(fire, IDLE_FALLBACK_MS)
+    }
+
+    return () => {
+      if (idleId && typeof w.cancelIdleCallback === 'function') {
+        w.cancelIdleCallback(idleId)
+      }
+      if (timeoutId) window.clearTimeout(timeoutId)
+    }
+  }, [])
+
+  // IntersectionObserver runs as soon as the wrapper mounts, even if
+  // Spline isn't loaded yet. Once Spline loads, onLoad consults
+  // visibleRef to decide whether to play or stop immediately.
   useEffect(() => {
     const node = wrapRef.current
     if (!node) return
     if (typeof window === 'undefined') return
 
-    // Honor prefers-reduced-motion: never run the render loop.
     const reduced = window.matchMedia(
       '(prefers-reduced-motion: reduce)',
     ).matches
@@ -88,20 +138,39 @@ export function SplineScene({ scene, className }: SplineSceneProps) {
   }
 
   return (
-    <div ref={wrapRef} className={className} style={{ width: '100%', height: '100%' }}>
-      <Suspense
-        fallback={
-          <div className="w-full h-full flex items-center justify-center">
-            <span className="loader"></span>
-          </div>
-        }
-      >
-        <Spline
-          scene={scene}
-          className={className}
-          onLoad={handleLoad}
-        />
-      </Suspense>
+    <div
+      ref={wrapRef}
+      className={className}
+      style={{ width: '100%', height: '100%', position: 'relative' }}
+    >
+      {/* CSS-only placeholder: a soft mint radial glow that matches
+          the Spline scene's lighting silhouette. Sits in the same
+          layout box so there's no shift when Spline mounts on top of
+          it. Fades out via CSS once Spline takes over the canvas
+          (via the `data-spline-loaded` attribute). */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background:
+            'radial-gradient(ellipse 50% 60% at 50% 55%, rgba(110,231,183,0.18), rgba(110,231,183,0.04) 50%, transparent 75%)',
+          opacity: shouldMount ? 0 : 1,
+          transition: 'opacity 0.6s ease',
+          pointerEvents: 'none',
+        }}
+      />
+      {shouldMount && (
+        <Suspense
+          fallback={
+            <div className="w-full h-full flex items-center justify-center">
+              <span className="loader"></span>
+            </div>
+          }
+        >
+          <Spline scene={scene} className={className} onLoad={handleLoad} />
+        </Suspense>
+      )}
     </div>
   )
 }

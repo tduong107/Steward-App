@@ -495,6 +495,29 @@ body {
   .use-case-card:active { transform: none; }
 }
 
+/* Modal entrance — replaces framer-motion's AnimatePresence +
+   motion.div initial/animate. We don't preserve the exit animation
+   (modal disappears instantly on close), which is fine for click-
+   dismiss UX and saves the entire framer-motion dep on the hero. */
+@keyframes modal-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes modal-pop-in {
+  from { opacity: 0; transform: translateY(24px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.modal-fade-in {
+  animation: modal-fade-in 0.25s ease both;
+}
+.modal-pop-in {
+  animation: modal-pop-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .modal-fade-in,
+  .modal-pop-in { animation: none; opacity: 1; transform: none; }
+}
+
 @keyframes wordReveal {
   to { opacity: 1; transform: translateY(0) rotateX(0deg); }
 }
