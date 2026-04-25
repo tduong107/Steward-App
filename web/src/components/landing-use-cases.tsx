@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { EyebrowPill } from '@/components/landing-fx/eyebrow-pill'
+import { SectionMarks } from '@/components/landing-fx/section-marks'
 
 type Detail = {
   emoji: string
@@ -110,12 +112,13 @@ export function LandingUseCases() {
   const visible = CARDS.filter((c) => filter === 'all' || c.cat === filter)
 
   return (
-    <section id="why-steward" style={{ padding: 'clamp(60px,10vh,120px) clamp(24px,8vw,60px)', background: '#080A08' }}>
+    <section id="why-steward" style={{ padding: 'clamp(60px,10vh,120px) clamp(24px,8vw,60px)', background: '#080A08', position: 'relative' }}>
+      <SectionMarks index={5} topic="Why Steward" right="6 verticals · 2 rails" />
       {/* Header */}
       <div className="landing-reveal" style={{ textAlign: 'center', maxWidth: 600, margin: '0 auto clamp(40px,7vh,72px)' }}>
-        <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#6EE7B7', opacity: 0.7, marginBottom: 16 }}>Why Steward</div>
-        <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(36px,5vw,48px)', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-0.03em', color: '#F7F6F3', margin: 0, marginBottom: 16 }}>
-          One app, endless<br />ways to <em style={{ fontStyle: 'italic', color: '#6EE7B7' }}>save</em>
+        <div style={{ marginBottom: 16 }}><EyebrowPill>Why Steward</EyebrowPill></div>
+        <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(44px,6vw,88px)', fontWeight: 700, lineHeight: 0.96, letterSpacing: '-0.035em', color: '#F7F6F3', margin: 0, marginBottom: 16 }}>
+          One app, endless<br />ways to <em className="italic-accent">save</em>
         </h2>
       </div>
 

@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { EyebrowPill } from '@/components/landing-fx/eyebrow-pill'
+import { SectionMarks } from '@/components/landing-fx/section-marks'
 
 // ── data ─────────────────────────────────────────────────────────────────────
 const STEPS = [
@@ -333,11 +335,12 @@ export function LandingHIW() {
 
   return (
     <section ref={sectionRef} id="how-it-works" style={{ position: 'relative', background: 'linear-gradient(180deg,#080A08 0%,rgba(15,32,24,0.15) 30%,rgba(15,32,24,0.15) 70%,#080A08 100%)' }}>
+      <SectionMarks index={4} topic="How it works" right="3 steps · ≈ 30 seconds" />
       {/* Header */}
       <div className="hiw-header landing-reveal">
-        <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#6EE7B7', opacity: 0.7, marginBottom: 16 }}>How it works</div>
-        <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(32px,5vw,48px)', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-0.03em', color: '#F7F6F3', margin: 0, marginBottom: 16 }}>
-          Effortless savings<br />in <em style={{ fontStyle: 'italic', color: '#6EE7B7' }}>three steps</em>
+        <div style={{ marginBottom: 16 }}><EyebrowPill>How it works</EyebrowPill></div>
+        <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(44px,6vw,88px)', fontWeight: 700, lineHeight: 0.96, letterSpacing: '-0.035em', color: '#F7F6F3', margin: 0, marginBottom: 16 }}>
+          Effortless savings<br />in <em className="italic-accent">three steps</em>
         </h2>
         <div style={{ fontSize: 16, lineHeight: 1.6, color: 'rgba(247,246,243,0.5)', fontWeight: 300 }}>Set up in 30 seconds. Here&apos;s how.</div>
       </div>

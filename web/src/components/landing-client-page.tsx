@@ -8,6 +8,9 @@ import { LandingHIW } from '@/components/landing-hiw'
 import { LandingUseCases } from '@/components/landing-use-cases'
 import { CursorSpotlight } from '@/components/landing-fx/cursor-spotlight'
 import { GlobalBg } from '@/components/landing-fx/global-bg'
+import { EyebrowPill } from '@/components/landing-fx/eyebrow-pill'
+import { SectionMarks } from '@/components/landing-fx/section-marks'
+import { Magnetic } from '@/components/landing-fx/magnetic'
 
 // ── Logo ─────────────────────────────────────────────────────────────────────
 function Logo() {
@@ -219,11 +222,12 @@ function PriceFeature() {
   }, [animated])
 
   return (
-    <section style={{ padding: 'clamp(60px,10vh,120px) clamp(24px,8vw,60px)', background: S.bg }}>
+    <section style={{ padding: 'clamp(60px,10vh,120px) clamp(24px,8vw,60px)', background: S.bg, position: 'relative' }}>
+      <SectionMarks index={2} topic="Price Drops" right="1 retailer · live" />
       <div className="lnd-feature-grid" style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 80, alignItems: 'center' }}>
         <div className="landing-reveal">
           <Pill icon="📉" label="Price Drops" />
-          <FeatTitle>Your target<br />price <em>Achieved</em></FeatTitle>
+          <FeatTitle>Your target<br />price <em className="italic-accent">Achieved</em></FeatTitle>
           <FeatBody>Works across Amazon, Nike, Best Buy, Target, Walmart, and thousands of other retailers. Steward monitors 24/7 and pings you the moment your target hits, with fake deal detection so you never get played by artificially inflated prices.</FeatBody>
           <FeatLink href="/signup">Start tracking prices →</FeatLink>
         </div>
@@ -274,7 +278,8 @@ function AIFeature() {
   }, [])
 
   return (
-    <section style={{ padding: 'clamp(60px,10vh,120px) clamp(24px,8vw,60px)', background: S.bg }}>
+    <section style={{ padding: 'clamp(60px,10vh,120px) clamp(24px,8vw,60px)', background: S.bg, position: 'relative' }}>
+      <SectionMarks index={3} topic="AI Concierge" right="no forms · just text" />
       <div className="lnd-feature-grid lnd-feature-reverse" style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 80, alignItems: 'center' }}>
         {/* Chat visual — left visually, first in DOM */}
         <div className="landing-reveal" ref={ref} style={{ background: 'linear-gradient(135deg,rgba(42,92,69,0.25),rgba(15,32,24,0.15))', border: '1px solid rgba(110,231,183,0.08)', borderRadius: 24, padding: 32, display: 'flex', flexDirection: 'column', gap: 10, position: 'relative', overflow: 'hidden' }}>
@@ -311,7 +316,7 @@ function AIFeature() {
         {/* Text — lnd-ai-text allows order swap on mobile */}
         <div className="landing-reveal lnd-ai-text">
           <Pill icon="✦" label="AI Concierge" />
-          <FeatTitle>No forms<br />Just say<br />what you <em>want</em></FeatTitle>
+          <FeatTitle>No forms<br />Just say<br />what you <em className="italic-accent">want</em></FeatTitle>
           <FeatBody>Skip the dropdowns and filters. Tell Steward what you want via text or a screenshot. The AI finds the product or experience and sets up tracking in seconds. It even detects fake deals.</FeatBody>
           <FeatLink href="/signup">Try the AI concierge →</FeatLink>
         </div>
@@ -330,8 +335,10 @@ function Pill({ icon, label }: { icon: string; label: string }) {
   )
 }
 function FeatTitle({ children }: { children: React.ReactNode }) {
+  // Section H2 — clamp(44px, 6vw, 88px) per the concierge restyle spec.
+  // Line-height 0.96 + letter-spacing -0.035em across all section H2s.
   return (
-    <h2 style={{ fontFamily: S.serif, fontSize: 'clamp(28px,4vw,46px)', fontWeight: 700, lineHeight: 1.08, letterSpacing: '-0.03em', color: S.cream, margin: 0, marginBottom: 18 }}>
+    <h2 style={{ fontFamily: S.serif, fontSize: 'clamp(44px,6vw,88px)', fontWeight: 700, lineHeight: 0.96, letterSpacing: '-0.035em', color: S.cream, margin: 0, marginBottom: 18 }}>
       {children}
     </h2>
   )
@@ -380,6 +387,7 @@ function PlatformShowcase() {
 
   return (
     <section id="platforms" ref={sectionRef} style={{ padding: 'clamp(80px,12vh,140px) clamp(24px,8vw,60px)', background: S.bg, position: 'relative', overflow: 'hidden' }}>
+      <SectionMarks index={6} topic="Platform" right="iOS · web · synced" />
       {/* Bg glow */}
       <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 900px 700px at 50% 45%,rgba(42,92,69,0.35) 0%,transparent 60%)' }} />
 
@@ -391,8 +399,8 @@ function PlatformShowcase() {
             <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase' as const, color: S.mint }}>Now on iOS &amp; Web</span>
             <span style={{ fontSize: 13, color: S.mint }}>💻</span>
           </div>
-          <h2 style={{ fontFamily: S.serif, fontSize: 'clamp(36px,5vw,52px)', fontWeight: 700, lineHeight: 1.08, letterSpacing: '-0.03em', color: S.cream, margin: 0, marginBottom: 16 }}>
-            One account<br /><em style={{ color: S.mint }}>Every screen</em>
+          <h2 style={{ fontFamily: S.serif, fontSize: 'clamp(44px,6vw,88px)', fontWeight: 700, lineHeight: 0.96, letterSpacing: '-0.035em', color: S.cream, margin: 0, marginBottom: 16 }}>
+            One account<br /><em className="italic-accent">Every screen</em>
           </h2>
           <p style={{ fontSize: 16, lineHeight: 1.6, color: 'rgba(247,246,243,0.5)', fontWeight: 300, maxWidth: 500, margin: '0 auto' }}>
             Create a watch on your phone. Manage it on your laptop. Alerts hit everywhere. Same account, perfectly synced.
@@ -675,11 +683,12 @@ function Pricing() {
   const [yearly, setYearly] = useState(false)
 
   return (
-    <section id="pricing" style={{ padding: 'clamp(60px,10vh,120px) clamp(24px,8vw,60px)', background: S.bg }}>
+    <section id="pricing" style={{ padding: 'clamp(60px,10vh,120px) clamp(24px,8vw,60px)', background: S.bg, position: 'relative' }}>
+      <SectionMarks index={7} topic="Pricing" right="3 tiers · pay yearly" />
       <div className="landing-reveal" style={{ textAlign: 'center', maxWidth: 600, margin: '0 auto 40px' }}>
-        <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '0.2em', textTransform: 'uppercase' as const, color: S.mint, opacity: 0.7, marginBottom: 16 }}>Pricing</div>
-        <h2 style={{ fontFamily: S.serif, fontSize: 'clamp(36px,5vw,48px)', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-0.03em', color: S.cream, margin: 0, marginBottom: 16 }}>
-          Pays for itself<br />with <em style={{ color: S.mint }}>one deal</em>
+        <div style={{ marginBottom: 16 }}><EyebrowPill>Pricing</EyebrowPill></div>
+        <h2 style={{ fontFamily: S.serif, fontSize: 'clamp(44px,6vw,88px)', fontWeight: 700, lineHeight: 0.96, letterSpacing: '-0.035em', color: S.cream, margin: 0, marginBottom: 16 }}>
+          Pays for itself<br />with <em className="italic-accent">one deal</em>
         </h2>
         <p style={{ fontSize: 16, lineHeight: 1.6, color: 'rgba(247,246,243,0.5)', fontWeight: 300 }}>Start free, upgrade when you see how much you save.</p>
       </div>
@@ -782,11 +791,12 @@ function FAQ() {
   const [open, setOpen] = useState<number | null>(null)
 
   return (
-    <section id="faq" style={{ padding: 'clamp(60px,10vh,120px) clamp(24px,8vw,60px)', background: S.bg }}>
+    <section id="faq" style={{ padding: 'clamp(60px,10vh,120px) clamp(24px,8vw,60px)', background: S.bg, position: 'relative' }}>
+      <SectionMarks index={8} topic="FAQ" right="7 answers" />
       <div className="landing-reveal" style={{ maxWidth: 720, margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: 48 }}>
-          <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '0.2em', textTransform: 'uppercase' as const, color: S.mint, opacity: 0.7, marginBottom: 16 }}>FAQ</div>
-          <h2 style={{ fontFamily: S.serif, fontSize: 'clamp(32px,4.5vw,46px)', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-0.03em', color: S.cream, margin: 0 }}>
+          <div style={{ marginBottom: 16 }}><EyebrowPill>FAQ</EyebrowPill></div>
+          <h2 style={{ fontFamily: S.serif, fontSize: 'clamp(44px,6vw,88px)', fontWeight: 700, lineHeight: 0.96, letterSpacing: '-0.035em', color: S.cream, margin: 0 }}>
             Frequently Asked Questions
           </h2>
         </div>
@@ -832,11 +842,12 @@ function FAQ() {
 function FinalCTA() {
   return (
     <section className="landing-reveal" style={{ padding: 'clamp(60px,10vh,120px) clamp(24px,8vw,60px)', textAlign: 'center', position: 'relative', overflow: 'hidden', background: S.bg }}>
+      <SectionMarks index={9} topic="Final CTA" right="free · 30 seconds" />
       <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 600px 400px at 50% 50%,rgba(42,92,69,0.35) 0%,transparent 70%)' }} />
       <div style={{ position: 'relative', zIndex: 1 }}>
-        <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '0.2em', textTransform: 'uppercase' as const, color: S.mint, opacity: 0.7, marginBottom: 16 }}>Your concierge is ready</div>
-        <h2 style={{ fontFamily: S.serif, fontSize: 'clamp(36px,5vw,52px)', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-0.03em', color: S.cream, margin: 0, marginBottom: 20 }}>
-          Stop losing to bots<br />Get <em style={{ color: S.mint }}>your own</em>
+        <div style={{ marginBottom: 16 }}><EyebrowPill>Your concierge is ready</EyebrowPill></div>
+        <h2 style={{ fontFamily: S.serif, fontSize: 'clamp(44px,6vw,88px)', fontWeight: 700, lineHeight: 0.96, letterSpacing: '-0.035em', color: S.cream, margin: 0, marginBottom: 20 }}>
+          Stop losing to bots<br />Get <em className="italic-accent">your own</em>
         </h2>
         <p style={{ fontSize: 16, lineHeight: 1.6, color: 'rgba(247,246,243,0.5)', fontWeight: 300, maxWidth: 600, margin: '0 auto 40px' }}>
           Steward monitors prices, tables, tickets, and campsites around the clock and pings you the moment something opens up. No scripts. No refreshing. Just results.
