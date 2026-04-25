@@ -176,6 +176,14 @@ export function LandingHIW() {
   const clickLockedRef = useRef(false)
   useEffect(() => { clickLockedRef.current = clickLocked }, [clickLocked])
 
+  // Mirror activeStep so the rAF-throttled scroll handler can read
+  // the current step without depending on stale closure state, and
+  // can guard setActiveStep so it only fires when the value actually
+  // changes (otherwise the reconciler still does work even when
+  // React bails on the render).
+  const activeStepRef = useRef(0)
+  useEffect(() => { activeStepRef.current = activeStep }, [activeStep])
+
   function handleTouchStart(e: React.TouchEvent) {
     touchStartX.current = e.touches[0].clientX
     touchStartY.current = e.touches[0].clientY
@@ -243,7 +251,22 @@ export function LandingHIW() {
     }
 
     function update() {
-      if (!sectionRef.current || !phoneColRef.current) return
+      if (!sectionRef.current || !phoneColRef.current) {
+        ticking = false
+        return
+      }
+
+      // PERF: bail out when the entire section is far outside the
+      // viewport. Without this, the rAF-throttled scroll handler
+      // still ran 4–5 getBoundingClientRect() calls on every frame
+      // even when the section was off the screen, which compounded
+      // with all the other sections during long-page scrolls.
+      const sectionRect = sectionRef.current.getBoundingClientRect()
+      const vh = window.innerHeight
+      if (sectionRect.bottom < -200 || sectionRect.top > vh + 200) {
+        ticking = false
+        return
+      }
 
       if (!isMobileRef.current) {
         updateSticky()
@@ -251,7 +274,7 @@ export function LandingHIW() {
 
       // Step tracking — desktop only
       if (!isMobileRef.current && !clickLockedRef.current) {
-        const target = window.innerHeight * 0.45
+        const target = vh * 0.45
         let best = 0, bestDist = Infinity
         stepRefs.forEach((ref, i) => {
           if (!ref.current) return
@@ -259,8 +282,14 @@ export function LandingHIW() {
           const dist = Math.abs(top + height / 2 - target)
           if (dist < bestDist) { bestDist = dist; best = i }
         })
-        setActiveStep(best)
-        setProgress((best / 2) * 100)
+        // Only schedule a re-render when the active step actually
+        // changed. Calling setActiveStep with the current value still
+        // costs reconciler work even if React bails on the render.
+        if (best !== activeStepRef.current) {
+          activeStepRef.current = best
+          setActiveStep(best)
+          setProgress(best * 50)
+        }
       }
       ticking = false
     }
@@ -333,7 +362,7 @@ export function LandingHIW() {
   )
 
   return (
-    <section ref={sectionRef} id="how-it-works" style={{ position: 'relative', background: 'linear-gradient(180deg,#080A08 0%,rgba(15,32,24,0.15) 30%,rgba(15,32,24,0.15) 70%,#080A08 100%)' }}>
+    <section ref={sectionRef} id="how-it-works" style={{ position: 'relative', background: 'transparent' }}>
       {/* Header */}
       <div className="hiw-header landing-reveal">
         <div style={{ marginBottom: 16 }}><EyebrowPill>How it works</EyebrowPill></div>

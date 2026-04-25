@@ -83,10 +83,15 @@ function Nav() {
       position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100,
       padding: scrolled ? '14px 48px' : '22px 48px',
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      background: scrolled ? 'rgba(8,10,8,0.92)' : 'rgba(8,10,8,0.7)',
-      backdropFilter: 'blur(12px)',
+      // PERF: dropped `backdropFilter: blur(12px)` on the fixed nav.
+      // Backdrop blur on an always-on fixed bar forces the compositor
+      // to re-blur the content beneath it every scroll tick — one of
+      // the larger remaining causes of scroll jank. The unscrolled
+      // background is now 0.85 opaque (was 0.7 + blur) so the hero
+      // copy still doesn't show through under the bar.
+      background: scrolled ? 'rgba(8,10,8,0.94)' : 'rgba(8,10,8,0.85)',
       borderBottom: '1px solid rgba(110,231,183,0.06)',
-      transition: 'all 0.4s',
+      transition: 'background 0.4s, padding 0.4s',
       flexWrap: 'wrap' as const,
     }}>
       <a href="#" onClick={e => { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }) }} style={{ display: 'flex', alignItems: 'center', gap: 12, textDecoration: 'none', cursor: 'pointer' }}>
@@ -411,7 +416,12 @@ function PriceFeature() {
                   WebkitBackgroundClip: 'text',
                   backgroundClip: 'text',
                   WebkitTextFillColor: 'transparent',
-                  filter: 'drop-shadow(0 0 24px rgba(110,231,183,0.35))',
+                  // PERF: dropped `filter: drop-shadow(0 0 24px ...)` —
+                  // LivePrice re-renders its text on every count-down
+                  // tick, and a drop-shadow filter on a rapidly
+                  // changing element forces a per-frame text + shadow
+                  // re-rasterization. The mint gradient text fill is
+                  // already striking on its own.
                   fontVariantNumeric: 'tabular-nums',
                 }}
               />
@@ -1076,7 +1086,7 @@ function PlatformShowcase() {
   }, [])
 
   return (
-    <section id="platforms" ref={sectionRef} style={{ padding: 'clamp(80px,12vh,140px) clamp(24px,8vw,60px)', background: S.bg, position: 'relative', overflow: 'hidden' }}>
+    <section id="platforms" ref={sectionRef} style={{ padding: 'clamp(80px,12vh,140px) clamp(24px,8vw,60px)', background: 'transparent', position: 'relative', overflow: 'hidden' }}>
       {/* Bg glow */}
       <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 900px 700px at 50% 45%,rgba(42,92,69,0.35) 0%,transparent 60%)' }} />
 
@@ -1375,7 +1385,7 @@ function Pricing() {
   const [yearly, setYearly] = useState(false)
 
   return (
-    <section id="pricing" style={{ padding: 'clamp(60px,10vh,120px) clamp(24px,8vw,60px)', background: S.bg, position: 'relative' }}>
+    <section id="pricing" style={{ padding: 'clamp(60px,10vh,120px) clamp(24px,8vw,60px)', background: 'transparent', position: 'relative' }}>
       <div className="landing-reveal" style={{ textAlign: 'center', maxWidth: 600, margin: '0 auto 40px' }}>
         <div style={{ marginBottom: 16 }}><EyebrowPill>Pricing</EyebrowPill></div>
         <h2 style={{ fontFamily: S.serif, fontSize: 'clamp(44px,6vw,88px)', fontWeight: 700, lineHeight: 0.96, letterSpacing: '-0.035em', color: S.cream, margin: 0, marginBottom: 16 }}>
@@ -1513,7 +1523,7 @@ function FAQ() {
   const [open, setOpen] = useState<number | null>(null)
 
   return (
-    <section id="faq" style={{ padding: 'clamp(60px,10vh,120px) clamp(24px,8vw,60px)', background: S.bg, position: 'relative' }}>
+    <section id="faq" style={{ padding: 'clamp(60px,10vh,120px) clamp(24px,8vw,60px)', background: 'transparent', position: 'relative' }}>
       <div className="landing-reveal" style={{ maxWidth: 720, margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: 48 }}>
           <div style={{ marginBottom: 16 }}><EyebrowPill>FAQ</EyebrowPill></div>
@@ -1562,7 +1572,7 @@ function FAQ() {
 // ── Final CTA ─────────────────────────────────────────────────────────────────
 function FinalCTA() {
   return (
-    <section className="landing-reveal" style={{ padding: 'clamp(60px,10vh,120px) clamp(24px,8vw,60px)', textAlign: 'center', position: 'relative', overflow: 'hidden', background: S.bg }}>
+    <section className="landing-reveal" style={{ padding: 'clamp(60px,10vh,120px) clamp(24px,8vw,60px)', textAlign: 'center', position: 'relative', overflow: 'hidden', background: 'transparent' }}>
       <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 600px 400px at 50% 50%,rgba(42,92,69,0.35) 0%,transparent 70%)' }} />
       <div style={{ position: 'relative', zIndex: 1 }}>
         <div style={{ marginBottom: 16 }}><EyebrowPill>Your concierge is ready</EyebrowPill></div>
@@ -1710,9 +1720,13 @@ export function LandingClientPage() {
           100% { transform: translateY(0); opacity: 0; }
         }
         .lnd-sync-orb { animation: syncPulse 3s ease-in-out infinite; }
+        /* PERF: was a 40px+80px stacked box-shadow at 50%. Stacked
+           large blur-radius shadows on an infinite-animated element
+           expand the layer's damage rect every paint, costing more
+           than the visual weight justified. Single 16px shadow now. */
         @keyframes syncPulse {
-          0%, 100% { box-shadow: 0 0 20px rgba(110,231,183,0.1); }
-          50% { box-shadow: 0 0 40px rgba(110,231,183,0.3), 0 0 80px rgba(110,231,183,0.1); }
+          0%, 100% { box-shadow: 0 0 8px rgba(110,231,183,0.12); }
+          50%      { box-shadow: 0 0 16px rgba(110,231,183,0.30); }
         }
 
         /* Pulse dot for notification indicators */

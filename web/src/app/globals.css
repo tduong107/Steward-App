@@ -415,6 +415,35 @@ body {
   box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.08);
 }
 
+/* ── PERF: skip rendering off-screen sections ──────────────────────
+   `content-visibility: auto` tells the browser it can skip layout
+   and paint for these sections when they're outside the viewport,
+   then resume when the user scrolls them in. The most impactful
+   single perf knob on long landing pages — the hero + first feature
+   section render at the same speed, but every section below them
+   stops contending for paint budget on each scroll tick.
+
+   `contain-intrinsic-size` reserves a placeholder height so the
+   scrollbar doesn't jump as sections become visible. The values
+   are conservative ceilings; once a section paints once the browser
+   remembers its real size and uses that on subsequent visits.
+
+   Skipped:
+   - #how-it-works has the sticky-phone scroll handler that needs
+     real geometry, so excluding it.
+   - LandingHero / S/02 / S/03 are above the fold or near it,
+     skipping wouldn't help.
+
+   The fix only kicks in on browsers that support it (Chrome 85+,
+   Safari 18+, Firefox 125+); older browsers ignore it gracefully. */
+#why-steward,
+#platforms,
+#pricing,
+#faq {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 900px;
+}
+
 /* ── Landing Page Kinetic Animations ── */
 
 @keyframes pulseDot {

@@ -111,7 +111,7 @@ export function LandingUseCases() {
   const visible = CARDS.filter((c) => filter === 'all' || c.cat === filter)
 
   return (
-    <section id="why-steward" style={{ padding: 'clamp(60px,10vh,120px) clamp(24px,8vw,60px)', background: '#080A08', position: 'relative' }}>
+    <section id="why-steward" style={{ padding: 'clamp(60px,10vh,120px) clamp(24px,8vw,60px)', background: 'transparent', position: 'relative' }}>
       {/* Header */}
       <div className="landing-reveal" style={{ textAlign: 'center', maxWidth: 600, margin: '0 auto clamp(40px,7vh,72px)' }}>
         <div style={{ marginBottom: 16 }}><EyebrowPill>Why Steward</EyebrowPill></div>
@@ -182,7 +182,13 @@ export function LandingUseCases() {
           onClick={() => setModal(null)}
           onKeyDown={(e) => e.key === 'Escape' && setModal(null)}
           tabIndex={-1}
-          style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          // PERF: dropped `backdropFilter: blur(8px)` — full-viewport
+          // backdrop blur is the single most expensive GPU effect we
+          // had on this page (forces a complete viewport recomposite
+          // every frame the modal is open). Bumped overlay opacity
+          // 0.7 → 0.82 so the underlying content is still pushed back
+          // visually without the blur.
+          style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.82)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
         >
           <div
             onClick={(e) => e.stopPropagation()}
