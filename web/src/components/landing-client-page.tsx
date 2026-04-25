@@ -723,13 +723,31 @@ function Pricing() {
         {PLANS.map((plan, i) => (
           <div key={plan.name} className="landing-reveal"
             style={{
-              background: plan.featured ? 'linear-gradient(135deg,rgba(42,92,69,0.3),rgba(15,32,24,0.2))' : S.cardBg,
-              border: plan.featured ? '1px solid rgba(110,231,183,0.2)' : S.border,
+              // Featured (Premium) tier gets the spec mint gradient bg
+              // + brighter mint border + 60px mint outer glow per the
+              // concierge restyle. Non-featured tiers stay subtle.
+              background: plan.featured
+                ? 'linear-gradient(135deg, rgba(110,231,183,0.18), rgba(42,92,69,0.35))'
+                : S.cardBg,
+              border: plan.featured ? '1px solid rgba(110,231,183,0.35)' : S.border,
               borderRadius: 24, padding: '36px 28px', position: 'relative', overflow: 'hidden',
               display: 'flex', flexDirection: 'column' as const,
               animationDelay: `${i * 100}ms`,
+              boxShadow: plan.featured
+                ? '0 0 60px rgba(110,231,183,0.18), inset 0 1px 0 rgba(255,255,255,0.08)'
+                : 'none',
             }}>
-            {plan.tag && <div style={{ position: 'absolute', top: 16, right: 16, background: S.gold, color: S.forest, fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', padding: '3px 10px', borderRadius: 20 }}>{plan.tag}</div>}
+            {plan.tag && (
+              <div style={{
+                position: 'absolute', top: 16, right: 16,
+                // Mint→green gradient ribbon per concierge spec (was solid gold)
+                background: 'linear-gradient(135deg, var(--mint, #6EE7B7), var(--green-mid, #3A7C5A))',
+                color: 'var(--deep, #0F2018)',
+                fontSize: 9, fontWeight: 800, letterSpacing: '0.08em',
+                padding: '4px 11px', borderRadius: 20,
+                boxShadow: '0 4px 14px rgba(110,231,183,0.35), inset 0 1px 0 rgba(255,255,255,0.4)',
+              }}>{plan.tag}</div>
+            )}
             <div style={{ fontFamily: S.serif, fontSize: 22, fontWeight: 700, color: S.cream, marginBottom: 8 }}>{plan.name}</div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 20 }}>
               <span style={{ fontFamily: S.serif, fontSize: 38, fontWeight: 700, color: S.mint }}>{yearly ? plan.yearly : plan.monthly}</span>
@@ -742,12 +760,22 @@ function Pricing() {
                 </li>
               ))}
             </ul>
-            <Link href="/signup" style={{ marginTop: 'auto',
-              display: 'block', textAlign: 'center', padding: 14, borderRadius: 12, fontSize: 14, fontWeight: plan.featured ? 700 : 600, textDecoration: 'none', transition: 'all .3s',
-              background: plan.featured ? S.mint : 'rgba(110,231,183,0.06)',
-              border: plan.featured ? 'none' : '1px solid rgba(110,231,183,0.18)',
-              color: plan.featured ? S.forest : S.mint,
-            }}>{yearly ? plan.btnYearly : plan.btnMonthly}</Link>
+            <Magnetic strength={0.2} style={{ marginTop: 'auto', display: 'flex' }}>
+              <Link href="/signup" style={{
+                display: 'block', textAlign: 'center', padding: 14, borderRadius: 12,
+                fontSize: 14, fontWeight: plan.featured ? 700 : 600,
+                textDecoration: 'none', transition: 'all .3s',
+                width: '100%',
+                background: plan.featured
+                  ? 'linear-gradient(180deg, var(--mint, #6EE7B7) 0%, var(--green, #2A5C45) 100%)'
+                  : 'rgba(110,231,183,0.06)',
+                border: plan.featured ? 'none' : '1px solid rgba(110,231,183,0.18)',
+                color: plan.featured ? 'var(--deep, #0F2018)' : 'var(--mint, #6EE7B7)',
+                boxShadow: plan.featured
+                  ? '0 2px 10px rgba(110,231,183,0.25), inset 0 1px 0 rgba(255,255,255,0.4)'
+                  : 'none',
+              }}>{yearly ? plan.btnYearly : plan.btnMonthly}</Link>
+            </Magnetic>
           </div>
         ))}
       </div>
@@ -853,15 +881,17 @@ function FinalCTA() {
           Steward monitors prices, tables, tickets, and campsites around the clock and pings you the moment something opens up. No scripts. No refreshing. Just results.
         </p>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, flexWrap: 'wrap' as const }}>
-          <Link href="/signup" className="landing-btn-shimmer lnd-cta-primary"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: S.mint, color: S.forest, fontSize: 17, fontWeight: 700, padding: '18px 40px', borderRadius: 14, textDecoration: 'none' }}>
-            Start Free on Web →
-          </Link>
-          <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className="lnd-appstore-btn"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: S.cream, fontSize: 15, fontWeight: 600, padding: '16px 32px', borderRadius: 14, textDecoration: 'none', transition: 'all .35s' }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
-            iOS App
-          </a>
+          <Magnetic strength={0.3}>
+            <Link href="/signup" className="btn-primary">
+              Start Free on Web <span aria-hidden="true">→</span>
+            </Link>
+          </Magnetic>
+          <Magnetic strength={0.3}>
+            <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className="btn-ghost">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+              iOS App
+            </a>
+          </Magnetic>
         </div>
       </div>
     </section>
