@@ -417,18 +417,6 @@ body {
 
 /* ── Landing Page Kinetic Animations ── */
 
-@keyframes tickerScroll {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
-}
-.landing-ticker-track {
-  display: flex;
-  gap: 40px;
-  animation: tickerScroll 50s linear infinite;
-  width: max-content;
-}
-.landing-ticker-track:hover { animation-play-state: paused; }
-
 @keyframes pulseDot {
   0%, 100% { box-shadow: 0 0 8px rgba(110,231,183,0.4); transform: scale(1); }
   50%       { box-shadow: 0 0 18px rgba(110,231,183,0.9); transform: scale(1.15); }

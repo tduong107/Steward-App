@@ -159,42 +159,6 @@ function Nav() {
 }
 
 
-// ── Ticker ────────────────────────────────────────────────────────────────────
-const TICKER_ITEMS = [
-  { icon: '👟', bold: '$31 saved', rest: 'on Nike Dunks', time: '2 min ago' },
-  { icon: '✈️', bold: '$127 saved', rest: 'on LAX → Tokyo', time: '5 min ago' },
-  { icon: '🍽', bold: 'Table found', rest: 'at Carbone NY', time: '8 min ago' },
-  { icon: '🏕', bold: 'Campsite snagged', rest: 'at Yosemite', time: '12 min ago' },
-  { icon: '🎫', bold: 'Tickets found', rest: 'for Kendrick Lamar', time: '15 min ago' },
-  { icon: '📦', bold: 'Restock alert', rest: 'PS5 Pro at Target', time: '18 min ago' },
-  { icon: '👟', bold: '$48 saved', rest: 'on New Balance 990v6', time: '22 min ago' },
-  { icon: '✈️', bold: '$89 saved', rest: 'on SFO → JFK', time: '25 min ago' },
-  { icon: '🍽', bold: 'Table found', rest: 'at Don Angie', time: '28 min ago' },
-  { icon: '🏕', bold: 'Campsite snagged', rest: 'at Big Sur', time: '31 min ago' },
-]
-
-function Ticker() {
-  const doubled = [...TICKER_ITEMS, ...TICKER_ITEMS]
-  return (
-    <div aria-hidden="true" style={{ overflow: 'hidden', padding: '32px 0', borderTop: '1px solid rgba(255,255,255,0.04)', borderBottom: '1px solid rgba(255,255,255,0.04)', background: 'rgba(15,32,24,0.3)' }}>
-      <div className="landing-ticker-track">
-        {doubled.map((item, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 40, whiteSpace: 'nowrap' as const, flexShrink: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ width: 32, height: 32, borderRadius: 10, background: 'rgba(110,231,183,0.08)', border: '1px solid rgba(110,231,183,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>{item.icon}</div>
-              <span style={{ fontSize: 13, color: 'rgba(247,246,243,0.55)' }}>
-                <strong>{item.bold}</strong>{' '}{item.rest}
-                <span style={{ fontSize: 11, color: 'rgba(247,246,243,0.25)', marginLeft: 4 }}>{item.time}</span>
-              </span>
-            </div>
-            <span style={{ color: 'rgba(255,255,255,0.1)', fontSize: 20, flexShrink: 0 }}>·</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
 // ── Price Feature ─────────────────────────────────────────────────────────────
 // Retailers shown beneath the body copy in S/02. Order is editorial,
 // not alphabetic — the most recognizable names lead.
@@ -1694,7 +1658,6 @@ export function LandingClientPage() {
       <ScrollRevealInit />
       <Nav />
       <LandingHero />
-      <Ticker />
       <PriceFeature />
       <AIFeature />
       <LandingHIW />
