@@ -6,6 +6,8 @@ import { track } from '@vercel/analytics'
 import { LandingHero } from '@/components/landing-hero'
 import { LandingHIW } from '@/components/landing-hiw'
 import { LandingUseCases } from '@/components/landing-use-cases'
+import { CursorSpotlight } from '@/components/landing-fx/cursor-spotlight'
+import { GlobalBg } from '@/components/landing-fx/global-bg'
 
 // ── Logo ─────────────────────────────────────────────────────────────────────
 function Logo() {
@@ -915,7 +917,11 @@ function ScrollRevealInit() {
 // ── Export ────────────────────────────────────────────────────────────────────
 export function LandingClientPage() {
   return (
-    <div style={{ background: S.bg, minHeight: '100vh', color: S.cream }}>
+    <div style={{ background: 'var(--forest, #0A0C0B)', minHeight: '100vh', color: S.cream, position: 'relative' }}>
+      {/* Concierge-restyle global layers — both fixed-position and pointer-
+          events:none, so they sit behind/under all section content. */}
+      <GlobalBg />
+      <CursorSpotlight />
       <ScrollRevealInit />
       <Nav />
       <LandingHero />
