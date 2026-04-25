@@ -11,6 +11,8 @@ import { GlobalBg } from '@/components/landing-fx/global-bg'
 import { EyebrowPill } from '@/components/landing-fx/eyebrow-pill'
 import { SectionMarks } from '@/components/landing-fx/section-marks'
 import { Magnetic } from '@/components/landing-fx/magnetic'
+import { Bento } from '@/components/landing-fx/bento'
+import { LivePrice } from '@/components/landing-fx/live-price'
 
 // ── Logo ─────────────────────────────────────────────────────────────────────
 function Logo() {
@@ -195,133 +197,925 @@ function Ticker() {
 }
 
 // ── Price Feature ─────────────────────────────────────────────────────────────
+// Retailers shown beneath the body copy in S/02. Order is editorial,
+// not alphabetic — the most recognizable names lead.
+const PRICE_RETAILERS = ['Amazon', 'Nike', 'Best Buy', 'Target', 'Walmart', 'Nordstrom']
+
+// 9 chart waypoints that descend from y=20 (top, ~$120-ish) to y=52
+// (just above the dashed target line at y=50). Hand-tuned wiggle so
+// the line reads like a real 30-day price history rather than a smooth
+// curve. Width 300, viewBox 300×60.
+const PRICE_CHART_POINTS: Array<[number, number]> = [
+  [0, 22],
+  [38, 18],
+  [76, 28],
+  [114, 24],
+  [152, 32],
+  [190, 26],
+  [228, 38],
+  [266, 44],
+  [300, 52],
+]
+const PRICE_CHART_PATH = PRICE_CHART_POINTS.map((p, i) => `${i === 0 ? 'M' : 'L'}${p[0]},${p[1]}`).join(' ')
+const PRICE_CHART_FILL_PATH = `${PRICE_CHART_PATH} L300,60 L0,60 Z`
+
 function PriceFeature() {
-  const ref = useRef<HTMLDivElement>(null)
-  const [animated, setAnimated] = useState(false)
-  const [price, setPrice] = useState(120)
-  const [showSave, setShowSave] = useState(false)
-  const [showNotif, setShowNotif] = useState(false)
-
-  useEffect(() => {
-    const obs = new IntersectionObserver(([e]) => {
-      if (e.isIntersecting && !animated) {
-        setAnimated(true)
-        let c = 120
-        setTimeout(() => {
-          const tick = () => {
-            c--; setPrice(c)
-            if (c <= 89) { setShowSave(true); setTimeout(() => setShowNotif(true), 600); return }
-            setTimeout(tick, 40 + Math.random() * 30)
-          }
-          tick()
-        }, 800)
-      }
-    }, { threshold: 0.4 })
-    if (ref.current) obs.observe(ref.current)
-    return () => obs.disconnect()
-  }, [animated])
-
   return (
-    <section style={{ padding: 'clamp(60px,10vh,120px) clamp(24px,8vw,60px)', background: S.bg, position: 'relative' }}>
-      <SectionMarks index={2} topic="Price Drops" right="1 retailer · live" />
-      <div className="lnd-feature-grid" style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 80, alignItems: 'center' }}>
+    <section
+      style={{
+        padding: 'clamp(60px,10vh,120px) clamp(24px,8vw,60px)',
+        background: 'transparent',
+        position: 'relative',
+        overflow: 'hidden',
+      }}
+    >
+      <SectionMarks index={2} topic="Feature" right="Price drops" />
+
+      {/* Local aurora blobs scoped to this section — sit beneath the
+          grid in <GlobalBg /> for extra depth in the dark band. */}
+      <div
+        aria-hidden="true"
+        className="s02-aurora s02-aurora-a"
+        style={{
+          position: 'absolute',
+          right: '-8%',
+          top: '12%',
+          width: 520,
+          height: 520,
+          borderRadius: '50%',
+          background: 'rgba(110,231,183,0.12)',
+          filter: 'blur(100px)',
+          pointerEvents: 'none',
+          zIndex: 0,
+        }}
+      />
+      <div
+        aria-hidden="true"
+        className="s02-aurora s02-aurora-b"
+        style={{
+          position: 'absolute',
+          left: '-6%',
+          bottom: '4%',
+          width: 480,
+          height: 480,
+          borderRadius: '50%',
+          background: 'rgba(42,92,69,0.45)',
+          filter: 'blur(100px)',
+          pointerEvents: 'none',
+          zIndex: 0,
+        }}
+      />
+
+      <div
+        className="lnd-feature-grid"
+        style={{
+          maxWidth: 1100,
+          margin: '0 auto',
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: 80,
+          alignItems: 'center',
+          position: 'relative',
+          zIndex: 1,
+        }}
+      >
+        {/* ── Left column: copy ─────────────────────────────────────── */}
         <div className="landing-reveal">
-          <Pill icon="📉" label="Price Drops" />
-          <FeatTitle>Your target<br />price <em className="italic-accent">Achieved</em></FeatTitle>
-          <FeatBody>Works across Amazon, Nike, Best Buy, Target, Walmart, and thousands of other retailers. Steward monitors 24/7 and pings you the moment your target hits, with fake deal detection so you never get played by artificially inflated prices.</FeatBody>
-          <FeatLink href="/signup">Start tracking prices →</FeatLink>
+          <div style={{ marginBottom: 20 }}>
+            <EyebrowPill icon="📉">Price Drops</EyebrowPill>
+          </div>
+
+          <h2
+            style={{
+              fontFamily: S.serif,
+              fontSize: 'clamp(40px, 5.8vw, 84px)',
+              fontWeight: 700,
+              lineHeight: 0.96,
+              letterSpacing: '-0.035em',
+              color: 'var(--ink, #fff)',
+              margin: 0,
+              marginBottom: 22,
+            }}
+          >
+            Your target<br />price <em className="italic-accent">Achieved.</em>
+          </h2>
+
+          <p
+            style={{
+              fontFamily: 'var(--font-body, "Inter", system-ui, sans-serif)',
+              fontSize: 17,
+              lineHeight: 1.6,
+              color: 'var(--ink-60, rgba(255,255,255,0.62))',
+              fontWeight: 300,
+              marginBottom: 32,
+              maxWidth: 500,
+            }}
+          >
+            Works across Amazon, Nike, Best Buy, Target, Walmart, and thousands of other retailers.
+            Steward monitors 24/7 and pings you the moment your target hits — with fake-deal
+            detection so you never get played by artificially inflated prices.
+          </p>
+
+          <Magnetic strength={0.3}>
+            <Link
+              href="/signup"
+              onClick={() => track('signup_button_click', { location: 'price_feature' })}
+              className="btn-primary"
+            >
+              Start tracking prices <span aria-hidden="true">→</span>
+            </Link>
+          </Magnetic>
+
+          {/* Retailer row — uppercase mint-tinted monospace list, separated
+              by mint diamond bullets. */}
+          <div
+            style={{
+              marginTop: 36,
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              gap: '8px 14px',
+              fontFamily:
+                'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, monospace',
+              fontSize: 11,
+              fontWeight: 500,
+              letterSpacing: '0.18em',
+              textTransform: 'uppercase',
+              color: 'rgba(110,231,183,0.65)',
+            }}
+          >
+            {PRICE_RETAILERS.map((r, i) => (
+              <span key={r} style={{ display: 'inline-flex', alignItems: 'center', gap: 14 }}>
+                {i > 0 && <span style={{ color: 'rgba(110,231,183,0.3)' }}>◆</span>}
+                <span>{r}</span>
+              </span>
+            ))}
+          </div>
         </div>
-        <div className="landing-reveal" ref={ref} style={{ background: 'linear-gradient(135deg,rgba(42,92,69,0.3),rgba(15,32,24,0.2))', border: '1px solid rgba(110,231,183,0.1)', borderRadius: 24, padding: 40, position: 'relative', overflow: 'hidden' }}>
-          <div style={{ position: 'absolute', top: -40, right: -40, width: 160, height: 160, borderRadius: '50%', background: 'rgba(110,231,183,0.05)' }} />
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 24 }}>
-            <span style={{ fontSize: 36 }}>👟</span>
-            <div><div style={{ fontSize: 15, fontWeight: 500, color: S.cream }}>Nike Dunk Low Panda</div><div style={{ fontSize: 12, color: 'rgba(247,246,243,0.4)' }}>nike.com</div></div>
+
+        {/* ── Right column: dark Nike Dunk price-drop card ──────────── */}
+        <div className="landing-reveal" style={{ position: 'relative' }}>
+          {/* Floating ✦ chip outside top-right at 3°, 6s float */}
+          <div
+            className="s02-floating-chip"
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              top: -18,
+              right: -10,
+              zIndex: 3,
+              padding: '8px 14px',
+              borderRadius: 999,
+              background: 'rgba(15,32,24,0.85)',
+              border: '1px solid rgba(110,231,183,0.25)',
+              backdropFilter: 'blur(10px)',
+              WebkitBackdropFilter: 'blur(10px)',
+              transform: 'rotate(3deg)',
+              boxShadow: '0 14px 40px rgba(0,0,0,0.45)',
+              fontFamily: 'var(--font-body, "Inter", sans-serif)',
+              fontSize: 11.5,
+              fontWeight: 500,
+              color: 'rgba(247,246,243,0.85)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <span style={{ color: 'var(--mint, #6EE7B7)', fontSize: 12 }}>✦</span>
+            <span>Find the Dyson V15, alert under $500</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, marginBottom: 28 }}>
-            <span style={{ fontSize: 18, color: 'rgba(247,246,243,0.3)', textDecoration: 'line-through' }}>$120</span>
-            <span style={{ fontFamily: S.serif, fontSize: 52, fontWeight: 700, color: S.mint }}>${price}</span>
-            <span style={{ background: S.gold, color: S.forest, fontSize: 11, fontWeight: 800, letterSpacing: '0.05em', padding: '4px 10px', borderRadius: 20, alignSelf: 'center', opacity: showSave ? 1 : 0, transition: 'opacity .4s' }}>SAVE 26%</span>
-          </div>
-          <div style={{ height: 80, position: 'relative', marginBottom: 20 }}>
-            <svg viewBox="0 0 400 80" preserveAspectRatio="none" width="100%" height="100%">
-              <defs><linearGradient id="pg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="rgba(110,231,183,0.2)"/><stop offset="100%" stopColor="rgba(110,231,183,0)"/></linearGradient></defs>
-              <path d="M0,20 Q50,18 100,25 T200,30 T300,22 T380,55 L400,55 L400,80 L0,80 Z" fill="url(#pg)" style={{ opacity: animated ? 1 : 0, transition: 'opacity 1.5s .5s ease' }} />
-              <path d="M0,20 Q50,18 100,25 T200,30 T300,22 T380,55" stroke={S.mint} strokeWidth="2.5" fill="none" style={{ strokeDasharray: 500, strokeDashoffset: animated ? 0 : 500, transition: 'stroke-dashoffset 2s ease' }} />
-              <circle cx="380" cy="55" r={animated ? 5 : 0} fill={S.mint} style={{ transition: 'r .4s 1.8s cubic-bezier(.34,1.56,.64,1)' }} />
-            </svg>
-          </div>
-          <div style={{ background: 'rgba(110,231,183,0.08)', border: '1px solid rgba(110,231,183,0.18)', borderRadius: 14, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10, opacity: showNotif ? 1 : 0, transform: showNotif ? 'none' : 'translateY(10px)', transition: 'all .5s ease' }}>
-            <span className="lnd-pulse-dot" />
-            <span style={{ fontSize: 12.5, color: 'rgba(247,246,243,0.7)', lineHeight: 1.3 }}><strong style={{ color: S.mint }}>Target price hit!</strong> Tap to buy now →</span>
-          </div>
+
+          <Bento
+            className="s02-bento"
+            style={
+              {
+                background: 'var(--forest-2, #0F1410)',
+                borderRadius: 20,
+                border: '1px solid rgba(110,231,183,0.25)',
+                padding: 32,
+                boxShadow:
+                  '0 32px 80px rgba(0,0,0,0.55), inset 0 0 80px rgba(110,231,183,0.05)',
+                color: S.cream,
+                position: 'relative',
+                overflow: 'hidden',
+              } as React.CSSProperties
+            }
+          >
+            {/* Top row: 80×80 emoji tile + name + price */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 18,
+                marginBottom: 26,
+              }}
+            >
+              <div
+                style={{
+                  width: 80,
+                  height: 80,
+                  borderRadius: 18,
+                  background:
+                    'linear-gradient(135deg, rgba(110,231,183,0.18), rgba(42,92,69,0.35))',
+                  border: '1px solid rgba(110,231,183,0.3)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 48,
+                  flexShrink: 0,
+                  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)',
+                }}
+              >
+                👟
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <div
+                  style={{
+                    fontFamily: S.serif,
+                    fontSize: 19,
+                    fontWeight: 700,
+                    color: 'var(--ink, #fff)',
+                    letterSpacing: '-0.01em',
+                    marginBottom: 4,
+                  }}
+                >
+                  Nike Dunk Low Panda
+                </div>
+                <div style={{ fontSize: 12.5, color: 'var(--ink-60, rgba(255,255,255,0.62))' }}>
+                  nike.com
+                </div>
+              </div>
+            </div>
+
+            {/* Price row: was $120 → animating LivePrice → SAVE 26% */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'baseline',
+                gap: 14,
+                marginBottom: 24,
+              }}
+            >
+              <span
+                style={{
+                  fontSize: 18,
+                  color: 'rgba(255,255,255,0.32)',
+                  textDecoration: 'line-through',
+                  fontVariantNumeric: 'tabular-nums',
+                }}
+              >
+                $120
+              </span>
+              <LivePrice
+                start={120}
+                end={89}
+                style={{
+                  fontFamily: S.serif,
+                  fontSize: 56,
+                  fontWeight: 700,
+                  letterSpacing: '-0.02em',
+                  background: 'linear-gradient(180deg, #A7F3D0, #6EE7B7 55%, #3A7C5A)',
+                  WebkitBackgroundClip: 'text',
+                  backgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  filter: 'drop-shadow(0 0 24px rgba(110,231,183,0.35))',
+                  fontVariantNumeric: 'tabular-nums',
+                }}
+              />
+              <span
+                style={{
+                  alignSelf: 'center',
+                  background:
+                    'linear-gradient(135deg, var(--mint-2, #A7F3D0), var(--mint, #6EE7B7))',
+                  color: 'var(--deep, #0F2018)',
+                  fontSize: 11,
+                  fontWeight: 800,
+                  letterSpacing: '0.06em',
+                  padding: '4px 11px',
+                  borderRadius: 20,
+                  boxShadow: '0 4px 12px rgba(110,231,183,0.3)',
+                }}
+              >
+                SAVE 26%
+              </span>
+            </div>
+
+            {/* 30-day price chart — 300×60 viewBox, mint line + fill +
+                dashed mint target line + pulsing waypoint dot. */}
+            <div style={{ position: 'relative', marginBottom: 22 }}>
+              <svg
+                viewBox="0 0 300 60"
+                preserveAspectRatio="none"
+                width="100%"
+                height="80"
+                aria-hidden="true"
+              >
+                <defs>
+                  <linearGradient id="s02-area-fill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="rgba(110,231,183,0.28)" />
+                    <stop offset="100%" stopColor="rgba(110,231,183,0)" />
+                  </linearGradient>
+                </defs>
+                {/* Area fill */}
+                <path d={PRICE_CHART_FILL_PATH} fill="url(#s02-area-fill)" />
+                {/* Mint line */}
+                <path
+                  d={PRICE_CHART_PATH}
+                  stroke="var(--mint, #6EE7B7)"
+                  strokeWidth="2"
+                  fill="none"
+                  vectorEffect="non-scaling-stroke"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                {/* Dashed target line at y=50 */}
+                <line
+                  x1="0"
+                  y1="50"
+                  x2="300"
+                  y2="50"
+                  stroke="rgba(110,231,183,0.5)"
+                  strokeWidth="1"
+                  strokeDasharray="4 4"
+                  vectorEffect="non-scaling-stroke"
+                />
+                {/* Pulsing dot at final waypoint with faint ring */}
+                <circle
+                  cx="300"
+                  cy="52"
+                  r="9"
+                  fill="rgba(110,231,183,0.25)"
+                  className="s02-chart-ping-bg"
+                />
+                <circle
+                  cx="300"
+                  cy="52"
+                  r="4"
+                  fill="var(--mint, #6EE7B7)"
+                  className="s02-chart-dot"
+                />
+              </svg>
+              <span
+                style={{
+                  position: 'absolute',
+                  right: 0,
+                  top: -6,
+                  fontFamily: 'var(--font-body, "Inter", sans-serif)',
+                  fontSize: 10,
+                  fontWeight: 600,
+                  letterSpacing: '0.18em',
+                  textTransform: 'uppercase',
+                  color: 'rgba(110,231,183,0.55)',
+                  background: 'rgba(15,32,24,0.65)',
+                  padding: '2px 8px',
+                  borderRadius: 4,
+                }}
+              >
+                target $90
+              </span>
+            </div>
+
+            {/* Target hit banner */}
+            <div
+              style={{
+                background:
+                  'linear-gradient(90deg, rgba(110,231,183,0.14), rgba(42,92,69,0.06))',
+                border: '1px solid rgba(110,231,183,0.35)',
+                borderRadius: 10,
+                padding: '12px 16px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+              }}
+            >
+              <span className="live-dot" aria-hidden="true" />
+              <span
+                style={{
+                  flex: 1,
+                  fontSize: 13,
+                  color: 'var(--ink, #fff)',
+                  lineHeight: 1.3,
+                }}
+              >
+                <strong style={{ color: 'var(--mint, #6EE7B7)' }}>Target price hit!</strong>{' '}
+                Tap to buy now
+              </span>
+              <span
+                aria-hidden="true"
+                style={{ color: 'var(--mint, #6EE7B7)', fontSize: 16, fontWeight: 700 }}
+              >
+                →
+              </span>
+            </div>
+          </Bento>
         </div>
       </div>
+
+      {/* Section-local keyframes (chip float, chart ping, aurora drift). */}
+      <style>{`
+        @keyframes s02-chip-float {
+          0%, 100% { transform: translateY(0) rotate(3deg); }
+          50%      { transform: translateY(-6px) rotate(3.4deg); }
+        }
+        .s02-floating-chip {
+          animation: s02-chip-float 6s ease-in-out infinite;
+          will-change: transform;
+        }
+        @keyframes s02-chart-ping {
+          0%, 100% { opacity: 0.3; transform: scale(1); transform-origin: 300px 52px; }
+          50%      { opacity: 0.9; transform: scale(1.6); transform-origin: 300px 52px; }
+        }
+        .s02-chart-ping-bg {
+          animation: s02-chart-ping 2.2s ease-in-out infinite;
+          transform-box: fill-box;
+          transform-origin: center;
+        }
+        @keyframes s02-aurora-drift-a {
+          0%, 100% { transform: translate3d(0,0,0) scale(1); }
+          50%      { transform: translate3d(-30px,40px,0) scale(1.05); }
+        }
+        @keyframes s02-aurora-drift-b {
+          0%, 100% { transform: translate3d(0,0,0) scale(1); }
+          50%      { transform: translate3d(40px,-30px,0) scale(1.07); }
+        }
+        .s02-aurora-a { animation: s02-aurora-drift-a 28s ease-in-out infinite; will-change: transform; }
+        .s02-aurora-b { animation: s02-aurora-drift-b 24s ease-in-out -6s infinite; will-change: transform; }
+
+        @media (prefers-reduced-motion: reduce) {
+          .s02-floating-chip,
+          .s02-chart-ping-bg,
+          .s02-aurora-a,
+          .s02-aurora-b { animation: none !important; }
+        }
+      `}</style>
     </section>
   )
 }
 
 // ── AI Feature ────────────────────────────────────────────────────────────────
+//
+// Three messages cycle on a 2.8s interval. Each appears with a 300ms
+// fade-up and stays visible until the loop resets. Step 0 = nothing
+// shown; step 1/2/3 = first / first+second / all three. After step 3
+// holds for one interval, we reset to 0 and replay.
+type AiStep = 0 | 1 | 2 | 3
+
 function AIFeature() {
   const ref = useRef<HTMLDivElement>(null)
-  const [chatStep, setChatStep] = useState(0)
+  const [step, setStep] = useState<AiStep>(0)
 
   useEffect(() => {
-    const obs = new IntersectionObserver(([e]) => {
-      if (e.isIntersecting && chatStep === 0) {
-        const seq: Array<[number, number]> = [[300, 1], [900, 2], [2200, 3], [2500, 4], [3000, 5], [3600, 6]]
-        seq.forEach(([delay, step]) => setTimeout(() => setChatStep(step), delay))
+    const el = ref.current
+    if (!el) return
+
+    const reduced =
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+    let timer: ReturnType<typeof setInterval> | null = null
+    let visible = false
+
+    const start = () => {
+      if (reduced) {
+        // Static end state — show all three messages immediately.
+        setStep(3)
+        return
       }
-    }, { threshold: 0.3 })
-    if (ref.current) obs.observe(ref.current)
-    return () => obs.disconnect()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+      if (timer) return
+      // Kick off step 1 quickly, then step every 2.8s.
+      setStep(1)
+      let s: AiStep = 1
+      timer = setInterval(() => {
+        s = (s === 3 ? 0 : ((s + 1) as AiStep))
+        setStep(s)
+      }, 2800)
+    }
+    const stop = () => {
+      if (timer) {
+        clearInterval(timer)
+        timer = null
+      }
+    }
+
+    const obs = new IntersectionObserver(
+      ([entry]) => {
+        const isIn = entry.isIntersecting
+        if (isIn && !visible) {
+          visible = true
+          start()
+        } else if (!isIn && visible) {
+          visible = false
+          stop()
+        }
+      },
+      { threshold: 0.3 },
+    )
+    obs.observe(el)
+    return () => {
+      obs.disconnect()
+      stop()
+    }
   }, [])
 
   return (
-    <section style={{ padding: 'clamp(60px,10vh,120px) clamp(24px,8vw,60px)', background: S.bg, position: 'relative' }}>
-      <SectionMarks index={3} topic="AI Concierge" right="no forms · just text" />
-      <div className="lnd-feature-grid lnd-feature-reverse" style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 80, alignItems: 'center' }}>
-        {/* Chat visual — left visually, first in DOM */}
-        <div className="landing-reveal" ref={ref} style={{ background: 'linear-gradient(135deg,rgba(42,92,69,0.25),rgba(15,32,24,0.15))', border: '1px solid rgba(110,231,183,0.08)', borderRadius: 24, padding: 32, display: 'flex', flexDirection: 'column', gap: 10, position: 'relative', overflow: 'hidden' }}>
-          <div style={{ maxWidth: '85%', padding: '12px 16px', borderRadius: '18px 18px 4px 18px', fontSize: 13, lineHeight: 1.5, background: '#2A5C45', color: S.cream, alignSelf: 'flex-end', marginLeft: 'auto', opacity: chatStep >= 1 ? 1 : 0, transform: chatStep >= 1 ? 'none' : 'translateY(12px)', transition: 'all .5s ease' }}>
-            Find the Dyson V15, alert me under $500
-          </div>
-          {chatStep === 2 && (
-            <div style={{ display: 'flex', gap: 4, padding: '12px 16px', alignSelf: 'flex-start' }}>
-              {[0, 0.2, 0.4].map(d => (
-                <span key={d} style={{ width: 6, height: 6, borderRadius: '50%', background: 'rgba(110,231,183,0.4)', animation: `typeBounce 1.4s ${d}s ease-in-out infinite`, display: 'block' }} />
-              ))}
+    <section
+      style={{
+        padding: 'clamp(60px,10vh,120px) clamp(24px,8vw,60px)',
+        background: 'transparent',
+        position: 'relative',
+        overflow: 'hidden',
+      }}
+    >
+      <SectionMarks index={3} topic="AI Concierge" right="Chat · screenshot · share" />
+
+      {/* Soft vertical band so this section reads distinct from S/02
+          while staying in the same dark palette. The aurora blob below
+          adds a top-right accent. */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background:
+            'linear-gradient(180deg, transparent 0%, rgba(15,32,24,0.30) 45%, rgba(15,32,24,0.30) 55%, transparent 100%)',
+          pointerEvents: 'none',
+          zIndex: 0,
+        }}
+      />
+      <div
+        aria-hidden="true"
+        className="s03-aurora"
+        style={{
+          position: 'absolute',
+          right: '-6%',
+          top: '6%',
+          width: 540,
+          height: 540,
+          borderRadius: '50%',
+          background: 'rgba(110,231,183,0.16)',
+          filter: 'blur(100px)',
+          pointerEvents: 'none',
+          zIndex: 0,
+        }}
+      />
+
+      <div
+        className="lnd-feature-grid lnd-feature-reverse"
+        style={{
+          maxWidth: 1100,
+          margin: '0 auto',
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: 80,
+          alignItems: 'center',
+          position: 'relative',
+          zIndex: 1,
+        }}
+      >
+        {/* ── Left column: Chat panel ─────────────────────────────── */}
+        <div className="landing-reveal" ref={ref}>
+          <Bento
+            className="s03-bento"
+            style={
+              {
+                background: 'var(--forest-2, #0F1410)',
+                borderRadius: 24,
+                border: '1px solid rgba(110,231,183,0.15)',
+                padding: 24,
+                boxShadow:
+                  '0 32px 80px rgba(0,0,0,0.55), inset 0 0 80px rgba(110,231,183,0.04)',
+                color: S.cream,
+                position: 'relative',
+                overflow: 'hidden',
+              } as React.CSSProperties
+            }
+          >
+            {/* Header row */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                paddingBottom: 18,
+                borderBottom: '1px solid rgba(255,255,255,0.06)',
+                marginBottom: 18,
+              }}
+            >
+              <div
+                aria-hidden="true"
+                style={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: 7,
+                  background:
+                    'linear-gradient(135deg, var(--mint-2, #A7F3D0), var(--green-mid, #3A7C5A))',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontFamily: S.serif,
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: 'var(--deep, #0F2018)',
+                  flexShrink: 0,
+                  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.4)',
+                }}
+              >
+                ✦
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div
+                  style={{
+                    fontFamily: S.serif,
+                    fontSize: 15,
+                    fontWeight: 700,
+                    color: 'var(--ink, #fff)',
+                    letterSpacing: '-0.01em',
+                    lineHeight: 1.1,
+                  }}
+                >
+                  Steward
+                </div>
+                <div
+                  style={{
+                    marginTop: 3,
+                    fontSize: 10.5,
+                    fontWeight: 600,
+                    letterSpacing: '0.05em',
+                    textTransform: 'uppercase',
+                    color: 'rgba(110,231,183,0.75)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                  }}
+                >
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: '50%',
+                      background: 'var(--mint, #6EE7B7)',
+                      animation: 'pulse 2s ease-in-out infinite',
+                      display: 'inline-block',
+                    }}
+                  />
+                  ✦ AI concierge
+                </div>
+              </div>
+              <span
+                aria-hidden="true"
+                style={{
+                  fontSize: 9,
+                  fontWeight: 700,
+                  letterSpacing: '0.22em',
+                  textTransform: 'uppercase',
+                  color: 'rgba(110,231,183,0.55)',
+                  border: '1px solid rgba(110,231,183,0.22)',
+                  padding: '3px 8px',
+                  borderRadius: 6,
+                }}
+              >
+                Live
+              </span>
             </div>
-          )}
-          {chatStep >= 3 && (
-            <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12, width: '85%', opacity: 1, animation: 'hiw-fadeUp .4s ease' }}>
-              <div style={{ width: 40, height: 40, borderRadius: 10, background: 'linear-gradient(135deg,rgba(110,231,183,0.2),rgba(42,92,69,0.4))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>🧹</div>
-              <div><div style={{ fontSize: 12, fontWeight: 500, color: S.cream, marginBottom: 2 }}>Dyson V15 Detect Absolute</div><div style={{ fontSize: 11, color: S.mint }}>$549 · dyson.com</div></div>
+
+            {/* Message stream — min-height keeps the input row from
+                jumping as bubbles appear */}
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 12,
+                minHeight: 260,
+              }}
+            >
+              {/* User: step ≥ 1 */}
+              <ChatBubble visible={step >= 1} role="user">
+                find me a table at carbone for fri at 8 for 2 ppl
+              </ChatBubble>
+
+              {/* AI bubble: step ≥ 2 */}
+              <ChatBubble visible={step >= 2} role="ai" tag="✦ Creating watch…">
+                Got it. I&apos;ll watch Resy every 2 hrs for{' '}
+                <strong style={{ color: 'var(--mint, #6EE7B7)', fontWeight: 600 }}>
+                  Carbone NY · Fri 8pm · party of 2
+                </strong>
+                .
+              </ChatBubble>
+
+              {/* AI bubble: step ≥ 3 */}
+              <ChatBubble visible={step >= 3} role="ai" tag="✦ Watch live">
+                <span style={{ color: 'var(--mint, #6EE7B7)', fontWeight: 600 }}>✓ Done.</span>{' '}
+                You&apos;ll get a push the moment a table opens.
+              </ChatBubble>
             </div>
-          )}
-          {chatStep >= 4 && (
-            <div style={{ maxWidth: '85%', padding: '12px 16px', borderRadius: '18px 18px 18px 4px', fontSize: 13, lineHeight: 1.5, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(247,246,243,0.7)', animation: 'hiw-fadeUp .4s ease' }}>
-              <strong style={{ color: S.mint }}>Found it.</strong> It&apos;s $549 now. I&apos;ll ping you the moment it dips below $500.
+
+            {/* Input row — placeholder swaps once the watch is live */}
+            <div
+              style={{
+                marginTop: 18,
+                background: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.06)',
+                borderRadius: 12,
+                padding: 6,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+              }}
+            >
+              <span
+                style={{
+                  flex: 1,
+                  paddingLeft: 12,
+                  fontSize: 13,
+                  color: 'rgba(255,255,255,0.42)',
+                  fontFamily: 'var(--font-body, "Inter", sans-serif)',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+              >
+                {step >= 3 ? 'Track another…' : 'Tell me what to find'}
+              </span>
+              <button
+                type="button"
+                aria-label="Attach a screenshot"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  background: 'rgba(110,231,183,0.10)',
+                  border: '1px solid rgba(110,231,183,0.22)',
+                  color: 'var(--mint, #6EE7B7)',
+                  fontSize: 11,
+                  fontWeight: 600,
+                  padding: '7px 11px',
+                  borderRadius: 8,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  flexShrink: 0,
+                }}
+              >
+                <span aria-hidden="true">📷</span> Screenshot
+              </button>
+              <button
+                type="button"
+                aria-label="Send"
+                style={{
+                  position: 'relative',
+                  overflow: 'hidden',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  background:
+                    'linear-gradient(180deg, var(--mint, #6EE7B7) 0%, var(--green, #2A5C45) 100%)',
+                  color: 'var(--deep, #0F2018)',
+                  border: 'none',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  padding: '8px 14px',
+                  borderRadius: 8,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  flexShrink: 0,
+                  boxShadow:
+                    '0 2px 8px rgba(110,231,183,0.25), inset 0 1px 0 rgba(255,255,255,0.4)',
+                }}
+              >
+                Send <span aria-hidden="true">→</span>
+              </button>
             </div>
-          )}
-          {chatStep >= 5 && (
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' as const, animation: 'hiw-fadeUp .4s ease' }}>
-              {['✓ Start tracking', 'Change price', 'More options'].map(chip => (
-                <div key={chip} style={{ background: 'rgba(110,231,183,0.07)', border: '1px solid rgba(110,231,183,0.16)', borderRadius: 20, padding: '5px 12px', fontSize: 11, color: S.mint, cursor: 'pointer' }}>{chip}</div>
-              ))}
-            </div>
-          )}
+          </Bento>
         </div>
 
-        {/* Text — lnd-ai-text allows order swap on mobile */}
+        {/* ── Right column: copy ──────────────────────────────────── */}
         <div className="landing-reveal lnd-ai-text">
-          <Pill icon="✦" label="AI Concierge" />
-          <FeatTitle>No forms<br />Just say<br />what you <em className="italic-accent">want</em></FeatTitle>
-          <FeatBody>Skip the dropdowns and filters. Tell Steward what you want via text or a screenshot. The AI finds the product or experience and sets up tracking in seconds. It even detects fake deals.</FeatBody>
-          <FeatLink href="/signup">Try the AI concierge →</FeatLink>
+          <div style={{ marginBottom: 20 }}>
+            <EyebrowPill icon="✦">AI Concierge</EyebrowPill>
+          </div>
+
+          <h2
+            style={{
+              fontFamily: S.serif,
+              fontSize: 'clamp(40px, 5.8vw, 84px)',
+              fontWeight: 700,
+              lineHeight: 0.96,
+              letterSpacing: '-0.035em',
+              color: 'var(--ink, #fff)',
+              margin: 0,
+              marginBottom: 22,
+            }}
+          >
+            No forms.<br />Just say<br />what you <em className="italic-accent">want.</em>
+          </h2>
+
+          <p
+            style={{
+              fontFamily: 'var(--font-body, "Inter", system-ui, sans-serif)',
+              fontSize: 17,
+              lineHeight: 1.6,
+              color: 'var(--ink-60, rgba(255,255,255,0.62))',
+              fontWeight: 300,
+              marginBottom: 32,
+              maxWidth: 500,
+            }}
+          >
+            Skip the dropdowns and filters. Tell Steward what you want via text or a screenshot.
+            The AI finds the product or experience and sets up tracking in seconds. It even
+            detects fake deals.
+          </p>
+
+          <Magnetic strength={0.3}>
+            <Link
+              href="/signup"
+              onClick={() => track('signup_button_click', { location: 'ai_feature' })}
+              className="btn-primary"
+            >
+              Try the AI concierge <span aria-hidden="true">→</span>
+            </Link>
+          </Magnetic>
         </div>
       </div>
+
+      {/* Section-local keyframes (aurora drift; chat fade-up handled
+          inline via transition on opacity + transform). */}
+      <style>{`
+        @keyframes s03-aurora-drift {
+          0%, 100% { transform: translate3d(0,0,0) scale(1); }
+          50%      { transform: translate3d(-30px, 36px, 0) scale(1.06); }
+        }
+        .s03-aurora { animation: s03-aurora-drift 26s ease-in-out infinite; will-change: transform; }
+        @media (prefers-reduced-motion: reduce) {
+          .s03-aurora { animation: none !important; }
+        }
+      `}</style>
     </section>
+  )
+}
+
+// ── ChatBubble (S/03 internal) ────────────────────────────────────────────────
+//
+// Slides up + fades in over 300ms when `visible` flips true. Stays visible
+// until the parent step resets. Re-uses the role-specific styling for user vs
+// AI. Optional small uppercase "tag" line beneath an AI bubble (e.g. "✦
+// Creating watch…").
+function ChatBubble({
+  visible,
+  role,
+  tag,
+  children,
+}: {
+  visible: boolean
+  role: 'user' | 'ai'
+  tag?: string
+  children: React.ReactNode
+}) {
+  const isUser = role === 'user'
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: isUser ? 'flex-end' : 'flex-start',
+        gap: 6,
+        opacity: visible ? 1 : 0,
+        transform: visible ? 'translateY(0)' : 'translateY(8px)',
+        transition: 'opacity 0.3s var(--ease-out), transform 0.3s var(--ease-out)',
+      }}
+    >
+      <div
+        style={{
+          maxWidth: '85%',
+          padding: '12px 16px',
+          fontSize: 13.5,
+          lineHeight: 1.5,
+          color: isUser ? 'var(--deep, #0F2018)' : 'rgba(247,246,243,0.85)',
+          background: isUser
+            ? 'linear-gradient(135deg, var(--mint-2, #A7F3D0), var(--mint, #6EE7B7))'
+            : 'rgba(255,255,255,0.05)',
+          border: isUser ? 'none' : '1px solid rgba(255,255,255,0.07)',
+          borderRadius: isUser ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+          fontWeight: isUser ? 500 : 400,
+          boxShadow: isUser ? '0 6px 18px rgba(110,231,183,0.22)' : 'none',
+        }}
+      >
+        {children}
+      </div>
+      {tag && !isUser && (
+        <span
+          style={{
+            fontSize: 10.5,
+            fontWeight: 600,
+            letterSpacing: '0.05em',
+            textTransform: 'uppercase',
+            color: 'rgba(110,231,183,0.75)',
+          }}
+        >
+          {tag}
+        </span>
+      )}
+    </div>
   )
 }
 
