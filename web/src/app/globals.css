@@ -868,27 +868,20 @@ body {
   );
 }
 
-/* ── Italic accent (mint) ────────────────────────────────────────── */
-/* PERF: removed the 28px drop-shadow filter that used to render here.
-   With 8+ italic phrases on the landing, the cumulative cost of
-   filter:drop-shadow during scroll was significant — it forces a
-   repaint of the text + shadow region on every frame the element
-   moves through the viewport. The mint gradient text fill is striking
-   enough on its own without the glow. */
+/* ── Italic accent ───────────────────────────────────────────────── */
+/* Italic phrases inside H2s — same white as the rest of the title,
+   only the italic + serif distinguishes them. Per design feedback
+   the mint gradient text-fill was dropped so the headline reads as
+   one continuous color. (Earlier the 28px drop-shadow filter was
+   also removed for perf; both changes leave a clean white italic.) */
 .italic-accent {
   font-family: var(--font-serif, Georgia, serif);
   font-style: italic;
   font-weight: 400;
-  background: linear-gradient(180deg, #A7F3D0, #6EE7B7 55%, #3A7C5A);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: inherit;
 }
 .italic-accent--gold {
-  background: linear-gradient(180deg, #FDE68A, #F59E0B 55%, #B45309);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: inherit;
 }
 
 /* ── Section corner marks ────────────────────────────────────────── */

@@ -265,7 +265,7 @@ function PriceFeature() {
               marginBottom: 22,
             }}
           >
-            Your target<br />price <em className="italic-accent">Achieved.</em>
+            Your target<br />price <em className="italic-accent">Achieved</em>
           </h2>
 
           <p
@@ -948,7 +948,7 @@ function AIFeature() {
               marginBottom: 22,
             }}
           >
-            No forms.<br />Just say<br />what you <em className="italic-accent">want.</em>
+            No forms.<br />Just say<br />what you <em className="italic-accent">want</em>
           </h2>
 
           <p
