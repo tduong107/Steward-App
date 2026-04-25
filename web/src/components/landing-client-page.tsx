@@ -229,40 +229,10 @@ function PriceFeature() {
       }}
     >
 
-      {/* Local aurora blobs scoped to this section — sit beneath the
-          grid in <GlobalBg /> for extra depth in the dark band. */}
-      <div
-        aria-hidden="true"
-        className="s02-aurora s02-aurora-a"
-        style={{
-          position: 'absolute',
-          right: '-8%',
-          top: '12%',
-          width: 520,
-          height: 520,
-          borderRadius: '50%',
-          background: 'rgba(110,231,183,0.12)',
-          filter: 'blur(100px)',
-          pointerEvents: 'none',
-          zIndex: 0,
-        }}
-      />
-      <div
-        aria-hidden="true"
-        className="s02-aurora s02-aurora-b"
-        style={{
-          position: 'absolute',
-          left: '-6%',
-          bottom: '4%',
-          width: 480,
-          height: 480,
-          borderRadius: '50%',
-          background: 'rgba(42,92,69,0.45)',
-          filter: 'blur(100px)',
-          pointerEvents: 'none',
-          zIndex: 0,
-        }}
-      />
+      {/* PERF: section-local aurora blobs removed — <GlobalBg /> already
+          provides aurora coverage across the viewport, and stacking
+          two more blur(100px) layers per section was the largest
+          source of scroll repaint cost. */}
 
       <div
         className="lnd-feature-grid"
@@ -629,22 +599,9 @@ function PriceFeature() {
           transform-box: fill-box;
           transform-origin: center;
         }
-        @keyframes s02-aurora-drift-a {
-          0%, 100% { transform: translate3d(0,0,0) scale(1); }
-          50%      { transform: translate3d(-30px,40px,0) scale(1.05); }
-        }
-        @keyframes s02-aurora-drift-b {
-          0%, 100% { transform: translate3d(0,0,0) scale(1); }
-          50%      { transform: translate3d(40px,-30px,0) scale(1.07); }
-        }
-        .s02-aurora-a { animation: s02-aurora-drift-a 28s ease-in-out infinite; will-change: transform; }
-        .s02-aurora-b { animation: s02-aurora-drift-b 24s ease-in-out -6s infinite; will-change: transform; }
-
         @media (prefers-reduced-motion: reduce) {
           .s02-floating-chip,
-          .s02-chart-ping-bg,
-          .s02-aurora-a,
-          .s02-aurora-b { animation: none !important; }
+          .s02-chart-ping-bg { animation: none !important; }
         }
       `}</style>
     </section>
@@ -740,22 +697,9 @@ function AIFeature() {
           zIndex: 0,
         }}
       />
-      <div
-        aria-hidden="true"
-        className="s03-aurora"
-        style={{
-          position: 'absolute',
-          right: '-6%',
-          top: '6%',
-          width: 540,
-          height: 540,
-          borderRadius: '50%',
-          background: 'rgba(110,231,183,0.16)',
-          filter: 'blur(100px)',
-          pointerEvents: 'none',
-          zIndex: 0,
-        }}
-      />
+      {/* PERF: s03-aurora blob removed — <GlobalBg /> provides
+          aurora coverage; the section-local blob added another
+          blur(100px) repaint cost without visible benefit. */}
 
       <div
         className="lnd-feature-grid lnd-feature-reverse"
@@ -1035,18 +979,9 @@ function AIFeature() {
         </div>
       </div>
 
-      {/* Section-local keyframes (aurora drift; chat fade-up handled
-          inline via transition on opacity + transform). */}
-      <style>{`
-        @keyframes s03-aurora-drift {
-          0%, 100% { transform: translate3d(0,0,0) scale(1); }
-          50%      { transform: translate3d(-30px, 36px, 0) scale(1.06); }
-        }
-        .s03-aurora { animation: s03-aurora-drift 26s ease-in-out infinite; will-change: transform; }
-        @media (prefers-reduced-motion: reduce) {
-          .s03-aurora { animation: none !important; }
-        }
-      `}</style>
+      {/* PERF: section-local aurora keyframes removed alongside the
+          blob; chat fade-up is handled inline via opacity/transform
+          transitions, so this section needs no scoped <style>. */}
     </section>
   )
 }
@@ -1206,7 +1141,10 @@ function PlatformShowcase() {
             background: 'linear-gradient(145deg,#1a1a1a,#0a0a0a)',
             borderRadius: 36, padding: 8,
             border: '2px solid rgba(255,255,255,0.12)',
-            boxShadow: '0 20px 60px rgba(0,0,0,0.5), 0 0 40px rgba(110,231,183,0.08)',
+            // PERF: dropped 60px+40px stacked shadows on this animated
+            // mockup to a single 28px ambient — paired blur shadows on
+            // an always-floating element re-rasterized every frame.
+            boxShadow: '0 16px 28px rgba(0,0,0,0.45)',
             animation: 'platformFloatA 6s ease-in-out infinite',
             position: 'relative',
           }}>
@@ -1513,8 +1451,11 @@ function Pricing() {
           <div key={plan.name} className="landing-reveal"
             style={{
               // Featured (Premium) tier gets the spec mint gradient bg
-              // + brighter mint border + 60px mint outer glow per the
-              // concierge restyle. Non-featured tiers stay subtle.
+              // + brighter mint border. PERF: 60px outer glow dropped
+              // to a 28px shadow — large blur shadows on always-rendered
+              // elements force the compositor to expand the layer's
+              // damage rect every paint, which compounded with the
+              // global aurora layer for visible scroll jank.
               background: plan.featured
                 ? 'linear-gradient(135deg, rgba(110,231,183,0.18), rgba(42,92,69,0.35))'
                 : S.cardBg,
@@ -1523,7 +1464,7 @@ function Pricing() {
               display: 'flex', flexDirection: 'column' as const,
               animationDelay: `${i * 100}ms`,
               boxShadow: plan.featured
-                ? '0 0 60px rgba(110,231,183,0.18), inset 0 1px 0 rgba(255,255,255,0.08)'
+                ? '0 12px 28px rgba(110,231,183,0.14), inset 0 1px 0 rgba(255,255,255,0.08)'
                 : 'none',
             }}>
             {plan.tag && (

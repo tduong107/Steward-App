@@ -55,6 +55,13 @@ export function GlobalBg() {
         }}
       />
 
+      {/* PERF: dropped from 3 aurora blobs (each blur 100px) to 2.
+          Section-local blobs in S/02 + S/03 already cover the same
+          mid-page real estate, so the third global blob was double-
+          stacking blurs there. Blur radius dialed back from 100 → 80
+          to halve the GPU shader work per repaint while keeping the
+          soft-light feel. */}
+
       {/* Aurora blob — deep green, near hero */}
       <div
         style={{
@@ -64,42 +71,28 @@ export function GlobalBg() {
           width: 720,
           height: 720,
           borderRadius: '50%',
-          background: 'rgba(42, 92, 69, 0.5)',
-          filter: 'blur(100px)',
+          background: 'rgba(42, 92, 69, 0.45)',
+          filter: 'blur(80px)',
           animation: `${driftAnim} 26s ease-in-out infinite`,
           willChange: 'transform',
+          transform: 'translateZ(0)',
         }}
       />
 
-      {/* Aurora blob — mint, mid-page */}
-      <div
-        style={{
-          position: 'absolute',
-          right: '6%',
-          top: '38%',
-          width: 540,
-          height: 540,
-          borderRadius: '50%',
-          background: 'rgba(110, 231, 183, 0.18)',
-          filter: 'blur(100px)',
-          animation: `${driftAnim} 22s ease-in-out -8s infinite`,
-          willChange: 'transform',
-        }}
-      />
-
-      {/* Aurora blob — mint-2, lower */}
+      {/* Aurora blob — mint-2, lower (kept for the warm bottom wash) */}
       <div
         style={{
           position: 'absolute',
           left: '40%',
           top: '78%',
-          width: 600,
-          height: 600,
+          width: 560,
+          height: 560,
           borderRadius: '50%',
           background: 'rgba(167, 243, 208, 0.10)',
-          filter: 'blur(100px)',
+          filter: 'blur(80px)',
           animation: `${driftAnim} 30s ease-in-out -14s infinite`,
           willChange: 'transform',
+          transform: 'translateZ(0)',
         }}
       />
     </div>

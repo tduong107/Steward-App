@@ -704,6 +704,10 @@ body {
 }
 
 /* ── Eyebrow pill ────────────────────────────────────────────────── */
+/* PERF: dropped backdrop-filter (blur 8px on ~7 pills site-wide) and
+   the infinite `eyebrow-shimmer` animation. The shimmer used to run
+   on every pill at the same time, causing sustained compositor work
+   even when no pill was visible. Shimmer now only plays on hover. */
 .eyebrow-pill {
   display: inline-flex;
   align-items: center;
@@ -718,8 +722,6 @@ body {
   font-weight: 500;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
   position: relative;
   overflow: hidden;
 }
@@ -734,7 +736,13 @@ body {
     transparent 70%
   );
   pointer-events: none;
-  animation: eyebrow-shimmer 4s ease-in-out infinite;
+  transform: translateX(-180%) skewX(-22deg);
+  opacity: 0;
+  transition: transform 0.7s var(--ease-out), opacity 0.3s var(--ease-out);
+}
+.eyebrow-pill:hover::after {
+  transform: translateX(220%) skewX(-22deg);
+  opacity: 0.55;
 }
 .eyebrow-pill--gold {
   background: rgba(245, 158, 11, 0.06);
@@ -861,6 +869,12 @@ body {
 }
 
 /* ── Italic accent (mint) ────────────────────────────────────────── */
+/* PERF: removed the 28px drop-shadow filter that used to render here.
+   With 8+ italic phrases on the landing, the cumulative cost of
+   filter:drop-shadow during scroll was significant — it forces a
+   repaint of the text + shadow region on every frame the element
+   moves through the viewport. The mint gradient text fill is striking
+   enough on its own without the glow. */
 .italic-accent {
   font-family: var(--font-serif, Georgia, serif);
   font-style: italic;
@@ -869,14 +883,12 @@ body {
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  filter: drop-shadow(0 0 28px rgba(110, 231, 183, 0.35));
 }
 .italic-accent--gold {
   background: linear-gradient(180deg, #FDE68A, #F59E0B 55%, #B45309);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  filter: drop-shadow(0 0 28px rgba(245, 158, 11, 0.35));
 }
 
 /* ── Section corner marks ────────────────────────────────────────── */
