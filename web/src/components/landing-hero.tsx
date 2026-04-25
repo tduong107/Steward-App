@@ -5,6 +5,9 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { track } from '@vercel/analytics'
 import { SplineScene } from '@/components/ui/splite'
 import { Spotlight } from '@/components/ui/spotlight'
+import { EyebrowPill } from '@/components/landing-fx/eyebrow-pill'
+import { Magnetic } from '@/components/landing-fx/magnetic'
+import { SectionMarks } from '@/components/landing-fx/section-marks'
 
 // Brand tokens — mirror the S object in landing-client-page.tsx so the
 // hero reads as a true extension of the rest of the landing.
@@ -242,7 +245,10 @@ export function LandingHero() {
         position: 'relative',
         minHeight: '100vh',
         width: '100%',
-        background: C.bg,
+        // Section bg pulled to transparent so the global aurora + grid
+        // (mounted at the LandingClientPage root) shows through. The
+        // root layer's --forest fallback handles the deep base color.
+        background: 'transparent',
         overflow: 'hidden',
         display: 'flex',
         alignItems: 'center',
@@ -250,6 +256,9 @@ export function LandingHero() {
         fontFamily: SANS,
       }}
     >
+      {/* Huly-style corner marks. Numbered as section 01. */}
+      <SectionMarks index={1} topic="Hero" right="3 steps · ≈ 12 seconds" />
+
       {/* Resource hints — React 19 hoists these to <head>. Preconnect
           lets the browser open the TLS handshake to Spline's CDN in
           parallel with the page render, and preload pre-fetches the
@@ -373,46 +382,28 @@ export function LandingHero() {
             maxWidth: 560,
           }}
         >
-          {/* Eyebrow */}
+          {/* Eyebrow — uses the global .eyebrow-pill class via the
+              shared <EyebrowPill /> primitive (shimmer + mint border). */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 8,
-              background: 'rgba(110,231,183,0.08)',
-              border: '1px solid rgba(110,231,183,0.18)',
-              borderRadius: 30,
-              padding: '6px 16px',
-              marginBottom: 28,
-            }}
+            style={{ marginBottom: 28 }}
           >
-            <span style={{ fontSize: 14, color: C.mint }}>✦</span>
-            <span
-              style={{
-                fontSize: 11,
-                fontWeight: 600,
-                letterSpacing: '0.18em',
-                textTransform: 'uppercase',
-                color: C.mint,
-              }}
-            >
-              Now on the App Store &amp; Web
-            </span>
+            <EyebrowPill icon="✦">Now on the App Store &amp; Web</EyebrowPill>
           </motion.div>
 
-          {/* Headline — word reveal */}
+          {/* Headline — word reveal. Scale + spacing match the spec
+              (clamp 52→128, line-height 0.96, letter-spacing -0.035em). */}
           <h1
             style={{
               fontFamily: SERIF,
-              lineHeight: 1.08,
-              letterSpacing: '-0.03em',
-              color: C.cream,
+              lineHeight: 0.96,
+              letterSpacing: '-0.035em',
+              color: 'var(--ink, #fff)',
               margin: 0,
               marginBottom: 24,
-              fontSize: 'clamp(38px, 5.5vw, 62px)',
+              fontSize: 'clamp(52px, 8.5vw, 128px)',
               fontWeight: 700,
             }}
           >
@@ -457,49 +448,29 @@ export function LandingHero() {
             transition={{ duration: 0.8, delay: 1.6, ease: [0.22, 1, 0.36, 1] }}
             style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}
           >
-            <a
-              href="/signup"
-              onClick={() => track('signup_button_click', { location: 'hero' })}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 10,
-                background: C.mint,
-                color: C.forest,
-                fontSize: 16,
-                fontWeight: 700,
-                padding: '18px 36px',
-                borderRadius: 14,
-                textDecoration: 'none',
-                boxShadow: '0 10px 40px rgba(110,231,183,0.3)',
-              }}
-            >
-              Start for free <span>→</span>
-            </a>
-            <a
-              href="https://apps.apple.com/us/app/steward-concierge/id6760180137"
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => track('app_store_click', { location: 'hero' })}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 10,
-                background: 'rgba(255,255,255,0.06)',
-                border: '1px solid rgba(110,231,183,0.25)',
-                color: C.cream,
-                fontSize: 16,
-                fontWeight: 700,
-                padding: '18px 36px',
-                borderRadius: 14,
-                textDecoration: 'none',
-              }}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill={C.mint}>
-                <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" />
-              </svg>
-              iOS App
-            </a>
+            <Magnetic strength={0.3}>
+              <a
+                href="/signup"
+                onClick={() => track('signup_button_click', { location: 'hero' })}
+                className="btn-primary"
+              >
+                Start for free <span aria-hidden="true">→</span>
+              </a>
+            </Magnetic>
+            <Magnetic strength={0.3}>
+              <a
+                href="https://apps.apple.com/us/app/steward-concierge/id6760180137"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => track('app_store_click', { location: 'hero' })}
+                className="btn-ghost"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="var(--mint, #6EE7B7)" aria-hidden="true">
+                  <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" />
+                </svg>
+                iOS App
+              </a>
+            </Magnetic>
           </motion.div>
 
           {/* Demo bar — functional AI-search simulation */}
@@ -542,23 +513,25 @@ export function LandingHero() {
                   fontFamily: 'inherit',
                 }}
               />
-              <button
-                onClick={runFreeformDemo}
-                style={{
-                  background: C.mint,
-                  color: C.forest,
-                  border: 'none',
-                  fontSize: 13,
-                  fontWeight: 700,
-                  padding: '10px 20px',
-                  borderRadius: 10,
-                  cursor: 'pointer',
-                  flexShrink: 0,
-                  fontFamily: 'inherit',
-                }}
-              >
-                Track it ✦
-              </button>
+              <Magnetic strength={0.25} style={{ flexShrink: 0 }}>
+                <button
+                  onClick={runFreeformDemo}
+                  style={{
+                    background: 'linear-gradient(180deg, var(--mint, #6EE7B7) 0%, var(--green, #2A5C45) 100%)',
+                    color: 'var(--deep, #0F2018)',
+                    border: 'none',
+                    fontSize: 13,
+                    fontWeight: 700,
+                    padding: '10px 20px',
+                    borderRadius: 10,
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                    boxShadow: '0 2px 10px rgba(110,231,183,0.25), inset 0 1px 0 rgba(255,255,255,0.4)',
+                  }}
+                >
+                  Track it ✦
+                </button>
+              </Magnetic>
             </div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
               {DEMO_CHIPS.map((chip) => (
@@ -870,16 +843,22 @@ function RevealWord({
   italic?: boolean
   color?: string
 }) {
+  // Italic phrases on hero-style headlines use the global `.italic-accent`
+  // class (mint gradient + drop-shadow) so they match every other
+  // accented phrase on the site. The class owns font-style, font-weight,
+  // color, and the filter — we drop the previous inline blur entrance
+  // because framer-motion animating filter would have wiped the
+  // drop-shadow defined in CSS.
   return (
     <motion.span
-      initial={{ opacity: 0, y: 30, filter: 'blur(8px)' }}
-      animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+      initial={{ opacity: 0, y: 30 }}
+      animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.9, delay, ease: [0.22, 1, 0.36, 1] }}
+      className={italic ? 'italic-accent' : undefined}
       style={{
         display: 'inline-block',
         marginRight,
-        color,
-        fontStyle: italic ? 'italic' : 'normal',
+        ...(italic ? {} : { color }),
       }}
     >
       {word}
