@@ -172,18 +172,16 @@ const DEMO_CHIPS: DemoResult[] = [
 // ───── Main hero ─────
 
 export function LandingHero() {
-  const [cardsReady, setCardsReady] = useState(false)
+  // PERF: dropped `cardsReady` setTimeout-driven state. Cards now
+  // animate in via the same `.use-case-card` CSS keyframe with a
+  // baseline delay (encoded in --card-delay), eliminating one
+  // initial-mount setState + a re-render of all 6 cards.
   const [modal, setModal] = useState<UseCase | null>(null)
   const [demoInput, setDemoInput] = useState('')
   const [demoLoading, setDemoLoading] = useState(false)
   const [demoResult, setDemoResult] = useState<DemoResult | null>(null)
   const closeBtnRef = useRef<HTMLButtonElement>(null)
   const triggerRef = useRef<HTMLElement | null>(null)
-
-  useEffect(() => {
-    const t = setTimeout(() => setCardsReady(true), 250)
-    return () => clearTimeout(t)
-  }, [])
 
   const openModal = (uc: UseCase, trigger: EventTarget | null) => {
     triggerRef.current = trigger as HTMLElement | null
@@ -379,15 +377,15 @@ export function LandingHero() {
           }}
         >
           {/* Eyebrow — uses the global .eyebrow-pill class via the
-              shared <EyebrowPill /> primitive (shimmer + mint border). */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
-            style={{ marginBottom: 28 }}
+              shared <EyebrowPill /> primitive (shimmer + mint border).
+              PERF: was framer-motion `initial`/`animate`/`delay`; now
+              a pure CSS keyframe `hero-rise` (compositor thread, no JS). */}
+          <div
+            className="hero-rise"
+            style={{ marginBottom: 28, ['--hero-delay' as string]: '0.1s' } as React.CSSProperties}
           >
             <EyebrowPill icon="✦">Now on the App Store &amp; Web</EyebrowPill>
-          </motion.div>
+          </div>
 
           {/* Headline — word reveal. The 8.5vw / 128px max from the
               first concierge spec was wrapping each word onto its own
@@ -405,15 +403,19 @@ export function LandingHero() {
               fontWeight: 700,
             }}
           >
+            {/* PERF: tightened the staggered delays — was 0.5–1.15s
+                (entrance dragged on for ~2s after page load), now
+                0.15–0.5s so the full headline resolves in ~1.1s.
+                Same 0.6s easing curve, just less waiting. */}
             {['Scalpers', 'have', 'bots'].map((w, i) => (
-              <RevealWord key={w} word={w} delay={0.5 + i * 0.1} marginRight="0.22em" />
+              <RevealWord key={w} word={w} delay={0.15 + i * 0.05} marginRight="0.22em" />
             ))}
             <br />
             {['Now', 'you', 'have', 'a\u00a0concierge'].map((w, i) => (
               <RevealWord
                 key={w}
                 word={w}
-                delay={0.85 + i * 0.1}
+                delay={0.35 + i * 0.05}
                 marginRight={i < 3 ? '0.22em' : '0'}
                 italic
                 color={C.mint}
@@ -421,11 +423,9 @@ export function LandingHero() {
             ))}
           </h1>
 
-          {/* Subhead */}
-          <motion.p
-            initial={{ opacity: 0, y: 25 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 1.4, ease: [0.22, 1, 0.36, 1] }}
+          {/* Subhead — entrance via CSS keyframe (was framer-motion). */}
+          <p
+            className="hero-rise"
             style={{
               fontSize: 17,
               lineHeight: 1.65,
@@ -433,18 +433,23 @@ export function LandingHero() {
               fontWeight: 300,
               marginBottom: 36,
               maxWidth: 440,
-            }}
+              ['--hero-delay' as string]: '0.55s',
+            } as React.CSSProperties}
           >
             Be the first to snag deals, hard to get reservations, and sold-out tickets with Steward.
             Your personalized AI concierge that levels the playing field.
-          </motion.p>
+          </p>
 
-          {/* CTAs */}
-          <motion.div
-            initial={{ opacity: 0, y: 25 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 1.6, ease: [0.22, 1, 0.36, 1] }}
-            style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}
+          {/* CTAs — entrance via CSS keyframe (was framer-motion). */}
+          <div
+            className="hero-rise"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 16,
+              flexWrap: 'wrap',
+              ['--hero-delay' as string]: '0.65s',
+            } as React.CSSProperties}
           >
             <Magnetic strength={0.3}>
               <a
@@ -469,14 +474,16 @@ export function LandingHero() {
                 iOS App
               </a>
             </Magnetic>
-          </motion.div>
+          </div>
 
-          {/* Demo bar — functional AI-search simulation */}
-          <motion.div
-            initial={{ opacity: 0, y: 25 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 1.9, ease: [0.22, 1, 0.36, 1] }}
-            style={{ marginTop: 32, maxWidth: 460 }}
+          {/* Demo bar — entrance via CSS keyframe (was framer-motion). */}
+          <div
+            className="hero-rise"
+            style={{
+              marginTop: 32,
+              maxWidth: 460,
+              ['--hero-delay' as string]: '0.75s',
+            } as React.CSSProperties}
           >
             <div
               style={{
@@ -580,12 +587,12 @@ export function LandingHero() {
               </div>
             )}
 
-            {/* Result card (appears after 1.4s "search") */}
+            {/* Result card (appears after 1.4s "search") — entrance via
+                CSS keyframe (was framer-motion). Same `hero-rise` class
+                with 0s delay since the trigger is the user's submit. */}
             {!demoLoading && demoResult && (
-              <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+              <div
+                className="hero-rise"
                 style={{
                   marginTop: 14,
                   background:
@@ -593,7 +600,8 @@ export function LandingHero() {
                   border: '1px solid rgba(110,231,183,0.2)',
                   borderRadius: 16,
                   padding: 16,
-                }}
+                  ['--hero-delay' as string]: '0s',
+                } as React.CSSProperties}
               >
                 <div
                   style={{
@@ -677,9 +685,9 @@ export function LandingHero() {
                     Change condition
                   </button>
                 </div>
-              </motion.div>
+              </div>
             )}
-          </motion.div>
+          </div>
         </div>
 
         {/* ── RIGHT: concierge stage ──
@@ -716,10 +724,8 @@ export function LandingHero() {
               container-left 9% to align with the robot's actual render
               position inside the Spline canvas (GENKUB renders ~9% from
               the left edge of its scene, not at canvas center). */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 1.6, delay: 0.6, ease: 'easeOut' }}
+          <div
+            className="hero-rise"
             style={{
               position: 'absolute',
               left: '9%',
@@ -730,14 +736,14 @@ export function LandingHero() {
               background:
                 'radial-gradient(ellipse 50% 80% at 50% 0%, rgba(110,231,183,0.22), transparent 70%)',
               pointerEvents: 'none',
-            }}
+              ['--hero-delay' as string]: '0.4s',
+            } as React.CSSProperties}
           />
 
-          {/* Robot halo — aligned with robot render position */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 1.4, delay: 0.9, ease: [0.22, 1, 0.36, 1] }}
+          {/* Robot halo — aligned with robot render position. Entrance
+              via shared `hero-rise` keyframe (was framer-motion). */}
+          <div
+            className="hero-rise"
             style={{
               position: 'absolute',
               left: '9%',
@@ -751,7 +757,8 @@ export function LandingHero() {
                 'radial-gradient(circle at 50% 50%, rgba(110,231,183,0.18) 0%, rgba(110,231,183,0.04) 40%, transparent 70%)',
               filter: 'blur(30px)',
               pointerEvents: 'none',
-            }}
+              ['--hero-delay' as string]: '0.6s',
+            } as React.CSSProperties}
           />
 
           {/* Spline robot */}
@@ -801,7 +808,6 @@ export function LandingHero() {
               >
                 <UseCaseCard
                   useCase={uc}
-                  ready={cardsReady}
                   isOpen={modal?.id === uc.id}
                   onClick={(e) => openModal(uc, e.currentTarget)}
                 />
@@ -841,26 +847,24 @@ function RevealWord({
   italic?: boolean
   color?: string
 }) {
-  // Italic phrases on hero-style headlines use the global `.italic-accent`
-  // class (mint gradient + drop-shadow) so they match every other
-  // accented phrase on the site. The class owns font-style, font-weight,
-  // color, and the filter — we drop the previous inline blur entrance
-  // because framer-motion animating filter would have wiped the
-  // drop-shadow defined in CSS.
+  // PERF: was a `motion.span` with `initial`/`animate` — converted to
+  // the shared `hero-rise` CSS keyframe. Each word still gets its own
+  // staggered start via the `--hero-delay` custom property. CSS-thread
+  // reveal removes the framer-motion JS scheduler pressure that was
+  // serializing all 7 word reveals + the eyebrow/subhead/CTA animations
+  // onto the main thread during the 0.5–1.15s window.
   return (
-    <motion.span
-      initial={{ opacity: 0, y: 30 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.9, delay, ease: [0.22, 1, 0.36, 1] }}
-      className={italic ? 'italic-accent' : undefined}
+    <span
+      className={`hero-rise${italic ? ' italic-accent' : ''}`}
       style={{
         display: 'inline-block',
         marginRight,
+        ['--hero-delay' as string]: `${delay}s`,
         ...(italic ? {} : { color }),
-      }}
+      } as React.CSSProperties}
     >
       {word}
-    </motion.span>
+    </span>
   )
 }
 
@@ -878,37 +882,30 @@ function RevealWord({
 
 function UseCaseCard({
   useCase,
-  ready,
   isOpen,
   onClick,
 }: {
   useCase: UseCase
-  ready: boolean
   isOpen: boolean
   onClick: (e: React.MouseEvent<HTMLButtonElement>) => void
 }) {
-  // Idle floating is handled by the `.hero-float-card` CSS animation on
-  // the parent wrapper. This component only drives entrance (one-shot),
-  // hover, and tap — so framer-motion's frame-scheduler is only busy
-  // during explicit user interaction, not on every tick.
+  // PERF: was a `motion.button` with `initial`/`animate`/`whileHover`/
+  // `whileTap` — converted to a plain <button> with the `.use-case-card`
+  // CSS class. Entrance keyframe + hover lift + tap press all live in
+  // globals.css now. With 6 cards, the framer-motion JS scheduler had
+  // to coordinate 6 entrance animations + per-frame hover/tap targets;
+  // CSS hands all of that to the compositor.
   return (
-    <motion.button
+    <button
       type="button"
       onClick={onClick}
       aria-label={`Learn more about ${useCase.title}`}
-      initial={{ opacity: 0, y: 14, scale: 0.94 }}
-      animate={ready ? { opacity: 1, y: 0, scale: 1 } : { opacity: 0, y: 14, scale: 0.94 }}
-      transition={{
-        duration: 0.55,
-        delay: ready ? useCase.delay / 1000 : 0,
-        ease: [0.22, 1, 0.36, 1],
-      }}
-      whileHover={{ scale: 1.06, y: -6, transition: { duration: 0.2 } }}
-      whileTap={{ scale: 0.97 }}
+      className="use-case-card"
       style={{
         position: 'relative',
         width: '100%',
         padding: '14px',
+        ['--card-delay' as string]: `${0.25 + useCase.delay / 1000}s`,
         // Fully opaque gradient replaces the previous 82%-alpha + 18px
         // backdrop-filter blur — blurring a moving element was forcing
         // the compositor to re-paint behind each card every frame, the
@@ -930,9 +927,11 @@ function UseCaseCard({
         color: 'inherit',
         pointerEvents: 'auto',
         overflow: 'hidden',
-        transition: 'border-color 0.3s, background 0.3s, box-shadow 0.3s',
+        // Add transform to existing transitions (border-color/bg/shadow)
+        // so CSS :hover/:active translate-scales animate smoothly.
+        transition: 'border-color 0.3s, background 0.3s, box-shadow 0.3s, transform 0.2s var(--ease-out)',
         willChange: 'transform',
-      }}
+      } as React.CSSProperties}
     >
       {/* Live mint dot top-right — CSS @keyframes (see <style> above);
           framer-motion was running 6 parallel infinite opacity/scale
@@ -999,7 +998,7 @@ function UseCaseCard({
         </div>
       </div>
 
-    </motion.button>
+    </button>
   )
 }
 
@@ -1037,9 +1036,11 @@ function UseCaseModal({
         position: 'fixed',
         inset: 0,
         zIndex: 200,
-        background: 'rgba(0,0,0,0.7)',
-        backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
+        // PERF: dropped backdrop-filter blur(8px) — full-viewport
+        // backdrop blur on a fixed overlay forces the compositor
+        // to re-blur every frame the modal is open. Bumped overlay
+        // opacity 0.7 → 0.82 to keep the same depth feel.
+        background: 'rgba(0,0,0,0.82)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',

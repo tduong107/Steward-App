@@ -1,17 +1,29 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { track } from '@vercel/analytics'
 import { LandingHero } from '@/components/landing-hero'
-import { LandingHIW } from '@/components/landing-hiw'
-import { LandingUseCases } from '@/components/landing-use-cases'
 import { CursorSpotlight } from '@/components/landing-fx/cursor-spotlight'
 import { GlobalBg } from '@/components/landing-fx/global-bg'
 import { EyebrowPill } from '@/components/landing-fx/eyebrow-pill'
 import { Magnetic } from '@/components/landing-fx/magnetic'
 import { Bento } from '@/components/landing-fx/bento'
 import { LivePrice } from '@/components/landing-fx/live-price'
+
+// PERF: lazy-load the two heaviest below-the-fold extracted components.
+// `next/dynamic` keeps `ssr: true` (default) so the HTML still renders
+// server-side for SEO, but their JS lands in separate chunks that the
+// browser can fetch in parallel with the main bundle. LandingHIW alone
+// has the sticky-phone scroll handler, multiple SVG paths, and the
+// step state machine — easily the largest below-fold JS payload.
+const LandingHIW = dynamic(
+  () => import('@/components/landing-hiw').then((m) => m.LandingHIW),
+)
+const LandingUseCases = dynamic(
+  () => import('@/components/landing-use-cases').then((m) => m.LandingUseCases),
+)
 
 // ── Logo ─────────────────────────────────────────────────────────────────────
 function Logo() {

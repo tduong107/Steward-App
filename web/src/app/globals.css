@@ -446,9 +446,53 @@ body {
 
 /* ── Landing Page Kinetic Animations ── */
 
+/* Hero entrance — replaces framer-motion `initial`/`animate` + `delay`
+   on every element above the fold. Compositor-thread keyframe (opacity
+   + transform only), no JS scheduler involvement, no per-frame
+   reconciliation. Each element sets its own `--hero-delay` inline. */
+@keyframes hero-rise {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.hero-rise {
+  animation: hero-rise 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--hero-delay, 0s);
+  will-change: opacity, transform;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-rise { animation: none; opacity: 1; transform: none; }
+}
+
 @keyframes pulseDot {
   0%, 100% { box-shadow: 0 0 8px rgba(110,231,183,0.4); transform: scale(1); }
   50%       { box-shadow: 0 0 18px rgba(110,231,183,0.9); transform: scale(1.15); }
+}
+
+/* Hero use-case card entrance + interaction (was framer-motion's
+   `initial`/`animate`/`whileHover`/`whileTap` per-card; converted to
+   CSS so the framer-motion JS scheduler isn't coordinating 6 buttons
+   on initial mount). The parent wrapper handles the idle float via
+   `.hero-float-card` — these classes only own the card's own state. */
+@keyframes use-case-rise {
+  from { opacity: 0; transform: translateY(14px) scale(0.94); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.use-case-card {
+  animation: use-case-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--card-delay, 0.25s);
+}
+.use-case-card:hover {
+  /* Match the previous whileHover: scale 1.06 + y -6px */
+  transform: translateY(-6px) scale(1.06);
+}
+.use-case-card:active {
+  /* Match the previous whileTap: scale 0.97 (overrides hover) */
+  transform: scale(0.97);
+}
+@media (prefers-reduced-motion: reduce) {
+  .use-case-card { animation: none; opacity: 1; transform: none; }
+  .use-case-card:hover,
+  .use-case-card:active { transform: none; }
 }
 
 @keyframes wordReveal {
@@ -831,8 +875,10 @@ body {
   letter-spacing: 0.01em;
   text-decoration: none;
   cursor: pointer;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  /* PERF: dropped `backdrop-filter: blur(12px)` — applied to ghost
+     buttons that sit on a scrolling page (Hero "iOS App", Final CTA),
+     which forced the compositor to re-blur the content beneath the
+     button on every scroll tick. Solid translucent bg below is fine. */
   transition: border-color 0.25s var(--ease-out), transform 0.25s var(--ease-out), background 0.25s var(--ease-out);
 }
 .btn-ghost:hover {

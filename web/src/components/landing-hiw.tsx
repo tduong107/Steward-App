@@ -306,13 +306,52 @@ export function LandingHIW() {
       update()
     }
 
-    checkMobile()
-    window.addEventListener('scroll', onScroll, { passive: true })
-    window.addEventListener('resize', onResize)
-    update()
-    return () => {
+    // PERF: only attach scroll + resize listeners while the HIW section
+    // is near the viewport. Previously the listener was always attached
+    // and bailed out when off-screen, but the bail-out itself fired at
+    // 60fps with a getBoundingClientRect call. With this gate, the
+    // entire scroll handler is detached when scrolling through hero /
+    // pricing / FAQ / etc., freeing the main thread completely.
+    let attached = false
+    const attach = () => {
+      if (attached) return
+      attached = true
+      window.addEventListener('scroll', onScroll, { passive: true })
+      window.addEventListener('resize', onResize)
+      update()
+    }
+    const detach = () => {
+      if (!attached) return
+      attached = false
       window.removeEventListener('scroll', onScroll)
       window.removeEventListener('resize', onResize)
+    }
+
+    checkMobile()
+    const sectionEl = sectionRef.current
+    let io: IntersectionObserver | null = null
+    if (sectionEl && typeof IntersectionObserver !== 'undefined') {
+      io = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            if (entry.isIntersecting) attach()
+            else detach()
+          }
+        },
+        // 600px rootMargin: attach a bit before the section enters the
+        // viewport so the sticky-phone snap is fully resolved by the
+        // time the user sees it.
+        { rootMargin: '600px 0px', threshold: 0 },
+      )
+      io.observe(sectionEl)
+    } else {
+      // Fallback: attach immediately if IntersectionObserver isn't
+      // available (very old browsers).
+      attach()
+    }
+    return () => {
+      if (io) io.disconnect()
+      detach()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
