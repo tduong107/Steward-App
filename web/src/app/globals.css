@@ -868,16 +868,17 @@ body {
   );
 }
 
-/* ── Italic accent ───────────────────────────────────────────────── */
-/* Italic phrases inside H2s — same white as the rest of the title,
-   only the italic + serif distinguishes them. Per design feedback
-   the mint gradient text-fill was dropped so the headline reads as
-   one continuous color. (Earlier the 28px drop-shadow filter was
-   also removed for perf; both changes leave a clean white italic.) */
+/* ── Italic accent (legacy class name) ──────────────────────────── */
+/* Despite the legacy name, these phrases now render the same as the
+   rest of the H2 — same serif family, same weight, same color, no
+   italic. Per design feedback the headline should read as one
+   continuous treatment. The class is kept (rather than renamed
+   across 7 files) so prior commits stay diff-friendly. <em> gets
+   `font-style: normal` to override the user-agent default italic. */
 .italic-accent {
-  font-family: var(--font-serif, Georgia, serif);
-  font-style: italic;
-  font-weight: 400;
+  font-family: inherit;
+  font-style: normal;
+  font-weight: inherit;
   color: inherit;
 }
 .italic-accent--gold {
