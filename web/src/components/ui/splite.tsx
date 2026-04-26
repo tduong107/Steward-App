@@ -93,6 +93,10 @@ export function SplineScene({ scene, className }: SplineSceneProps) {
   // IntersectionObserver runs as soon as the wrapper mounts, even if
   // Spline isn't loaded yet. Once Spline loads, onLoad consults
   // visibleRef to decide whether to play or stop immediately.
+  // Phase 9: also pause on `document.visibilitychange` so the WebGL
+  // render loop doesn't keep ticking when the user has the tab in the
+  // background. (Most browsers throttle hidden-tab rAF to ~1Hz, but
+  // explicit stop is cheaper and frees the GPU context entirely.)
   useEffect(() => {
     const node = wrapRef.current
     if (!node) return
@@ -102,20 +106,22 @@ export function SplineScene({ scene, className }: SplineSceneProps) {
       '(prefers-reduced-motion: reduce)',
     ).matches
 
+    const tabHiddenRef = { current: document.visibilityState === 'hidden' }
+
+    const apply = () => {
+      const app = appRef.current
+      if (!app) return
+      if (reduced || tabHiddenRef.current || !visibleRef.current) app.stop()
+      else app.play()
+    }
+
     const io = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
-          const isVisible = entry.isIntersecting && entry.intersectionRatio > 0
-          visibleRef.current = isVisible
-          const app = appRef.current
-          if (!app) continue
-          if (reduced) {
-            app.stop()
-            continue
-          }
-          if (isVisible) app.play()
-          else app.stop()
+          visibleRef.current =
+            entry.isIntersecting && entry.intersectionRatio > 0
         }
+        apply()
       },
       // 256px rootMargin: start the loop a bit before the canvas
       // scrolls into view so the user doesn't see a frozen first
@@ -123,7 +129,17 @@ export function SplineScene({ scene, className }: SplineSceneProps) {
       { rootMargin: '256px 0px', threshold: 0 },
     )
     io.observe(node)
-    return () => io.disconnect()
+
+    const onVisibility = () => {
+      tabHiddenRef.current = document.visibilityState === 'hidden'
+      apply()
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+
+    return () => {
+      io.disconnect()
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
   }, [])
 
   const handleLoad = (app: SplineApp) => {

@@ -1,34 +1,35 @@
-'use client'
-
 /**
- * GlobalBg — fixed-position layer that sits behind all page content.
+ * GlobalBg — fixed-position layer behind all page content.
  *
- * Two layers:
- *   1. Mint dot/grid lattice (`linear-gradient`s × 2, masked to a
- *      vignette). Static.
- *   2. Three aurora blobs (deep green near top, mint mid, mint-2 lower)
- *      that drift on a 22-30s ease-in-out keyframe.
+ * Phase 9 perf: this is now a server component. Two key changes vs.
+ * prior implementation:
  *
- * The aurora drift is paused under prefers-reduced-motion (handled
- * inline because each blob has its own animation-delay).
+ * 1. **`filter: blur(80px)` removed from the aurora blobs.** A blur
+ *    filter on a fixed-position element forces the compositor to
+ *    allocate a separate texture, run a 5-tap separable Gaussian
+ *    over the entire 720×720 / 560×560 region, and re-composite
+ *    every paint. Even though the blobs are static now, every page
+ *    paint (scroll, repaint, hover anywhere) was paying that cost.
+ *
+ *    Replaced with `radial-gradient(circle, <color> 0%, <color>
+ *    transparent 70%)`. Visually identical (a soft circular glow
+ *    falling off to transparent), but it's just a single solid paint
+ *    — zero blur compositor work.
+ *
+ * 2. **Aurora-drift infinite animation removed.** The 26s + 30s
+ *    `transform`/`scale` loops kept the compositor "warm" even when
+ *    the page was completely idle (driving rAF ticks for the blob
+ *    layer). The drift was so slow + subtle that almost no user ever
+ *    noticed it; killing it removes a continuous background cost.
+ *
+ * 3. **No `'use client'`, no `useEffect`, no `useState`** — there's
+ *    no longer any media-query work to do (the drift animation that
+ *    needed the prefers-reduced-motion gate is gone). Now this
+ *    renders as a pure server component, shipping zero JS to the
+ *    client for the background layer.
  */
 
-import { useEffect, useState } from 'react'
-
 export function GlobalBg() {
-  const [reduced, setReduced] = useState(false)
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
-    setReduced(mq.matches)
-    const onChange = (e: MediaQueryListEvent) => setReduced(e.matches)
-    mq.addEventListener('change', onChange)
-    return () => mq.removeEventListener('change', onChange)
-  }, [])
-
-  const driftAnim = reduced ? 'none' : 'aurora-drift'
-
   return (
     <div
       aria-hidden="true"
@@ -40,7 +41,10 @@ export function GlobalBg() {
         overflow: 'hidden',
       }}
     >
-      {/* Mint grid lattice */}
+      {/* Mint grid lattice — two thin gradients masked to a centered
+          ellipse so the lines fade into the page edges. Static, no
+          animation. The mask is the only borderline-expensive thing
+          here and we keep it because it's the signature look. */}
       <div
         style={{
           position: 'absolute',
@@ -55,14 +59,9 @@ export function GlobalBg() {
         }}
       />
 
-      {/* PERF: dropped from 3 aurora blobs (each blur 100px) to 2.
-          Section-local blobs in S/02 + S/03 already cover the same
-          mid-page real estate, so the third global blob was double-
-          stacking blurs there. Blur radius dialed back from 100 → 80
-          to halve the GPU shader work per repaint while keeping the
-          soft-light feel. */}
-
-      {/* Aurora blob — deep green, near hero */}
+      {/* Aurora blob — deep green, near hero. Pure radial-gradient now;
+          no filter:blur, no animation. The 720x720 block is purely
+          declarative paint. */}
       <div
         style={{
           position: 'absolute',
@@ -71,15 +70,12 @@ export function GlobalBg() {
           width: 720,
           height: 720,
           borderRadius: '50%',
-          background: 'rgba(42, 92, 69, 0.45)',
-          filter: 'blur(80px)',
-          animation: `${driftAnim} 26s ease-in-out infinite`,
-          willChange: 'transform',
-          transform: 'translateZ(0)',
+          background:
+            'radial-gradient(circle, rgba(42, 92, 69, 0.45) 0%, rgba(42, 92, 69, 0.18) 35%, rgba(42, 92, 69, 0) 70%)',
         }}
       />
 
-      {/* Aurora blob — mint-2, lower (kept for the warm bottom wash) */}
+      {/* Aurora blob — mint-2, lower (warm bottom wash). */}
       <div
         style={{
           position: 'absolute',
@@ -88,11 +84,8 @@ export function GlobalBg() {
           width: 560,
           height: 560,
           borderRadius: '50%',
-          background: 'rgba(167, 243, 208, 0.10)',
-          filter: 'blur(80px)',
-          animation: `${driftAnim} 30s ease-in-out -14s infinite`,
-          willChange: 'transform',
-          transform: 'translateZ(0)',
+          background:
+            'radial-gradient(circle, rgba(167, 243, 208, 0.10) 0%, rgba(167, 243, 208, 0.04) 40%, rgba(167, 243, 208, 0) 70%)',
         }}
       />
     </div>
