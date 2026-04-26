@@ -13,12 +13,10 @@
  * inlined via <style> at the end (still allowed in server components).
  */
 
-import Link from 'next/link'
-import { track } from '@vercel/analytics'
 import { EyebrowPill } from '@/components/landing-fx/eyebrow-pill'
-import { Magnetic } from '@/components/landing-fx/magnetic'
 import { Bento } from '@/components/landing-fx/bento'
 import { LivePrice } from '@/components/landing-fx/live-price'
+import { PriceCTA } from './price-cta'
 import { S } from './tokens'
 
 // Retailers shown beneath the body copy. Order is editorial — most
@@ -106,15 +104,7 @@ export function PriceFeature() {
             artificially inflated prices.
           </p>
 
-          <Magnetic strength={0.3}>
-            <Link
-              href="/signup"
-              onClick={() => track('signup_button_click', { location: 'price_feature' })}
-              className="btn-primary"
-            >
-              Start tracking prices <span aria-hidden="true">→</span>
-            </Link>
-          </Magnetic>
+          <PriceCTA />
 
           {/* Retailer row */}
           <div
