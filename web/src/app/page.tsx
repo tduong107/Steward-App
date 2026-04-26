@@ -39,8 +39,14 @@ import { FinalCTA } from '@/components/landing/final-cta'
 import { Footer } from '@/components/landing/footer'
 
 // Client islands (heavy interactive sections — split into async
-// chunks so they don't block the hero TTI)
-import { AIFeature } from '@/components/landing/ai-feature'
+// chunks so they don't block the hero TTI). Phase 10b: AIFeature
+// also moved to dynamic import — it's the second below-the-fold
+// section (S/03) and was eagerly imported, dragging its 2.8s
+// chat-interval state machine + IntersectionObserver into the
+// initial bundle even though the user has to scroll to see it.
+const AIFeature = nextDynamic(
+  () => import('@/components/landing/ai-feature').then((m) => m.AIFeature),
+)
 const LandingHIW = nextDynamic(
   () => import('@/components/landing-hiw').then((m) => m.LandingHIW),
 )

@@ -1148,3 +1148,28 @@ body {
 /* Shared fade-in for chat items */
 @keyframes tapHintPulse { 0%,100%{opacity:.4} 50%{opacity:1} }
 @keyframes sharePulse   { 0%,100%{opacity:.6;transform:scale(1)} 50%{opacity:1;transform:scale(1.15)} }
+
+/* ── S/02 (Price Drops) section-local kinetic styles ──────────────
+   Phase 10b: moved from an inline <style> block in price-feature.tsx
+   so the SSR'd HTML doesn't ship them on every server render. */
+@keyframes s02-chip-float {
+  0%, 100% { transform: translateY(0) rotate(3deg); }
+  50%      { transform: translateY(-6px) rotate(3.4deg); }
+}
+.s02-floating-chip {
+  animation: s02-chip-float 6s ease-in-out infinite;
+  will-change: transform;
+}
+@keyframes s02-chart-ping {
+  0%, 100% { opacity: 0.3; transform: scale(1); transform-origin: 300px 52px; }
+  50%      { opacity: 0.9; transform: scale(1.6); transform-origin: 300px 52px; }
+}
+.s02-chart-ping-bg {
+  animation: s02-chart-ping 2.2s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+@media (prefers-reduced-motion: reduce) {
+  .s02-floating-chip,
+  .s02-chart-ping-bg { animation: none !important; }
+}

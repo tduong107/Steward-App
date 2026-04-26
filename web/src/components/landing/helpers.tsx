@@ -5,12 +5,14 @@
  *
  * Phase 10 server-shell refactor: these were inline functions inside
  * the giant `landing-client-page.tsx` client component. Moving them
- * here means the static SVG, copy chrome, and chat bubble markup are
- * no longer part of the client bundle.
+ * here means the static SVG and chat bubble markup are no longer
+ * part of the client bundle.
+ *
+ * Phase 10b cleanup: dropped `Pill`, `FeatTitle`, `FeatBody`, and
+ * `FeatLink` exports — they were inherited from the old wrapper but
+ * had zero callers after the section extraction. The two remaining
+ * exports (`Logo`, `ChatBubble`) are both genuinely used.
  */
-
-import Link from 'next/link'
-import { S } from './tokens'
 
 // ── Logo ─────────────────────────────────────────────────────────────────────
 export function Logo() {
@@ -45,103 +47,6 @@ export function Logo() {
         </radialGradient>
       </defs>
     </svg>
-  )
-}
-
-// ── Pill (legacy mint pill, used in a few sections) ─────────────────────────
-export function Pill({ icon, label }: { icon: string; label: string }) {
-  return (
-    <div
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 6,
-        background: 'rgba(110,231,183,0.08)',
-        border: '1px solid rgba(110,231,183,0.18)',
-        borderRadius: 24,
-        padding: '5px 14px',
-        marginBottom: 20,
-      }}
-    >
-      <span style={{ fontSize: 13 }}>{icon}</span>
-      <span
-        style={{
-          fontSize: 10,
-          fontWeight: 700,
-          letterSpacing: '0.15em',
-          textTransform: 'uppercase',
-          color: S.mint,
-        }}
-      >
-        {label}
-      </span>
-    </div>
-  )
-}
-
-// ── Section H2 helper ───────────────────────────────────────────────────────
-export function FeatTitle({ children }: { children: React.ReactNode }) {
-  // Section H2 — clamp(44px, 6vw, 88px) per the concierge restyle spec.
-  // Line-height 0.96 + letter-spacing -0.035em across all section H2s.
-  return (
-    <h2
-      style={{
-        fontFamily: S.serif,
-        fontSize: 'clamp(44px,6vw,88px)',
-        fontWeight: 700,
-        lineHeight: 0.96,
-        letterSpacing: '-0.035em',
-        color: S.cream,
-        margin: 0,
-        marginBottom: 18,
-      }}
-    >
-      {children}
-    </h2>
-  )
-}
-
-export function FeatBody({ children }: { children: React.ReactNode }) {
-  return (
-    <p
-      style={{
-        fontSize: 16,
-        lineHeight: 1.65,
-        color: S.textDim,
-        fontWeight: 300,
-        marginBottom: 32,
-        maxWidth: 420,
-      }}
-    >
-      {children}
-    </p>
-  )
-}
-
-export function FeatLink({
-  href,
-  children,
-}: {
-  href: string
-  children: React.ReactNode
-}) {
-  return (
-    <Link
-      href={href}
-      className="lnd-feat-link"
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 8,
-        fontSize: 14,
-        fontWeight: 600,
-        color: S.mint,
-        textDecoration: 'none',
-        transition: 'gap .3s',
-      }}
-    >
-      {children}
-    </Link>
   )
 }
 

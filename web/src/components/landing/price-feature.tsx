@@ -7,10 +7,11 @@
  * else here — copy, retailer row, SVG chart, target-hit banner —
  * ships as zero-JS HTML.
  *
- * The big LivePrice text + the floating chip + the SVG chart are the
- * visually busy parts of S/02, but none of them need React state at
- * this level. The CSS keyframes for chip float + chart ping are
- * inlined via <style> at the end (still allowed in server components).
+ * Phase 10b: section-local <style> block (s02-chip-float, s02-chart-
+ * ping keyframes + classes) moved to globals.css for consistency
+ * with the other section keyframes — same SSR'd HTML, but the rules
+ * live with the rest of the landing chrome and don't re-ship inline
+ * on every server render.
  */
 
 import { EyebrowPill } from '@/components/landing-fx/eyebrow-pill'
@@ -370,30 +371,6 @@ export function PriceFeature() {
           </Bento>
         </div>
       </div>
-
-      <style>{`
-        @keyframes s02-chip-float {
-          0%, 100% { transform: translateY(0) rotate(3deg); }
-          50%      { transform: translateY(-6px) rotate(3.4deg); }
-        }
-        .s02-floating-chip {
-          animation: s02-chip-float 6s ease-in-out infinite;
-          will-change: transform;
-        }
-        @keyframes s02-chart-ping {
-          0%, 100% { opacity: 0.3; transform: scale(1); transform-origin: 300px 52px; }
-          50%      { opacity: 0.9; transform: scale(1.6); transform-origin: 300px 52px; }
-        }
-        .s02-chart-ping-bg {
-          animation: s02-chart-ping 2.2s ease-in-out infinite;
-          transform-box: fill-box;
-          transform-origin: center;
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .s02-floating-chip,
-          .s02-chart-ping-bg { animation: none !important; }
-        }
-      `}</style>
     </section>
   )
 }
