@@ -1013,3 +1013,138 @@ body {
   .bento::before { display: none; }
   /* Aurora drift is paused on the elements that own it (handled inline) */
 }
+
+/* ── Landing page chrome (Phase 10 server-shell refactor) ──────────
+   These styles were inline in a giant <style> block at the bottom of
+   the (now-deleted) LandingClientPage component. Moved here so the
+   server-rendered HTML doesn't need to ship 100+ lines of <style>
+   inline on every page load and so the rules are reusable across
+   the extracted section files. */
+
+/* Hover helpers that can't easily be inline */
+.lnd-cta-primary:hover {
+  transform: translateY(-3px) scale(1.02) !important;
+  box-shadow: 0 12px 40px rgba(110,231,183,0.35) !important;
+}
+.lnd-ghost-link:hover  { color: #6EE7B7 !important; }
+.lnd-feat-link:hover   { gap: 12px !important; }
+.lnd-chip:hover {
+  background: rgba(110,231,183,0.12) !important;
+  color: #6EE7B7 !important;
+  transform: translateY(-1px);
+}
+.lnd-demo-btn:hover {
+  transform: scale(1.04);
+  box-shadow: 0 4px 16px rgba(110,231,183,0.3);
+}
+.lnd-footer-link:hover { color: #6EE7B7 !important; }
+.lnd-appstore-btn:hover {
+  background: rgba(255,255,255,0.14) !important;
+  border-color: rgba(255,255,255,0.25) !important;
+  transform: translateY(-2px);
+}
+.lnd-nav-ios:hover {
+  border-color: rgba(110,231,183,0.4) !important;
+  background: rgba(110,231,183,0.08) !important;
+  color: #6EE7B7 !important;
+}
+.lnd-appstore-hero:hover {
+  background: rgba(110,231,183,0.1) !important;
+  border-color: rgba(110,231,183,0.4) !important;
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 8px 32px rgba(110,231,183,0.15) !important;
+}
+
+/* Platform device scene */
+@keyframes platformFloatA {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-12px); }
+}
+@keyframes platformFloatB {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+/* Single pulse: phone→laptop→phone ping-pong (horizontal) */
+@keyframes beamPingPong {
+  0%   { left: 0; opacity: 0; }
+  3%   { opacity: 1; }
+  48%  { left: calc(100% - 10px); opacity: 1; }
+  50%  { left: calc(100% - 10px); opacity: 1; }
+  52%  { opacity: 1; }
+  97%  { left: 0; opacity: 1; }
+  100% { left: 0; opacity: 0; }
+}
+/* Single pulse vertical: uses translateY so !important on top won't block it */
+@keyframes beamPingPongV {
+  0%   { transform: translateY(0); opacity: 0; }
+  3%   { opacity: 1; }
+  48%  { transform: translateY(calc(var(--track-h, 100px) - 10px)); opacity: 1; }
+  50%  { transform: translateY(calc(var(--track-h, 100px) - 10px)); opacity: 1; }
+  52%  { opacity: 1; }
+  97%  { transform: translateY(0); opacity: 1; }
+  100% { transform: translateY(0); opacity: 0; }
+}
+.lnd-sync-orb { animation: syncPulse 3s ease-in-out infinite; }
+/* Phase 6: was a 40px+80px stacked box-shadow at 50%. Stacked large
+   blur-radius shadows on an infinite-animated element expand the
+   layer's damage rect every paint. Single 16px shadow now. */
+@keyframes syncPulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(110,231,183,0.12); }
+  50%      { box-shadow: 0 0 16px rgba(110,231,183,0.30); }
+}
+
+/* Pulse dot for notification indicators */
+.lnd-pulse-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #6EE7B7; flex-shrink: 0; display: block;
+  box-shadow: 0 0 8px rgba(110,231,183,0.5);
+  animation: pulseDot 2s ease-in-out infinite;
+}
+
+/* Floating card parallax — CSS custom property method */
+[data-parallax] { translate: var(--px,0px) var(--py,0px); }
+
+/* Feature reverse on desktop */
+@media (min-width: 1101px) {
+  .lnd-feature-reverse { direction: rtl; }
+  .lnd-feature-reverse > * { direction: ltr; }
+}
+
+/* Responsive breakpoints */
+@media (max-width: 1100px) {
+  .lnd-hero-cards { display: none !important; }
+  .lnd-hero-text  { max-width: 100% !important; padding-left: 0 !important; text-align: center; }
+  .lnd-feature-grid   { grid-template-columns: 1fr !important; gap: 48px !important; direction: ltr !important; }
+  .lnd-feature-reverse { direction: ltr !important; }
+  .lnd-pricing-grid   { grid-template-columns: 1fr !important; max-width: 440px; margin: 0 auto; }
+  .lnd-device-scene       { flex-direction: column !important; gap: 0 !important; }
+  .lnd-phone-mockup       { margin-bottom: 0; }
+  .lnd-laptop-mockup      { width: 100% !important; max-width: 380px; }
+  .lnd-sync-connector     { --track-h: 110px; flex-direction: column !important; min-width: unset !important; max-width: unset !important; width: auto !important; min-height: 110px; padding: 8px 0 !important; }
+  .lnd-beam-track         { left: 50% !important; right: auto !important; top: 0 !important; bottom: 0 !important; width: 2px !important; height: auto !important; transform: translateX(-50%); background: repeating-linear-gradient(180deg, rgba(110,231,183,0.33) 0, rgba(110,231,183,0.33) 3px, transparent 3px, transparent 8px) !important; }
+  .lnd-pulse-track        { left: 50% !important; right: auto !important; top: 0 !important; bottom: 0 !important; width: 10px !important; height: 110px !important; transform: translateX(-50%) !important; }
+  .lnd-pulse-dot-pingpong { top: 0 !important; left: 0 !important; animation: beamPingPongV 3s ease-in-out infinite !important; }
+  .lnd-hamburger      { display: flex !important; }
+}
+/* Hide the desktop nav links / show hamburger a bit sooner — the
+   nav items are now larger so they need more horizontal room. */
+@media (max-width: 1200px) {
+  .lnd-nav-links      { display: none !important; }
+  .lnd-hamburger      { display: flex !important; }
+}
+@media (max-width: 768px) {
+  .lnd-hero-text { padding: 0 !important; }
+  nav { padding-left: clamp(16px, 5vw, 40px) !important; padding-right: clamp(16px, 5vw, 40px) !important; }
+}
+@media (max-width: 540px) {
+  .lnd-pricing-grid { grid-template-columns: 1fr !important; }
+  .lnd-feature-grid { gap: 36px !important; }
+}
+/* AI feature: show text above animation on mobile */
+@media (max-width: 1100px) {
+  .lnd-ai-text { order: -1 !important; }
+}
+
+/* Shared fade-in for chat items */
+@keyframes tapHintPulse { 0%,100%{opacity:.4} 50%{opacity:1} }
+@keyframes sharePulse   { 0%,100%{opacity:.6;transform:scale(1)} 50%{opacity:1;transform:scale(1.15)} }
