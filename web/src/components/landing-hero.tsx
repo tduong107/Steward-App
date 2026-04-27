@@ -382,7 +382,7 @@ export function LandingHero() {
               a pure CSS keyframe `hero-rise` (compositor thread, no JS). */}
           <div
             className="hero-rise"
-            style={{ marginBottom: 28, ['--hero-delay' as string]: '0.1s' } as React.CSSProperties}
+            style={{ marginBottom: 28, ['--hero-delay' as string]: '0s' } as React.CSSProperties}
           >
             <EyebrowPill icon="✦">Now on the App Store &amp; Web</EyebrowPill>
           </div>
@@ -407,15 +407,19 @@ export function LandingHero() {
                 (entrance dragged on for ~2s after page load), now
                 0.15–0.5s so the full headline resolves in ~1.1s.
                 Same 0.6s easing curve, just less waiting. */}
-            {['Scalpers', 'have', 'bots'].map((w, i) => (
-              <RevealWord key={w} word={w} delay={0.15 + i * 0.05} marginRight="0.22em" />
+            {/* Phase 11: dropped per-word stagger so all 7 headline
+                words fade together with the rest of the hero (instead
+                of resolving over 0.15-0.50s, which made warm-cache
+                Spline render BEFORE the headline finished). */}
+            {['Scalpers', 'have', 'bots'].map((w) => (
+              <RevealWord key={w} word={w} delay={0} marginRight="0.22em" />
             ))}
             <br />
             {['Now', 'you', 'have', 'a\u00a0concierge'].map((w, i) => (
               <RevealWord
                 key={w}
                 word={w}
-                delay={0.35 + i * 0.05}
+                delay={0}
                 marginRight={i < 3 ? '0.22em' : '0'}
                 italic
                 color={C.mint}
@@ -433,7 +437,7 @@ export function LandingHero() {
               fontWeight: 300,
               marginBottom: 36,
               maxWidth: 440,
-              ['--hero-delay' as string]: '0.55s',
+              ['--hero-delay' as string]: '0.05s',
             } as React.CSSProperties}
           >
             Be the first to snag deals, hard to get reservations, and sold-out tickets with Steward.
@@ -448,7 +452,7 @@ export function LandingHero() {
               alignItems: 'center',
               gap: 16,
               flexWrap: 'wrap',
-              ['--hero-delay' as string]: '0.65s',
+              ['--hero-delay' as string]: '0.1s',
             } as React.CSSProperties}
           >
             <Magnetic strength={0.3}>
@@ -482,7 +486,7 @@ export function LandingHero() {
             style={{
               marginTop: 32,
               maxWidth: 460,
-              ['--hero-delay' as string]: '0.75s',
+              ['--hero-delay' as string]: '0.15s',
             } as React.CSSProperties}
           >
             <div
@@ -736,7 +740,7 @@ export function LandingHero() {
               background:
                 'radial-gradient(ellipse 50% 80% at 50% 0%, rgba(110,231,183,0.22), transparent 70%)',
               pointerEvents: 'none',
-              ['--hero-delay' as string]: '0.4s',
+              ['--hero-delay' as string]: '0s',
             } as React.CSSProperties}
           />
 
@@ -757,7 +761,7 @@ export function LandingHero() {
                 'radial-gradient(circle at 50% 50%, rgba(110,231,183,0.18) 0%, rgba(110,231,183,0.04) 40%, transparent 70%)',
               filter: 'blur(30px)',
               pointerEvents: 'none',
-              ['--hero-delay' as string]: '0.6s',
+              ['--hero-delay' as string]: '0s',
             } as React.CSSProperties}
           />
 
@@ -910,7 +914,10 @@ function UseCaseCard({
         position: 'relative',
         width: '100%',
         padding: '14px',
-        ['--card-delay' as string]: `${0.25 + useCase.delay / 1000}s`,
+        // Phase 11: dropped per-card stagger (was 0.25s + useCase.delay)
+        // so all 6 cards fade together with the rest of the hero,
+        // converging with text + Spline arrival.
+        ['--card-delay' as string]: '0s',
         // Fully opaque gradient replaces the previous 82%-alpha + 18px
         // backdrop-filter blur — blurring a moving element was forcing
         // the compositor to re-paint behind each card every frame, the
