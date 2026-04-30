@@ -16,7 +16,12 @@ struct AuthScreen: View {
 
     var initialMode: AuthMode = .signUp
     @State private var authMode: AuthMode = .signIn
+    /// Local-portion of the phone number (digits only — country code is
+    /// supplied separately by the `country` picker below). The combined
+    /// E.164 string is built via `country.buildE164(localNumber:)`.
     @State private var phoneNumber = ""
+    @State private var country: Country = .default
+    @State private var showCountrySheet = false
     @State private var password = ""
     @State private var fullName = ""
     @State private var otpCode = ""
@@ -123,19 +128,17 @@ struct AuthScreen: View {
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
 
-            // Phone — the placeholder hints at international support so
-            // users from Spain/UK/etc. know they need to type the +country
-            // code prefix instead of just their local digits. The 6-digit
-            // example is illustrative only (US format), but the country
-            // code framing makes the intl path discoverable.
-            authTextField(icon: "phone", placeholder: "Phone (e.g., +1 555 123 4567)", text: $phoneNumber, keyboardType: .phonePad, contentType: .telephoneNumber)
+            // Phone — country chip (taps to open picker) + local-number
+            // input. The chip surfaces the chosen country's flag + dial
+            // code so international users see at a glance which country
+            // their number will be sent to. Replaces the older
+            // single-text-field that asked users to type "+34" themselves.
+            phoneFieldRow
 
             if authMode == .signUp {
-                Text("We'll text a 6-digit code to verify your number. Include your country code (e.g., +34 for Spain).")
+                Text("We'll text a code to verify your number")
                     .font(.system(size: 11)).foregroundStyle(mint.opacity(0.4))
                     .frame(maxWidth: .infinity, alignment: .leading).padding(.top, -8)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
             }
 
             // Password
@@ -186,7 +189,7 @@ struct AuthScreen: View {
 
             VStack(spacing: 6) {
                 Text("Verify Your Phone").font(.system(size: 17, weight: .semibold)).foregroundStyle(.white)
-                Text("We sent a 6-digit code to \(formatPhoneDisplay(phoneNumber))")
+                Text("We sent a 6-digit code to \(phoneDisplay)")
                     .font(.system(size: 13)).foregroundStyle(mint.opacity(0.6)).multilineTextAlignment(.center)
             }
 
@@ -220,13 +223,14 @@ struct AuthScreen: View {
 
             switch forgotPasswordStep {
             case .enterPhone:
-                authTextField(icon: "phone", placeholder: "Phone Number", text: $phoneNumber, keyboardType: .phonePad, contentType: .telephoneNumber)
+                phoneFieldRow
                 errorView
 
                 Button { Task { await handleSendResetOTP() } } label: {
                     submitLabel("Send Reset Code", icon: nil)
                 }
-                .disabled(isSubmitting || normalizedPhone.count < 10).opacity(normalizedPhone.count >= 10 ? 1.0 : 0.5)
+                .disabled(isSubmitting || !hasEnoughPhoneDigits)
+                .opacity(hasEnoughPhoneDigits ? 1.0 : 0.5)
 
             case .enterOTP:
                 authTextField(icon: "number", placeholder: "6-digit code", text: $otpCode, keyboardType: .numberPad, contentType: .oneTimeCode)
@@ -258,7 +262,7 @@ struct AuthScreen: View {
     private var forgotStepSubtitle: String {
         switch forgotPasswordStep {
         case .enterPhone: return "Enter your phone number to receive a reset code"
-        case .enterOTP: return "Enter the 6-digit code sent to \(formatPhoneDisplay(phoneNumber))"
+        case .enterOTP: return "Enter the 6-digit code sent to \(phoneDisplay)"
         case .enterNewPassword: return "Choose a new password (minimum 6 characters)"
         }
     }
@@ -375,6 +379,67 @@ struct AuthScreen: View {
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(mint.opacity(0.1), lineWidth: 1))
     }
 
+    /// Country chip (tappable) + local-number TextField, side by side.
+    /// Used by both the main signup/signin form and the forgot-password
+    /// "enter phone" step. Tapping the chip opens `CountryPickerSheet`
+    /// which writes back to `country`. The local-number input only
+    /// captures digits — `country.buildE164(localNumber:)` joins them
+    /// when we send to Supabase.
+    private var phoneFieldRow: some View {
+        HStack(spacing: 8) {
+            // Country chip — tappable button that opens the picker sheet
+            Button {
+                showCountrySheet = true
+            } label: {
+                HStack(spacing: 6) {
+                    Text(country.flag).font(.system(size: 18))
+                    Text(country.dial)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.white)
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(mint.opacity(0.5))
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 14)
+                .background(cardBg)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(mint.opacity(0.15), lineWidth: 1)
+                )
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Country: \(country.name), dial code \(country.dial). Tap to change.")
+
+            // Local-number input — phone icon + digits-only TextField.
+            HStack(spacing: 12) {
+                Image(systemName: "phone")
+                    .font(.system(size: 15))
+                    .foregroundStyle(mint.opacity(0.5))
+                    .frame(width: 20)
+                TextField(
+                    "",
+                    text: $phoneNumber,
+                    prompt: Text("Phone number").foregroundStyle(mint.opacity(0.3))
+                )
+                .font(.system(size: 15))
+                .foregroundStyle(.white)
+                .keyboardType(.phonePad)
+                .textContentType(.telephoneNumber)
+                .autocorrectionDisabled()
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .background(cardBg)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(mint.opacity(0.1), lineWidth: 1))
+        }
+        .sheet(isPresented: $showCountrySheet) {
+            CountryPickerSheet(selected: $country)
+        }
+    }
+
     private func authSecureField(icon: String, placeholder: String, text: Binding<String>) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon).font(.system(size: 15)).foregroundStyle(mint.opacity(0.5)).frame(width: 20)
@@ -388,29 +453,36 @@ struct AuthScreen: View {
 
     // MARK: - Validation
 
+    /// True when the local-number TextField has enough digits to bother
+    /// submitting. Permissive (Country.minLocalDigits = 7); Supabase /
+    /// Twilio do the authoritative validation. Used to gate the submit
+    /// button on both the main form and the forgot-password phone step.
+    private var hasEnoughPhoneDigits: Bool {
+        phoneNumber.filter { $0.isNumber }.count >= Country.minLocalDigits
+    }
+
     private var isFormValid: Bool {
-        let phoneValid = normalizedPhone.count >= 10
         if authMode == .signUp {
-            return phoneValid
+            return hasEnoughPhoneDigits
                 && !fullName.trimmingCharacters(in: .whitespaces).isEmpty
                 && password.count >= 6
         }
-        return phoneValid && password.count >= 6
+        return hasEnoughPhoneDigits && password.count >= 6
     }
 
+    /// Combined country dial code + local digits in E.164 format.
+    /// This is what Supabase / Twilio expect (e.g. `"+34634695622"`).
     private var normalizedPhone: String {
-        let digits = phoneNumber.filter { $0.isNumber }
-        if phoneNumber.hasPrefix("+") { return "+\(digits)" }
-        else if digits.count == 10 { return "+1\(digits)" }
-        else if digits.count == 11 && digits.hasPrefix("1") { return "+\(digits)" }
-        return "+\(digits)"
+        country.buildE164(localNumber: phoneNumber)
     }
 
-    private func formatPhoneDisplay(_ phone: String) -> String {
-        let digits = phone.filter { $0.isNumber }
-        if digits.count == 10 { return "(\(digits.prefix(3))) \(digits.dropFirst(3).prefix(3))-\(digits.suffix(4))" }
-        return phone
-    }
+    /// Display-friendly version of the user's phone number — currently
+    /// just the full E.164 string (e.g. `"+34634695622"`). Used in the
+    /// "We sent a code to ..." copy on the OTP step. Keeps the country
+    /// context visible so the user knows which number to expect the
+    /// SMS at. Computed property rather than a function so callers
+    /// don't have to pass anything.
+    private var phoneDisplay: String { normalizedPhone }
 
     // MARK: - Actions
 
