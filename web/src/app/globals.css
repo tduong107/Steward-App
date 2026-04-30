@@ -1,15 +1,28 @@
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
-/* NOTE: `@import "tw-animate-css"` and `@import "shadcn/tailwind.css"` were
-   previously here but were never paired with their npm packages in the
-   committed package.json — they came from a stray shadcn-CLI run that
-   landed in the uncommitted WIP. Vercel's clean install couldn't resolve
-   either package, which broke 5 deploys in a row (commits b86c83d → c5e7bd0).
-   Both imports are dead weight: the `fade-in-up` and `slide-in-right`
-   keyframes that page code actually uses are defined inline below, and
-   the shadcn token mappings live in the `@theme inline` block at the end
-   of this file. Removed permanently. */
+/* PERF: removed `@import url('fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap')`.
+   That was a render-blocking CSS request to Google Fonts loading
+   SEVEN font weights — most of which the landing copy never uses.
+   The `--font-body` stack already prefers system Inter (which ships
+   native on macOS Sonoma+, iOS 17+, Windows 11) and falls through
+   `-apple-system → BlinkMacSystemFont → Segoe UI → system-ui →
+   sans-serif` everywhere else. The visual delta from "Google-served
+   Inter" → system-ui fallback is sub-pixel for body copy at
+   16-18px; the FCP / render-blocking-request delta is ~200-400ms on
+   slow networks because we drop one CSS request and 7 font binary
+   fetches. (PageSpeed-tracked April 30 2026 was flagging exactly
+   this under "Render blocking requests".)
+
+   If we ever need pixel-perfect Inter across all platforms, bring it
+   back via `next/font/google` with `preload: true` only on the
+   routes that need it — never as a sitewide `@import`.
+
+   Earlier note (still applies): `@import "tw-animate-css"` and
+   `@import "shadcn/tailwind.css"` previously lived here too but
+   came from a stray shadcn-CLI run that landed in uncommitted WIP
+   without the matching npm packages. Removed in a prior cleanup.
+   The keyframes the page uses are inline below; shadcn tokens are
+   in the `@theme inline` block at the end. */
 
 @custom-variant dark (&:is(.dark *));
 
