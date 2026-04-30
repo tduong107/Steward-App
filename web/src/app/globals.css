@@ -260,6 +260,10 @@ html {
 }
 
 body {
+  /* CROSS-BROWSER: dvh (dynamic viewport height) requires Safari 15.4+
+     and Firefox 101+. Older browsers ignore the second declaration and
+     keep the first (vh), so this is a safe progressive enhancement. */
+  min-height: 100vh;
   min-height: 100dvh;
   overflow-x: clip;
 }
@@ -589,6 +593,12 @@ body {
   inset: 0;
   background-image: radial-gradient(circle, rgba(110,231,183,0.06) 1px, transparent 1px);
   background-size: 44px 44px;
+  /* CROSS-BROWSER: Safari needs the -webkit- prefix for mask-image. Without
+     it, Safari renders the dot-grid as a hard-edged rectangle covering the
+     full viewport (rather than the soft vignette the design intends). The
+     equivalent inline style in landing-fx/global-bg.tsx already had both
+     prefixes; this rule was missing the partner. */
+  -webkit-mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 0%, transparent 80%);
   mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 0%, transparent 80%);
   animation: gridDrift 25s linear infinite;
 }

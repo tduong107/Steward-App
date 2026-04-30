@@ -66,7 +66,13 @@ function Dialog({ open, onClose, title, children, className }: DialogProps) {
         aria-modal="true"
         aria-label={title}
         className={cn(
-          'relative flex flex-col w-full max-h-[calc(100dvh-2rem)] max-w-[calc(100vw-2rem)] sm:max-w-lg rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] shadow-xl transition-all duration-200',
+          // CROSS-BROWSER: was `max-h-[calc(100dvh-2rem)]` (Safari 15.4+,
+          // Firefox 101+). Tailwind arbitrary values render as a single
+          // CSS rule so we can't ship a vh→dvh fallback; using 100vh as
+          // the lowest-common-denominator means modals on older browsers
+          // get full viewport height too. URL-bar precision is moot for
+          // a transient overlay.
+          'relative flex flex-col w-full max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] sm:max-w-lg rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] shadow-xl transition-all duration-200',
           visible ? 'scale-100 opacity-100' : 'scale-95 opacity-0',
           className,
         )}

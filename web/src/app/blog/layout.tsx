@@ -9,7 +9,11 @@ export default function BlogLayout({ children }: { children: React.ReactNode }) 
       style={{
         background: '#080A08',
         color: '#F7F6F3',
-        minHeight: '100dvh',
+        // CROSS-BROWSER: React inline `style` only takes one minHeight value
+        // and `100dvh` is Safari 15.4+/Firefox 101+. Use 100vh so older
+        // browsers also get full-height; the URL-bar precision dvh would
+        // give isn't worth losing the fallback on a content-driven page.
+        minHeight: '100vh',
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
       }}
     >

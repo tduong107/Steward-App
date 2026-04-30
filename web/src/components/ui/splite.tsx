@@ -23,8 +23,33 @@
  * the placeholder remains as the final visual). Saves the runtime
  * cost completely for users who opted out of motion.
  */
-import { Suspense, lazy, useEffect, useRef, useState } from 'react'
+import { Component, Suspense, lazy, useEffect, useRef, useState, type ReactNode } from 'react'
 const Spline = lazy(() => import('@splinetool/react-spline'))
+
+// CROSS-BROWSER (Phase 12): error boundary around the Spline canvas.
+// Safari has documented WebGL context-loss bugs and the @splinetool
+// runtime can throw at decode time on malformed/corrupted .splinecode
+// fetches. Without a boundary, a Spline error bubbles up and crashes
+// the entire page tree (React 19 unmounts the parent). With this in
+// place, a Spline failure just leaves the static mint-glow placeholder
+// visible and the rest of the hero stays interactive.
+class SplineErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false }
+  static getDerivedStateFromError() {
+    return { hasError: true }
+  }
+  componentDidCatch(error: unknown) {
+    if (typeof console !== 'undefined') {
+      console.warn('[SplineScene] runtime error caught — falling back to placeholder', error)
+    }
+  }
+  render() {
+    return this.state.hasError ? null : this.props.children
+  }
+}
 
 // Minimal type for the bits of the Spline Application we touch — the
 // real type comes from @splinetool/runtime which we don't import
@@ -177,15 +202,17 @@ export function SplineScene({ scene, className }: SplineSceneProps) {
         }}
       />
       {shouldMount && (
-        <Suspense
-          fallback={
-            <div className="w-full h-full flex items-center justify-center">
-              <span className="loader"></span>
-            </div>
-          }
-        >
-          <Spline scene={scene} className={className} onLoad={handleLoad} />
-        </Suspense>
+        <SplineErrorBoundary>
+          <Suspense
+            fallback={
+              <div className="w-full h-full flex items-center justify-center">
+                <span className="loader"></span>
+              </div>
+            }
+          >
+            <Spline scene={scene} className={className} onLoad={handleLoad} />
+          </Suspense>
+        </SplineErrorBoundary>
       )}
     </div>
   )
