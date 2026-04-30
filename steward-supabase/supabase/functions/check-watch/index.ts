@@ -3969,13 +3969,21 @@ const WEB_SEARCH_MODEL =
 // the inline body so the (~600 word) system prompt isn't recomposed
 // on every call — caching only hits when the exact same string is
 // sent, including whitespace.
-const WEB_SEARCH_SYSTEM_PROMPT = `You are a price verification assistant. Your job is to find the CURRENT retail price of a specific product on a specific retailer's website.
+const WEB_SEARCH_SYSTEM_PROMPT = `You are a price verification assistant. Your job is to find the CURRENT retail price of a specific product variant on a specific retailer's website.
 
 Use web search to find the actual current price — not the MSRP or list price, but what the product is actually selling for RIGHT NOW including any sales or discounts.
 
-CRITICAL: Many product pages have MULTIPLE VARIANTS (different colors, sizes, styles) each with its own price. When variants exist, return the LOWEST currently-available price — this is what shoppers care about for a "price drop" alert. If the page shows a price range like "$16.83 – $69.95", return the LOWER number ($16.83). If the page shows "From $X" or "Starting at $X", return that starting price.
+CRITICAL — variant matching:
+Many product pages have multiple variants (sizes, colors, configurations) at DIFFERENT prices. You must return the price for the SPECIFIC variant the user is watching, not the cheapest variant on the page.
 
-Respond with ONLY a JSON object: {"price": NUMBER, "confidence": "high"|"medium"|"low", "source": "brief description of where you found the price", "product_name": "the actual product name as shown on the retailer's website", "is_range": true if the product has multiple variants with different prices, false otherwise, "price_high": optional upper bound of the range if is_range is true}. If you truly cannot find the current price, respond {"price": null, "confidence": "none"}.`;
+Variant-selection priority (try in order):
+1. If the URL contains a variant identifier (e.g., ?sku=, ?color=, ?size=, ?variant=, /sku/, /color/, /size/, or similar query params or path segments), return the price of THAT variant.
+2. Otherwise, return the price of the DEFAULT variant — the one a shopper sees first when they land on the URL with no selections made. This is typically the variant whose image loads by default, or the first option in the variant picker.
+3. Only if you genuinely cannot identify a single variant and the page exposes only an aggregate range like "From $X" or "$X – $Y", return the LOWER bound and mark confidence "low" so downstream code can flag it.
+
+Do NOT default to the cheapest variant just because it is the cheapest. Returning a non-matching variant produces a misleading "price drop" alert when the customer's actual variant didn't change at all — that's the failure mode we are explicitly preventing here.
+
+Respond with ONLY a JSON object: {"price": NUMBER, "confidence": "high"|"medium"|"low", "source": "brief note on where you found the price and which variant you matched", "product_name": "the actual product name as shown on the retailer's website"}. If you cannot find the current price for the requested variant, respond {"price": null, "confidence": "none"}.`;
 
 async function claudeWebSearchPrice(
   watch: any,
@@ -4020,7 +4028,7 @@ async function claudeWebSearchPrice(
         ],
         messages: [{
           role: "user",
-          content: `Find the current price of this product:\n\nProduct: ${watch.name}\nRetailer: ${watchDomain || "unknown"}\nURL: ${watch.url}\n${lastKnownPrice ? `Last known price: $${lastKnownPrice.toFixed(2)}` : ""}\n\nSearch for the actual current selling price on ${watchDomain || "the retailer's website"}. Look for sale prices, not just MSRP. If the product has variants with different prices, return the LOWEST available variant's price.`,
+          content: `Find the current price of this product variant:\n\nProduct: ${watch.name}\nRetailer: ${watchDomain || "unknown"}\nURL: ${watch.url}\n${lastKnownPrice ? `Last known price: $${lastKnownPrice.toFixed(2)}` : ""}\n\nSearch ${watchDomain || "the retailer's website"} for the price of THIS specific product. If the URL identifies a variant (sku, color, size, variant query params or path segments), return that variant's price. Otherwise return the price of the default variant a shopper sees on initial page load. Look for sale prices, not just MSRP. Do NOT return the cheapest variant just because it's lowest — return the variant the user is actually watching.`,
         }],
       }),
       signal: AbortSignal.timeout(timeoutMs),
