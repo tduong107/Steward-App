@@ -1432,6 +1432,13 @@ serve(async (req) => {
     let claudeEarlyPrice: number | null = null;
     let claudeEarlyConfidence: "high" | "medium" | "low" | "none" = "none";
     let claudeEarlyResultText: string | null = null;
+    // Cost guard: tracks whether the early-stage Claude Web Search ran
+    // (regardless of outcome) so the late-stage Fallback 0 below doesn't
+    // make a second identical call when the first one already returned
+    // null. Without this flag, a single watch check on a blocked
+    // domain that fails web-search extraction was paying for TWO
+    // Anthropic web-search calls before falling through to Serper.
+    let claudeEarlyAttempted = false;
     // Run the fast path for BOTH tiers of known-blocked domains:
     //   - serperFallbackDomains: rei, coach, nordstrom, etc. (flaky direct)
     //   - serperPrimaryDomains:  temu, shein, zara, hm        (always blocked)
@@ -1447,6 +1454,10 @@ serve(async (req) => {
       timeRemaining() > 16000
     ) {
       const wsStart = Date.now();
+      // Set BEFORE the await so a thrown error in claudeWebSearchPrice
+      // still records the attempt (don't pay for the same call twice
+      // even if the first one threw).
+      claudeEarlyAttempted = true;
       try {
         console.log(`[check-watch] Blocked-domain fast-path: Claude Web Search for ${watch.id} (${fetchDomain})`);
         // Use tighter 15s timeout (vs default 20s) to preserve budget for
@@ -2368,9 +2379,15 @@ serve(async (req) => {
     const needsFallback = (isCheckFailure || (currentPrice === null && watch.action_type === "price")) && !changed;
 
     // ─── Fallback 0: Claude Web Search (most accurate — uses real-time web search) ────
-    // Only for price watches on blocked domains where direct fetch fails consistently
+    // Only for price watches on blocked domains where direct fetch fails consistently.
+    //
+    // !claudeEarlyAttempted: skip if the early-stage fast path already
+    // ran above. The early path uses the same model + system prompt
+    // against the same URL, so calling claudeWebSearchPrice a second
+    // time can't produce a different answer — it would just charge us
+    // again for an identical web-search request.
     const isBlockedDomain = serperFallbackDomains.some(d => fetchDomain.includes(d)) || serperPrimaryDomains.some(d => fetchDomain.includes(d));
-    if (needsFallback && !autoFixed && ANTHROPIC_API_KEY && watch.name && isBlockedDomain && timeRemaining() > 22000) {
+    if (needsFallback && !autoFixed && ANTHROPIC_API_KEY && watch.name && isBlockedDomain && !claudeEarlyAttempted && timeRemaining() > 22000) {
       const wsStart = Date.now();
       try {
         console.log(`[check-watch] Fallback 0 — Claude Web Search for ${watch.id} (${watch.name})`);
@@ -3934,6 +3951,32 @@ function findPriceInJsonLd(obj: any): number | null {
 // More accurate than Serper+Claude because Claude can visit and understand full pages
 // ────────────────────────────────────────────────────────────────
 
+// Cost guard — was hardcoded to claude-sonnet-4-20250514, which made
+// every blocked-domain watch check ~10× more expensive than the rest
+// of the system (the other 6 Anthropic call sites all use Haiku 4.5).
+//
+// The web-search-with-extraction task this function performs ("visit
+// a known product URL, return the current price as JSON") does not
+// require Sonnet's reasoning — Haiku 4.5 supports the same
+// `web_search_20250305` tool and handles structured-extract prompts
+// well. Defaulting to Haiku here closes the cost gap without
+// degrading output. Override via `CLAUDE_WEB_SEARCH_MODEL` if you
+// need to A/B test Sonnet on a specific domain.
+const WEB_SEARCH_MODEL =
+  Deno.env.get("CLAUDE_WEB_SEARCH_MODEL") ?? "claude-haiku-4-5-20251001";
+
+// Constant so prompt caching has a stable cache key. Pulled out of
+// the inline body so the (~600 word) system prompt isn't recomposed
+// on every call — caching only hits when the exact same string is
+// sent, including whitespace.
+const WEB_SEARCH_SYSTEM_PROMPT = `You are a price verification assistant. Your job is to find the CURRENT retail price of a specific product on a specific retailer's website.
+
+Use web search to find the actual current price — not the MSRP or list price, but what the product is actually selling for RIGHT NOW including any sales or discounts.
+
+CRITICAL: Many product pages have MULTIPLE VARIANTS (different colors, sizes, styles) each with its own price. When variants exist, return the LOWEST currently-available price — this is what shoppers care about for a "price drop" alert. If the page shows a price range like "$16.83 – $69.95", return the LOWER number ($16.83). If the page shows "From $X" or "Starting at $X", return that starting price.
+
+Respond with ONLY a JSON object: {"price": NUMBER, "confidence": "high"|"medium"|"low", "source": "brief description of where you found the price", "product_name": "the actual product name as shown on the retailer's website", "is_range": true if the product has multiple variants with different prices, false otherwise, "price_high": optional upper bound of the range if is_range is true}. If you truly cannot find the current price, respond {"price": null, "confidence": "none"}.`;
+
 async function claudeWebSearchPrice(
   watch: any,
   lastKnownPrice: number | null,
@@ -3950,24 +3993,31 @@ async function claudeWebSearchPrice(
       headers: {
         "x-api-key": ANTHROPIC_API_KEY,
         "anthropic-version": "2023-06-01",
-        "anthropic-beta": "web-search-2025-03-05",
+        // Two betas comma-joined: web-search for the tool, prompt-caching
+        // so the 600-word system prompt is cached after the first call.
+        // Without caching every blocked-domain watch was paying full
+        // input-token cost on identical prompt content.
+        "anthropic-beta": "web-search-2025-03-05,prompt-caching-2024-07-31",
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
+        model: WEB_SEARCH_MODEL,
         max_tokens: 1024,
         tools: [{
           type: "web_search_20250305",
           name: "web_search",
           max_uses: 3,
         }],
-        system: `You are a price verification assistant. Your job is to find the CURRENT retail price of a specific product on a specific retailer's website.
-
-Use web search to find the actual current price — not the MSRP or list price, but what the product is actually selling for RIGHT NOW including any sales or discounts.
-
-CRITICAL: Many product pages have MULTIPLE VARIANTS (different colors, sizes, styles) each with its own price. When variants exist, return the LOWEST currently-available price — this is what shoppers care about for a "price drop" alert. If the page shows a price range like "$16.83 – $69.95", return the LOWER number ($16.83). If the page shows "From $X" or "Starting at $X", return that starting price.
-
-Respond with ONLY a JSON object: {"price": NUMBER, "confidence": "high"|"medium"|"low", "source": "brief description of where you found the price", "product_name": "the actual product name as shown on the retailer's website", "is_range": true if the product has multiple variants with different prices, false otherwise, "price_high": optional upper bound of the range if is_range is true}. If you truly cannot find the current price, respond {"price": null, "confidence": "none"}.`,
+        // Array form (vs plain string) is required to attach
+        // cache_control. Mirrors the Haiku evaluation call at the
+        // top of this file.
+        system: [
+          {
+            type: "text",
+            text: WEB_SEARCH_SYSTEM_PROMPT,
+            cache_control: { type: "ephemeral" },
+          },
+        ],
         messages: [{
           role: "user",
           content: `Find the current price of this product:\n\nProduct: ${watch.name}\nRetailer: ${watchDomain || "unknown"}\nURL: ${watch.url}\n${lastKnownPrice ? `Last known price: $${lastKnownPrice.toFixed(2)}` : ""}\n\nSearch for the actual current selling price on ${watchDomain || "the retailer's website"}. Look for sale prices, not just MSRP. If the product has variants with different prices, return the LOWEST available variant's price.`,
