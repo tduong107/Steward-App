@@ -8,6 +8,8 @@ import { ChatDrawer } from '@/components/chat-drawer'
 import { CommandPalette } from '@/components/command-palette'
 import { LaunchAnimation } from '@/components/launch-animation'
 import { PaywallDialog } from '@/components/paywall-dialog'
+import { AuthProvider } from '@/providers/auth-provider'
+import { SubscriptionProvider } from '@/providers/subscription-provider'
 import { ChatProvider, useChatDrawer } from '@/providers/chat-provider'
 import { useWatches } from '@/hooks/use-watches'
 
@@ -100,11 +102,31 @@ function DashboardLayoutInner({ children }: { children: ReactNode }) {
 }
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
+  // PERF: AuthProvider + SubscriptionProvider used to live in the
+  // root layout (`app/layout.tsx`), which meant every public
+  // marketing route (/, /about, /blog/*, /privacy, /terms, /support,
+  // /signup, /login, /forgot-password) shipped `@supabase/supabase-js`
+  // (~80 KiB) and the supabase/ssr cookie helpers despite never
+  // consuming the auth context. PageSpeed (Apr 30 2026) flagged 454
+  // KiB of unused JavaScript on the landing page and a 33s
+  // main-thread budget under throttling — most of which traced back
+  // here. Moving the providers into this dashboard layout means:
+  //   - Marketing routes never bundle the supabase client.
+  //   - /(auth)/login + /(auth)/signup + /(auth)/forgot-password
+  //     create their own supabase clients locally (they don't read
+  //     the AuthContext), so they're unaffected.
+  //   - /home/* (the only routes using `useAuth()` per a repo-wide
+  //     grep) still get the providers via this nested layout.
+  // ChatProvider stays nested inside because it's also dashboard-only.
   return (
-    <ChatProvider>
-      <Suspense>
-        <DashboardLayoutInner>{children}</DashboardLayoutInner>
-      </Suspense>
-    </ChatProvider>
+    <AuthProvider>
+      <SubscriptionProvider>
+        <ChatProvider>
+          <Suspense>
+            <DashboardLayoutInner>{children}</DashboardLayoutInner>
+          </Suspense>
+        </ChatProvider>
+      </SubscriptionProvider>
+    </AuthProvider>
   )
 }

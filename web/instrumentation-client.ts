@@ -36,7 +36,14 @@ posthog.init(process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN!, {
   capture_exceptions: true,
   disable_session_recording: true,
   disable_surveys: true,
-  advanced_disable_decide: true,
+  // PERF investigation note: also tried `advanced_disable_decide: true`
+  // in commit 2b5492b but the next PageSpeed run (Apr 30 2026 12:31)
+  // came back WORSE on TBT and showed +26 KiB unused JS. Best
+  // explanation is that PostHog falls into a different bundling /
+  // fallback path when /decide is hard-disabled — the /decide
+  // round-trip is a few hundred bytes; the *consequences* of disabling
+  // it apparently aren't free. Reverted; the recording + surveys
+  // disables alone capture the win we wanted.
   debug: process.env.NODE_ENV === "development",
 });
 

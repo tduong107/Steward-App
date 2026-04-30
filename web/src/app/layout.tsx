@@ -2,8 +2,16 @@ import type { Metadata } from 'next'
 import { Analytics } from '@vercel/analytics/react'
 import { SpeedInsights } from '@vercel/speed-insights/next'
 import './globals.css'
-import { AuthProvider } from '@/providers/auth-provider'
-import { SubscriptionProvider } from '@/providers/subscription-provider'
+// PERF: AuthProvider + SubscriptionProvider were previously imported
+// here and wrapped every route. They've been moved to
+// `app/home/layout.tsx` so the public marketing routes (/, /about,
+// /blog/*, /privacy, /terms, /support, /signup, /login,
+// /forgot-password) no longer ship `@supabase/supabase-js`. The
+// /(auth) routes create their own supabase client locally rather
+// than reading the AuthContext, and the /home dashboard routes are
+// the only consumers of `useAuth()` — moving the providers down to
+// /home preserves that behavior with a much smaller marketing
+// bundle.
 import { ThemeProvider } from '@/providers/theme-provider'
 import { PostHogProvider } from '@/providers/posthog-provider'
 import { Geist } from "next/font/google";
@@ -258,11 +266,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body style={{ fontFamily: 'var(--font-body)' }}>
         <PostHogProvider>
           <ThemeProvider>
-            <AuthProvider>
-              <SubscriptionProvider>
-                {children}
-              </SubscriptionProvider>
-            </AuthProvider>
+            {children}
           </ThemeProvider>
         </PostHogProvider>
         <Analytics />
