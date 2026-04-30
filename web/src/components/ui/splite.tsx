@@ -90,6 +90,17 @@ export function SplineScene({ scene, className }: SplineSceneProps) {
     ).matches
     if (reduced) return
 
+    // PERF: the landing-hero stage that hosts this canvas is hidden
+    // via `display: none` at max-width: 767px (see .hero-stage-desktop
+    // in landing-hero.tsx). Without this guard the component still
+    // mounts in the React tree on mobile, which triggers the dynamic
+    // Spline import + the .splinecode binary fetch + WebGL init for a
+    // canvas that's never visible. Gating the deferred mount on the
+    // desktop breakpoint drops ~562 KiB of JS + ~380 KiB of binary
+    // from every mobile pageload.
+    const isDesktop = window.matchMedia('(min-width: 768px)').matches
+    if (!isDesktop) return
+
     let timeoutId = 0
     let idleId = 0
 
