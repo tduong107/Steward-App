@@ -100,40 +100,117 @@ export const metadata: Metadata = {
   category: 'technology',
 }
 
+// Shared offer list used by both SoftwareApplication and
+// MobileApplication schemas — keeps pricing in one place so the two
+// surfaces can never drift.
+const offers = [
+  { '@type': 'Offer', 'price': '0', 'priceCurrency': 'USD', 'name': 'Free', 'description': '3 trackers, daily checks, push notifications' },
+  { '@type': 'Offer', 'price': '4.99', 'priceCurrency': 'USD', 'name': 'Pro', 'description': '7 trackers, 12-hour checks, email & SMS alerts' },
+  { '@type': 'Offer', 'price': '9.99', 'priceCurrency': 'USD', 'name': 'Premium', 'description': '15 trackers, 2-hour checks, automated actions, fake deal detection' },
+]
+
+// Master JSON-LD `@graph` describing the Steward entity to crawlers.
+//
+// Why each node is here:
+//
+// - `WebSite` — the canonical Steward web presence. The `potentialAction`
+//   SearchAction tells Google we have an internal search (the blog is
+//   query-able via `?q=`) and unlocks the sitelinks search box on the
+//   SERP. Even when the search target is modest, AI systems use this
+//   block to disambiguate "Steward" from other entities of the same
+//   name.
+//
+// - `SoftwareApplication` — describes the cross-platform product
+//   (web + iOS). Lists the three pricing tiers as `Offer`s so AI
+//   answers about pricing have authoritative numbers to cite.
+//
+// - `MobileApplication` — narrower node specifically for the iOS app.
+//   `SoftwareApplication` alone is not enough: it doesn't tell crawlers
+//   the app is on the App Store, what it costs to download, or which
+//   OS version is required. Without this, queries like "best AI
+//   shopping assistant iPhone app" can't surface Steward as a mobile
+//   app candidate.
+//
+// - `Organization` — entity for "the company called Steward". `sameAs`
+//   anchors the brand to its first-party platform profiles (App Store
+//   today; add Twitter / LinkedIn / Crunchbase as those go live) which
+//   helps Google's Knowledge Graph and reduces the risk that AI
+//   systems conflate us with other Steward-branded products.
 const jsonLd = {
   '@context': 'https://schema.org',
   '@graph': [
     {
       '@type': 'WebSite',
       'name': 'Steward',
+      'alternateName': 'Steward Concierge',
       'url': 'https://www.joinsteward.app',
       'description': 'AI-powered price tracker that monitors price drops, restocks, restaurant reservations, campsite openings, flight deals, and event tickets.',
+      'publisher': { '@id': 'https://www.joinsteward.app/#organization' },
+      'potentialAction': {
+        '@type': 'SearchAction',
+        'target': {
+          '@type': 'EntryPoint',
+          'urlTemplate': 'https://www.joinsteward.app/blog?q={search_term_string}',
+        },
+        'query-input': 'required name=search_term_string',
+      },
     },
     {
       '@type': 'SoftwareApplication',
+      '@id': 'https://www.joinsteward.app/#software',
       'name': 'Steward',
       'alternateName': 'Steward AI Concierge',
       'applicationCategory': 'UtilitiesApplication',
-      'operatingSystem': 'iOS, Web',
+      'applicationSubCategory': 'Price Tracker',
+      'operatingSystem': 'iOS 17.0, Web',
       'url': 'https://www.joinsteward.app',
       'downloadUrl': 'https://apps.apple.com/us/app/steward-concierge/id6760180137',
       'description': 'AI-powered price tracker that monitors price drops, restocks, restaurant reservations, campsite openings, flight deals, and event tickets across Amazon, Nike, Resy, Recreation.gov and more.',
-      'offers': [
-        { '@type': 'Offer', 'price': '0', 'priceCurrency': 'USD', 'name': 'Free', 'description': '3 trackers, daily checks, push notifications' },
-        { '@type': 'Offer', 'price': '4.99', 'priceCurrency': 'USD', 'name': 'Pro', 'description': '7 trackers, 12-hour checks, email & SMS alerts' },
-        { '@type': 'Offer', 'price': '9.99', 'priceCurrency': 'USD', 'name': 'Premium', 'description': '15 trackers, 2-hour checks, automated actions, fake deal detection' },
+      'featureList': [
+        'Price drop alerts on any URL',
+        'Restock alerts (Nike, Best Buy, Target)',
+        'Restaurant reservation tracking (Resy, OpenTable)',
+        'Campsite availability (Recreation.gov)',
+        'Flight fare tracking (Google Flights, Kayak)',
+        'Event ticket restock alerts (Ticketmaster)',
+        'AI chat for natural-language watch creation',
+        'iOS share extension',
+        'Push notifications, email, and SMS alerts',
       ],
+      'offers': offers,
+      'publisher': { '@id': 'https://www.joinsteward.app/#organization' },
+    },
+    {
+      '@type': 'MobileApplication',
+      '@id': 'https://www.joinsteward.app/#ios-app',
+      'name': 'Steward Concierge',
+      'alternateName': 'Steward — AI Price & Deal Tracker',
+      'applicationCategory': 'UtilitiesApplication',
+      'applicationSubCategory': 'Price Tracker',
+      'operatingSystem': 'iOS 17.0',
+      'url': 'https://apps.apple.com/us/app/steward-concierge/id6760180137',
+      'downloadUrl': 'https://apps.apple.com/us/app/steward-concierge/id6760180137',
+      'installUrl': 'https://apps.apple.com/us/app/steward-concierge/id6760180137',
+      'description': 'Native iOS app for Steward. Monitor price drops, restocks, restaurant reservations, campsites, flights, and event tickets with AI-assisted setup, push notifications, and a Safari share extension.',
+      'screenshot': 'https://www.joinsteward.app/og-image.png',
+      'offers': offers,
+      'publisher': { '@id': 'https://www.joinsteward.app/#organization' },
     },
     {
       '@type': 'Organization',
+      '@id': 'https://www.joinsteward.app/#organization',
       'name': 'Steward',
       'url': 'https://www.joinsteward.app',
       'logo': 'https://www.joinsteward.app/steward-logo.png',
+      'description': 'Maker of Steward, the AI-powered concierge app for price drops, restocks, restaurant reservations, campsite openings, flight deals, and event tickets.',
       'contactPoint': {
         '@type': 'ContactPoint',
         'email': 'hello@joinsteward.app',
         'contactType': 'customer support',
       },
+      'sameAs': [
+        'https://apps.apple.com/us/app/steward-concierge/id6760180137',
+      ],
     },
   ],
 }

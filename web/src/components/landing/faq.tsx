@@ -47,6 +47,29 @@ const FAQ_ITEMS = [
   },
 ]
 
+/**
+ * JSON-LD FAQPage schema. Injected as a `<script>` inside the section so
+ * that AI crawlers (ChatGPT, Perplexity, Google AI Overviews) and
+ * traditional rich-result parsers can extract Q&A pairs directly.
+ *
+ * Built from the same `FAQ_ITEMS` source the UI renders, so copy can
+ * never drift from the structured data. This is the single highest-ROI
+ * AI-SEO win on the landing page — FAQPage schema is one of the few
+ * formats that gets pulled verbatim into AI Overviews.
+ */
+const faqJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: FAQ_ITEMS.map((item) => ({
+    '@type': 'Question',
+    name: item.q,
+    acceptedAnswer: {
+      '@type': 'Answer',
+      text: item.a,
+    },
+  })),
+}
+
 export function FAQ() {
   const [open, setOpen] = useState<number | null>(null)
 
@@ -59,6 +82,10 @@ export function FAQ() {
         position: 'relative',
       }}
     >
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+      />
       <div className="landing-reveal" style={{ maxWidth: 720, margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: 48 }}>
           <div style={{ marginBottom: 16 }}>
