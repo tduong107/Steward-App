@@ -123,13 +123,19 @@ struct AuthScreen: View {
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
 
-            // Phone
-            authTextField(icon: "phone", placeholder: "Phone Number", text: $phoneNumber, keyboardType: .phonePad, contentType: .telephoneNumber)
+            // Phone — the placeholder hints at international support so
+            // users from Spain/UK/etc. know they need to type the +country
+            // code prefix instead of just their local digits. The 6-digit
+            // example is illustrative only (US format), but the country
+            // code framing makes the intl path discoverable.
+            authTextField(icon: "phone", placeholder: "Phone (e.g., +1 555 123 4567)", text: $phoneNumber, keyboardType: .phonePad, contentType: .telephoneNumber)
 
             if authMode == .signUp {
-                Text("We'll text a code to verify your number")
+                Text("We'll text a 6-digit code to verify your number. Include your country code (e.g., +34 for Spain).")
                     .font(.system(size: 11)).foregroundStyle(mint.opacity(0.4))
                     .frame(maxWidth: .infinity, alignment: .leading).padding(.top, -8)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             // Password
@@ -479,7 +485,35 @@ struct AuthScreen: View {
         if msg.contains("invalid login credentials") || msg.contains("invalid_credentials") { return "Incorrect phone number or password." }
         if msg.contains("phone") && msg.contains("already") { return "An account with this phone number already exists. Try signing in." }
         if msg.contains("rate limit") || msg.contains("too many") { return "Too many attempts. Please wait a moment and try again." }
-        if msg.contains("otp") || msg.contains("token") { return "Invalid verification code. Please check and try again." }
+
+        // Specific phone-format / Twilio-rejection errors. These come BEFORE
+        // any verification code is generated — the user is still on the
+        // phone-entry screen — so the previous catch-all "Invalid
+        // verification code" message was misleading. International numbers
+        // lacking a valid country code, regions Twilio can't reach, and
+        // malformed E.164 strings all land here.
+        let isSendFailure =
+            msg.contains("sending") ||                    // "error sending sms otp", "error sending OTP"
+            msg.contains("send sms") ||                   // "failed to send sms"
+            msg.contains("sms_send") ||                   // "sms_send_failed"
+            msg.contains("send_otp") ||                   // "send_otp_failed"
+            msg.contains("phone_provider") ||             // "phone_provider_disabled"
+            msg.contains("phone provider") ||             // human-readable variant
+            (msg.contains("phone") && msg.contains("invalid")) ||      // "phone is invalid", "invalid phone number"
+            (msg.contains("phone") && msg.contains("not supported")) || // "phone not supported in your region"
+            (msg.contains("phone") && msg.contains("not configured")) ||
+            (msg.contains("'to'") && msg.contains("phone")) ||         // Twilio: "Invalid 'To' Phone Number"
+            msg.contains("validation_failed")             // generic Supabase validation wrapper
+        if isSendFailure {
+            return "Couldn't send a code to that number. Make sure it includes the country code (e.g., +1 for US, +34 for Spain) and try again."
+        }
+
+        // OTP-verification failures (user has already entered a code that
+        // doesn't match or has expired). Tightened the match so it doesn't
+        // also swallow send-failures above.
+        if (msg.contains("otp") || msg.contains("token")) && (msg.contains("invalid") || msg.contains("expired")) {
+            return "Invalid verification code. Please check and try again."
+        }
         if msg.contains("password") && (msg.contains("short") || msg.contains("weak")) { return "Password must be at least 6 characters." }
         return error.localizedDescription
     }
