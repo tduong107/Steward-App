@@ -55,7 +55,7 @@ export default function SignupPage() {
     try {
       const supabase = createClient()
       // Sign up with phone + password; Supabase sends an OTP to verify the number
-      const { error: signUpError } = await supabase.auth.signUp({
+      const { data, error: signUpError } = await supabase.auth.signUp({
         phone: e164,
         password,
         options: {
@@ -71,6 +71,17 @@ export default function SignupPage() {
       })
 
       if (signUpError) { setError(friendlyAuthError(signUpError.message)); return }
+
+      // Supabase signals "this phone is already registered" by returning
+      // a User with an empty `identities` array (no error thrown — that
+      // would leak account-existence info). Without this check, the UI
+      // would advance to the OTP step where the user would wait
+      // forever for a code Supabase never asked Twilio to send.
+      if (data.user && (data.user.identities ?? []).length === 0) {
+        setError('An account with this phone number already exists. Try signing in.')
+        return
+      }
+
       setOtpSent(true)
     } catch {
       setError('An unexpected error occurred. Please try again.')
