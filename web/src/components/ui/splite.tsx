@@ -182,7 +182,27 @@ export function SplineScene({ scene, className }: SplineSceneProps) {
     <div
       ref={wrapRef}
       className={className}
-      style={{ width: '100%', height: '100%', position: 'relative' }}
+      style={{
+        width: '100%',
+        height: '100%',
+        position: 'relative',
+        // CROSS-BROWSER (Phase 12b): force an atomic GPU compositor layer
+        // on the canvas wrapper. Safari composites WebGL canvases on a
+        // separate layer from regular HTML; if the parent has any
+        // `transform` (the hero stage uses `translateX(13%)`), the canvas
+        // layer tracks the parent's layer with one frame of lag during
+        // scroll, producing a visible "swimming" / "robot not staying
+        // in place" effect. translateZ(0) promotes this wrapper to its
+        // own 3D-context layer that scrolls atomically with its parent.
+        // backface-visibility: hidden prevents Safari from re-rasterizing
+        // the canvas pixels on every scroll tick. willChange: transform
+        // hints the compositor to keep the layer warm during scroll.
+        transform: 'translateZ(0)',
+        WebkitTransform: 'translateZ(0)',
+        backfaceVisibility: 'hidden',
+        WebkitBackfaceVisibility: 'hidden',
+        willChange: 'transform',
+      }}
     >
       {/* CSS-only placeholder: a soft mint radial glow that matches
           the Spline scene's lighting silhouette. Sits in the same
