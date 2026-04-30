@@ -37,11 +37,13 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // Fetch all active watches with user_id to enforce tier limits
-    // Triggered watches are re-checked at reduced frequency for self-healing
+    // Fetch all active watches with user_id to enforce tier limits.
+    // Triggered watches are re-checked at reduced frequency for
+    // self-healing. `created_at` powers the per-user count cap below
+    // (oldest watches win when a user is over-cap).
     const { data: watches, error } = await supabase
       .from("watches")
-      .select("id, user_id, check_frequency, last_checked, preferred_check_time, triggered, status, consecutive_failures, needs_attention")
+      .select("id, user_id, check_frequency, last_checked, preferred_check_time, triggered, status, consecutive_failures, needs_attention, created_at")
       .in("status", ["watching", "triggered"])
       // Safety net: paused watches are excluded by status filter above,
       // but also skip anything with 24+ failures (max pause threshold for 2h watches)
@@ -68,6 +70,14 @@ serve(async (req) => {
       premium: 7200,    // Every 2 hours
     };
 
+    // Max active watches per tier — keep in sync with
+    // web/src/lib/utils.ts::watchLimit() and the iOS UI.
+    const TIER_MAX_WATCHES: Record<string, number> = {
+      free: 3,
+      pro: 7,
+      premium: 15,
+    };
+
     // Enforce: if a watch's frequency is faster than their tier allows, treat it as the tier max
     for (const w of watches ?? []) {
       const userTier = tierMap[w.user_id] ?? "free";
@@ -85,6 +95,71 @@ serve(async (req) => {
           .from("watches")
           .update({ check_frequency: cappedFreqName })
           .eq("id", w.id);
+      }
+    }
+
+    // ─── Watch-count cap enforcement ──────────────────────────────────
+    // The 20260429 migration adds a BEFORE INSERT trigger on `watches`
+    // that rejects new active rows above the tier cap. That covers
+    // future inserts; this block covers two cases the trigger can't
+    // help with:
+    //
+    //   (a) Existing users who already had over-cap watches at the
+    //       moment the trigger landed (grandfathered rows).
+    //   (b) Downgrade — a Premium user with 15 watches who drops to
+    //       Pro keeps all 15 rows. The trigger only blocks NEW
+    //       activations, so without this guard we'd happily run all
+    //       15 through Anthropic on every cron tick.
+    //
+    // Strategy: group active watches by user, sort each group by
+    // `created_at` ascending (oldest = most likely the user's
+    // intentional core watches), and only keep the first N per tier
+    // cap. The remaining over-cap watches are skipped silently this
+    // cycle — we don't pause them in the DB because the user might
+    // legitimately have grandfathered rows we want to preserve until
+    // they delete or upgrade. The cost protection is enough.
+    if (watches && watches.length > 0) {
+      const byUser = new Map<string, any[]>();
+      for (const w of watches) {
+        if (!w.user_id) continue;
+        const list = byUser.get(w.user_id) ?? [];
+        list.push(w);
+        byUser.set(w.user_id, list);
+      }
+
+      const allowedIds = new Set<string>();
+      for (const [userId, userWatches] of byUser) {
+        const userTier = tierMap[userId] ?? "free";
+        const cap = TIER_MAX_WATCHES[userTier] ?? TIER_MAX_WATCHES.free;
+        if (userWatches.length <= cap) {
+          // Under cap — every watch passes through.
+          for (const w of userWatches) allowedIds.add(w.id);
+          continue;
+        }
+        // Over cap — sort by created_at ascending, keep first N.
+        // Fallback to id sort if created_at is null/missing for
+        // legacy rows (deterministic, just less semantic).
+        userWatches.sort((a, b) => {
+          const ta = a.created_at ? new Date(a.created_at).getTime() : 0;
+          const tb = b.created_at ? new Date(b.created_at).getTime() : 0;
+          if (ta !== tb) return ta - tb;
+          return String(a.id).localeCompare(String(b.id));
+        });
+        const kept = userWatches.slice(0, cap);
+        for (const w of kept) allowedIds.add(w.id);
+        console.warn(
+          `[check-all] User ${userId} (${userTier}) is over the watch cap: ` +
+          `${userWatches.length} active vs ${cap} allowed. ` +
+          `Processing oldest ${cap}; skipping ${userWatches.length - cap} this cycle.`
+        );
+      }
+
+      // Mutate in place so the rest of the function operates on the
+      // capped subset.
+      const before = watches.length;
+      (watches as any[]).splice(0, watches.length, ...watches.filter((w: any) => allowedIds.has(w.id)));
+      if (watches.length !== before) {
+        console.log(`[check-all] Watch-count cap removed ${before - watches.length} watches from this cycle`);
       }
     }
 
