@@ -36,8 +36,20 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Redirect authenticated users away from auth pages
-  if (user && (request.nextUrl.pathname.startsWith('/login') || request.nextUrl.pathname.startsWith('/signup'))) {
+  // Redirect authenticated users away from auth pages AND the marketing
+  // landing. Phase 13: previously the redirect for `/` lived inside
+  // `app/page.tsx` as a Server Component side effect, which forced the
+  // page into `dynamic = 'force-dynamic'` and ran `auth.getUser()` a
+  // SECOND time per request (this middleware already ran it once at
+  // line 26). Moving the redirect here removes that duplicate auth
+  // check on every landing request (~80–150ms TTFB win for anon users)
+  // and lets the landing page itself be statically rendered.
+  if (
+    user &&
+    (request.nextUrl.pathname.startsWith('/login') ||
+      request.nextUrl.pathname.startsWith('/signup') ||
+      request.nextUrl.pathname === '/')
+  ) {
     const url = request.nextUrl.clone()
     url.pathname = '/home'
     return NextResponse.redirect(url)

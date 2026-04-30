@@ -15,13 +15,17 @@
  *
  * GlobalBg + CursorSpotlight + ScrollRevealInit are tiny client
  * effects that mount once at the root.
+ *
+ * Phase 13: dropped `dynamic = 'force-dynamic'` and the per-request
+ * `supabase.auth.getUser()` redirect. The middleware already runs
+ * the auth check on every request and now also handles the `/` →
+ * `/home` redirect for authed users (see lib/supabase/middleware.ts).
+ * Doing the check here too was duplicating ~80-150ms of TTFB latency
+ * per landing request. Without `force-dynamic`, Next.js can also
+ * statically render the page shell + cache it on the CDN.
  */
 
-export const dynamic = 'force-dynamic'
-
-import { redirect } from 'next/navigation'
 import nextDynamic from 'next/dynamic'
-import { createClient } from '@/lib/supabase/server'
 
 // Server-rendered chrome
 import { GlobalBg } from '@/components/landing-fx/global-bg'
@@ -63,16 +67,7 @@ const FAQ = nextDynamic(
   () => import('@/components/landing/faq').then((m) => m.FAQ),
 )
 
-export default async function LandingPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (user) {
-    redirect('/home')
-  }
-
+export default function LandingPage() {
   return (
     <div
       style={{
