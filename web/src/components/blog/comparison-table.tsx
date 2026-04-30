@@ -15,19 +15,48 @@ interface ComparisonGroup {
 interface ComparisonTableProps {
   competitorName: string
   groups: ComparisonGroup[]
+  /**
+   * Optional explicit caption. Defaults to a sensible "Steward vs
+   * <competitor>" string. The caption is also surfaced to AI crawlers
+   * and screen readers as the table's accessible name.
+   */
+  caption?: string
+}
+
+/**
+ * Visually-hidden span pattern (the standard "sr-only" technique).
+ * Renders text that's invisible on screen but present in the DOM,
+ * which means AI crawlers (ChatGPT, Perplexity, AI Overviews) and
+ * screen readers see plain "Yes" / "No" tokens rather than just the
+ * unicode glyphs the sighted user sees. Without this the boolean
+ * columns extract as opaque \u2713/\u2717 symbols and AI answers can't tell us
+ * which side has the feature.
+ */
+const visuallyHidden: React.CSSProperties = {
+  position: 'absolute',
+  width: 1,
+  height: 1,
+  padding: 0,
+  margin: -1,
+  overflow: 'hidden',
+  clip: 'rect(0,0,0,0)',
+  whiteSpace: 'nowrap',
+  border: 0,
 }
 
 function CellValue({ value }: { value: string | boolean }) {
   if (typeof value === 'boolean') {
     return (
       <span
+        aria-label={value ? 'Yes' : 'No'}
         style={{
           fontSize: 18,
           fontWeight: 700,
           color: value ? '#6EE7B7' : '#EF4444',
         }}
       >
-        {value ? '\u2713' : '\u2717'}
+        <span aria-hidden="true">{value ? '\u2713' : '\u2717'}</span>
+        <span style={visuallyHidden}>{value ? 'Yes' : 'No'}</span>
       </span>
     )
   }
@@ -37,7 +66,11 @@ function CellValue({ value }: { value: string | boolean }) {
 export default function ComparisonTable({
   competitorName,
   groups,
+  caption,
 }: ComparisonTableProps) {
+  const accessibleCaption =
+    caption ?? `Steward vs ${competitorName} feature comparison`
+
   return (
     <>
       {/* Desktop table */}
@@ -57,6 +90,10 @@ export default function ComparisonTable({
             fontSize: 14,
           }}
         >
+          {/* Visually-hidden caption: gives the table an accessible
+              name for screen readers AND a labeled hook AI crawlers can
+              use when extracting the comparison into an answer. */}
+          <caption style={visuallyHidden}>{accessibleCaption}</caption>
           <thead>
             <tr
               style={{
@@ -67,6 +104,7 @@ export default function ComparisonTable({
               }}
             >
               <th
+                scope="col"
                 style={{
                   textAlign: 'left' as const,
                   padding: '12px 16px',
@@ -80,6 +118,7 @@ export default function ComparisonTable({
                 Feature
               </th>
               <th
+                scope="col"
                 style={{
                   textAlign: 'center' as const,
                   padding: '12px 16px',
@@ -94,6 +133,7 @@ export default function ComparisonTable({
                 Steward
               </th>
               <th
+                scope="col"
                 style={{
                   textAlign: 'center' as const,
                   padding: '12px 16px',
@@ -144,16 +184,24 @@ export default function ComparisonTable({
                         : {}),
                     }}
                   >
-                    <td
+                    {/* `scope="row"` tells crawlers and assistive tech
+                        that the feature name labels the row's other
+                        cells — so an AI extracting "Steward: Yes" from
+                        the second column knows what attribute that
+                        "Yes" applies to. */}
+                    <th
+                      scope="row"
                       style={{
                         padding: '12px 16px',
                         color: '#F7F6F3',
                         borderBottom:
                           '1px solid rgba(255,255,255,0.04)',
+                        textAlign: 'left' as const,
+                        fontWeight: 400,
                       }}
                     >
                       {row.feature}
-                    </td>
+                    </th>
                     <td
                       style={{
                         padding: '12px 16px',
