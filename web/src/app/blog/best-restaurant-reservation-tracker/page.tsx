@@ -206,7 +206,12 @@ export default function BestRestaurantReservationTrackerPage() {
             margin: 0,
           }}
         >
-          Published April 9, 2026 &middot; 6 min read
+          {/* Visible publish date. This article's `datePublished` and
+              `dateModified` (in articleJsonLd above) are both
+              2026-04-23 — most-recent of the four posts — so we don't
+              show a separate "Updated" line until the article is
+              meaningfully edited and `dateModified` is bumped. */}
+          Published April 23, 2026 &middot; 6 min read
         </p>
       </header>
 

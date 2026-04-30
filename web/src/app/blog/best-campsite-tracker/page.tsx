@@ -15,8 +15,13 @@ const APP_STORE_URL =
 const WEB_APP_URL = '/signup'
 
 /* ── SEO Metadata ── */
+// Trimmed page title from 65 chars to 56 to fit Google's ~60-char
+// SERP display (the previous "...National Park Reservations" was
+// truncating to "...Park Reser..." in search results, hurting CTR).
+// The og:title and the visible H1 keep the longer phrasing because
+// they're not subject to the SERP truncation.
 export const metadata: Metadata = {
-  title: 'Best Campsite Tracker: Get Yosemite & National Park Reservations',
+  title: 'Best Campsite Tracker: Yosemite & National Parks',
   description:
     'How to snag sold-out campsites at Yosemite, Yellowstone, Big Sur, and other national parks. Steward monitors Recreation.gov cancellations 24/7 and alerts you instantly.',
   alternates: {
@@ -87,8 +92,11 @@ const faqs = [
 const articleJsonLd = {
   '@context': 'https://schema.org',
   '@type': 'Article',
-  headline:
-    'Best Campsite Tracker: Get Yosemite & National Park Reservations',
+  // Trimmed from "Best Campsite Tracker: Get Yosemite & National Park
+  // Reservations" (65 chars) to fit Google's ~60-char SERP display.
+  // The full keyword phrasing still lives in the H1, og:title, and
+  // article body — only the structured-data `headline` is shortened.
+  headline: 'Best Campsite Tracker: Yosemite & National Parks',
   description:
     'How to snag sold-out campsites at Yosemite, Yellowstone, Big Sur, and other national parks. Steward monitors Recreation.gov cancellations 24/7 and alerts you instantly.',
   datePublished: '2026-04-09',
@@ -198,6 +206,13 @@ export default function BestCampsiteTrackerPage() {
           Yosemite, Yellowstone, and Big Sur sites sell out in minutes.
           Here&apos;s how to actually get one.
         </p>
+        {/* Published + Updated dates — visible freshness signal.
+            Both Google ("Last updated" appears in SERPs) and AI
+            answer engines weigh these as recency cues, and human
+            readers trust recently-updated guides more than ones with
+            only a stale published date. Keep the displayed dates
+            in sync with `datePublished` and `dateModified` in the
+            articleJsonLd block above this component. */}
         <p
           style={{
             fontSize: 13,
@@ -205,7 +220,7 @@ export default function BestCampsiteTrackerPage() {
             margin: 0,
           }}
         >
-          Published April 9, 2026 &middot; 6 min read
+          Published April 9, 2026 &middot; Updated April 25, 2026 &middot; 6 min read
         </p>
       </header>
 

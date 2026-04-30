@@ -6,6 +6,19 @@ export const metadata: Metadata = {
   title: 'Terms of Service',
   description: 'Terms of Service for Steward — the AI-powered price tracker and web monitoring concierge.',
   alternates: { canonical: 'https://www.joinsteward.app/terms' },
+  // OpenGraph + Twitter so a shared "/terms" link gets a proper
+  // page-titled preview. Image inherits from app/opengraph-image.tsx.
+  openGraph: {
+    title: 'Terms of Service | Steward',
+    description: 'Terms of Service for Steward — the AI-powered price tracker and web monitoring concierge.',
+    url: 'https://www.joinsteward.app/terms',
+    type: 'article',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Terms of Service | Steward',
+    description: 'Terms of Service for Steward — the AI-powered price tracker and web monitoring concierge.',
+  },
 }
 
 export default function TermsOfServicePage() {

@@ -282,7 +282,11 @@ export default function StewardVsCamelCamelCamelPage() {
             color: 'rgba(247,246,243,0.35)',
           }}
         >
-          Published April 9, 2026 &middot; 5 min read
+          {/* Visible publish + updated dates. Keep these in sync with
+              `articleJsonLd.datePublished` and `dateModified` above.
+              Google surfaces "Last updated" in SERPs and AI answer
+              engines weigh recency. */}
+          Published March 26, 2026 &middot; Updated April 22, 2026 &middot; 5 min read
         </p>
       </header>
 

@@ -269,7 +269,12 @@ export default function StewardVsHoneyPage() {
             margin: 0,
           }}
         >
-          Published April 9, 2026 &middot; 5 min read
+          {/* Visible publish + updated dates. Keep these in sync with
+              `articleJsonLd.datePublished` and `dateModified` above.
+              Google surfaces "Last updated" in SERPs and AI answer
+              engines weigh recency, so this is a meaningful trust
+              signal — not just a UI nicety. */}
+          Published March 12, 2026 &middot; Updated April 22, 2026 &middot; 5 min read
         </p>
       </header>
 

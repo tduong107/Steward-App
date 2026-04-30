@@ -6,6 +6,21 @@ export const metadata: Metadata = {
   title: 'Privacy Policy',
   description: 'Privacy Policy for Steward — how we handle your data, protect your privacy, and keep your price tracking information secure.',
   alternates: { canonical: 'https://www.joinsteward.app/privacy' },
+  // OpenGraph + Twitter so a shared "/privacy" link gets a proper
+  // page-titled preview rather than falling back to the layout-level
+  // generic landing-page tags. Image is inherited from the
+  // app/opengraph-image.tsx convention file (no override needed).
+  openGraph: {
+    title: 'Privacy Policy | Steward',
+    description: 'How Steward handles your data, protects your privacy, and keeps your tracking information secure.',
+    url: 'https://www.joinsteward.app/privacy',
+    type: 'article',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Privacy Policy | Steward',
+    description: 'How Steward handles your data, protects your privacy, and keeps your tracking information secure.',
+  },
 }
 
 export default function PrivacyPolicyPage() {

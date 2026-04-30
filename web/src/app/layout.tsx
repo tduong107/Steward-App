@@ -60,18 +60,19 @@ export const metadata: Metadata = {
     siteName: 'Steward',
     type: 'website',
     locale: 'en_US',
-    images: [{
-      url: '/og-image.png',
-      width: 1200,
-      height: 630,
-      alt: 'Steward — AI Price Tracker for Deals, Restocks, Reservations & Flights',
-    }],
+    // No `images` here on purpose. Next.js auto-emits og:image,
+    // og:image:width, og:image:height, and og:image:alt from
+    // `app/opengraph-image.tsx`. Hardcoding `images: [{url: '/og-image.png'}]`
+    // here would 404 (no such static asset) and used to suppress
+    // the convention file in older Next versions. Let the
+    // convention own this.
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Steward — AI Price Tracker for Deals, Restocks, Reservations & Flights',
     description: 'Track price drops, restocks, restaurant reservations, campsites, flights, and event tickets. Free to start.',
-    images: ['/og-image.png'],
+    // Same story as openGraph above — `app/twitter-image.tsx`
+    // generates the image and Next emits twitter:image automatically.
   },
   robots: {
     index: true,
@@ -192,7 +193,12 @@ const jsonLd = {
       'downloadUrl': 'https://apps.apple.com/us/app/steward-concierge/id6760180137',
       'installUrl': 'https://apps.apple.com/us/app/steward-concierge/id6760180137',
       'description': 'Native iOS app for Steward. Monitor price drops, restocks, restaurant reservations, campsites, flights, and event tickets with AI-assisted setup, push notifications, and a Safari share extension.',
-      'screenshot': 'https://www.joinsteward.app/og-image.png',
+      // Use the Next.js convention OG image — `/og-image.png` was a
+      // 404'ing static asset reference. The convention route
+      // generates a 1200×630 PNG branded for social previews and is
+      // a perfectly fine `screenshot` value for the
+      // MobileApplication schema.
+      'screenshot': 'https://www.joinsteward.app/opengraph-image',
       'offers': offers,
       'publisher': { '@id': 'https://www.joinsteward.app/#organization' },
     },
