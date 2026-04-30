@@ -154,8 +154,11 @@ const articleJsonLd = {
   headline: 'Steward vs Honey (2026): Beyond Coupon Codes',
   description:
     'Honey finds coupons at checkout. Steward tracks prices, restaurants, campsites, flights, and event tickets across any website. See the full comparison.',
-  datePublished: '2026-04-09',
-  dateModified: '2026-04-09',
+  datePublished: '2026-03-12',
+  // dateModified > datePublished signals to AI ranking that the post
+  // is actively maintained — bump this whenever you meaningfully edit
+  // the comparison table or FAQ.
+  dateModified: '2026-04-22',
   author: { '@type': 'Organization', name: 'Steward' },
   publisher: { '@type': 'Organization', name: 'Steward' },
   mainEntityOfPage: 'https://www.joinsteward.app/blog/steward-vs-honey',
@@ -174,6 +177,20 @@ const faqJsonLd = {
   })),
 }
 
+// BreadcrumbList lets Google show the hierarchy in SERPs ("joinsteward.app
+// › Blog › Steward vs Honey") and gives AI crawlers a structured
+// navigational path back to the homepage and blog index. Order matters —
+// `position` indexes from 1.
+const breadcrumbJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://www.joinsteward.app' },
+    { '@type': 'ListItem', position: 2, name: 'Blog', item: 'https://www.joinsteward.app/blog' },
+    { '@type': 'ListItem', position: 3, name: 'Steward vs Honey', item: 'https://www.joinsteward.app/blog/steward-vs-honey' },
+  ],
+}
+
 /* ══════════════════════════════════════════════
    Page Component
    ══════════════════════════════════════════════ */
@@ -188,6 +205,10 @@ export default function StewardVsHoneyPage() {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
       />
 
       {/* ── Breadcrumbs ── */}

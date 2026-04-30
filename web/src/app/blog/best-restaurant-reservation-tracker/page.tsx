@@ -92,8 +92,11 @@ const articleJsonLd = {
     'Best Restaurant Reservation Tracker: Get Hard-to-Book Tables',
   description:
     'How to get reservations at Carbone, Don Angie, and other impossible restaurants. Steward monitors Resy and OpenTable for cancellations automatically.',
-  datePublished: '2026-04-09',
-  dateModified: '2026-04-09',
+  datePublished: '2026-04-23',
+  // Most recently published of the four — `dateModified` matches
+  // `datePublished` until the post is meaningfully edited. Bump it
+  // when you revise the restaurant list, FAQ, or steps.
+  dateModified: '2026-04-23',
   author: { '@type': 'Organization', name: 'Steward' },
   publisher: { '@type': 'Organization', name: 'Steward' },
   mainEntityOfPage:
@@ -113,6 +116,17 @@ const faqJsonLd = {
   })),
 }
 
+// BreadcrumbList — hierarchical SERP / AI-crawler navigation aid.
+const breadcrumbJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://www.joinsteward.app' },
+    { '@type': 'ListItem', position: 2, name: 'Blog', item: 'https://www.joinsteward.app/blog' },
+    { '@type': 'ListItem', position: 3, name: 'Best Restaurant Reservation Tracker', item: 'https://www.joinsteward.app/blog/best-restaurant-reservation-tracker' },
+  ],
+}
+
 /* ══════════════════════════════════════════════
    Page Component
    ══════════════════════════════════════════════ */
@@ -127,6 +141,10 @@ export default function BestRestaurantReservationTrackerPage() {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
       />
 
       {/* ── Breadcrumbs ── */}

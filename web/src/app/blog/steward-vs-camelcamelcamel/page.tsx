@@ -165,7 +165,10 @@ export default function StewardVsCamelCamelCamelPage() {
       'Steward vs CamelCamelCamel (2026): Price Tracking Beyond Amazon',
     description:
       'CamelCamelCamel only tracks Amazon prices. Steward works on any website — Nike, Best Buy, Target — plus restaurants, campsites, flights, and tickets.',
-    datePublished: '2026-04-09',
+    datePublished: '2026-03-26',
+    // dateModified > datePublished signals active maintenance to AI
+    // ranking. Bump when you meaningfully edit the comparison or FAQ.
+    dateModified: '2026-04-22',
     author: { '@type': 'Organization', name: 'Steward' },
     publisher: {
       '@type': 'Organization',
@@ -187,6 +190,19 @@ export default function StewardVsCamelCamelCamelPage() {
     })),
   }
 
+  /* ── JSON-LD: BreadcrumbList ── */
+  // Hierarchical navigation hint for SERPs and AI crawlers. `position`
+  // is 1-indexed by spec.
+  const breadcrumbJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://www.joinsteward.app' },
+      { '@type': 'ListItem', position: 2, name: 'Blog', item: 'https://www.joinsteward.app/blog' },
+      { '@type': 'ListItem', position: 3, name: 'Steward vs CamelCamelCamel', item: 'https://www.joinsteward.app/blog/steward-vs-camelcamelcamel' },
+    ],
+  }
+
   return (
     <>
       {/* JSON-LD */}
@@ -197,6 +213,10 @@ export default function StewardVsCamelCamelCamelPage() {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
       />
 
       {/* ── Breadcrumbs ── */}

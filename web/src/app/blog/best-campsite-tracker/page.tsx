@@ -92,7 +92,10 @@ const articleJsonLd = {
   description:
     'How to snag sold-out campsites at Yosemite, Yellowstone, Big Sur, and other national parks. Steward monitors Recreation.gov cancellations 24/7 and alerts you instantly.',
   datePublished: '2026-04-09',
-  dateModified: '2026-04-09',
+  // Bump this whenever the park list, FAQ, or step-by-step content is
+  // meaningfully revised. AI ranking weights `dateModified > datePublished`
+  // as a signal that the page is actively maintained.
+  dateModified: '2026-04-25',
   author: { '@type': 'Organization', name: 'Steward' },
   publisher: { '@type': 'Organization', name: 'Steward' },
   mainEntityOfPage:
@@ -112,6 +115,17 @@ const faqJsonLd = {
   })),
 }
 
+// BreadcrumbList — hierarchical SERP / AI-crawler navigation aid.
+const breadcrumbJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://www.joinsteward.app' },
+    { '@type': 'ListItem', position: 2, name: 'Blog', item: 'https://www.joinsteward.app/blog' },
+    { '@type': 'ListItem', position: 3, name: 'Best Campsite Tracker', item: 'https://www.joinsteward.app/blog/best-campsite-tracker' },
+  ],
+}
+
 /* ══════════════════════════════════════════════
    Page Component
    ══════════════════════════════════════════════ */
@@ -126,6 +140,10 @@ export default function BestCampsiteTrackerPage() {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
       />
 
       {/* ── Breadcrumbs ── */}
