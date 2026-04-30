@@ -219,8 +219,15 @@ const jsonLd = {
         'email': 'hello@joinsteward.app',
         'contactType': 'customer support',
       },
+      // sameAs anchors the Steward brand to its first-party
+      // platform profiles. More entries = stronger entity
+      // disambiguation in Google's Knowledge Graph and reduced risk
+      // that AI engines confuse "Steward" with other identically
+      // named products. Add new official social profiles here as
+      // they go live.
       'sameAs': [
         'https://apps.apple.com/us/app/steward-concierge/id6760180137',
+        'https://www.instagram.com/joinsteward/',
       ],
     },
     // Person node — the canonical entity for Tienhung Duong as

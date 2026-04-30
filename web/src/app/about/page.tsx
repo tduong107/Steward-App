@@ -246,6 +246,17 @@ export default function AboutPage() {
                   Download Steward Concierge for iOS
                 </a>
               </li>
+              <li>
+                Instagram:{' '}
+                <a
+                  href="https://www.instagram.com/joinsteward/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[var(--color-accent)] hover:underline"
+                >
+                  @joinsteward
+                </a>
+              </li>
             </ul>
           </section>
         </div>

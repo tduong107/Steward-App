@@ -96,6 +96,40 @@ export function Footer() {
             </svg>
             iOS App
           </a>
+          {/* Instagram — sitewide footer link.
+              `rel="me"` is the IndieWeb / Microformats-2 convention
+              for "this is the same entity"; Google's Knowledge Graph
+              honors it as a confirmation signal alongside the
+              Organization.sameAs entry in layout.tsx. Combined, every
+              page on the site now both schema-claims and visibly
+              links the @joinsteward Instagram, which is the strongest
+              brand-to-profile pairing we can give crawlers.
+              `target="_blank"` opens the profile in a new tab.
+              `noopener noreferrer` is mandatory for `_blank` links
+              (security + perf). */}
+          <a
+            href="https://www.instagram.com/joinsteward/"
+            target="_blank"
+            rel="me noopener noreferrer"
+            aria-label="Steward on Instagram"
+            className="lnd-footer-link"
+            style={{
+              fontSize: 12,
+              color: 'rgba(247,246,243,0.35)',
+              textDecoration: 'none',
+              transition: 'color .25s',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+            }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+              <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+              <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
+            </svg>
+            Instagram
+          </a>
         </div>
         <div style={{ fontSize: 11, color: 'rgba(247,246,243,0.25)' }}>
           Contact:{' '}
