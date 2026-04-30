@@ -4,20 +4,14 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-
-function toE164(raw: string): string {
-  const digits = raw.replace(/\D/g, '')
-  if (digits.startsWith('1') && digits.length === 11) return `+${digits}`
-  if (digits.length === 10) return `+1${digits}`
-  return `+${digits}`
-}
-
-function formatDisplay(raw: string): string {
-  const digits = raw.replace(/\D/g, '').slice(0, 10)
-  if (digits.length <= 3) return digits
-  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`
-  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`
-}
+import { PhoneField } from '@/components/auth/phone-field'
+import {
+  buildE164,
+  DEFAULT_COUNTRY,
+  MIN_LOCAL_DIGITS,
+  type Country,
+} from '@/lib/countries'
+import { friendlyAuthError } from '@/lib/auth-errors'
 
 const INPUT_CLS =
   'w-full rounded-xl border border-[#2A5C45]/30 bg-[#0F2018]/50 px-4 py-3 text-sm text-[#F7F6F3] placeholder:text-[#F7F6F3]/25 focus:outline-none focus:border-[#6EE7B7]/40 transition-colors'
@@ -27,7 +21,8 @@ type Step = 'phone' | 'otp' | 'newPassword'
 export default function ForgotPasswordPage() {
   const router = useRouter()
   const [step, setStep] = useState<Step>('phone')
-  const [phone, setPhone] = useState('')
+  const [country, setCountry] = useState<Country>(DEFAULT_COUNTRY)
+  const [localNumber, setLocalNumber] = useState('')
   const [otp, setOtp] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -38,20 +33,22 @@ export default function ForgotPasswordPage() {
   const [resending, setResending] = useState(false)
   const [resent, setResent] = useState(false)
 
-  const e164 = toE164(phone)
+  const e164 = buildE164(country, localNumber)
 
   // Step 1 — send OTP
   async function handleSendCode(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
-    const digits = phone.replace(/\D/g, '')
-    if (digits.length < 10) { setError('Please enter a valid 10-digit US phone number'); return }
+    if (localNumber.length < MIN_LOCAL_DIGITS) {
+      setError('Please enter your full phone number, including all local digits.')
+      return
+    }
 
     setLoading(true)
     try {
       const supabase = createClient()
       const { error: otpError } = await supabase.auth.signInWithOtp({ phone: e164 })
-      if (otpError) { setError(otpError.message); return }
+      if (otpError) { setError(friendlyAuthError(otpError.message)); return }
       setStep('otp')
     } catch {
       setError('An unexpected error occurred. Please try again.')
@@ -74,7 +71,7 @@ export default function ForgotPasswordPage() {
         token: otp,
         type: 'sms',
       })
-      if (verifyError) { setError(verifyError.message); return }
+      if (verifyError) { setError(friendlyAuthError(verifyError.message)); return }
       setStep('newPassword')
     } catch {
       setError('An unexpected error occurred. Please try again.')
@@ -94,7 +91,7 @@ export default function ForgotPasswordPage() {
     try {
       const supabase = createClient()
       const { error: updateError } = await supabase.auth.updateUser({ password: newPassword })
-      if (updateError) { setError(updateError.message); return }
+      if (updateError) { setError(friendlyAuthError(updateError.message)); return }
 
       // Password updated — go to home
       sessionStorage.setItem('steward_just_signed_in', '1')
@@ -115,7 +112,7 @@ export default function ForgotPasswordPage() {
     try {
       const supabase = createClient()
       const { error: otpError } = await supabase.auth.signInWithOtp({ phone: e164 })
-      if (otpError) { setError(otpError.message) }
+      if (otpError) { setError(friendlyAuthError(otpError.message)) }
       else { setResent(true); setTimeout(() => setResent(false), 5000) }
     } catch {
       setError('Failed to resend. Please try again.')
@@ -148,23 +145,14 @@ export default function ForgotPasswordPage() {
             </div>
 
             <form onSubmit={handleSendCode} className="flex flex-col gap-4">
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#6EE7B7]/40">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 0 0 2.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 0 1-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 0 0-1.091-.852H4.5A2.25 2.25 0 0 0 2.25 4.5v2.25Z" />
-                  </svg>
-                </div>
-                <span className="absolute inset-y-0 left-9 flex items-center text-sm text-[#F7F6F3]/30 select-none pointer-events-none">+1</span>
-                <input
-                  type="tel"
-                  required
-                  value={phone}
-                  onChange={e => setPhone(formatDisplay(e.target.value))}
-                  placeholder="(555) 000-0000"
-                  autoComplete="tel-national"
-                  className={`${INPUT_CLS} pl-16`}
-                />
-              </div>
+              <PhoneField
+                country={country}
+                onCountryChange={setCountry}
+                localNumber={localNumber}
+                onLocalNumberChange={setLocalNumber}
+                autoComplete="tel-national"
+                disabled={loading}
+              />
 
               {error && <p className="text-sm text-red-400 bg-red-400/10 rounded-xl px-3 py-2.5">{error}</p>}
 
@@ -200,7 +188,7 @@ export default function ForgotPasswordPage() {
               </button>
               <h2 className="text-lg font-semibold text-[#F7F6F3] mb-1">Check your texts</h2>
               <p className="text-sm text-[#F7F6F3]/40">
-                Code sent to <span className="text-[#F7F6F3]/70">+1 {phone}</span>
+                Code sent to <span className="text-[#F7F6F3]/70">{e164}</span>
               </p>
             </div>
 
