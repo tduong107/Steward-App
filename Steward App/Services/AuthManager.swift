@@ -125,6 +125,21 @@ final class AuthManager {
             ]
         )
 
+        // Detect "this phone is already registered" — Supabase doesn't
+        // throw an error in this case (security: revealing that a phone
+        // is already on file is a minor enumeration leak, so the API
+        // returns success). Instead, the returned User has an empty
+        // `identities` array. If we don't catch it here, no SMS is sent
+        // (Supabase doesn't ask Twilio to dispatch an OTP for an
+        // already-registered phone) and the UI advances to the OTP
+        // step where the user just waits for a code that never arrives.
+        // Throwing tells the caller to surface the "Try signing in"
+        // friendly error.
+        let identities = response.user.identities ?? []
+        if identities.isEmpty {
+            throw AuthError.phoneAlreadyExists
+        }
+
         // If we got a session immediately (auto-confirm enabled), finalize
         if let session = response.session {
             self.currentUserId = session.user.id
@@ -585,6 +600,16 @@ final class AuthManager {
         case missingToken
         case invalidPhone
         case invalidOTP
+        /// Returned by `signUp()` when the phone number is already
+        /// registered. Supabase signals this by returning a User with
+        /// an empty `identities` array (no error thrown server-side),
+        /// so we detect it client-side and surface it as an error.
+        ///
+        /// IMPORTANT: the error description must contain the
+        /// substrings "phone" and "already" so that AuthScreen's
+        /// `friendlyError()` mapper recognizes it and shows the
+        /// "Try signing in" copy.
+        case phoneAlreadyExists
 
         var errorDescription: String? {
             switch self {
@@ -594,6 +619,8 @@ final class AuthManager {
                 return "Please enter a valid phone number."
             case .invalidOTP:
                 return "Invalid verification code. Please try again."
+            case .phoneAlreadyExists:
+                return "An account with this phone number already exists."
             }
         }
     }
