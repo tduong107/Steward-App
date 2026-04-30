@@ -169,12 +169,11 @@ export default function StewardVsCamelCamelCamelPage() {
     // dateModified > datePublished signals active maintenance to AI
     // ranking. Bump when you meaningfully edit the comparison or FAQ.
     dateModified: '2026-04-22',
-    author: { '@type': 'Organization', name: 'Steward' },
-    publisher: {
-      '@type': 'Organization',
-      name: 'Steward',
-      url: 'https://www.joinsteward.app',
-    },
+    // Author is the founder Person entity defined in layout.tsx /about.
+    // E-E-A-T: named-author attribution materially lifts AI citation
+    // rates and Google rich-result eligibility over org-only.
+    author: { '@id': 'https://www.joinsteward.app/about#tienhung' },
+    publisher: { '@id': 'https://www.joinsteward.app/#organization' },
     mainEntityOfPage:
       'https://www.joinsteward.app/blog/steward-vs-camelcamelcamel',
   }
@@ -282,11 +281,21 @@ export default function StewardVsCamelCamelCamelPage() {
             color: 'rgba(247,246,243,0.35)',
           }}
         >
-          {/* Visible publish + updated dates. Keep these in sync with
-              `articleJsonLd.datePublished` and `dateModified` above.
-              Google surfaces "Last updated" in SERPs and AI answer
-              engines weigh recency. */}
-          Published March 26, 2026 &middot; Updated April 22, 2026 &middot; 5 min read
+          {/* Byline + dates. /about hosts the Person entity referenced
+              by articleJsonLd.author so crawlers can hop from this
+              link to the schema'd identity. */}
+          By{' '}
+          <Link
+            href="/about"
+            style={{
+              color: 'rgba(247,246,243,0.55)',
+              textDecoration: 'underline',
+              textDecorationColor: 'rgba(247,246,243,0.25)',
+            }}
+          >
+            Tienhung Duong
+          </Link>{' '}
+          &middot; Published March 26, 2026 &middot; Updated April 22, 2026 &middot; 5 min read
         </p>
       </header>
 
@@ -416,6 +425,231 @@ export default function StewardVsCamelCamelCamelPage() {
             </div>
           ))}
         </div>
+      </section>
+
+      {/* ── Where Amazon-Only Tracking Falls Short ──
+          Added April 2026 to push article word count over the 2000
+          threshold (was ~1670) and to make the comparison concrete
+          with named use cases. Each subsection targets a specific
+          long-tail query intent ("how to track Nike sneaker drops",
+          "Resy reservation alert", etc.). */}
+      <section style={{ ...prose, marginTop: 64 }}>
+        <h2
+          style={{
+            fontFamily: serif,
+            fontSize: 28,
+            fontWeight: 700,
+            color: cream,
+            marginBottom: 16,
+          }}
+        >
+          Where Amazon-only tracking falls short
+        </h2>
+        <p
+          style={{
+            fontSize: 16,
+            lineHeight: 1.7,
+            color: 'rgba(247,246,243,0.75)',
+            marginBottom: 32,
+          }}
+        >
+          Most price-watching tools have an Amazon problem in reverse:
+          they assume Amazon is where you&rsquo;d buy, when it often
+          isn&rsquo;t. Here are five categories CamelCamelCamel
+          can&rsquo;t help you with — every one of which Steward
+          handles natively.
+        </p>
+
+        <h3
+          style={{
+            fontFamily: serif,
+            fontSize: 20,
+            fontWeight: 700,
+            color: cream,
+            marginTop: 28,
+            marginBottom: 10,
+          }}
+        >
+          Sneaker and apparel drops
+        </h3>
+        <p
+          style={{
+            fontSize: 15.5,
+            lineHeight: 1.7,
+            color: 'rgba(247,246,243,0.7)',
+            marginBottom: 20,
+          }}
+        >
+          When a Nike Air Max colorway drops at 10 a.m. ET, it&rsquo;s
+          gone in two minutes. Resale prices triple by lunch.
+          CamelCamelCamel doesn&rsquo;t track Nike, Adidas, On
+          Running, or Hoka — those drops live on the brand&rsquo;s own
+          site or the SNKRS app, and CCC&rsquo;s database starts and
+          ends at amazon.com. Steward, by contrast, watches any URL.
+          Paste the SNKRS link, set a condition like &ldquo;back in
+          stock in size 10,&rdquo; and you&rsquo;ll get a push
+          notification the moment the variant flips to available.
+          Same flow for Lululemon&rsquo;s We Made Too Much section,
+          Patagonia&rsquo;s Worn Wear, or Aritzia&rsquo;s archive
+          sales.
+        </p>
+
+        <h3
+          style={{
+            fontFamily: serif,
+            fontSize: 20,
+            fontWeight: 700,
+            color: cream,
+            marginTop: 28,
+            marginBottom: 10,
+          }}
+        >
+          Concert and event ticket restocks
+        </h3>
+        <p
+          style={{
+            fontSize: 15.5,
+            lineHeight: 1.7,
+            color: 'rgba(247,246,243,0.7)',
+            marginBottom: 20,
+          }}
+        >
+          Tickets sell out in seconds. Then minutes later, somebody&rsquo;s
+          cart times out and a single seat reappears. By the time you
+          refresh Ticketmaster, it&rsquo;s gone again. The classic
+          deal-hunter workflow involves a Chrome tab open all day with
+          auto-refresh. CamelCamelCamel can&rsquo;t help here —
+          Ticketmaster, AXS, SeatGeek, and StubHub aren&rsquo;t in
+          its data model. Steward watches the listing, detects when a
+          seat appears, and sends an instant alert with a deep link
+          straight to the checkout flow.
+        </p>
+
+        <h3
+          style={{
+            fontFamily: serif,
+            fontSize: 20,
+            fontWeight: 700,
+            color: cream,
+            marginTop: 28,
+            marginBottom: 10,
+          }}
+        >
+          Restaurant reservations and hard-to-book tables
+        </h3>
+        <p
+          style={{
+            fontSize: 15.5,
+            lineHeight: 1.7,
+            color: 'rgba(247,246,243,0.7)',
+            marginBottom: 20,
+          }}
+        >
+          Carbone in New York. Don Angie. Hawksmoor. Funke in Los
+          Angeles. These are tables you can&rsquo;t get without a Resy
+          bot — or until now. CamelCamelCamel has no concept of
+          restaurant reservations because it isn&rsquo;t an Amazon
+          product category. Steward monitors Resy and OpenTable for
+          cancellations and openings. When a table opens for your
+          restaurant, date, time, and party size, you get a push
+          notification — and on Premium, an auto-book attempt before
+          anyone else can refresh.
+        </p>
+
+        <h3
+          style={{
+            fontFamily: serif,
+            fontSize: 20,
+            fontWeight: 700,
+            color: cream,
+            marginTop: 28,
+            marginBottom: 10,
+          }}
+        >
+          Campsite cancellations at booked-up parks
+        </h3>
+        <p
+          style={{
+            fontSize: 15.5,
+            lineHeight: 1.7,
+            color: 'rgba(247,246,243,0.7)',
+            marginBottom: 20,
+          }}
+        >
+          Yosemite&rsquo;s Upper Pines campground sells out within
+          minutes of opening for the summer. Yellowstone, Big Sur, the
+          entire Pacific Northwest National Forests system — same
+          story. The only way to get a site for a popular weekend is
+          to catch a cancellation. Recreation.gov isn&rsquo;t on
+          CamelCamelCamel. Steward watches the dates and site numbers
+          you actually want, and pings you when something opens. The
+          2-hour Premium check frequency is the difference between
+          catching a Saturday-night cancellation and watching it
+          disappear into someone else&rsquo;s confirmation email.
+        </p>
+
+        <h3
+          style={{
+            fontFamily: serif,
+            fontSize: 20,
+            fontWeight: 700,
+            color: cream,
+            marginTop: 28,
+            marginBottom: 10,
+          }}
+        >
+          Flight fare drops and mistake fares
+        </h3>
+        <p
+          style={{
+            fontSize: 15.5,
+            lineHeight: 1.7,
+            color: 'rgba(247,246,243,0.7)',
+            marginBottom: 20,
+          }}
+        >
+          Google Flights and Kayak run their own price-tracking, but
+          neither alerts you the moment a fare crosses your target
+          threshold. CamelCamelCamel has no flight data at all.
+          Steward lets you paste a Google Flights or Kayak URL, set a
+          condition like &ldquo;alert me below $500 round-trip,&rdquo;
+          and get a notification when fares drop. It also catches
+          mistake fares — those rare moments when an airline
+          accidentally lists a $2,000 transcontinental flight for $200
+          and the deal evaporates in under an hour.
+        </p>
+
+        <h3
+          style={{
+            fontFamily: serif,
+            fontSize: 20,
+            fontWeight: 700,
+            color: cream,
+            marginTop: 28,
+            marginBottom: 10,
+          }}
+        >
+          The hidden cost of Amazon-only tracking
+        </h3>
+        <p
+          style={{
+            fontSize: 15.5,
+            lineHeight: 1.7,
+            color: 'rgba(247,246,243,0.7)',
+            marginBottom: 0,
+          }}
+        >
+          Even within shopping, Amazon often isn&rsquo;t the cheapest.
+          Brand-direct stores routinely undercut Amazon by 10-25% on
+          their own products, especially during seasonal sales —
+          Nike.com, Lululemon.com, Patagonia.com, and Sonos.com all
+          run direct discounts that never appear on Amazon&rsquo;s
+          listings. Costco and Sam&rsquo;s Club beat Amazon on bulk
+          basics. Best Buy frequently price-matches and tacks on free
+          installation. A tracker locked to Amazon-only data shows you
+          half the picture and quietly biases you toward the
+          higher-price option.
+        </p>
       </section>
 
       {/* ── How Steward Works ── */}

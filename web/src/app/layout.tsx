@@ -209,6 +209,11 @@ const jsonLd = {
       'url': 'https://www.joinsteward.app',
       'logo': 'https://www.joinsteward.app/steward-logo.png',
       'description': 'Maker of Steward, the AI-powered concierge app for price drops, restocks, restaurant reservations, campsite openings, flight deals, and event tickets.',
+      // Founder linkage — references the Person node defined on
+      // /about. Anchors the brand to a named human, which is one of
+      // Google's strongest E-E-A-T signals and helps AI answer
+      // engines disambiguate "Steward" from other entities.
+      'founder': { '@id': 'https://www.joinsteward.app/about#tienhung' },
       'contactPoint': {
         '@type': 'ContactPoint',
         'email': 'hello@joinsteward.app',
@@ -217,6 +222,19 @@ const jsonLd = {
       'sameAs': [
         'https://apps.apple.com/us/app/steward-concierge/id6760180137',
       ],
+    },
+    // Person node — the canonical entity for Tienhung Duong as
+    // founder. Lives in the global @graph (rather than only on the
+    // /about page) so blog Article author references resolve cleanly
+    // regardless of which page a crawler enters from. The full
+    // bio + knowsAbout fields are emitted on /about.
+    {
+      '@type': 'Person',
+      '@id': 'https://www.joinsteward.app/about#tienhung',
+      'name': 'Tienhung Duong',
+      'jobTitle': 'Founder',
+      'url': 'https://www.joinsteward.app/about',
+      'worksFor': { '@id': 'https://www.joinsteward.app/#organization' },
     },
   ],
 }

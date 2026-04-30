@@ -30,7 +30,7 @@ export async function updateSession(request: NextRequest) {
   const path = request.nextUrl.pathname
   const isStaticFile = path.endsWith('.xml') || path.endsWith('.txt') || path.endsWith('.json') || path.startsWith('/.well-known')
 
-  if (!user && !isStaticFile && !path.startsWith('/login') && !path.startsWith('/signup') && !path.startsWith('/forgot-password') && !path.startsWith('/welcome') && !path.startsWith('/shared') && !path.startsWith('/auth/callback') && !path.startsWith('/api/') && !path.startsWith('/privacy') && !path.startsWith('/terms') && !path.startsWith('/support') && !path.startsWith('/blog') && !path.startsWith('/labs') && path !== '/') {
+  if (!user && !isStaticFile && !path.startsWith('/login') && !path.startsWith('/signup') && !path.startsWith('/forgot-password') && !path.startsWith('/welcome') && !path.startsWith('/shared') && !path.startsWith('/auth/callback') && !path.startsWith('/api/') && !path.startsWith('/privacy') && !path.startsWith('/terms') && !path.startsWith('/support') && !path.startsWith('/about') && !path.startsWith('/blog') && !path.startsWith('/labs') && path !== '/') {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)

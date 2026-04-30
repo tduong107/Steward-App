@@ -159,8 +159,11 @@ const articleJsonLd = {
   // is actively maintained — bump this whenever you meaningfully edit
   // the comparison table or FAQ.
   dateModified: '2026-04-22',
-  author: { '@type': 'Organization', name: 'Steward' },
-  publisher: { '@type': 'Organization', name: 'Steward' },
+  // Author is the founder Person entity defined in layout.tsx /about.
+  // E-E-A-T: Princeton GEO study found named-author attribution lifts
+  // AI citation rates by +25-30% over org-only authorship.
+  author: { '@id': 'https://www.joinsteward.app/about#tienhung' },
+  publisher: { '@id': 'https://www.joinsteward.app/#organization' },
   mainEntityOfPage: 'https://www.joinsteward.app/blog/steward-vs-honey',
 }
 
@@ -269,12 +272,23 @@ export default function StewardVsHoneyPage() {
             margin: 0,
           }}
         >
-          {/* Visible publish + updated dates. Keep these in sync with
-              `articleJsonLd.datePublished` and `dateModified` above.
-              Google surfaces "Last updated" in SERPs and AI answer
-              engines weigh recency, so this is a meaningful trust
-              signal — not just a UI nicety. */}
-          Published March 12, 2026 &middot; Updated April 22, 2026 &middot; 5 min read
+          {/* Byline + dates. The author link points at /about which
+              hosts the Person entity — gives crawlers an easy hop
+              from prose to the schema'd founder identity, and gives
+              human readers a real face to attribute the take to.
+              Keep dates in sync with articleJsonLd above. */}
+          By{' '}
+          <Link
+            href="/about"
+            style={{
+              color: 'rgba(247,246,243,0.55)',
+              textDecoration: 'underline',
+              textDecorationColor: 'rgba(247,246,243,0.25)',
+            }}
+          >
+            Tienhung Duong
+          </Link>{' '}
+          &middot; Published March 12, 2026 &middot; Updated April 22, 2026 &middot; 5 min read
         </p>
       </header>
 

@@ -104,8 +104,9 @@ const articleJsonLd = {
   // meaningfully revised. AI ranking weights `dateModified > datePublished`
   // as a signal that the page is actively maintained.
   dateModified: '2026-04-25',
-  author: { '@type': 'Organization', name: 'Steward' },
-  publisher: { '@type': 'Organization', name: 'Steward' },
+  // Author is the founder Person entity defined in layout.tsx /about.
+  author: { '@id': 'https://www.joinsteward.app/about#tienhung' },
+  publisher: { '@id': 'https://www.joinsteward.app/#organization' },
   mainEntityOfPage:
     'https://www.joinsteward.app/blog/best-campsite-tracker',
 }
@@ -220,7 +221,18 @@ export default function BestCampsiteTrackerPage() {
             margin: 0,
           }}
         >
-          Published April 9, 2026 &middot; Updated April 25, 2026 &middot; 6 min read
+          By{' '}
+          <Link
+            href="/about"
+            style={{
+              color: 'rgba(247,246,243,0.55)',
+              textDecoration: 'underline',
+              textDecorationColor: 'rgba(247,246,243,0.25)',
+            }}
+          >
+            Tienhung Duong
+          </Link>{' '}
+          &middot; Published April 9, 2026 &middot; Updated April 25, 2026 &middot; 6 min read
         </p>
       </header>
 

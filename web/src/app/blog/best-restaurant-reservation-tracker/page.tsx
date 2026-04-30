@@ -97,8 +97,9 @@ const articleJsonLd = {
   // `datePublished` until the post is meaningfully edited. Bump it
   // when you revise the restaurant list, FAQ, or steps.
   dateModified: '2026-04-23',
-  author: { '@type': 'Organization', name: 'Steward' },
-  publisher: { '@type': 'Organization', name: 'Steward' },
+  // Author is the founder Person entity defined in layout.tsx /about.
+  author: { '@id': 'https://www.joinsteward.app/about#tienhung' },
+  publisher: { '@id': 'https://www.joinsteward.app/#organization' },
   mainEntityOfPage:
     'https://www.joinsteward.app/blog/best-restaurant-reservation-tracker',
 }
@@ -206,12 +207,21 @@ export default function BestRestaurantReservationTrackerPage() {
             margin: 0,
           }}
         >
-          {/* Visible publish date. This article's `datePublished` and
-              `dateModified` (in articleJsonLd above) are both
-              2026-04-23 — most-recent of the four posts — so we don't
-              show a separate "Updated" line until the article is
-              meaningfully edited and `dateModified` is bumped. */}
-          Published April 23, 2026 &middot; 6 min read
+          {/* Byline + publish date. dateModified == datePublished for
+              this article so we omit the "Updated" line until the
+              post is meaningfully edited and the schema is bumped. */}
+          By{' '}
+          <Link
+            href="/about"
+            style={{
+              color: 'rgba(247,246,243,0.55)',
+              textDecoration: 'underline',
+              textDecorationColor: 'rgba(247,246,243,0.25)',
+            }}
+          >
+            Tienhung Duong
+          </Link>{' '}
+          &middot; Published April 23, 2026 &middot; 6 min read
         </p>
       </header>
 

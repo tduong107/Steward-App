@@ -7,7 +7,12 @@ import Link from 'next/link'
 import { Logo } from './helpers'
 import { S, APP_STORE_URL } from './tokens'
 
+// Footer links double as internal-link equity for SEO. Order matters:
+// `/about` early gives the founder Person entity a high-priority
+// crawl path from the sitewide footer (every page links here),
+// boosting its E-E-A-T weight.
 const FOOTER_LINKS: ReadonlyArray<readonly [string, string]> = [
+  ['About', '/about'],
   ['Resources', '/blog'],
   ['Privacy', '/privacy'],
   ['Terms', '/terms'],

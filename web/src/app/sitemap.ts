@@ -49,6 +49,15 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 1,
     },
     {
+      url: 'https://www.joinsteward.app/about',
+      lastModified: STATIC_PAGES_LAST_MODIFIED,
+      changeFrequency: 'monthly',
+      // Higher than legal pages — /about hosts the founder Person
+      // entity referenced by every blog Article author and is one of
+      // the strongest brand-trust pages on the site.
+      priority: 0.7,
+    },
+    {
       url: 'https://www.joinsteward.app/support',
       lastModified: STATIC_PAGES_LAST_MODIFIED,
       changeFrequency: 'monthly',
