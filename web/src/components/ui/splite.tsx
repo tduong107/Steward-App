@@ -24,7 +24,14 @@
  * cost completely for users who opted out of motion.
  */
 import { Component, Suspense, lazy, useEffect, useRef, useState, type ReactNode } from 'react'
-const Spline = lazy(() => import('@splinetool/react-spline'))
+// `webpackPrefetch: true` adds <link rel="prefetch"> to the HTML head
+// so the browser pulls the Spline runtime chunk (~562 KiB) during its
+// own idle window — typically right after FCP, before we ask for it.
+// By the time `lazy()` triggers the actual import, the chunk is already
+// in cache and resolves synchronously. Combined with MOUNT_DELAY_MS=0
+// below, this closes most of the "robot lags way behind the rest of
+// the page" gap the user reported.
+const Spline = lazy(() => import(/* webpackPrefetch: true */ '@splinetool/react-spline'))
 
 // CROSS-BROWSER (Phase 12): error boundary around the Spline canvas.
 // Safari has documented WebGL context-loss bugs and the @splinetool
@@ -64,11 +71,13 @@ interface SplineSceneProps {
   className?: string
 }
 
-// Deferred-mount delay in milliseconds. Long enough for hero text +
-// CTAs to paint and become interactive before Spline starts its GPU/
-// network work; short enough that real users see the robot soon after
-// landing on the page.
-const MOUNT_DELAY_MS = 1500
+// Deferred-mount delay in milliseconds. Set to 0 so the mount happens
+// on the next tick after the wrapper's first paint — Spline starts its
+// network/GPU work right after the page paints, instead of waiting
+// out a fixed buffer. Combined with the webpackPrefetch hint on the
+// lazy import above, the chunk is typically already in cache by then,
+// so the robot appears very close to when the rest of the page does.
+const MOUNT_DELAY_MS = 0
 
 export function SplineScene({ scene, className }: SplineSceneProps) {
   const wrapRef = useRef<HTMLDivElement>(null)
