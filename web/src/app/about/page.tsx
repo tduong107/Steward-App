@@ -69,12 +69,26 @@ export const metadata: Metadata = {
       'Why we built an AI concierge for price drops, restocks, restaurant reservations, campsites, flights, and event tickets.',
     url: 'https://www.joinsteward.app/about',
     type: 'profile',
+    // Reuse the homepage OG image (Steward-branded). Without an explicit
+    // images field, LinkedIn's Post Inspector flagged "Add an og:image
+    // tag to the page to have control over the content's image" — the
+    // /about route has no opengraph-image.tsx, so Next.js had no image
+    // to serve. The homepage image is the right brand stand-in here.
+    images: [
+      {
+        url: 'https://www.joinsteward.app/opengraph-image',
+        width: 1200,
+        height: 630,
+        alt: 'Steward — AI Price Tracker & Personal Concierge',
+      },
+    ],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'About Steward — Founded by Tienhung Duong',
     description:
       'Why we built an AI concierge for price drops, restocks, restaurant reservations, campsites, flights, and event tickets.',
+    images: ['https://www.joinsteward.app/opengraph-image'],
   },
 }
 
