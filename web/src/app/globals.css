@@ -461,6 +461,25 @@ body {
   contain-intrinsic-size: auto 900px;
 }
 
+/* ── Spline canvas: Safari swimming-during-scroll fix ──
+   The Spline runtime renders a <canvas> several layers deep inside its
+   own component, so CSS hints on our wrapper don't reach the canvas
+   element itself. Safari composites WebGL canvases on a separate GPU
+   layer; without an explicit transform the canvas's screen position is
+   re-resolved from layout each scroll frame, producing a visible drift.
+   translate3d(0,0,0) forces the canvas onto its own GPU compositor
+   layer that scrolls atomically with the document. backface-visibility
+   prevents Safari from re-rasterizing canvas pixels on every scroll
+   tick. We don't add will-change here — the canvas already has GPU
+   promotion via WebGL, and will-change on a canvas can cause Safari to
+   over-allocate GPU memory. */
+.hero-stage-desktop canvas {
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
 /* ── Landing Page Kinetic Animations ── */
 
 /* Hero entrance — replaces framer-motion `initial`/`animate` + `delay`
