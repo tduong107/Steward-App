@@ -99,11 +99,19 @@ const articleJsonLd = {
   headline: 'Best Campsite Tracker: Yosemite & National Parks',
   description:
     'How to snag sold-out campsites at Yosemite, Yellowstone, Big Sur, and other national parks. Steward monitors Recreation.gov cancellations 24/7 and alerts you instantly.',
-  datePublished: '2026-04-09',
+  datePublished: '2026-04-09T12:00:00-07:00',
   // Bump this whenever the park list, FAQ, or step-by-step content is
   // meaningfully revised. AI ranking weights `dateModified > datePublished`
   // as a signal that the page is actively maintained.
-  dateModified: '2026-04-25',
+  dateModified: '2026-04-25T12:00:00-07:00',
+  // Per-post OG image (Satori-rendered, 1200×630). Required as
+  // ImageObject to clear Rich Results "Missing field 'image'" warning.
+  image: {
+    '@type': 'ImageObject',
+    url: 'https://www.joinsteward.app/blog/best-campsite-tracker/opengraph-image',
+    width: 1200,
+    height: 630,
+  },
   // Author is the founder Person entity defined in layout.tsx /about.
   author: { '@id': 'https://www.joinsteward.app/about#tienhung' },
   publisher: { '@id': 'https://www.joinsteward.app/#organization' },

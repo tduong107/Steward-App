@@ -154,11 +154,21 @@ const articleJsonLd = {
   headline: 'Steward vs Honey (2026): Beyond Coupon Codes',
   description:
     'Honey finds coupons at checkout. Steward tracks prices, restaurants, campsites, flights, and event tickets across any website. See the full comparison.',
-  datePublished: '2026-03-12',
+  datePublished: '2026-03-12T12:00:00-07:00',
   // dateModified > datePublished signals to AI ranking that the post
   // is actively maintained — bump this whenever you meaningfully edit
   // the comparison table or FAQ.
-  dateModified: '2026-04-22',
+  dateModified: '2026-04-22T12:00:00-07:00',
+  // Per-post OG image. Article schema allows ImageObject with explicit
+  // dimensions — Google's Rich Results validator otherwise flags
+  // "Missing field 'image'" as a non-critical warning. The /opengraph-image
+  // route is rendered via Satori at 1200×630 (Article schema spec).
+  image: {
+    '@type': 'ImageObject',
+    url: 'https://www.joinsteward.app/blog/steward-vs-honey/opengraph-image',
+    width: 1200,
+    height: 630,
+  },
   // Author is the founder Person entity defined in layout.tsx /about.
   // E-E-A-T: Princeton GEO study found named-author attribution lifts
   // AI citation rates by +25-30% over org-only authorship.

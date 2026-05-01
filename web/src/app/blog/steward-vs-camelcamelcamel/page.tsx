@@ -165,10 +165,18 @@ export default function StewardVsCamelCamelCamelPage() {
       'Steward vs CamelCamelCamel (2026): Price Tracking Beyond Amazon',
     description:
       'CamelCamelCamel only tracks Amazon prices. Steward works on any website — Nike, Best Buy, Target — plus restaurants, campsites, flights, and tickets.',
-    datePublished: '2026-03-26',
+    datePublished: '2026-03-26T12:00:00-07:00',
     // dateModified > datePublished signals active maintenance to AI
     // ranking. Bump when you meaningfully edit the comparison or FAQ.
-    dateModified: '2026-04-22',
+    dateModified: '2026-04-22T12:00:00-07:00',
+    // Per-post OG image (Satori-rendered, 1200×630). Required as
+    // ImageObject to clear Rich Results "Missing field 'image'" warning.
+    image: {
+      '@type': 'ImageObject',
+      url: 'https://www.joinsteward.app/blog/steward-vs-camelcamelcamel/opengraph-image',
+      width: 1200,
+      height: 630,
+    },
     // Author is the founder Person entity defined in layout.tsx /about.
     // E-E-A-T: named-author attribution materially lifts AI citation
     // rates and Google rich-result eligibility over org-only.

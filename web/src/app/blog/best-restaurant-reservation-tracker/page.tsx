@@ -92,11 +92,19 @@ const articleJsonLd = {
     'Best Restaurant Reservation Tracker: Get Hard-to-Book Tables',
   description:
     'How to get reservations at Carbone, Don Angie, and other impossible restaurants. Steward monitors Resy and OpenTable for cancellations automatically.',
-  datePublished: '2026-04-23',
+  datePublished: '2026-04-23T12:00:00-07:00',
   // Most recently published of the four — `dateModified` matches
   // `datePublished` until the post is meaningfully edited. Bump it
   // when you revise the restaurant list, FAQ, or steps.
-  dateModified: '2026-04-23',
+  dateModified: '2026-04-23T12:00:00-07:00',
+  // Per-post OG image (Satori-rendered, 1200×630). Required as
+  // ImageObject to clear Rich Results "Missing field 'image'" warning.
+  image: {
+    '@type': 'ImageObject',
+    url: 'https://www.joinsteward.app/blog/best-restaurant-reservation-tracker/opengraph-image',
+    width: 1200,
+    height: 630,
+  },
   // Author is the founder Person entity defined in layout.tsx /about.
   author: { '@id': 'https://www.joinsteward.app/about#tienhung' },
   publisher: { '@id': 'https://www.joinsteward.app/#organization' },
