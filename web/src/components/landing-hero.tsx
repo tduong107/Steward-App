@@ -808,7 +808,21 @@ export function LandingHero() {
             style={{
               position: 'absolute',
               inset: 0,
-              pointerEvents: 'auto',
+              // SAFARI FIX (Apr-30): the GENKUB scene has built-in
+              // mouse-tracking — the robot leans toward the cursor.
+              // Safari synthesizes mousemove-equivalent events during
+              // scroll (because the canvas slides under a stationary
+              // cursor, the relative position changes). Spline's runtime
+              // sees those as cursor sweeps and animates the robot
+              // accordingly, producing the "robot swims around when I
+              // scroll near it" behavior the user reported. Chrome
+              // doesn't fire those synthetic events. Disabling pointer
+              // events on the canvas stops the runtime from receiving
+              // any mouse data — the idle wave/breathing animation
+              // continues, but the robot no longer chases the cursor.
+              // Trade-off: no click-on-robot interactivity (we don't
+              // currently have any).
+              pointerEvents: 'none',
             }}
           >
             <SplineScene scene={SPLINE_URL} className="w-full h-full" />
