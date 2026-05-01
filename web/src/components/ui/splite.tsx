@@ -197,22 +197,26 @@ export function SplineScene({ scene, className }: SplineSceneProps) {
         width: '100%',
         height: '100%',
         position: 'relative',
-        // CROSS-BROWSER (Phase 12b): force an atomic GPU compositor layer
-        // on the canvas wrapper. Safari composites WebGL canvases on a
-        // separate layer from regular HTML; if the parent has any
-        // `transform` (the hero stage uses `translateX(13%)`), the canvas
-        // layer tracks the parent's layer with one frame of lag during
-        // scroll, producing a visible "swimming" / "robot not staying
-        // in place" effect. translateZ(0) promotes this wrapper to its
-        // own 3D-context layer that scrolls atomically with its parent.
-        // backface-visibility: hidden prevents Safari from re-rasterizing
-        // the canvas pixels on every scroll tick. willChange: transform
-        // hints the compositor to keep the layer warm during scroll.
+        // CROSS-BROWSER (Phase 12b + Apr-30 follow-up): force an atomic
+        // GPU compositor layer on the canvas wrapper AND isolate it from
+        // ancestor compositing. Safari composites WebGL canvases on a
+        // separate layer from regular HTML; if any ancestor has a
+        // `transform`, the canvas layer tracks that ancestor with a
+        // frame of lag during scroll, producing a visible "swimming" /
+        // "robot drifting" effect. The earlier translateZ(0) +
+        // backface-visibility:hidden hints alone weren't enough — Safari
+        // still chased an ancestor transform on landing-hero's stage.
+        // We removed that ancestor transform, AND we add `contain: paint;
+        // isolation: isolate;` here so any future ancestor transform
+        // can't reintroduce the bug: the compositor must keep all paint
+        // for this subtree inside this wrapper's bounding box.
         transform: 'translateZ(0)',
         WebkitTransform: 'translateZ(0)',
         backfaceVisibility: 'hidden',
         WebkitBackfaceVisibility: 'hidden',
         willChange: 'transform',
+        contain: 'layout paint',
+        isolation: 'isolate',
       }}
     >
       {/* CSS-only placeholder: a soft mint radial glow that matches

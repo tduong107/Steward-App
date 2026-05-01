@@ -738,22 +738,28 @@ export function LandingHero() {
           className="hero-stage-desktop"
           style={{
             position: 'absolute',
-            // Canvas widened from 65% → 85% (left:45 + right:-30) so the
-            // robot's raised waving arm no longer clips at the left edge
-            // during the GENKUB greeting animation's peak frames. The
-            // wider canvas means the Spline camera captures more of the
-            // scene horizontally.
-            left: '45%',
-            right: '-30%',
+            // Canvas width preserved at 85% (right - left = 141 - 56).
+            // The original positioning was left:45% / right:-30% with a
+            // `transform: translateX(13%)` baked on top to land the robot
+            // face at ~64% of viewport. That parent transform caused
+            // Safari's compositor to lag the WebGL canvas during scroll
+            // (the canvas creates its own GPU layer that has to re-resolve
+            // its parent's transform every frame, producing a visible
+            // "swimming" / "robot drifting during scroll" effect that no
+            // amount of translateZ(0) on the canvas wrapper could fully
+            // compensate for). Replaced the transform with adjusted
+            // absolute offsets so the parent has no transform at all —
+            // Safari can now treat this stage as a static layout box.
+            //
+            // Geometry preserved: 56% left + 0.09×85% face-offset = 63.65%
+            // visible robot-face position, identical to the prior
+            // 45% + 0.13×85% + 0.09×85% calc.
+            left: '56%',
+            right: '-41%',
             top: 0,
             bottom: 0,
             zIndex: 1,
             pointerEvents: 'none',
-            // Retuned shift to keep robot face landing around 64% of
-            // viewport (cards' geometric center of mass). Formula:
-            //   face% = left + translateX*width + 0.09*width
-            //   64   = 45 + 0.13*85 + 0.09*85 = 45 + 11 + 7.65 = 63.65%
-            transform: 'translateX(13%)',
           }}
         >
           {/* Stage light — mint cone from above the robot. Positioned at
