@@ -64,11 +64,11 @@ interface SplineSceneProps {
   className?: string
 }
 
-// Idle-time fallback in milliseconds. If `requestIdleCallback` isn't
-// available (Safari ≤ 17.5 doesn't ship it natively), or if the
-// browser never reports idle time within this budget, we mount
-// anyway so the user eventually sees the scene.
-const IDLE_FALLBACK_MS = 1500
+// Deferred-mount delay in milliseconds. Long enough for hero text +
+// CTAs to paint and become interactive before Spline starts its GPU/
+// network work; short enough that real users see the robot soon after
+// landing on the page.
+const MOUNT_DELAY_MS = 1500
 
 export function SplineScene({ scene, className }: SplineSceneProps) {
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -76,10 +76,9 @@ export function SplineScene({ scene, className }: SplineSceneProps) {
   const visibleRef = useRef<boolean>(true)
   const [shouldMount, setShouldMount] = useState(false)
 
-  // PERF: schedule the Spline mount for the first idle slot the
-  // browser hands us, with a 1.5s ceiling. This means hero animations
-  // and content can paint + become interactive before we start the
-  // GPU/network work to load the 3D scene.
+  // PERF: defer the Spline mount by 1.5s after the wrapper paints.
+  // This gives hero animations + content time to become interactive
+  // before we start the GPU/network work to load the 3D scene.
   useEffect(() => {
     if (typeof window === 'undefined') return
 
@@ -101,28 +100,24 @@ export function SplineScene({ scene, className }: SplineSceneProps) {
     const isDesktop = window.matchMedia('(min-width: 768px)').matches
     if (!isDesktop) return
 
-    let timeoutId = 0
-    let idleId = 0
-
-    const fire = () => setShouldMount(true)
-
-    type IdleWindow = Window & {
-      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number
-      cancelIdleCallback?: (id: number) => void
-    }
-    const w = window as IdleWindow
-
-    if (typeof w.requestIdleCallback === 'function') {
-      idleId = w.requestIdleCallback(fire, { timeout: IDLE_FALLBACK_MS })
-    } else {
-      timeoutId = window.setTimeout(fire, IDLE_FALLBACK_MS)
-    }
+    // SAFARI FIX (May-01): we previously raced requestIdleCallback
+    // (with `{timeout: 1500}`) against a setTimeout fallback. Safari
+    // 17.6+ implements rIC but doesn't honor the timeout strictly —
+    // when the page has any ongoing work (aurora background, cursor
+    // spotlight RAF, CSS keyframes on the floating cards), Safari can
+    // park rIC indefinitely. A user reported the robot didn't appear
+    // until the first mouse move, which is the next event that wakes
+    // Safari's scheduler. Chrome respects the timeout, so it didn't
+    // show this. We don't actually need rIC's "wait for true idle"
+    // semantic — we just want a deferred mount with a known upper
+    // bound. setTimeout is deterministic everywhere.
+    const timeoutId = window.setTimeout(
+      () => setShouldMount(true),
+      MOUNT_DELAY_MS,
+    )
 
     return () => {
-      if (idleId && typeof w.cancelIdleCallback === 'function') {
-        w.cancelIdleCallback(idleId)
-      }
-      if (timeoutId) window.clearTimeout(timeoutId)
+      window.clearTimeout(timeoutId)
     }
   }, [])
 
