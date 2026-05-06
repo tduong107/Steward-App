@@ -45,26 +45,21 @@ const CARDS: Card[] = [
     detail: { emoji: '📦', title: 'Restocks', desc: 'Limited drops, sold-out sneakers, viral products that vanish in minutes. Steward monitors stock status and alerts you the moment something is back so you\'re always first in line.', simBold: 'Back in stock!', simBody: 'PS5 Pro is available at Target right now. Grab it before it sells out again.' },
   },
   {
-    emoji: '✦', name: 'AI Chat Setup',
-    detail: { emoji: '✦', title: 'AI Chat Setup', desc: 'Skip the forms and dropdowns. Just describe what you want. "Dyson V15 under $500" or "Carbone table next Friday" and Steward\'s AI finds it and sets up the tracker in seconds.', simBold: 'Found it.', simBody: 'Dyson V15 Detect is $549 at dyson.com. I\'ll ping you the moment it dips below $500.' },
-  },
-  {
     emoji: '↗', name: 'Share Extension',
     detail: { emoji: '↗', title: 'Share Extension', desc: 'See something while browsing? Tap the share button in Safari, Chrome, or any app, then tap Steward. The AI reads the page, identifies the product, and sets up tracking in under 10 seconds.', simBold: 'Link received!', simBody: 'Nike Dunk Low Panda detected from nike.com. What should I track?' },
   },
 ]
 
-// Polar coords for each icon — angles in degrees (0=right, 90=top, 180=left)
-// Scattered across the upper hemisphere so the layout feels organic, not gridded.
+// Polar coords for each icon — angles in degrees (0=right, 90=top, 180=left).
+// 3-2-2 hemisphere: 3 across the top arc, 2 closer-in mid, 2 outer-bottom.
 const POSITIONS: Array<{ angle: number; radius: number }> = [
-  { angle: 158, radius: 280 },
-  { angle: 132, radius: 200 },
-  { angle: 102, radius: 290 },
-  { angle: 78,  radius: 215 },
-  { angle: 50,  radius: 295 },
-  { angle: 22,  radius: 245 },
-  { angle: 145, radius: 130 },
-  { angle: 35,  radius: 135 },
+  { angle: 145, radius: 295 }, // Price Drops       — top-left
+  { angle: 118, radius: 210 }, // Restaurant Tables — mid-left, closer in
+  { angle: 92,  radius: 305 }, // Flight Deals      — top-center
+  { angle: 62,  radius: 210 }, // Campsites         — mid-right, closer in
+  { angle: 35,  radius: 295 }, // Event Tickets     — top-right
+  { angle: 168, radius: 310 }, // Restocks          — bottom-left outer
+  { angle: 12,  radius: 310 }, // Share Extension   — bottom-right outer
 ]
 
 function polar(angle: number, radius: number) {
