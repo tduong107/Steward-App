@@ -1416,3 +1416,32 @@ body {
     animation: none !important;
   }
 }
+
+/* ───── Steward theme override for CosmicParallaxBg ────────────────
+   Pass className="cosmic-steward" to swap the cool-blue cosmic
+   palette for Steward's Deep Forest (#0F2018), Mint Spark (#6EE7B7),
+   and Warm Cream (#F7F6F3). Selectors leverage the .cosmic-steward
+   parent + #id specificity to win the cascade against the base rules.
+   ────────────────────────────────────────────────────────────────── */
+.cosmic-steward {
+  background: radial-gradient(ellipse at bottom, #1A3329 0%, #050A07 100%);
+}
+
+.cosmic-steward #horizon .glow {
+  background: radial-gradient(ellipse at center bottom, rgba(110, 231, 183, 0.45) 0%, rgba(110, 231, 183, 0) 60%);
+}
+
+.cosmic-steward #earth {
+  background: radial-gradient(ellipse at top, #0F2018 30%, #050A07 100%);
+  box-shadow: 0 0 80px 10px rgba(110, 231, 183, 0.18);
+}
+
+.cosmic-steward #title {
+  color: #F7F6F3;
+  text-shadow: 0 0 30px rgba(110, 231, 183, 0.5);
+}
+
+.cosmic-steward #subtitle {
+  color: rgba(110, 231, 183, 0.8);
+  font-weight: 600;
+}
