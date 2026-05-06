@@ -63,10 +63,12 @@ export const IconContainer = ({
   icon,
   text,
   delay,
+  size = 48,
 }: {
   icon?: React.ReactNode;
   text?: string;
   delay?: number;
+  size?: number;
 }) => {
   return (
     <motion.div
@@ -75,7 +77,10 @@ export const IconContainer = ({
       transition={{ duration: 0.2, delay: delay ?? 0 }}
       className="relative z-50 flex flex-col items-center justify-center space-y-2"
     >
-      <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-700 bg-slate-800 shadow-inner">
+      <div
+        className="flex items-center justify-center rounded-2xl border border-slate-700 bg-slate-800 shadow-inner"
+        style={{ height: size, width: size }}
+      >
         {icon || (
           <svg className="h-8 w-8 text-slate-600" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />

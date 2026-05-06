@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { motion } from 'framer-motion'
 import { Radar, IconContainer } from '@/components/ui/radar-effect'
 import { EyebrowPill } from '@/components/landing-fx/eyebrow-pill'
@@ -50,16 +51,29 @@ const CARDS: Card[] = [
   },
 ]
 
-// Polar coords for each icon — angles in degrees (0=right, 90=top, 180=left).
-// 3-2-2 hemisphere: 3 across the top arc, 2 closer-in mid, 2 outer-bottom.
-const POSITIONS: Array<{ angle: number; radius: number }> = [
-  { angle: 145, radius: 295 }, // Price Drops       — top-left
-  { angle: 118, radius: 210 }, // Restaurant Tables — mid-left, closer in
-  { angle: 92,  radius: 305 }, // Flight Deals      — top-center
-  { angle: 62,  radius: 210 }, // Campsites         — mid-right, closer in
-  { angle: 35,  radius: 295 }, // Event Tickets     — top-right
-  { angle: 168, radius: 310 }, // Restocks          — bottom-left outer
-  { angle: 12,  radius: 310 }, // Share Extension   — bottom-right outer
+type Pos = { angle: number; radius: number }
+
+// Desktop: 3-2-2 hemisphere with bigger radii so the icons sit further out around a larger radar.
+const POSITIONS_DESKTOP: Pos[] = [
+  { angle: 145, radius: 320 }, // Price Drops       — top-left
+  { angle: 118, radius: 235 }, // Restaurant Tables — mid-left, closer in
+  { angle: 92,  radius: 360 }, // Flight Deals      — top-center
+  { angle: 62,  radius: 235 }, // Campsites         — mid-right, closer in
+  { angle: 35,  radius: 320 }, // Event Tickets     — top-right
+  { angle: 168, radius: 350 }, // Restocks          — bottom-left outer
+  { angle: 12,  radius: 350 }, // Share Extension   — bottom-right outer
+]
+
+// Mobile: angles biased away from horizontal so |x| stays small (no edge clipping),
+// and the top-center is pushed higher to use the vertical space.
+const POSITIONS_MOBILE: Pos[] = [
+  { angle: 142, radius: 175 },
+  { angle: 117, radius: 130 },
+  { angle: 92,  radius: 265 },
+  { angle: 63,  radius: 130 },
+  { angle: 38,  radius: 175 },
+  { angle: 158, radius: 105 },
+  { angle: 22,  radius: 105 },
 ]
 
 function polar(angle: number, radius: number) {
@@ -67,24 +81,57 @@ function polar(angle: number, radius: number) {
   return { x: Math.cos(r) * radius, y: Math.sin(r) * radius }
 }
 
+type Layout = {
+  positions: Pos[]
+  iconSize: number
+  iconFontSize: number
+  radarScale: number
+  stageHeight: string
+}
+
+const MOBILE_LAYOUT: Layout = {
+  positions: POSITIONS_MOBILE,
+  iconSize: 48,
+  iconFontSize: 22,
+  radarScale: 1.0,
+  stageHeight: '30rem',
+}
+const TABLET_LAYOUT: Layout = {
+  positions: POSITIONS_DESKTOP,
+  iconSize: 56,
+  iconFontSize: 26,
+  radarScale: 1.15,
+  stageHeight: '34rem',
+}
+const DESKTOP_LAYOUT: Layout = {
+  positions: POSITIONS_DESKTOP,
+  iconSize: 64,
+  iconFontSize: 30,
+  radarScale: 1.3,
+  stageHeight: '38rem',
+}
+
+function computeLayout(width: number): Layout {
+  if (width < 768) return MOBILE_LAYOUT
+  if (width < 1024) return TABLET_LAYOUT
+  return DESKTOP_LAYOUT
+}
+
 export function LandingUseCases() {
   const [modal, setModal] = useState<Detail | null>(null)
   const [pingIdx, setPingIdx] = useState<number | null>(null)
   const [pingTick, setPingTick] = useState(0)
-  const [hasInteracted, setHasInteracted] = useState(false)
-  const [scale, setScale] = useState(1)
+  // Default to mobile layout so the SSR/initial paint is the more constrained
+  // case — desktop scales UP when the resize listener fires.
+  const [layout, setLayout] = useState<Layout>(MOBILE_LAYOUT)
+  const [mounted, setMounted] = useState(false)
   const closeBtnRef = useRef<HTMLButtonElement>(null)
   const triggerRef = useRef<HTMLElement | null>(null)
 
-  // Responsive scale for the polar radii so icons don't overflow on mobile
   useEffect(() => {
+    setMounted(true)
     function update() {
-      const w = window.innerWidth
-      if (w < 420) setScale(0.5)
-      else if (w < 560) setScale(0.62)
-      else if (w < 720) setScale(0.78)
-      else if (w < 900) setScale(0.9)
-      else setScale(1)
+      setLayout(computeLayout(window.innerWidth))
     }
     update()
     window.addEventListener('resize', update)
@@ -128,7 +175,6 @@ export function LandingUseCases() {
   }, [modal])
 
   function openModal(detail: Detail, trigger: EventTarget | null) {
-    setHasInteracted(true)
     triggerRef.current = trigger as HTMLElement | null
     setModal(detail)
   }
@@ -151,39 +197,11 @@ export function LandingUseCases() {
       </div>
 
       {/* Radar stage */}
-      <div className="relative mx-auto h-[32rem] w-full max-w-4xl overflow-hidden">
-        {/* CTA hint — fades out after first interaction */}
-        <motion.div
-          initial={{ opacity: 0, y: -8 }}
-          animate={{ opacity: hasInteracted ? 0 : 1, y: hasInteracted ? -8 : 0 }}
-          transition={{ delay: hasInteracted ? 0 : 1.2, duration: 0.6 }}
-          className="absolute left-1/2 top-3 z-50 -translate-x-1/2 text-center"
-          aria-hidden={hasInteracted}
-        >
-          <span
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 8,
-              fontSize: 12, fontWeight: 600, letterSpacing: '0.04em',
-              color: '#6EE7B7',
-              background: 'rgba(110,231,183,0.08)',
-              border: '1px solid rgba(110,231,183,0.25)',
-              borderRadius: 999, padding: '6px 14px',
-              backdropFilter: 'blur(4px)',
-              WebkitBackdropFilter: 'blur(4px)',
-            }}
-          >
-            <span style={{
-              width: 6, height: 6, borderRadius: '50%', background: '#6EE7B7',
-              boxShadow: '0 0 8px rgba(110,231,183,0.7)',
-              animation: 'pulseDot 1.6s ease-in-out infinite',
-            }} />
-            Click any blip — Steward&rsquo;s tracking it
-          </span>
-        </motion.div>
-
+      <div className="relative mx-auto w-full max-w-5xl overflow-hidden" style={{ height: layout.stageHeight }}>
         {/* Icons positioned by polar coords */}
         {CARDS.map((card, i) => {
-          const { x, y } = polar(POSITIONS[i].angle, POSITIONS[i].radius * scale)
+          const pos = layout.positions[i]
+          const { x, y } = polar(pos.angle, pos.radius)
           const isPinging = pingIdx === i
           return (
             <div
@@ -225,7 +243,8 @@ export function LandingUseCases() {
                 <IconContainer
                   delay={0.3 + i * 0.07}
                   text={card.name}
-                  icon={<span style={{ fontSize: 22, lineHeight: 1 }}>{card.emoji}</span>}
+                  size={layout.iconSize}
+                  icon={<span style={{ fontSize: layout.iconFontSize, lineHeight: 1 }}>{card.emoji}</span>}
                 />
                 {/* Hover tooltip (desktop only) */}
                 <span className="pointer-events-none absolute -bottom-7 left-1/2 hidden -translate-x-1/2 whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-semibold opacity-0 transition-opacity duration-200 group-hover:opacity-100 md:block"
@@ -242,18 +261,25 @@ export function LandingUseCases() {
           )
         })}
 
-        {/* Radar at center-bottom */}
+        {/* Radar — scaled wrapper so the visible arc grows with viewport */}
         <div
-          className="absolute -bottom-12 left-1/2 -translate-x-1/2"
-          style={{ pointerEvents: 'none' }}
+          style={{
+            position: 'absolute',
+            bottom: '-3rem',
+            left: '50%',
+            transform: `translateX(-50%) scale(${layout.radarScale})`,
+            transformOrigin: 'center bottom',
+            pointerEvents: 'none',
+          }}
         >
           <Radar />
         </div>
         <div className="pointer-events-none absolute bottom-0 z-[41] h-px w-full bg-gradient-to-r from-transparent via-slate-700 to-transparent" />
       </div>
 
-      {/* Modal */}
-      {modal && (
+      {/* Modal — rendered to document.body via portal so it escapes any parent
+          stacking context (icons were bleeding through the overlay before). */}
+      {modal && mounted && createPortal(
         <div
           role="dialog"
           aria-modal="true"
@@ -261,7 +287,7 @@ export function LandingUseCases() {
           onClick={() => setModal(null)}
           onKeyDown={(e) => e.key === 'Escape' && setModal(null)}
           tabIndex={-1}
-          style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.82)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.88)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
         >
           <div
             onClick={(e) => e.stopPropagation()}
@@ -281,7 +307,8 @@ export function LandingUseCases() {
               Try it free →
             </a>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </section>
   )
