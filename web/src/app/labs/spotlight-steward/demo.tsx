@@ -91,21 +91,27 @@ export function SpotlightStewardLabDemo() {
         style={{ overflow: 'hidden' }}
       >
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center min-h-[80vh]">
+          <div className="grid lg:grid-cols-2 gap-8 lg:gap-16 items-center min-h-[80vh]">
             {/* Left Column — mirrors the production marketing hero */}
-            <div className="space-y-6 text-center lg:text-left order-2 lg:order-1">
-              <div>
+            <div className="text-center lg:text-left order-2 lg:order-1">
+              {/* Eyebrow */}
+              <div className="mb-7">
                 <EyebrowPill icon="✦">Now on the App Store &amp; Web</EyebrowPill>
               </div>
 
+              {/* Headline — capped at 72px so "Scalpers have bots" fits the
+                  lg half-column without breaking mid-line. Below lg the grid
+                  collapses and the font scales with viewport width, matching
+                  the production hero's natural responsive behavior. */}
               <h1
                 style={{
                   fontFamily: SERIF,
-                  lineHeight: 0.98,
+                  lineHeight: 1.0,
                   letterSpacing: '-0.03em',
                   color: 'var(--ink, #fff)',
                   margin: 0,
-                  fontSize: 'clamp(40px, 6vw, 88px)',
+                  marginBottom: 28,
+                  fontSize: 'clamp(36px, 5.2vw, 72px)',
                   fontWeight: 700,
                 }}
               >
@@ -114,22 +120,28 @@ export function SpotlightStewardLabDemo() {
                 <em className="italic-accent">Now you have a&nbsp;concierge</em>
               </h1>
 
+              {/* Subhead — center on mobile, left-align on lg via Tailwind
+                  classes (no inline `margin: 0 auto` so the lg:mx-0 actually
+                  wins). max-w-[520px] keeps the line length readable. */}
               <p
                 style={{
                   fontSize: 17,
                   lineHeight: 1.65,
                   color: 'rgba(247, 246, 243, 0.65)',
                   fontWeight: 300,
-                  maxWidth: 520,
-                  margin: '0 auto',
+                  marginBottom: 36,
                 }}
-                className="lg:mx-0"
+                className="mx-auto lg:mx-0 max-w-[520px]"
               >
                 Be the first to snag deals, hard to get reservations, and
                 sold-out tickets with Steward. Your personalized AI concierge
                 that levels the playing field.
               </p>
 
+              {/* CTAs — Start for free uses .btn-primary (~56px tall, 14px
+                  radius, 26px horizontal padding). The App Store badge is
+                  forced to identical metrics so the two buttons read as a
+                  matched pair with the .btn-ghost translucent treatment. */}
               <div className="flex flex-wrap items-center justify-center gap-4 lg:justify-start">
                 <a
                   href="/signup"
@@ -142,16 +154,16 @@ export function SpotlightStewardLabDemo() {
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="Download Steward on the App Store"
-                  className="inline-block"
+                  className="inline-flex"
                 >
                   <AppStoreButton
                     variant="ghost"
                     className={[
-                      // Match the production btn-ghost cosmetics so this CTA
-                      // sits alongside Start for free without competing with it.
-                      'rounded-xl px-5',
-                      'bg-white/[0.04] border border-white/[0.12] text-white',
-                      'hover:bg-white/[0.08] hover:border-emerald-400/50',
+                      // Size & shape matched to .btn-primary
+                      '!h-[56px] !px-[22px] !rounded-[14px]',
+                      // Cosmic-friendly translucent treatment, mint hover
+                      '!bg-white/[0.04] !border !border-white/[0.12] !text-white',
+                      'hover:!bg-white/[0.08] hover:!border-emerald-400/50',
                       'transition-colors',
                     ].join(' ')}
                   />
