@@ -5,10 +5,56 @@ import { useEffect, useRef, useState, memo, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import Image from "next/image"
-import { DollarSign } from "lucide-react"
+import { DollarSign, Check, Calendar, Plane, Tent, Ticket } from "lucide-react"
+
+// Icon keys → lucide component + colored background. Used by the spotlight
+// metadata bubbles so each category gets an instantly recognizable chip.
+type IconKey = 'dollar' | 'check' | 'calendar' | 'plane' | 'tent' | 'ticket'
+
+const ICON_COMP = {
+  dollar: DollarSign,
+  check: Check,
+  calendar: Calendar,
+  plane: Plane,
+  tent: Tent,
+  ticket: Ticket,
+} as const
+
+const ICON_BG: Record<IconKey, string> = {
+  dollar: 'bg-amber-500',
+  check: 'bg-emerald-500',
+  calendar: 'bg-blue-500',
+  plane: 'bg-sky-500',
+  tent: 'bg-emerald-700',
+  ticket: 'bg-rose-500',
+}
+
+function IconChip({ icon }: { icon: IconKey }) {
+  const Icon = ICON_COMP[icon]
+  return (
+    <div className={cn("w-6 h-6 rounded-full flex items-center justify-center", ICON_BG[icon])}>
+      <Icon className="w-3 h-3 text-white" />
+    </div>
+  )
+}
+
+// Floating product shape — `meta` is optional so existing demo data keeps
+// working with the default Price + Score bubble layout. Override `meta` to
+// give a product category-specific bubble content (e.g. "Found · Fri 8pm").
+export type FloatingProduct = {
+  id: number
+  name: string
+  price: string
+  score: number
+  image: string
+  meta?: {
+    primary: { label: string; value: string; icon: IconKey }
+    secondary: { label: string; value: string; icon: IconKey; useScoreWheel?: boolean }
+  }
+}
 
 // Sample product data for animations with mock images
-export const sampleProducts = [
+export const sampleProducts: FloatingProduct[] = [
 
   // KEY PRODUCTS - products that will be displayed (1-5)
   {
@@ -157,8 +203,29 @@ export const sampleProducts = [
 
 interface ProductMetadata {
   name: string
-  price: string
+  primary: { label: string; value: string; icon: IconKey }
+  secondary: { label: string; value: string; icon: IconKey; useScoreWheel?: boolean }
   score: number
+}
+
+// Resolve a product's metadata for the spotlight bubbles. Products with a
+// `meta` field get category-specific labels/icons; everything else falls
+// back to the original Price + Score schema for backward compatibility.
+function getProductMetadata(product: typeof sampleProducts[number]): ProductMetadata {
+  if (product.meta) {
+    return {
+      name: product.name,
+      primary: product.meta.primary,
+      secondary: product.meta.secondary,
+      score: product.score,
+    }
+  }
+  return {
+    name: product.name,
+    primary: { label: 'Price', value: product.price, icon: 'dollar' },
+    secondary: { label: 'Score', value: `${product.score}/100`, icon: 'dollar', useScoreWheel: true },
+    score: product.score,
+  }
 }
 
 // Helper function to generate random entry/exit points
@@ -192,7 +259,7 @@ function createCurvedPath(start: { x: number; y: number }, end: { x: number; y: 
 }
 
 interface AnimatedProductProps {
-  product: typeof sampleProducts[0]
+  product: FloatingProduct
   isKeyProduct?: boolean
   containerSize: { width: number; height: number }
   onReachCenter?: (metadata: ProductMetadata) => void
@@ -235,12 +302,8 @@ function AnimatedProduct({ product, isKeyProduct = false, containerSize, onReach
           }
         })
 
-        // Show metadata
-        onReachCenter?.({
-          name: product.name,
-          price: product.price,
-          score: product.score,
-        })
+        // Show metadata (resolves to category-specific bubbles when `meta` is set)
+        onReachCenter?.(getProductMetadata(product))
 
         // Pause for 3 seconds (completely stopped)
         await new Promise(resolve => setTimeout(resolve, 3000))
@@ -386,6 +449,7 @@ const MetadataDisplay = memo(function MetadataDisplay({ metadata }: MetadataDisp
       style={{ willChange: 'transform, opacity' }}
     >
       <div className="relative w-20 h-20 md:w-24 md:h-24">
+        {/* Left bubble - primary fact (price, found, available, etc.) */}
         <motion.div
           initial={{ opacity: 0, scale: 0.5, x: 15 }}
           animate={{ opacity: 1, scale: 1, x: 0 }}
@@ -393,16 +457,15 @@ const MetadataDisplay = memo(function MetadataDisplay({ metadata }: MetadataDisp
           className="absolute left-0 top-1/2 transform -translate-x-full -translate-y-1/2 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm border border-gray-200/30 dark:border-gray-700/30 rounded-lg p-2.5 shadow-lg"
         >
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
-              <DollarSign className="w-3 h-3 text-white" />
-            </div>
+            <IconChip icon={metadata.primary.icon} />
             <div>
-              <div className="text-xs text-gray-500 dark:text-gray-400 font-medium">Price</div>
-              <div className="text-sm font-bold text-gray-900 dark:text-white">{metadata.price}</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 font-medium">{metadata.primary.label}</div>
+              <div className="text-sm font-bold text-gray-900 dark:text-white whitespace-nowrap">{metadata.primary.value}</div>
             </div>
           </div>
         </motion.div>
 
+        {/* Right bubble - secondary fact (score wheel, date, route, etc.) */}
         <motion.div
           initial={{ opacity: 0, scale: 0.5, x: -15 }}
           animate={{ opacity: 1, scale: 1, x: 0 }}
@@ -410,10 +473,23 @@ const MetadataDisplay = memo(function MetadataDisplay({ metadata }: MetadataDisp
           className="absolute right-0 top-1/2 transform translate-x-full -translate-y-1/2 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm border border-gray-200/30 dark:border-gray-700/30 rounded-lg p-2.5 shadow-lg"
         >
           <div className="flex items-center gap-2">
-            <CircularProgress value={metadata.score} size={32} />
+            {metadata.secondary.useScoreWheel ? (
+              <CircularProgress value={metadata.score} size={32} />
+            ) : (
+              <IconChip icon={metadata.secondary.icon} />
+            )}
             <div>
-              <div className="text-xs text-gray-500 dark:text-gray-400 font-medium">Score</div>
-              <div className="text-sm font-bold text-green-600 dark:text-green-400">{metadata.score}/100</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 font-medium">{metadata.secondary.label}</div>
+              <div
+                className={cn(
+                  "text-sm font-bold whitespace-nowrap",
+                  metadata.secondary.useScoreWheel
+                    ? "text-green-600 dark:text-green-400"
+                    : "text-gray-900 dark:text-white",
+                )}
+              >
+                {metadata.secondary.value}
+              </div>
             </div>
           </div>
         </motion.div>
@@ -443,9 +519,11 @@ interface ComponentProps {
   /** Optional href — if provided, the CTA is wrapped in an <a> link. */
   ctaHref?: string
   /** Override the 20-product floating dataset. First 5 are featured, rest are background. */
-  products?: typeof sampleProducts
+  products?: FloatingProduct[]
   /** Hide the section's own background gradient (useful when layering on another bg). */
   transparentBg?: boolean
+  /** Drop the right-column box's bg + border + ambient overlay so the parent bg shows through. */
+  transparentStage?: boolean
 }
 
 export function Component({
@@ -458,6 +536,7 @@ export function Component({
   ctaHref,
   products,
   transparentBg = false,
+  transparentStage = false,
 }: ComponentProps = {}) {
   const productData = products ?? sampleProducts
   const keyProducts = productData.slice(0, 5)
@@ -582,13 +661,18 @@ export function Component({
           >
             <div
               ref={containerRef}
-              className="relative w-full h-96 md:h-[500px] lg:h-[600px] rounded-2xl overflow-hidden border border-border/50"
+              className={cn(
+                "relative w-full h-96 md:h-[500px] lg:h-[600px] rounded-2xl overflow-hidden",
+                !transparentStage && "border border-border/50",
+              )}
               style={{
-                background: `
-                  radial-gradient(circle at 30% 20%, hsl(var(--primary) / 0.08), transparent 60%),
-                  radial-gradient(circle at 70% 80%, hsl(var(--accent) / 0.08), transparent 60%),
-                  linear-gradient(135deg, hsl(var(--background)), hsl(var(--muted) / 0.2))
-                `,
+                background: transparentStage
+                  ? 'transparent'
+                  : `
+                    radial-gradient(circle at 30% 20%, hsl(var(--primary) / 0.08), transparent 60%),
+                    radial-gradient(circle at 70% 80%, hsl(var(--accent) / 0.08), transparent 60%),
+                    linear-gradient(135deg, hsl(var(--background)), hsl(var(--muted) / 0.2))
+                  `,
                 willChange: 'transform',
                 transform: 'translate3d(0, 0, 0)'
               }}
@@ -616,7 +700,9 @@ export function Component({
                   <MetadataDisplay metadata={currentMetadata} />
                 )}
               </AnimatePresence>
-              <div className="absolute inset-0 bg-gradient-to-t from-background/10 via-transparent to-background/10 pointer-events-none" />
+              {!transparentStage && (
+                <div className="absolute inset-0 bg-gradient-to-t from-background/10 via-transparent to-background/10 pointer-events-none" />
+              )}
             </div>
           </motion.div>
         </div>

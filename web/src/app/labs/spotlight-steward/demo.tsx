@@ -4,17 +4,69 @@ import { CosmicParallaxBg } from '@/components/ui/parallax-cosmic-background'
 import {
   Component as ProductSpotlightHero,
   sampleProducts,
+  type FloatingProduct,
 } from '@/components/ui/product-spotlight-hero-section'
 
-// Steward-flavoured key products (first 5 = featured spotlights). Background
-// items inherit the original Unsplash dataset so the floating field stays
-// dense and varied.
-const STEWARD_PRODUCTS = [
-  { id: 1,  name: 'Nike Dunk Low Panda',          price: '$89.99',  score: 92, image: sampleProducts[0].image },
-  { id: 2,  name: 'AirPods Pro 2',                price: '$199.00', score: 88, image: sampleProducts[1].image },
-  { id: 3,  name: 'Cartier Love Bracelet',        price: '$625.00', score: 84, image: sampleProducts[2].image },
-  { id: 4,  name: 'JBL Charge 5',                 price: '$129.50', score: 91, image: sampleProducts[3].image },
-  { id: 5,  name: 'Patagonia Travel Pack',        price: '$159.90', score: 89, image: sampleProducts[4].image },
+// 5 featured Steward use cases — each with category-matched imagery and
+// metadata that reads correctly when the item flies to the spotlight
+// (e.g. campsites show "Available · Jun 14–16" instead of "Price · $X").
+const STEWARD_PRODUCTS: FloatingProduct[] = [
+  {
+    id: 1,
+    name: 'Nike Dunk Low Panda',
+    price: '$89.99',
+    score: 92,
+    image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?q=80&w=1760&auto=format&fit=crop',
+    meta: {
+      primary:   { label: 'Price',  value: '$89.99', icon: 'dollar' },
+      secondary: { label: 'Score',  value: '92/100', icon: 'dollar', useScoreWheel: true },
+    },
+  },
+  {
+    id: 2,
+    name: 'Carbone NY · Friday',
+    price: 'Found',
+    score: 90,
+    image: 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?q=80&w=1760&auto=format&fit=crop',
+    meta: {
+      primary:   { label: 'Found',   value: 'Fri 8pm',  icon: 'check' },
+      secondary: { label: 'Party',   value: '2 guests', icon: 'calendar' },
+    },
+  },
+  {
+    id: 3,
+    name: 'SFO → Tokyo Round Trip',
+    price: '$1,120',
+    score: 88,
+    image: 'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?q=80&w=1760&auto=format&fit=crop',
+    meta: {
+      primary:   { label: 'Price',  value: '$1,120',     icon: 'dollar' },
+      secondary: { label: 'Route',  value: 'SFO → HND',  icon: 'plane' },
+    },
+  },
+  {
+    id: 4,
+    name: 'Yosemite · Upper Pines',
+    price: 'Available',
+    score: 91,
+    image: 'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?q=80&w=1760&auto=format&fit=crop',
+    meta: {
+      primary:   { label: 'Available', value: 'Jun 14–16', icon: 'tent' },
+      secondary: { label: 'Site',      value: '#47',       icon: 'check' },
+    },
+  },
+  {
+    id: 5,
+    name: 'Kendrick Lamar · The Forum',
+    price: '$245',
+    score: 87,
+    image: 'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?q=80&w=1760&auto=format&fit=crop',
+    meta: {
+      primary:   { label: 'Face Value', value: '$245',  icon: 'ticket' },
+      secondary: { label: 'Date',       value: 'Jul 14', icon: 'calendar' },
+    },
+  },
+  // Background floats (15) — keep the original Unsplash dataset for visual density.
   ...sampleProducts.slice(5),
 ]
 
@@ -28,11 +80,13 @@ export function SpotlightStewardLabDemo() {
         <CosmicParallaxBg head="" text="" className="cosmic-steward" loop={true} />
       </div>
 
-      {/* Product spotlight hero on top. transparentBg=true drops the
-          component's own dark gradient so the cosmic shows through. */}
+      {/* Product spotlight hero on top. transparentBg + transparentStage
+          drop the section bg AND the right-column box bg so the cosmic
+          starfield shows through everywhere. */}
       <div style={{ position: 'relative', zIndex: 10 }}>
         <ProductSpotlightHero
           transparentBg
+          transparentStage
           heading={{
             line1: 'Watch anything.',
             line2: 'Save everything.',
