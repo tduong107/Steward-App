@@ -526,18 +526,25 @@ interface ComponentProps {
   transparentStage?: boolean
 }
 
-export function Component({
-  heading = {
-    line1: "Capture Attention Effortlessly",
-    line2: "Build Products People Love",
-  },
-  subheading = "A modern, flexible hero section that helps you launch faster and make a bold first impression—ideal for startups, SaaS, or portfolios.",
-  ctaLabel = "Try It Free",
-  ctaHref,
+interface SpotlightProductFieldProps {
+  /** Override the 20-product floating dataset. First 5 are featured, rest are background. */
+  products?: FloatingProduct[]
+  /** Drop the box's bg + border + ambient overlay so the parent bg shows through. */
+  transparentStage?: boolean
+  /** Extra classes for the outer motion wrapper. */
+  className?: string
+}
+
+/**
+ * The animated product spotlight field — extracted from `Component` so it can
+ * be composed alongside a custom left column (e.g. matching a site's existing
+ * hero copy) instead of using the registry component's built-in left column.
+ */
+export function SpotlightProductField({
   products,
-  transparentBg = false,
   transparentStage = false,
-}: ComponentProps = {}) {
+  className,
+}: SpotlightProductFieldProps) {
   const productData = products ?? sampleProducts
   const keyProducts = productData.slice(0, 5)
   const backgroundProducts = productData.slice(5)
@@ -554,7 +561,6 @@ export function Component({
     }))
   })
 
-  // Debounce container size updates to avoid animation glitches
   useEffect(() => {
     let timeout: ReturnType<typeof setTimeout> | null = null
     const updateSize = () => {
@@ -589,6 +595,74 @@ export function Component({
     }, 3000)
   }, [])
 
+  return (
+    <motion.div
+      className={cn("relative", className)}
+      initial={{ opacity: 0, x: 50 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.8, delay: 0.3 }}
+    >
+      <div
+        ref={containerRef}
+        className={cn(
+          "relative w-full h-96 md:h-[500px] lg:h-[600px] rounded-2xl overflow-hidden",
+          !transparentStage && "border border-border/50",
+        )}
+        style={{
+          background: transparentStage
+            ? 'transparent'
+            : `
+              radial-gradient(circle at 30% 20%, hsl(var(--primary) / 0.08), transparent 60%),
+              radial-gradient(circle at 70% 80%, hsl(var(--accent) / 0.08), transparent 60%),
+              linear-gradient(135deg, hsl(var(--background)), hsl(var(--muted) / 0.2))
+            `,
+          willChange: 'transform',
+          transform: 'translate3d(0, 0, 0)'
+        }}
+      >
+        {backgroundProductInstances.map((item) => (
+          <AnimatedProduct
+            key={item.id}
+            product={item.product}
+            isKeyProduct={false}
+            containerSize={containerSize}
+          />
+        ))}
+        {isKeyProductAnimating && (
+          <AnimatedProduct
+            key={`key-${keyProducts[keyProductIndex].id}-${keyProductIndex}`}
+            product={keyProducts[keyProductIndex]}
+            isKeyProduct={true}
+            containerSize={containerSize}
+            onReachCenter={handleProductReachCenter}
+            onComplete={handleKeyProductComplete}
+          />
+        )}
+        <AnimatePresence mode="wait">
+          {currentMetadata && (
+            <MetadataDisplay metadata={currentMetadata} />
+          )}
+        </AnimatePresence>
+        {!transparentStage && (
+          <div className="absolute inset-0 bg-gradient-to-t from-background/10 via-transparent to-background/10 pointer-events-none" />
+        )}
+      </div>
+    </motion.div>
+  )
+}
+
+export function Component({
+  heading = {
+    line1: "Capture Attention Effortlessly",
+    line2: "Build Products People Love",
+  },
+  subheading = "A modern, flexible hero section that helps you launch faster and make a bold first impression—ideal for startups, SaaS, or portfolios.",
+  ctaLabel = "Try It Free",
+  ctaHref,
+  products,
+  transparentBg = false,
+  transparentStage = false,
+}: ComponentProps = {}) {
   const ctaButton = (
     <Button
       size="lg"
@@ -653,58 +727,11 @@ export function Component({
           </motion.div>
 
           {/* Right Column - Animated Product Field */}
-          <motion.div
-            className="relative order-1 lg:order-2"
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.8, delay: 0.3 }}
-          >
-            <div
-              ref={containerRef}
-              className={cn(
-                "relative w-full h-96 md:h-[500px] lg:h-[600px] rounded-2xl overflow-hidden",
-                !transparentStage && "border border-border/50",
-              )}
-              style={{
-                background: transparentStage
-                  ? 'transparent'
-                  : `
-                    radial-gradient(circle at 30% 20%, hsl(var(--primary) / 0.08), transparent 60%),
-                    radial-gradient(circle at 70% 80%, hsl(var(--accent) / 0.08), transparent 60%),
-                    linear-gradient(135deg, hsl(var(--background)), hsl(var(--muted) / 0.2))
-                  `,
-                willChange: 'transform',
-                transform: 'translate3d(0, 0, 0)'
-              }}
-            >
-              {backgroundProductInstances.map((item) => (
-                <AnimatedProduct
-                  key={item.id}
-                  product={item.product}
-                  isKeyProduct={false}
-                  containerSize={containerSize}
-                />
-              ))}
-              {isKeyProductAnimating && (
-                <AnimatedProduct
-                  key={`key-${keyProducts[keyProductIndex].id}-${keyProductIndex}`}
-                  product={keyProducts[keyProductIndex]}
-                  isKeyProduct={true}
-                  containerSize={containerSize}
-                  onReachCenter={handleProductReachCenter}
-                  onComplete={handleKeyProductComplete}
-                />
-              )}
-              <AnimatePresence mode="wait">
-                {currentMetadata && (
-                  <MetadataDisplay metadata={currentMetadata} />
-                )}
-              </AnimatePresence>
-              {!transparentStage && (
-                <div className="absolute inset-0 bg-gradient-to-t from-background/10 via-transparent to-background/10 pointer-events-none" />
-              )}
-            </div>
-          </motion.div>
+          <SpotlightProductField
+            products={products}
+            transparentStage={transparentStage}
+            className="order-1 lg:order-2"
+          />
         </div>
       </div>
     </section>
