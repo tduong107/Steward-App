@@ -104,14 +104,21 @@ export function LandingHero() {
           <div className="grid lg:grid-cols-2 gap-8 lg:gap-16 items-center min-h-[80vh]">
             {/* Left Column — copy + CTAs */}
             <div className="text-center lg:text-left order-2 lg:order-1">
-              {/* Eyebrow */}
-              <div className="mb-7">
+              {/* Eyebrow — first to enter */}
+              <div
+                className="mb-7 hero-rise"
+                style={{ ['--hero-delay' as string]: '0s' } as React.CSSProperties}
+              >
                 <EyebrowPill icon="✦">Now on the App Store &amp; Web</EyebrowPill>
               </div>
 
-              {/* Headline — capped at 72px so "Scalpers have bots" fits the
-                  lg half-column on a single line. Below lg the grid
-                  collapses and the font scales with viewport width. */}
+              {/* Headline — word-by-word reveal. Line 1 ("Scalpers have
+                  bots") rises in 3 quick beats; line 2 ("Now you have a
+                  concierge") slows down for the punchline. Each word is
+                  inline-block via .hero-word so transform animations
+                  apply correctly. .hero-line-glow on the italic accent
+                  adds a slow mint text-shadow pulse that begins after
+                  entry settles and runs continuously. */}
               <h1
                 style={{
                   fontFamily: SERIF,
@@ -124,9 +131,16 @@ export function LandingHero() {
                   fontWeight: 700,
                 }}
               >
-                Scalpers have bots
+                <span className="hero-word" style={{ ['--hero-delay' as string]: '0.10s' } as React.CSSProperties}>Scalpers</span>{' '}
+                <span className="hero-word" style={{ ['--hero-delay' as string]: '0.18s' } as React.CSSProperties}>have</span>{' '}
+                <span className="hero-word" style={{ ['--hero-delay' as string]: '0.26s' } as React.CSSProperties}>bots</span>
                 <br />
-                <em className="italic-accent">Now you have a&nbsp;concierge</em>
+                <em className="italic-accent hero-line-glow">
+                  <span className="hero-word" style={{ ['--hero-delay' as string]: '0.46s' } as React.CSSProperties}>Now</span>{' '}
+                  <span className="hero-word" style={{ ['--hero-delay' as string]: '0.56s' } as React.CSSProperties}>you</span>{' '}
+                  <span className="hero-word" style={{ ['--hero-delay' as string]: '0.66s' } as React.CSSProperties}>have</span>{' '}
+                  <span className="hero-word" style={{ ['--hero-delay' as string]: '0.80s' } as React.CSSProperties}>a&nbsp;concierge</span>
+                </em>
               </h1>
 
               {/* AI-SEO definition block.
@@ -161,7 +175,8 @@ export function LandingHero() {
 
               {/* Subhead — center on mobile, left-align on lg via Tailwind
                   classes (avoid inline `margin: 0 auto` which would beat
-                  lg:mx-0). max-w-[520px] keeps the line length readable. */}
+                  lg:mx-0). max-w-[520px] keeps the line length readable.
+                  Enters after the headline word-stagger completes. */}
               <p
                 style={{
                   fontSize: 17,
@@ -169,8 +184,9 @@ export function LandingHero() {
                   color: 'rgba(247, 246, 243, 0.65)',
                   fontWeight: 300,
                   marginBottom: 36,
-                }}
-                className="mx-auto lg:mx-0 max-w-[520px]"
+                  ['--hero-delay' as string]: '1.05s',
+                } as React.CSSProperties}
+                className="mx-auto lg:mx-0 max-w-[520px] hero-rise"
               >
                 Be the first to snag deals, hard to get reservations, and
                 sold-out tickets with Steward. Your personalized AI concierge
@@ -180,8 +196,12 @@ export function LandingHero() {
               {/* CTAs — Start for free is .btn-primary (~56px tall, 14px
                   radius, 26px horizontal padding); the App Store badge is
                   matched to the same metrics with the .btn-ghost-style
-                  translucent treatment so the two buttons read as a pair. */}
-              <div className="flex flex-wrap items-center justify-center gap-4 lg:justify-start">
+                  translucent treatment so the two buttons read as a pair.
+                  Last in the entrance cascade. */}
+              <div
+                className="flex flex-wrap items-center justify-center gap-4 lg:justify-start hero-rise"
+                style={{ ['--hero-delay' as string]: '1.2s' } as React.CSSProperties}
+              >
                 <a
                   href="/signup"
                   onClick={() => track('signup_button_click', { location: 'hero' })}

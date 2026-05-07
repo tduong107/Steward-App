@@ -499,6 +499,34 @@ body {
   .hero-rise { animation: none; opacity: 1; transform: none; }
 }
 
+/* Per-word hero entrance — same compositor-thread keyframe as
+   .hero-rise but `display:inline-block` so transform applies on
+   inline `<span>` words inside the H1. The browser auto-promotes
+   to the GPU during the animation; no `will-change` because we'd
+   otherwise be reserving a layer for every word in the headline. */
+.hero-word {
+  display: inline-block;
+  animation: hero-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--hero-delay, 0s);
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-word { animation: none; opacity: 1; transform: none; }
+}
+
+/* Slow mint text-shadow pulse on the italic-accent headline line
+   ("Now you have a concierge") — cheap GPU effect, runs forever
+   so the line subtly breathes after the word-stagger entry settles. */
+@keyframes hero-line-glow {
+  0%, 100% { text-shadow: 0 0 8px rgba(110, 231, 183, 0.15); }
+  50%      { text-shadow: 0 0 28px rgba(110, 231, 183, 0.45); }
+}
+.hero-line-glow {
+  animation: hero-line-glow 4.5s ease-in-out 1.6s infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-line-glow { animation: none; }
+}
+
 @keyframes pulseDot {
   0%, 100% { box-shadow: 0 0 8px rgba(110,231,183,0.4); transform: scale(1); }
   50%       { box-shadow: 0 0 18px rgba(110,231,183,0.9); transform: scale(1.15); }
