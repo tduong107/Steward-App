@@ -12,7 +12,6 @@
 // - Named LandingHero export (page.tsx and labs/hero-v2 import this).
 
 import { track } from '@vercel/analytics'
-import { CosmicParallaxBg } from '@/components/ui/parallax-cosmic-background'
 import {
   SpotlightProductField,
   sampleProducts,
@@ -93,19 +92,13 @@ export function LandingHero() {
       style={{
         position: 'relative',
         minHeight: '100vh',
-        overflow: 'hidden',
       }}
     >
-      {/* Cosmic background — fills only the hero section. The earth dome
-          + horizon glow live INSIDE the cosmic-parallax-container which
-          has overflow:hidden, so the curve doesn't bleed into the next
-          section. head + text are empty strings so the cosmic component's
-          own H1/subtitle don't compete with the hero copy. */}
-      <div style={{ position: 'absolute', inset: 0, zIndex: 0 }} aria-hidden="true">
-        <CosmicParallaxBg head="" text="" className="cosmic-steward" loop />
-      </div>
+      {/* No bg here — the page-level CosmicParallaxBg in page.tsx provides
+          the starfield, gradient, and horizon glow for every section,
+          including this hero. We just lay content on top. */}
 
-      {/* Hero content on top */}
+      {/* Hero content */}
       <div className="relative z-10 flex min-h-screen items-center py-12">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-8 lg:gap-16 items-center min-h-[80vh]">

@@ -31,6 +31,7 @@ import nextDynamic from 'next/dynamic'
 import { GlobalBg } from '@/components/landing-fx/global-bg'
 import { CursorSpotlight } from '@/components/landing-fx/cursor-spotlight'
 import { ScrollRevealInit } from '@/components/landing-fx/scroll-reveal-init'
+import { CosmicParallaxBg } from '@/components/ui/parallax-cosmic-background'
 
 // Client islands (above-the-fold; eager import so they're ready on
 // first paint)
@@ -80,6 +81,26 @@ export default function LandingPage() {
       {/* Concierge-restyle global layers — fixed-position, pointer-
           events:none. They sit behind/under all section content. */}
       <GlobalBg />
+      {/* Page-level cosmic backdrop — extends the hero's deep-green
+          starfield across every section so the bg reads as continuous.
+          Using position:fixed so the starfield stays viewport-sized as
+          the user scrolls (the box-shadow stars only cover a 2000px Y
+          range, which would leave the bottom of a tall document
+          starless if we used absolute). zIndex:0 + paint order after
+          GlobalBg means cosmic visually replaces the mint grid; sections
+          below have their own bg/content with positive z-index so they
+          render on top. */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 0,
+          pointerEvents: 'none',
+        }}
+      >
+        <CosmicParallaxBg head="" text="" className="cosmic-steward" loop />
+      </div>
       <CursorSpotlight />
       <ScrollRevealInit />
       <Nav />
