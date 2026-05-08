@@ -297,19 +297,6 @@ export function PlatformShowcase() {
           </Link>
         </div>
 
-        {/* Micro features */}
-        <div className="landing-reveal" style={{ display: 'flex', justifyContent: 'center', gap: 32, marginTop: 40, flexWrap: 'wrap' }}>
-          {[
-            { icon: '🔔', label: 'Push, Email & SMS alerts' },
-            { icon: '⚡', label: 'Real-time sync' },
-            { icon: '🔒', label: 'One account, all devices' },
-          ].map(f => (
-            <div key={f.label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 16 }}>{f.icon}</span>
-              <span style={{ fontSize: 13, color: 'rgba(247,246,243,0.45)', fontWeight: 400 }}>{f.label}</span>
-            </div>
-          ))}
-        </div>
       </div>
     </section>
   )
