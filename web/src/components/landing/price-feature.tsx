@@ -20,10 +20,6 @@ import { LivePrice } from '@/components/landing-fx/live-price'
 import { PriceCTA } from './price-cta'
 import { S } from './tokens'
 
-// Retailers shown beneath the body copy. Order is editorial — most
-// recognizable names lead.
-const PRICE_RETAILERS = ['Amazon', 'Nike', 'Best Buy', 'Target', 'Walmart', 'Nordstrom']
-
 // 9 chart waypoints descending from y=20 to y=52 (just above the
 // dashed target line). Hand-tuned wiggle so the line reads like a real
 // 30-day price history rather than a smooth curve. Width 300, viewBox
@@ -106,31 +102,6 @@ export function PriceFeature() {
           </p>
 
           <PriceCTA />
-
-          {/* Retailer row */}
-          <div
-            style={{
-              marginTop: 36,
-              display: 'flex',
-              flexWrap: 'wrap',
-              alignItems: 'center',
-              gap: '8px 14px',
-              fontFamily:
-                'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, monospace',
-              fontSize: 11,
-              fontWeight: 500,
-              letterSpacing: '0.18em',
-              textTransform: 'uppercase',
-              color: 'rgba(110,231,183,0.65)',
-            }}
-          >
-            {PRICE_RETAILERS.map((r, i) => (
-              <span key={r} style={{ display: 'inline-flex', alignItems: 'center', gap: 14 }}>
-                {i > 0 && <span style={{ color: 'rgba(110,231,183,0.3)' }}>◆</span>}
-                <span>{r}</span>
-              </span>
-            ))}
-          </div>
         </div>
 
         {/* ── Right column: dark Nike Dunk price-drop card ──────────── */}
