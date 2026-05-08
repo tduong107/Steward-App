@@ -81,7 +81,7 @@ export function PriceFeature() {
               marginBottom: 22,
             }}
           >
-            Your target<br />price <em className="italic-accent">Achieved</em>
+            Get what you<br />actually <em className="italic-accent">want</em>
           </h2>
 
           <p

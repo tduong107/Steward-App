@@ -342,7 +342,7 @@ export function AIFeature() {
               marginBottom: 22,
             }}
           >
-            No forms.<br />Just say<br />what you <em className="italic-accent">want</em>
+            Just say<br />what you <em className="italic-accent">want</em>
           </h2>
 
           <p
