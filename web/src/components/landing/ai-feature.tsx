@@ -158,27 +158,21 @@ export function AIFeature() {
                 marginBottom: 18,
               }}
             >
-              <div
+              <img
+                src="/steward-icon.svg"
+                alt=""
                 aria-hidden="true"
+                width={28}
+                height={28}
                 style={{
-                  width: 24,
-                  height: 24,
-                  borderRadius: 7,
-                  background:
-                    'linear-gradient(135deg, var(--mint-2, #A7F3D0), var(--green-mid, #3A7C5A))',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontFamily: S.serif,
-                  fontSize: 13,
-                  fontWeight: 700,
-                  color: 'var(--deep, #0F2018)',
+                  width: 28,
+                  height: 28,
                   flexShrink: 0,
-                  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.4)',
+                  display: 'block',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.35)',
+                  borderRadius: 6,
                 }}
-              >
-                ✦
-              </div>
+              />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div
                   style={{
