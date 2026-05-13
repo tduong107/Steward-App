@@ -171,7 +171,7 @@ export function PriceFeature() {
                   boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)',
                 }}
               >
-                👟
+                🌀
               </div>
               <div style={{ minWidth: 0 }}>
                 <div
@@ -184,15 +184,15 @@ export function PriceFeature() {
                     marginBottom: 4,
                   }}
                 >
-                  Nike Dunk Low Panda
+                  Dyson V15 Detect
                 </div>
                 <div style={{ fontSize: 12.5, color: 'var(--ink-60, rgba(255,255,255,0.62))' }}>
-                  nike.com
+                  dyson.com
                 </div>
               </div>
             </div>
 
-            {/* Price row: was $120 → animating LivePrice → SAVE 26% */}
+            {/* Price row: was $749 → animating LivePrice → SAVE 33% */}
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, marginBottom: 24 }}>
               <span
                 style={{
@@ -202,11 +202,11 @@ export function PriceFeature() {
                   fontVariantNumeric: 'tabular-nums',
                 }}
               >
-                $120
+                $749
               </span>
               <LivePrice
-                start={120}
-                end={89}
+                start={749}
+                end={499}
                 style={{
                   fontFamily: S.serif,
                   fontSize: 56,
@@ -233,7 +233,7 @@ export function PriceFeature() {
                   boxShadow: '0 4px 12px rgba(110,231,183,0.3)',
                 }}
               >
-                SAVE 26%
+                SAVE 33%
               </span>
             </div>
 
@@ -303,7 +303,7 @@ export function PriceFeature() {
                   borderRadius: 4,
                 }}
               >
-                target $90
+                target $500
               </span>
             </div>
 
