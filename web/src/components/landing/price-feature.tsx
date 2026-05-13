@@ -153,7 +153,7 @@ export function PriceFeature() {
               } as React.CSSProperties
             }
           >
-            {/* Top row: 80×80 emoji tile + name + price */}
+            {/* Top row: 80×80 product photo tile + name + price */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 18, marginBottom: 26 }}>
               <div
                 style={{
@@ -166,12 +166,22 @@ export function PriceFeature() {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: 48,
                   flexShrink: 0,
                   boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)',
+                  overflow: 'hidden',
+                  padding: 6,
                 }}
               >
-                🌀
+                <img
+                  src="/products/dyson-v15.png"
+                  alt="Dyson V15 Detect cordless vacuum"
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'contain',
+                    display: 'block',
+                  }}
+                />
               </div>
               <div style={{ minWidth: 0 }}>
                 <div
