@@ -24,7 +24,22 @@ import { Bento } from '@/components/landing-fx/bento'
 import { ChatBubble } from './helpers'
 import { S } from './tokens'
 
-type AiStep = 0 | 1 | 2 | 3
+type AiStep = 0 | 1 | 2 | 3 | 4
+
+// Category chips the real iOS Steward app shows on first open.
+// Order + labels match the actual app so the website mirrors the
+// real entry experience. "Reservation" is the one that "lights up"
+// during the loop to set up the Carbone example.
+const CHIPS: ReadonlyArray<{ label: string; badge?: string }> = [
+  { label: 'Product' },
+  { label: 'Travel' },
+  { label: 'Reservation' },
+  { label: 'Events' },
+  { label: 'Camping' },
+  { label: 'Screenshot' },
+  { label: 'General', badge: 'Beta' },
+  { label: 'Need help?' },
+]
 
 export function AIFeature() {
   const ref = useRef<HTMLDivElement>(null)
@@ -43,14 +58,14 @@ export function AIFeature() {
 
     const start = () => {
       if (reduced) {
-        setStep(3)
+        setStep(4)
         return
       }
       if (timer) return
       setStep(1)
       let s: AiStep = 1
       timer = setInterval(() => {
-        s = s === 3 ? 0 : ((s + 1) as AiStep)
+        s = s === 4 ? 0 : ((s + 1) as AiStep)
         setStep(s)
       }, 2800)
     }
@@ -226,14 +241,94 @@ export function AIFeature() {
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 12,
-                minHeight: 260,
+                minHeight: 340,
               }}
             >
-              <ChatBubble visible={step >= 1} role="user">
+              {/* Step 1: Steward greeting (matches the real iOS app's
+                  modal-open message) */}
+              <ChatBubble visible={step >= 1} role="ai">
+                Hello! I&apos;m Steward, your personal web watcher. I keep
+                an eye on websites and take action on your behalf.
+                <br />
+                <br />
+                What are you looking to watch?
+              </ChatBubble>
+
+              {/* Step 1: Category chip rail — mirrors the chips the real
+                  app shows under the greeting. "Reservation" lights up
+                  at step ≥ 2 to set up the Carbone example. */}
+              <div
+                aria-hidden={step < 1}
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: 6,
+                  opacity: step >= 1 ? 1 : 0,
+                  transform: step >= 1 ? 'translateY(0)' : 'translateY(4px)',
+                  transition: 'opacity .35s ease, transform .35s ease',
+                  paddingBottom: 4,
+                }}
+              >
+                {CHIPS.map(({ label, badge }) => {
+                  const isSelected = label === 'Reservation' && step >= 2
+                  return (
+                    <span
+                      key={label}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 5,
+                        fontFamily: 'var(--font-body, "Inter", sans-serif)',
+                        fontSize: 11.5,
+                        fontWeight: 600,
+                        padding: '5px 11px',
+                        borderRadius: 999,
+                        border: `1px solid ${
+                          isSelected
+                            ? 'rgba(110,231,183,0.65)'
+                            : 'rgba(110,231,183,0.22)'
+                        }`,
+                        background: isSelected
+                          ? 'rgba(110,231,183,0.18)'
+                          : 'transparent',
+                        color: isSelected
+                          ? 'var(--mint, #6EE7B7)'
+                          : 'rgba(110,231,183,0.7)',
+                        transition:
+                          'background .3s ease, border-color .3s ease, color .3s ease',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {label}
+                      {badge && (
+                        <span
+                          style={{
+                            fontSize: 9,
+                            fontWeight: 800,
+                            letterSpacing: '0.05em',
+                            textTransform: 'uppercase',
+                            padding: '1px 5px',
+                            borderRadius: 6,
+                            background: '#F59E0B',
+                            color: '#0F2018',
+                          }}
+                        >
+                          {badge}
+                        </span>
+                      )}
+                    </span>
+                  )
+                })}
+              </div>
+
+              {/* Step 2: user prompt — looks like the user tapped the
+                  Reservation chip and the natural-language query filled in */}
+              <ChatBubble visible={step >= 2} role="user">
                 find me a table at carbone for fri at 8 for 2 ppl
               </ChatBubble>
 
-              <ChatBubble visible={step >= 2} role="ai" tag="✦ Creating watch…">
+              {/* Step 3: Steward parses the ask and starts the watch */}
+              <ChatBubble visible={step >= 3} role="ai" tag="✦ Creating watch…">
                 Got it. I&apos;ll watch Resy every 2 hrs for{' '}
                 <strong style={{ color: 'var(--mint, #6EE7B7)', fontWeight: 600 }}>
                   Carbone NY · Fri 8pm · party of 2
@@ -241,7 +336,8 @@ export function AIFeature() {
                 .
               </ChatBubble>
 
-              <ChatBubble visible={step >= 3} role="ai" tag="✦ Watch live">
+              {/* Step 4: confirmation — watch is live */}
+              <ChatBubble visible={step >= 4} role="ai" tag="✦ Watch live">
                 <span style={{ color: 'var(--mint, #6EE7B7)', fontWeight: 600 }}>✓ Done.</span>{' '}
                 You&apos;ll get a push the moment a table opens.
               </ChatBubble>
@@ -271,7 +367,7 @@ export function AIFeature() {
                   textOverflow: 'ellipsis',
                 }}
               >
-                {step >= 3 ? 'Track another…' : 'Tell me what to find'}
+                Tell Steward what to watch…
               </span>
               <button
                 type="button"
