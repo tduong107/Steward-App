@@ -160,24 +160,27 @@ export function PriceFeature() {
                   width: 80,
                   height: 80,
                   borderRadius: 18,
-                  background:
-                    'linear-gradient(135deg, rgba(110,231,183,0.18), rgba(42,92,69,0.35))',
+                  // White tile so the PNG's white background blends in
+                  // seamlessly — reads like a clean retailer product
+                  // thumbnail. If a transparent PNG ships later, swap
+                  // this back to the mint gradient.
+                  background: '#FFFFFF',
                   border: '1px solid rgba(110,231,183,0.3)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   flexShrink: 0,
-                  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)',
+                  boxShadow:
+                    'inset 0 1px 0 rgba(255,255,255,0.08), 0 4px 14px rgba(0,0,0,0.25)',
                   overflow: 'hidden',
-                  padding: 6,
                 }}
               >
                 <img
                   src="/products/dyson-v15.png"
                   alt="Dyson V15 Detect cordless vacuum"
                   style={{
-                    width: '100%',
-                    height: '100%',
+                    width: '110%',
+                    height: '110%',
                     objectFit: 'contain',
                     display: 'block',
                   }}
